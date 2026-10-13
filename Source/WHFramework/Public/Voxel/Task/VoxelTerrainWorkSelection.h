@@ -45,6 +45,7 @@ struct WHFRAMEWORK_API FVoxelTerrainServiceCandidate
 	uint64 Sequence = 0;
 	double EstimatedMicroseconds = 1000.0;
 	bool bRunnable = false;
+	bool bPublicationContinuation = false;
 };
 
 // 有界扫描只保留各服务带的优先项与最老项，与选择器的两种选择完全对应。
@@ -60,8 +61,12 @@ struct FVoxelTerrainServiceCandidateSet
 				First.FirstQueuedSeconds < Second.FirstQueuedSeconds : First.Sequence < Second.Sequence;
 		};
 		auto& Normal = NormalHeads[Band];
-		if (Normal.Index == INDEX_NONE || HigherPriority(InCandidate.Priority, Normal.Priority) ||
-			(InCandidate.Priority == Normal.Priority && IsOlder(InCandidate, Normal))) Normal = InCandidate;
+		if (Normal.Index == INDEX_NONE || HigherPriority(InCandidate, Normal) ||
+			(InCandidate.Priority == Normal.Priority &&
+				(InCandidate.Priority.Band == EVoxelTerrainServiceBand::P0 ||
+				 InCandidate.Priority.Band == EVoxelTerrainServiceBand::P1 ||
+				 InCandidate.bPublicationContinuation == Normal.bPublicationContinuation) &&
+				IsOlder(InCandidate, Normal))) Normal = InCandidate;
 		auto& Oldest = OldestHeads[Band];
 		if (Oldest.Index == INDEX_NONE || IsOlder(InCandidate, Oldest)) Oldest = InCandidate;
 	}
@@ -84,7 +89,7 @@ struct FVoxelTerrainServiceCandidateSet
 	}
 
 private:
-	static bool HigherPriority(const FVoxelTerrainServicePriority& First, const FVoxelTerrainServicePriority& Second);
+	static bool HigherPriority(const FVoxelTerrainServiceCandidate& First, const FVoxelTerrainServiceCandidate& Second);
 	static constexpr int32 BandCount = int32(EVoxelTerrainServiceBand::Count);
 	FVoxelTerrainServiceCandidate NormalHeads[BandCount];
 	FVoxelTerrainServiceCandidate OldestHeads[BandCount];
@@ -136,6 +141,7 @@ public:
 	bool HasAccountingFault() const;
 	static bool IsValidCost(double InMicroseconds);
 	static bool HigherPriority(const FVoxelTerrainServicePriority& InFirst, const FVoxelTerrainServicePriority& InSecond);
+	static bool HigherPriority(const FVoxelTerrainServiceCandidate& InFirst, const FVoxelTerrainServiceCandidate& InSecond);
 	static FVoxelTerrainServicePriority Promote(const FVoxelTerrainServicePriority& InFirst, const FVoxelTerrainServicePriority& InSecond);
 	static bool IsNear(EVoxelTerrainServiceBand InBand);
 
@@ -168,8 +174,8 @@ private:
 	EVoxelTerrainResourceAdmission Admission = EVoxelTerrainResourceAdmission::None;
 };
 
-inline bool FVoxelTerrainServiceCandidateSet::HigherPriority(const FVoxelTerrainServicePriority& First,
-	const FVoxelTerrainServicePriority& Second)
+inline bool FVoxelTerrainServiceCandidateSet::HigherPriority(const FVoxelTerrainServiceCandidate& First,
+	const FVoxelTerrainServiceCandidate& Second)
 {
 	return FVoxelTerrainWorkSelection::HigherPriority(First, Second);
 }

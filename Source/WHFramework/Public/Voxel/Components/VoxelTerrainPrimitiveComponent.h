@@ -23,6 +23,7 @@ public:
 	void InitializeTerrain(
 		TSharedPtr<FVoxelTerrainRendererState, ESPMode::ThreadSafe> InState);
 	int32 RetainMaterial(UMaterialInterface* InMaterial, EVoxelTerrainResourceAdmission* OutAdmission = nullptr);
+	UVoxelTerrainPrimitiveComponent* DetachMaterialKeeper();
 	const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& GetNativeMaterialLease() const { return MaterialLease; }
 
 	TSharedPtr<FVoxelTerrainRendererState, ESPMode::ThreadSafe> TerrainState;

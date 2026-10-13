@@ -386,7 +386,7 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	ScopedManager.bHeightfieldTopologyDirty = true;
 	ScopedManager.SurfaceReady.Add(SurfaceKey);
 	ScopedManager.GetInputRoot().SurfaceWanted.Add(SurfaceKey);
-	ScopedManager.SurfaceActors.Add(SurfaceKey, FixtureWorld->SpawnActor<AActor>());
+	ScopedManager.SurfaceSources.Add(SurfaceKey, FVoxelViewSourceId::NewId());
 	Interest.Geometry.Add(Surface->Geometry.Key, Surface->Geometry);
 	ScopedManager.IndexCoverage(SurfaceKey);
 	ScopedManager.VisibleTerrainNodes.Reset();
@@ -406,7 +406,7 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	{
 		AddInfo(FString::Printf(TEXT("Surface: level=%d ready=%d wanted=%d actor=%d plans=%d pendingOwners=%d full=%d scopes=%d"),
 			SurfaceKey.Level, ScopedManager.SurfaceReady.Contains(SurfaceKey), ScopedManager.GetInputRoot().SurfaceWanted.Contains(SurfaceKey),
-			ScopedManager.SurfaceActors.FindRef(SurfaceKey) != nullptr, ScopedManager.HeightfieldCoveragePlans.Num(),
+			ScopedManager.SurfaceSources.FindRef(SurfaceKey).IsValid(), ScopedManager.HeightfieldCoveragePlans.Num(),
 			ScopedManager.PendingHeightfieldPlanOwners.Num(), ScopedManager.bActiveCoverageFull, ScopedManager.ActiveDirtyCoverageRects.Num()));
 		for (const auto& Pair : ScopedManager.HeightfieldCoveragePlans)
 			AddInfo(FString::Printf(TEXT("Plan: rep=%d coordinate=%s level=%d"), int32(Pair.Key.Representation), *Pair.Key.Coordinate.ToString(), Pair.Key.Level));

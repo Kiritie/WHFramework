@@ -1,6 +1,5 @@
 ﻿#include "Voxel/Rendering/VoxelViewManager.h"
 
-#include "GameFramework/Actor.h"
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
@@ -180,8 +179,8 @@ FVoxelGameThreadContinuation FVoxelViewManager::BuildCoverageSnapshotSteps(FCove
 	{
 		co_await FVoxelGameThreadContinuation::Yield();
 		if (!VoxelProxyReady.Contains(Node) || !GetInputRoot().ProxyWanted.Contains(Node) || !VisibleTerrainNodes.Contains(Node)) continue;
-		AActor* Actor = VoxelProxyActors.FindRef(Node);
-		if (Actor && (Actor->IsHidden() || !Publisher->IsCommitted(Actor))) continue;
+		FVoxelViewSourceId SourceId = VoxelProxySources.FindRef(Node);
+		if (SourceId && (Publisher->IsHidden(SourceId) || !Publisher->IsCommitted(SourceId))) continue;
 		OutSnapshot.ProxyNodes.Add(Node);
 		OutSnapshot.Proxy.Add(VoxelProxyCoverageBox(Node));
 		if (const auto Data = ProxySurfaceCoverage.FindRef(Node))
@@ -193,15 +192,15 @@ FVoxelGameThreadContinuation FVoxelViewManager::BuildCoverageSnapshotSteps(FCove
 	for (const auto& Key : SurfaceCandidates)
 	{
 		co_await FVoxelGameThreadContinuation::Yield();
-		AActor* Actor = SurfaceActors.FindRef(Key);
-		if (GetInputRoot().SurfaceWanted.Contains(Key) && SurfaceReady.Contains(Key) && Actor && !Actor->IsHidden() && Publisher->IsCommitted(Actor))
+		FVoxelViewSourceId SourceId = SurfaceSources.FindRef(Key);
+		if (GetInputRoot().SurfaceWanted.Contains(Key) && SurfaceReady.Contains(Key) && SourceId && !Publisher->IsHidden(SourceId) && Publisher->IsCommitted(SourceId))
 			OutSnapshot.Surface.Add(SurfaceCoverageRect(Key));
 	}
 	for (const auto& Key : MacroCandidates)
 	{
 		co_await FVoxelGameThreadContinuation::Yield();
-		AActor* Actor = MacroActors.FindRef(Key);
-		if (GetInputRoot().MacroWanted.Contains(Key) && MacroReady.Contains(Key) && Actor && !Actor->IsHidden() && Publisher->IsCommitted(Actor))
+		FVoxelViewSourceId SourceId = MacroSources.FindRef(Key);
+		if (GetInputRoot().MacroWanted.Contains(Key) && MacroReady.Contains(Key) && SourceId && !Publisher->IsHidden(SourceId) && Publisher->IsCommitted(SourceId))
 			OutSnapshot.Macro.Add(MacroCoverageRect(Key));
 	}
 	co_await VoxelGameThread::AppendSteps(OutSnapshot.Heightfield, OutSnapshot.Surface);

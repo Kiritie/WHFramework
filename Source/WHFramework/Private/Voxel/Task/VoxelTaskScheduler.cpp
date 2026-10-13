@@ -1171,6 +1171,7 @@ void FVoxelTaskScheduler::Tick(
 				const double* Estimate = ApplyCostEstimates.Find(Task.Kind);
 				Candidate.EstimatedMicroseconds = Estimate ? *Estimate : 50.0;
 				Candidate.bRunnable = true;
+				Candidate.bPublicationContinuation = Task.bPublicationContinuation;
 			}
 			FVoxelTerrainServiceCapacity Capacity;
 			Capacity.bAllowOverdueOpportunity = FrameContext && FrameContext->IsOverdueOpportunityAvailable();
@@ -2137,6 +2138,7 @@ void FVoxelTaskScheduler::Pump()
 			const double* Estimate = WorkerCostEstimates.Find(Request.Kind);
 			Candidate.EstimatedMicroseconds = Estimate ? *Estimate : 1000.0;
 			Candidate.bRunnable = bRunnable;
+			Candidate.bPublicationContinuation = Request.bPublicationContinuation;
 		}
 		FVoxelTerrainServiceCharge Charge;
 		bool bBorrowedKindSlot = false;

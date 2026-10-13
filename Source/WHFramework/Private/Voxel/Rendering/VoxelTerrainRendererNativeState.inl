@@ -126,9 +126,26 @@ bool FVoxelTerrainRenderer::EnsureState()
 	Candidate->Handoff.SetSectionChangedCallback(FVoxelRendererSectionChanged{BoundModule, BootstrapConsumer.WorldEpoch});
 	if (bRendering)
 	{
-		// 退休材质保持者独立于关卡，GPU退休不能强引用已结束的PIE World。
-		auto* Component = NewObject<UVoxelTerrainPrimitiveComponent>(GetTransientPackage());
+		FActorSpawnParameters Parameters;
+		Parameters.ObjectFlags |= RF_Transient;
+		Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AActor* Host = World->SpawnActor<AActor>(AActor::StaticClass(), FTransform::Identity, Parameters);
+		if (!Host)
+		{
+			BootstrapAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
+			return false;
+		}
+		Host->SetReplicates(false);
+		Host->SetActorEnableCollision(false);
+#if WITH_EDITOR
+		Host->SetActorLabel(TEXT("Voxel Terrain"), false);
+#endif
+		// 一个真实宿主提供默认 HActor 命中代理；各源仍仅为不可变发布记录。
+		auto* Component = NewObject<UVoxelTerrainPrimitiveComponent>(Host);
+		Host->SetRootComponent(Component);
+		Host->AddInstanceComponent(Component);
 		Component->InitializeTerrain(Candidate);
+		Candidate->Host = Host;
 		Candidate->Component = Component;
 		Candidate->ComponentPin.Reset(Component);
 		Component->RegisterComponentWithWorld(World);

@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Rendering/VoxelViewSourceId.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
@@ -18,7 +19,6 @@
 
 struct FVoxelHeightfieldCoveragePlan;
 struct FVoxelVolumeCoveragePlan;
-class AActor;
 class FVoxelTaskScheduler;
 class FVoxelGenerationPipeline;
 class FVoxelGenerationCacheRetentionLease;
@@ -451,6 +451,9 @@ private:
 	static void MergeCoverageRect(TArray<FVoxelCoverageRect>& InOutRects, const FVoxelCoverageRect& InBounds);
 	void ExpandActiveCoverage(const FVoxelCoverageRect& InBounds);
 	void RetryActiveCoverage();
+	FVoxelCoverageRect PublishGroupCoverageRect(const FVoxelPublishGroupKey& InKey) const;
+	void MarkPublishGroupCoverageDirty(const FVoxelPublishGroupKey& InKey);
+	void MarkPublishGroupCoverageDirty(const FGuid& InGroup);
 	FGuid BeginPublishGroup(const FVoxelPublishGroupKey& InKey);
 	bool CoverageAffects(const FVoxelCoverageRect& InBounds) const;
 	bool ShouldDeferCoverage(const FVoxelCoverageRect& InBounds) const;
@@ -618,6 +621,8 @@ private:
 	uint64 CommitGateConsecutiveClosedFrames = 0;
 	uint64 CoveragePassFirstFrame = 0;
 	uint64 CoveragePassFrameBuckets[4] = {};
+	// 覆盖 pass 内单组发布失败的所有权矩形；pass 结束后转为局部脏区，不升级为全量重算。
+	TArray<FVoxelCoverageRect> FailedPublishCoverageRects;
 	double NextPlanTimingLog = 0.0;
 	double NextPointHandoffLog = 0.0;
 	double NextTimingLog = 0.0;
@@ -735,13 +740,13 @@ private:
 	uint64 FullTerrainActorScanCount = 0;
 	TMap<FIntVector, uint64> FineRevisions;
 
-	TMap<FVoxelViewKey, TObjectPtr<AActor>> VoxelProxyActors;
+	TMap<FVoxelViewKey, FVoxelViewSourceId> VoxelProxySources;
 	TMap<FVoxelViewKey, uint64> VoxelProxyRevisions;
 
-	TMap<FVoxelSurfaceTileKey, TObjectPtr<AActor>> SurfaceActors;
-	TMap<FVoxelSurfaceTileKey, TObjectPtr<AActor>> WaterActors;
-	TMap<FVoxelMacroTileKey, TObjectPtr<AActor>> MacroActors;
-	TMap<FVoxelHeightfieldNodeKey, TObjectPtr<AActor>> HeightfieldTransitionActors;
+	TMap<FVoxelSurfaceTileKey, FVoxelViewSourceId> SurfaceSources;
+	TMap<FVoxelSurfaceTileKey, FVoxelViewSourceId> WaterSources;
+	TMap<FVoxelMacroTileKey, FVoxelViewSourceId> MacroSources;
+	TMap<FVoxelHeightfieldNodeKey, FVoxelViewSourceId> HeightfieldTransitionSources;
 	TMap<FVoxelHeightfieldNodeKey, uint64> HeightfieldTransitionSignatures;
 	TMap<FVoxelHeightfieldNodeKey, uint64> DesiredTransitionSignatures;
 	TMap<FVoxelHeightfieldNodeKey, TSharedPtr<const FVoxelFrozenHeightfieldInputs, ESPMode::ThreadSafe>> DesiredHeightfieldInputs;
@@ -760,7 +765,7 @@ private:
 	TMap<FVoxelViewKey, uint64> PreparedVolumeSignatures;
 	TMap<FVoxelViewKey, TSharedPtr<FVoxelSectionMeshResult, ESPMode::ThreadSafe>> PreparedVolumeMeshes;
 	TMap<FVoxelViewKey, TSharedPtr<FVoxelSectionMeshResult, ESPMode::ThreadSafe>> PreparedVolumeBoundaryMeshes;
-	TMap<FVoxelViewKey, TObjectPtr<AActor>> VolumeBoundaryActors;
+	TMap<FVoxelViewKey, FVoxelViewSourceId> VolumeBoundarySources;
 	TMap<FVoxelViewKey, TSharedPtr<const FVoxelBoundaryTransitionContext>> DesiredVolumeContexts;
 	TArray<FVoxelViewKey> UnsubmittedVolumeOwners;
 	int32 VolumeUnbalancedFaceCount = 0;

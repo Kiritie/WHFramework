@@ -35,6 +35,7 @@ struct FVoxelDetailAssetBatch
 	TWeakObjectPtr<UHierarchicalInstancedStaticMeshComponent> Instances;
 	TWeakObjectPtr<UVoxelCollisionComponent> Collision;
 	FVector Anchor = FVector::ZeroVector;
+	FIntPoint HostKey = FIntPoint::ZeroValue;
 	FVoxelGenerationConsumerKey Consumer;
 	int32 PlacementCursor = 0;
 	int32 PlacementEnd = 0;
@@ -63,7 +64,31 @@ namespace
 	constexpr int32 MaxDetailAssets = 64;
 	constexpr int32 MaxDetailInstances = 8192;
 	constexpr int32 MaxInstancesPerAsset = 2048;
-	constexpr int32 InstancesPerHost = 256;
+	constexpr int32 InstancesPerBatch = 256;
+	constexpr int32 DetailHostSideCells = 128;
+	constexpr int32 MaxPresentationBatches = MaxDetailInstances;
+	constexpr int32 MaxSpatialHosts = 2 * MaxPresentationBatches;
+
+	FIntPoint DetailHostKey(const FIntVector& InPosition)
+	{
+		return {VoxelGeneration::FloorDivide(InPosition.X, DetailHostSideCells),
+			VoxelGeneration::FloorDivide(InPosition.Y, DetailHostSideCells)};
+	}
+
+	void SetDetailChunk(FVoxelDetailAssetBatch& InBatch,
+		TConstArrayView<FVoxelStructureDetailPlacement> InPlacements, const double InCellSize)
+	{
+		InBatch.HostKey = DetailHostKey(InPlacements[InBatch.PlacementCursor].Position);
+		InBatch.Anchor = FVector(InBatch.HostKey.X * double(DetailHostSideCells),
+			InBatch.HostKey.Y * double(DetailHostSideCells), 0.0) * InCellSize;
+		InBatch.ChunkEnd = InBatch.PlacementCursor;
+		while (InBatch.ChunkEnd < InBatch.PlacementEnd &&
+			InBatch.ChunkEnd - InBatch.PlacementCursor < InstancesPerBatch &&
+			DetailHostKey(InPlacements[InBatch.ChunkEnd].Position) == InBatch.HostKey)
+		{
+			++InBatch.ChunkEnd;
+		}
+	}
 	constexpr int32 DetailMicrostep = 32;
 	constexpr double DetailNearRadiusCm = 1200.0;
 	constexpr double DetailMiddleRadiusCm = 12000.0;
@@ -146,7 +171,7 @@ bool FVoxelDetailView::Initialize(FString& OutError)
 	}
 	using namespace VoxelBoundedAllocation;
 	const auto StorageConsumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, OwnerId, OwnerIncarnation, {}, 1);
-	const uint64 StorageBytes = 3 * ArrayBytes<TWeakObjectPtr<AActor>>(MaxDetailAssets * MaxInstancesPerAsset / InstancesPerHost) +
+	const uint64 StorageBytes = 3 * ArrayBytes<FVoxelDetailPresentationBatch>(MaxPresentationBatches) + MapBytes<FIntPoint, FVoxelDetailHost>(MaxSpatialHosts) +
 		ArrayBytes<TStrongObjectPtr<UVoxelDetailData>>(MaxDetailAssets) + ArrayBytes<TStrongObjectPtr<UStaticMesh>>(MaxDetailAssets) +
 		MapBytes<FName, int32>(MaxDetailAssets) + 3 * ArrayBytes<FVector>(8) + 5 * ArrayBytes<FIntVector>(8);
 	const uint64 FactMetadataBytes = ArrayBytes<FVoxelGenerationConsumerKey>(8);
@@ -158,9 +183,10 @@ bool FVoxelDetailView::Initialize(FString& OutError)
 	Assets.Reserve(MaxDetailAssets);
 	Meshes.Reserve(MaxDetailAssets);
 	AssetIndices.Reserve(MaxDetailAssets);
-	ActiveActors.Reserve(MaxDetailAssets * MaxInstancesPerAsset / InstancesPerHost);
-	StagedActors.Reserve(MaxDetailAssets * MaxInstancesPerAsset / InstancesPerHost);
-	RetiringActors.Reserve(MaxDetailAssets * MaxInstancesPerAsset / InstancesPerHost);
+	ActiveBatches.Reserve(MaxPresentationBatches);
+	StagedBatches.Reserve(MaxPresentationBatches);
+	RetiringBatches.Reserve(MaxPresentationBatches);
+	Hosts.Reserve(MaxSpatialHosts);
 	Observers.Reserve(8);
 	LastObserverSections.Reserve(8);
 	PlannedObserverCells.Reserve(8);
@@ -203,16 +229,11 @@ void FVoxelDetailView::Tick(const TConstArrayView<FVector> InObservers)
 	}
 	auto& Budget = Module.GetTerrainFrameContext().GetPublishBudget();
 	const double Deadline = Module.GetTerrainFrameContext().Deadline(0.1);
-	for (int32 Work = 0; Work < 4 && !RetiringActors.IsEmpty() && FPlatformTime::Seconds() < Deadline; ++Work)
+	for (int32 Work = 0; Work < 4 && !RetiringBatches.IsEmpty() && FPlatformTime::Seconds() < Deadline; ++Work)
 	{
 		const double Started = FPlatformTime::Seconds();
 		if (!Budget.TryStart(EVoxelPublishPhase::Retire, Started, 0.01)) return;
-		const auto Actor = RetiringActors.Pop(EAllowShrinking::No);
-		if (Actor.IsValid())
-		{
-			if (auto* Collision = Actor->FindComponentByClass<UVoxelCollisionComponent>()) Collision->DestroyComponent();
-			Actor->Destroy();
-		}
+		DestroyBatch(RetiringBatches.Pop(EAllowShrinking::No));
 		Budget.Finish(EVoxelPublishPhase::Retire, Started, FPlatformTime::Seconds());
 	}
 	const double UpdateStarted = FPlatformTime::Seconds();
@@ -272,17 +293,12 @@ void FVoxelDetailView::Tick(const TConstArrayView<FVector> InObservers)
 	if (ObserverSections.IsEmpty())
 	{
 		if (bRunning || WaitingToken || !FactConsumers.IsEmpty()) CancelPlanning();
-		if (PendingPlan || AssetBatch || !StagedActors.IsEmpty()) AbortStaging();
-		for (int32 Work = 0; Work < 4 && !ActiveActors.IsEmpty() && FPlatformTime::Seconds() < Deadline; ++Work)
+		if (PendingPlan || AssetBatch || !StagedBatches.IsEmpty()) AbortStaging();
+		for (int32 Work = 0; Work < 4 && !ActiveBatches.IsEmpty() && FPlatformTime::Seconds() < Deadline; ++Work)
 		{
 			const double Started = FPlatformTime::Seconds();
 			if (!Budget.TryStart(EVoxelPublishPhase::Retire, Started, 0.01)) return;
-			const auto Actor = ActiveActors.Pop(EAllowShrinking::No);
-			if (Actor.IsValid())
-			{
-				if (auto* Collision = Actor->FindComponentByClass<UVoxelCollisionComponent>()) Collision->DestroyComponent();
-				Actor->Destroy();
-			}
+			DestroyBatch(ActiveBatches.Pop(EAllowShrinking::No));
 			Budget.Finish(EVoxelPublishPhase::Retire, Started, FPlatformTime::Seconds());
 		}
 		bDirty = true;
@@ -318,22 +334,18 @@ void FVoxelDetailView::Tick(const TConstArrayView<FVector> InObservers)
 		}
 		else
 		{
-			for (int32 Work = 0; Work < 4 && StagedActors.IsValidIndex(PresentationCursor) && FPlatformTime::Seconds() < Deadline; ++Work)
+			for (int32 Work = 0; Work < 4 && StagedBatches.IsValidIndex(PresentationCursor) && FPlatformTime::Seconds() < Deadline; ++Work)
 			{
 				const double Started = FPlatformTime::Seconds();
 				if (!Budget.TryStart(EVoxelPublishPhase::Commit, Started, 0.01)) return;
-				const auto Actor = StagedActors[PresentationCursor++];
-				if (Actor.IsValid())
-				{
-					Actor->SetActorHiddenInGame(false);
-					Actor->SetActorEnableCollision(true);
-				}
+				const auto& Batch = StagedBatches[PresentationCursor++];
+				if (auto* Instances = Batch.Instances.Get()) Instances->SetHiddenInGame(false);
 				Budget.Finish(EVoxelPublishPhase::Commit, Started, FPlatformTime::Seconds());
 			}
-			if (PresentationCursor != StagedActors.Num()) return;
-			check(RetiringActors.IsEmpty());
-			Swap(RetiringActors, ActiveActors);
-			Swap(ActiveActors, StagedActors);
+			if (PresentationCursor != StagedBatches.Num()) return;
+			check(RetiringBatches.IsEmpty());
+			Swap(RetiringBatches, ActiveBatches);
+			Swap(ActiveBatches, StagedBatches);
 			if (PendingPlan->WorkReceipt) PendingPlan->WorkReceipt->Resolve(true);
 			PendingPlan.Reset();
 			StagedAssetIndex = 0;
@@ -342,7 +354,7 @@ void FVoxelDetailView::Tick(const TConstArrayView<FVector> InObservers)
 	}
 
 	const double Now = FPlatformTime::Seconds();
-	if (bRunning || !bDirty || !RetiringActors.IsEmpty() || ObserverSections.IsEmpty() ||
+	if (bRunning || !bDirty || !RetiringBatches.IsEmpty() || ObserverSections.IsEmpty() ||
 		Now - LastRequestTime < 0.5)
 	{
 		return;
@@ -501,6 +513,10 @@ void FVoxelDetailView::Tick(const TConstArrayView<FVector> InObservers)
 			const FVoxelStructureDetailPlacement& InB)
 		{
 			if (InA.DetailId != InB.DetailId) return InA.DetailId.LexicalLess(InB.DetailId);
+			const FIntPoint HostA = DetailHostKey(InA.Position);
+			const FIntPoint HostB = DetailHostKey(InB.Position);
+			if (HostA.Y != HostB.Y) return HostA.Y < HostB.Y;
+			if (HostA.X != HostB.X) return HostA.X < HostB.X;
 			if (InA.OwnerId != InB.OwnerId) return InA.OwnerId < InB.OwnerId;
 			if (InA.Position.Z != InB.Position.Z) return InA.Position.Z < InB.Position.Z;
 			if (InA.Position.Y != InB.Position.Y) return InA.Position.Y < InB.Position.Y;
@@ -571,9 +587,11 @@ void FVoxelDetailView::Reset()
 	bStopped = true;
 	CancelPlanning();
 	AbortStaging();
-	DestroyActors(ActiveActors);
-	DestroyActors(RetiringActors);
-	ActiveActors.Empty(); StagedActors.Empty(); RetiringActors.Empty();
+	DestroyBatches(ActiveBatches);
+	DestroyBatches(RetiringBatches);
+	ActiveBatches.Empty(); StagedBatches.Empty(); RetiringBatches.Empty();
+	check(Hosts.IsEmpty());
+	Hosts.Empty();
 	Assets.Empty(); Meshes.Empty(); AssetIndices.Empty();
 	LastObserverSections.Empty(); Observers.Empty();
 	PlannedObserverCells.Empty();
@@ -621,8 +639,8 @@ bool FVoxelDetailView::BuildAssetBatch(const int32 InAssetIndex, bool& bOutCompl
 		const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelDetailAssetBatch>() +
 			VoxelBoundedAllocation::SharedBytes<TAtomic<bool>>() +
 			VoxelBoundedAllocation::ArrayBytes<FTransform>(DetailMicrostep) +
-			VoxelBoundedAllocation::ArrayBytes<FTransform>(InstancesPerHost) +
-			VoxelBoundedAllocation::ArrayBytes<FBox>(InstancesPerHost * Asset->CollisionBoxesCm.Num());
+			VoxelBoundedAllocation::ArrayBytes<FTransform>(InstancesPerBatch) +
+			VoxelBoundedAllocation::ArrayBytes<FBox>(InstancesPerBatch * Asset->CollisionBoxesCm.Num());
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		if (!Scheduler.GetTerrainResources()->Acquire(Consumer, EVoxelTerrainResourcePool::Working, Bytes, Lease))
 		{ OutError = TEXT("CapacityBlocked: Detail 局部准备等待容量"); return false; }
@@ -631,10 +649,9 @@ bool FVoxelDetailView::BuildAssetBatch(const int32 InAssetIndex, bool& bOutCompl
 		AssetBatch->Consumer = Consumer;
 		AssetBatch->PlacementCursor = Begin;
 		AssetBatch->PlacementEnd = First;
-		AssetBatch->ChunkEnd = FMath::Min(Begin + InstancesPerHost, First);
-		AssetBatch->Anchor = FVector(Placements[Begin].Position) * Module.BlockSize();
-		AssetBatch->Transforms.Reserve(InstancesPerHost);
-		AssetBatch->Boxes.Reserve(InstancesPerHost * Asset->CollisionBoxesCm.Num());
+		SetDetailChunk(*AssetBatch, Placements, Module.BlockSize());
+		AssetBatch->Transforms.Reserve(InstancesPerBatch);
+		AssetBatch->Boxes.Reserve(InstancesPerBatch * Asset->CollisionBoxesCm.Num());
 		AssetBatch->PhysicsSync = MakeShared<TAtomic<bool>, ESPMode::ThreadSafe>(false);
 	}
 	auto& Batch = *AssetBatch;
@@ -664,8 +681,7 @@ bool FVoxelDetailView::BuildAssetBatch(const int32 InAssetIndex, bool& bOutCompl
 	const auto FinishChunk = [&]
 	{
 		if (Batch.PlacementCursor == Batch.PlacementEnd) { AssetBatch.Reset(); bOutComplete = true; return; }
-		Batch.ChunkEnd = FMath::Min(Batch.PlacementCursor + InstancesPerHost, Batch.PlacementEnd);
-		Batch.Anchor = FVector(Placements[Batch.PlacementCursor].Position) * Module.BlockSize();
+		SetDetailChunk(Batch, Placements, Module.BlockSize());
 		Batch.Transforms.Reset(); Batch.Boxes.Reset();
 		Batch.Host.Reset(); Batch.Instances.Reset(); Batch.Collision.Reset(); Batch.PhysicalLease.Reset();
 		Batch.InstanceCursor = Batch.BoxCursor = 0;
@@ -678,29 +694,45 @@ bool FVoxelDetailView::BuildAssetBatch(const int32 InAssetIndex, bool& bOutCompl
 		if (Batch.Transforms.IsEmpty()) { FinishChunk(); return true; }
 		if (!Batch.Boxes.IsEmpty() && !Batch.PhysicalLease)
 		{
-			// 与精确 Collision 相同的独立物理驻留池；旧 Actor 尚未退休时保持交接峰值。
+			// 与精确 Collision 相同的独立物理驻留池；旧碰撞组件尚未退休时保持交接峰值。
 			const uint64 PhysicalBytes = 4096 + VoxelBoundedAllocation::ArrayBytes<FKBoxElem>(Batch.Boxes.Num()) +
 				UVoxelCollisionComponent::PreparedReclaimBytes() +
 				uint64(Batch.Boxes.Num()) * 1024;
 			if (!Scheduler.GetTerrainResources()->Acquire(Batch.Consumer, EVoxelTerrainResourcePool::Resident,
 				PhysicalBytes, Batch.PhysicalLease, 1)) { OutError = TEXT("CapacityBlocked: Detail 碰撞等待交接容量"); return false; }
 		}
-		FActorSpawnParameters Parameters;
-		Parameters.ObjectFlags |= RF_Transient;
-		Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		AActor* Host = World->SpawnActor<AActor>(AActor::StaticClass(), FTransform(Batch.Anchor), Parameters);
-		if (!Host) { OutError = TEXT("Detail 局部 Actor 分配失败"); return false; }
-		Host->SetReplicates(false);
-		Host->SetActorHiddenInGame(true);
+		FVoxelDetailHost* Record = Hosts.Find(Batch.HostKey);
+		AActor* Host = Record ? Record->Actor.Get() : nullptr;
+		if (!Host)
+		{
+			FActorSpawnParameters Parameters;
+			Parameters.ObjectFlags |= RF_Transient;
+			Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			Host = World->SpawnActor<AActor>(AActor::StaticClass(), FTransform(Batch.Anchor), Parameters);
+			if (!Host) { OutError = TEXT("Detail 空间宿主分配失败"); return false; }
+			Host->SetReplicates(false);
+#if WITH_EDITOR
+			Host->SetActorLabel(FString::Printf(TEXT("Voxel Details [%d,%d]"), Batch.HostKey.X, Batch.HostKey.Y), false);
+#endif
+			USceneComponent* Root = NewObject<USceneComponent>(Host);
+			Host->SetRootComponent(Root);
+			Host->AddInstanceComponent(Root);
+			Root->RegisterComponent();
+			Root->SetWorldLocation(Batch.Anchor);
+			Record = &Hosts.Add(Batch.HostKey, {Host, 0});
+		}
+		check(StagedBatches.Num() < MaxPresentationBatches);
+		++Record->BatchCount;
 		Batch.Host = Host;
-		StagedActors.Add(Host);
-		USceneComponent* Root = NewObject<USceneComponent>(Host);
-		Host->SetRootComponent(Root);
-		Root->RegisterComponent();
+		auto& Presentation = StagedBatches.AddDefaulted_GetRef();
+		Presentation.HostKey = Batch.HostKey;
+		USceneComponent* Root = Host->GetRootComponent();
 		if (UStaticMesh* Mesh = Meshes[InAssetIndex].Get())
 		{
 			auto* Instances = NewObject<UHierarchicalInstancedStaticMeshComponent>(Host);
 			Instances->SetupAttachment(Root);
+			Host->AddInstanceComponent(Instances);
+			Instances->SetHiddenInGame(true);
 			Instances->SetStaticMesh(Mesh);
 			Instances->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			Instances->SetGenerateOverlapEvents(false);
@@ -709,13 +741,16 @@ bool FVoxelDetailView::BuildAssetBatch(const int32 InAssetIndex, bool& bOutCompl
 			Instances->bAutoRebuildTreeOnInstanceChanges = false;
 			Instances->RegisterComponent();
 			Batch.Instances = Instances;
+			Presentation.Instances = Instances;
 		}
 		if (!Batch.Boxes.IsEmpty())
 		{
 			auto* Collision = NewObject<UVoxelCollisionComponent>(Host);
 			Collision->SetupAttachment(Root);
+			Host->AddInstanceComponent(Collision);
 			Collision->RegisterComponent();
 			Batch.Collision = Collision;
+			Presentation.Collision = Collision;
 			if (!Collision->BeginPrepare(Batch.Boxes.Num(), 1.0, Batch.PhysicalLease))
 			{ OutError = TEXT("Detail 碰撞输入准备失败"); return false; }
 		}
@@ -796,25 +831,31 @@ bool FVoxelDetailView::BuildAssetBatch(const int32 InAssetIndex, bool& bOutCompl
 	FinishChunk();
 	return true;
 }
-void FVoxelDetailView::DestroyActors(TArray<TWeakObjectPtr<AActor>>& InActors)
+void FVoxelDetailView::DestroyBatch(const FVoxelDetailPresentationBatch& InBatch)
 {
-	for (const TWeakObjectPtr<AActor>& Actor : InActors)
+	if (auto* Collision = InBatch.Collision.Get()) Collision->DestroyComponent();
+	if (auto* Instances = InBatch.Instances.Get()) Instances->DestroyComponent();
+	FVoxelDetailHost* Host = Hosts.Find(InBatch.HostKey);
+	check(Host && Host->BatchCount > 0);
+	if (--Host->BatchCount == 0)
 	{
-		if (Actor.IsValid())
-		{
-			if (auto* Collision = Actor->FindComponentByClass<UVoxelCollisionComponent>()) Collision->DestroyComponent();
-			Actor->Destroy();
-		}
+		if (AActor* Actor = Host->Actor.Get()) Actor->Destroy();
+		Hosts.Remove(InBatch.HostKey);
 	}
-	InActors.Reset();
+}
+
+void FVoxelDetailView::DestroyBatches(TArray<FVoxelDetailPresentationBatch>& InBatches)
+{
+	for (const auto& Batch : InBatches) DestroyBatch(Batch);
+	InBatches.Reset();
 }
 
 void FVoxelDetailView::AbortStaging()
 {
-	if (!StagedActors.IsEmpty())
+	if (!StagedBatches.IsEmpty())
 	{
-		check(RetiringActors.IsEmpty());
-		Swap(RetiringActors, StagedActors);
+		check(RetiringBatches.IsEmpty());
+		Swap(RetiringBatches, StagedBatches);
 	}
 	AssetBatch.Reset();
 	bCapacityBlocked = false;

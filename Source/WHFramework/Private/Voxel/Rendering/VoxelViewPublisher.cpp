@@ -4,9 +4,7 @@
 #include "Voxel/Rendering/VoxelViewLod.h"
 #include "Algo/Compare.h"
 
-#include "Components/SceneComponent.h"
 #include "Engine/World.h"
-#include "GameFramework/Actor.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Misc/ScopeExit.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
@@ -118,18 +116,18 @@ bool FVoxelViewPublisher::SetTerrainStage(const FGuid& InGroup, const int32 InTe
 	return true;
 }
 
-bool FVoxelViewPublisher::Stage(const FGuid& InGroup, AActor*& InOutActor,
+bool FVoxelViewPublisher::Stage(const FGuid& InGroup, FVoxelViewSourceId& InOutSourceId,
 	const FVector& InLocation, const double InScale, FVoxelSectionMeshResult&& InMesh,
 	const int32 InTerrainStage, const bool bInTransition)
 {
 	if (!InMesh.bValidated && !InMesh.ValidateAndCache()) return false;
-	return StageImmutable(InGroup, InOutActor, InLocation, InScale,
+	return StageImmutable(InGroup, InOutSourceId, InLocation, InScale,
 		MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>(MoveTemp(InMesh)), InTerrainStage, bInTransition);
 }
 
 bool FVoxelViewPublisher::StageImmutable(
 	const FGuid& InGroup,
-	AActor*& InOutActor,
+	FVoxelViewSourceId& InOutSourceId,
 	const FVector& InLocation,
 	const double InScale,
 	TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe> InMesh,
@@ -146,22 +144,15 @@ bool FVoxelViewPublisher::StageImmutable(
 	{
 		if (!Module.GetMaterialSet()->FindMaterial(Batch.Group, Batch.Bank, Batch.MaterialVariant)) return false;
 	}
-	if (!InOutActor)
+	if (!InMesh->Stamp.bHasGeometryIdentity)
 	{
-		FActorSpawnParameters Parameters;
-		Parameters.ObjectFlags |= RF_Transient;
-		Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		InOutActor = Module.GetWorld()->SpawnActor<AActor>(AActor::StaticClass(),
-			FTransform(InLocation), Parameters);
-		if (!InOutActor) return false;
-		InOutActor->SetReplicates(false);
-		InOutActor->SetActorEnableCollision(false);
-		USceneComponent* Root = NewObject<USceneComponent>(InOutActor);
-		InOutActor->SetRootComponent(Root);
-		Root->SetWorldLocation(InLocation);
-		Root->RegisterComponent();
+		const auto Representation = Group->Key.Representation == 1 || Group->Key.Representation == 6 ?
+			EVoxelTerrainRepresentation::VoxelProxy : Group->Key.Representation == 2 || Group->Key.Representation == 4 ?
+			EVoxelTerrainRepresentation::Surface : EVoxelTerrainRepresentation::Macro;
+		if (!Module.GetCurrentInterest().Geometry.Contains({Representation, Group->Key.Coordinate, Group->Key.Level})) return false;
 	}
-	FEntry& Entry = Entries.FindOrAdd(TWeakObjectPtr<AActor>(InOutActor));
+	if (!Entries.Contains(InOutSourceId)) InOutSourceId = FVoxelViewSourceId::NewId();
+	FEntry& Entry = Entries.FindOrAdd(InOutSourceId);
 	if (Entry.Source != InMesh)
 	{
 		Entry.NativeStamp = InMesh->Stamp;
@@ -188,8 +179,9 @@ bool FVoxelViewPublisher::StageImmutable(
 		}
 	}
 	Entry.TerrainStage = InTerrainStage;
+	Entry.bRetiring = false;
 	Entry.GroupKey = Group->Key;
-	OwnerActors.FindOrAdd(Group->Key).Add(TWeakObjectPtr<AActor>(InOutActor));
+	OwnerSources.FindOrAdd(Group->Key).Add(FVoxelViewSourceId(InOutSourceId));
 	Entry.bTransition = bInTransition;
 	Entry.bDirty |= Entry.Source != InMesh || Entry.Location != InLocation || Entry.Scale != InScale;
 	Entry.Location = InLocation;
@@ -199,11 +191,11 @@ bool FVoxelViewPublisher::StageImmutable(
 	return true;
 }
 
-bool FVoxelViewPublisher::SetCoverage(const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
+bool FVoxelViewPublisher::SetCoverage(const FGuid& InGroup, FVoxelViewSourceId InSourceId, TArray<FBox> InWorldCellBoxes,
 	TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes)
 {
 	bool bSuccess = false;
-	auto Work = SetCoverageSteps(InGroup, InActor, MoveTemp(InWorldCellBoxes), MoveTemp(InCommonBoxes), bSuccess);
+	auto Work = SetCoverageSteps(InGroup, InSourceId, MoveTemp(InWorldCellBoxes), MoveTemp(InCommonBoxes), bSuccess);
 	while (!Work.IsComplete())
 	{
 		Work.Resume();
@@ -212,19 +204,19 @@ bool FVoxelViewPublisher::SetCoverage(const FGuid& InGroup, AActor* InActor, TAr
 }
 
 const FVoxelViewPublisher::FUpdate* FVoxelViewPublisher::FindProjectedUpdate(
-	const TWeakObjectPtr<AActor> InActor, const uint64 InBeforeSerial, const FPublication** OutPublication) const
+	const FVoxelViewSourceId InSourceId, const uint64 InBeforeSerial, const FPublication** OutPublication) const
 {
 	if (OutPublication) *OutPublication = nullptr;
 	if (InBeforeSerial == MAX_uint64)
 	{
-		if (const int32* Index = PendingUpdateIndices.Find(InActor)) return &PendingUpdates[*Index];
+		if (const int32* Index = PendingUpdateIndices.Find(InSourceId)) return &PendingUpdates[*Index];
 		if (PendingPlan)
-			if (const int32* Index = PendingPlan->UpdateIndices.Find(InActor))
+			if (const int32* Index = PendingPlan->UpdateIndices.Find(InSourceId))
 				if (PendingPlan->Updates[*Index].Source) return &PendingPlan->Updates[*Index];
 	}
 	const FUpdate* Latest = nullptr;
 	uint64 Serial = 0;
-	if (const auto* Generations = ActorUpdateGenerations.Find(InActor))
+	if (const auto* Generations = SourceUpdateGenerations.Find(InSourceId))
 		for (const auto& Generation : *Generations)
 		{
 			const auto& Publication = Generation.Publication;
@@ -238,13 +230,13 @@ const FVoxelViewPublisher::FUpdate* FVoxelViewPublisher::FindProjectedUpdate(
 	return Latest;
 }
 
-bool FVoxelViewPublisher::CaptureCoverageSource(const TWeakObjectPtr<AActor> InActor,
+bool FVoxelViewPublisher::CaptureCoverageSource(const FVoxelViewSourceId InSourceId,
 	const bool bInRetainPresented, FUpdate& OutSource) const
 {
-	const FEntry* Entry = Entries.Find(InActor);
+	const FEntry* Entry = Entries.Find(InSourceId);
 	if (!Entry) return false;
-	const FUpdate* Projected = FindProjectedUpdate(InActor);
-	OutSource.Actor = InActor;
+	const FUpdate* Projected = FindProjectedUpdate(InSourceId);
+	OutSource.SourceId = InSourceId;
 	OutSource.bRetainSource = bInRetainPresented;
 	if (bInRetainPresented && Projected)
 	{
@@ -283,38 +275,38 @@ bool FVoxelViewPublisher::CaptureCoverageSource(const TWeakObjectPtr<AActor> InA
 }
 
 FVoxelGameThreadContinuation FVoxelViewPublisher::SetCoverageSteps(
-	const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
+	const FGuid& InGroup, FVoxelViewSourceId InSourceId, TArray<FBox> InWorldCellBoxes,
 	TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess)
 {
 	FUpdate Source;
 	OutSuccess = false;
-	if (!CaptureCoverageSource(InActor, false, Source)) co_return;
-	co_await SetCoverageSourceSteps(InGroup, InActor, MoveTemp(Source), MoveTemp(InWorldCellBoxes), MoveTemp(InCommonBoxes), OutSuccess);
+	if (!CaptureCoverageSource(InSourceId, false, Source)) co_return;
+	co_await SetCoverageSourceSteps(InGroup, InSourceId, MoveTemp(Source), MoveTemp(InWorldCellBoxes), MoveTemp(InCommonBoxes), OutSuccess);
 }
 
 FVoxelGameThreadContinuation FVoxelViewPublisher::SetCoverageSourceSteps(
-	const FGuid& InGroup, AActor* InActor, FUpdate InSource, TArray<FBox> InWorldCellBoxes,
+	const FGuid& InGroup, FVoxelViewSourceId InSourceId, FUpdate InSource, TArray<FBox> InWorldCellBoxes,
 	TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess)
 {
 	OutSuccess = false;
-	const TWeakObjectPtr<AActor> ActorKey(InActor);
+	const FVoxelViewSourceId SourceKey(InSourceId);
 	const FPendingGroup* Group = FindPendingGroup(InGroup);
-	const FEntry* Entry = Entries.Find(ActorKey);
+	const FEntry* Entry = Entries.Find(SourceKey);
 	if (!Group || Group->bCommitted || !Entry || Entry->GroupKey != Group->Key) co_return;
 	const FVoxelPublishGroupKey GroupKey = Group->Key;
 	const bool bMatchesPresentedSource = InSource.Source == Entry->PresentedSource;
 	// 先拥有不可变比较快照，再让协程跨预算边界；Entry 的待替换位姿不能改写保留源。
 	FUpdate Previous;
-	const FUpdate* Latest = FindProjectedUpdate(ActorKey);
+	const FUpdate* Latest = FindProjectedUpdate(SourceKey);
 	const bool bHasProjected = Latest != nullptr;
 	if (Latest) Previous = *Latest;
 	TArray<FBox> WorldExclusions;
 	co_await VoxelGameThread::AppendSteps(WorldExclusions, InWorldCellBoxes);
 	if (InCommonBoxes) co_await VoxelGameThread::AppendSteps(WorldExclusions, *InCommonBoxes);
-	Entry = Entries.Find(ActorKey);
+	Entry = Entries.Find(SourceKey);
 	if (!Entry) co_return;
-	OwnerActors.FindOrAdd(GroupKey).Add(ActorKey);
-	FEntry& Current = Entries.FindChecked(ActorKey);
+	OwnerSources.FindOrAdd(GroupKey).Add(SourceKey);
+	FEntry& Current = Entries.FindChecked(SourceKey);
 	Current.DesiredWorldExclusions = WorldExclusions;
 	Current.bHasDesiredExclusions = true;
 	auto EqualBoxes = [](TConstArrayView<FBox> Left, TConstArrayView<FBox> Right, bool& OutEqual) -> FVoxelGameThreadContinuation
@@ -356,10 +348,10 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::SetCoverageSourceSteps(
 		co_await EqualBoxes(Desired, InSource.PreviousExclusions, bSame);
 		if (bSame) { OutSuccess = true; co_return; }
 	}
-	if (!Entries.Contains(ActorKey)) co_return;
-	const int32* Existing = PendingUpdateIndices.Find(ActorKey);
+	if (!Entries.Contains(SourceKey)) co_return;
+	const int32* Existing = PendingUpdateIndices.Find(SourceKey);
 	const int32 Index = Existing ? *Existing : PendingUpdates.AddDefaulted();
-	if (!Existing) PendingUpdateIndices.Add(ActorKey, Index);
+	if (!Existing) PendingUpdateIndices.Add(SourceKey, Index);
 	InSource.Exclusions = InWorldCellBoxes;
 	InSource.LocalWorldBoxes = MoveTemp(InWorldCellBoxes);
 	InSource.CommonBoxes = MoveTemp(InCommonBoxes);
@@ -367,11 +359,11 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::SetCoverageSourceSteps(
 	OutSuccess = true;
 }
 
-bool FVoxelViewPublisher::SetSharedCoverage(const FGuid& InGroup, AActor* InActor,
+bool FVoxelViewPublisher::SetSharedCoverage(const FGuid& InGroup, FVoxelViewSourceId InSourceId,
 	TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes)
 {
 	bool bSuccess = false;
-	auto Work = SetSharedCoverageSteps(InGroup, InActor, MoveTemp(InCommonBoxes), bSuccess);
+	auto Work = SetSharedCoverageSteps(InGroup, InSourceId, MoveTemp(InCommonBoxes), bSuccess);
 	while (!Work.IsComplete())
 	{
 		Work.Resume();
@@ -380,33 +372,34 @@ bool FVoxelViewPublisher::SetSharedCoverage(const FGuid& InGroup, AActor* InActo
 }
 
 FVoxelGameThreadContinuation FVoxelViewPublisher::SetSharedCoverageSteps(
-	const FGuid& InGroup, AActor* InActor, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess)
+	const FGuid& InGroup, FVoxelViewSourceId InSourceId, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess)
 {
 	OutSuccess = false;
 	FUpdate Source;
-	if (!CaptureCoverageSource(InActor, true, Source)) co_return;
+	if (!CaptureCoverageSource(InSourceId, true, Source)) co_return;
 	TArray<FBox> LocalBoxes = Source.LocalWorldBoxes;
-	co_await SetCoverageSourceSteps(InGroup, InActor, MoveTemp(Source), MoveTemp(LocalBoxes), MoveTemp(InCommonBoxes), OutSuccess);
+	co_await SetCoverageSourceSteps(InGroup, InSourceId, MoveTemp(Source), MoveTemp(LocalBoxes), MoveTemp(InCommonBoxes), OutSuccess);
 }
 
-bool FVoxelViewPublisher::SetHidden(const FGuid& InGroup, AActor* InActor, const bool bInHidden)
+bool FVoxelViewPublisher::SetHidden(const FGuid& InGroup, FVoxelViewSourceId InSourceId, const bool bInHidden)
 {
 	const FPendingGroup* Group = FindPendingGroup(InGroup);
-	const FEntry* Entry = Entries.Find(TWeakObjectPtr<AActor>(InActor));
+	const FEntry* Entry = Entries.Find(FVoxelViewSourceId(InSourceId));
 	if (!Group || Group->bCommitted || !Entry || Entry->GroupKey != Group->Key)
 	{
 		return false;
 	}
 
-	const TWeakObjectPtr<AActor> Key(InActor);
+	const bool bHidden = bInHidden || Entry->bRetiring;
+	const FVoxelViewSourceId Key(InSourceId);
 	if (const bool* Pending = PendingVisibility.Find(Key))
 	{
-		if (*Pending == bInHidden)
+		if (*Pending == bHidden)
 		{
 			return true;
 		}
 	}
-	else if (InActor->IsHidden() == bInHidden && !ActorVisibilityGenerations.Contains(Key) &&
+	else if (Entry->bHidden == bHidden && !SourceVisibilityGenerations.Contains(Key) &&
 		(!PendingPlan || !PendingPlan->Visibility.Contains(Key)))
 	{
 		return true;
@@ -417,7 +410,7 @@ bool FVoxelViewPublisher::SetHidden(const FGuid& InGroup, AActor* InActor, const
 		FUpdate Source;
 		if (CaptureCoverageSource(Key, true, Source))
 		{
-			// 可见性也进入同一原生粗层事务，Actor 标志不能独自代表呈现根中的移除。
+			// 可见性也进入同一原生粗层事务，记录标志不能独自代表呈现根中的移除。
 			if (!FindProjectedUpdate(Key))
 			{
 				const FVector Origin = Source.Location / Module.BlockSize();
@@ -432,10 +425,10 @@ bool FVoxelViewPublisher::SetHidden(const FGuid& InGroup, AActor* InActor, const
 			Source.bUnchanged = true;
 			PendingUpdateIndices.Add(Key, PendingUpdates.Num());
 			PendingUpdates.Add(MoveTemp(Source));
-			OwnerActors.FindOrAdd(Group->Key).Add(Key);
+			OwnerSources.FindOrAdd(Group->Key).Add(Key);
 		}
 	}
-	PendingVisibility.Add(Key, bInHidden);
+	PendingVisibility.Add(Key, bHidden);
 	return true;
 }
 
@@ -510,9 +503,9 @@ bool FVoxelViewPublisher::DiscardUnchangedGroup(const FGuid& InGroup)
 	if (!Group || Group->bCommitted || Group->bOwnershipChanged ||
 		OwnerSerialQueues.Contains(Group->Key) ||
 		(PendingPlan && PendingPlan->GroupIds.Contains(Group->Key))) return false;
-	if (const auto* Actors = OwnerActors.Find(Group->Key))
-		for (const auto& Actor : *Actors)
-			if (PendingUpdateIndices.Contains(Actor) || PendingVisibility.Contains(Actor)) return false;
+	if (const auto* Sources = OwnerSources.Find(Group->Key))
+		for (const auto& SourceId : *Sources)
+			if (PendingUpdateIndices.Contains(SourceId) || PendingVisibility.Contains(SourceId)) return false;
 	PendingGroupIds.Remove(Group->Key);
 	PendingGroups.Remove(InGroup);
 	return true;
@@ -756,9 +749,9 @@ void FVoxelViewPublisher::RefreshGroupOrder(const FPublicationRef& Publication)
 FVoxelViewPublisher::FUpdate FVoxelViewPublisher::TakePendingUpdate(const int32 InIndex)
 {
 	FUpdate Update = MoveTemp(PendingUpdates[InIndex]);
-	PendingUpdateIndices.Remove(Update.Actor);
+	PendingUpdateIndices.Remove(Update.SourceId);
 	PendingUpdates.RemoveAtSwap(InIndex, 1, EAllowShrinking::No);
-	if (PendingUpdates.IsValidIndex(InIndex)) PendingUpdateIndices.FindChecked(PendingUpdates[InIndex].Actor) = InIndex;
+	if (PendingUpdates.IsValidIndex(InIndex)) PendingUpdateIndices.FindChecked(PendingUpdates[InIndex].SourceId) = InIndex;
 	return Update;
 }
 
@@ -782,11 +775,11 @@ void FVoxelViewPublisher::StartCommittedGroups()
 	}
 	for (const auto& Owner : KeyIndices)
 	{
-		const auto* Actors = OwnerActors.Find(Owner.Key);
-		if (!Actors) continue;
-		for (const auto& Actor : *Actors)
+		const auto* Sources = OwnerSources.Find(Owner.Key);
+		if (!Sources) continue;
+		for (const auto& SourceId : *Sources)
 		{
-		const auto* Found = Entries.Find(Actor);
+		const auto* Found = Entries.Find(SourceId);
 		if (!Found) continue;
 		const FEntry& Entry = *Found;
 		const int32* Index = KeyIndices.Find(Entry.GroupKey);
@@ -827,7 +820,7 @@ void FVoxelViewPublisher::StartCommittedGroups()
 	if (ReadyKeys.IsEmpty()) return;
 	for (int32 Index = PendingUpdates.Num() - 1; Index >= 0; --Index)
 	{
-		const FEntry* Entry = Entries.Find(PendingUpdates[Index].Actor);
+		const FEntry* Entry = Entries.Find(PendingUpdates[Index].SourceId);
 		if (Entry && !ReadyKeys.Contains(Entry->GroupKey)) continue;
 		Publication->Updates.Add(TakePendingUpdate(Index));
 	}
@@ -905,13 +898,13 @@ void FVoxelViewPublisher::AdvancePendingPlan()
 		Footprint.bTransition = Footprint.Key.Representation == 4 || Footprint.Key.Representation == 5;
 		if (!Footprint.bTransition)
 			Footprint.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Footprint.Key, Module.BlockSize(), Module.GetViewSettings().Lod);
-		if (const auto* Actors = OwnerActors.Find(Footprint.Key))
-			for (const auto& Actor : *Actors)
+		if (const auto* Sources = OwnerSources.Find(Footprint.Key))
+			for (const auto& SourceId : *Sources)
 			{
-				Plan.ActorKeys.Add(Actor, Footprint.Key);
-				const auto* Entry = Entries.Find(Actor);
+				Plan.SourceKeys.Add(SourceId, Footprint.Key);
+				const auto* Entry = Entries.Find(SourceId);
 				if (!Entry) continue;
-				const int32* UpdateIndex = Plan.UpdateIndices.Find(Actor);
+				const int32* UpdateIndex = Plan.UpdateIndices.Find(SourceId);
 				const FUpdate* Update = UpdateIndex ? &Plan.Updates[*UpdateIndex] : nullptr;
 				const FBox Bounds = Update ? Update->Bounds : Entry->Bounds;
 				const FVector Location = Update ? Update->Location : Entry->Location;
@@ -990,7 +983,8 @@ void FVoxelViewPublisher::AdvancePendingPlan()
 	{
 		if (!Plan.Updates.IsValidIndex(Plan.Cursor)) { Next(); return; }
 		FUpdate Update = MoveTemp(Plan.Updates[Plan.Cursor++]);
-		const auto* Key = Plan.ActorKeys.Find(Update.Actor);
+		if (!Entries.Contains(Update.SourceId)) return;
+		const auto* Key = Plan.SourceKeys.Find(Update.SourceId);
 		const int32* GroupIndex = Key ? Plan.SelectedKeys.Find(*Key) : nullptr;
 		if (GroupIndex)
 		{
@@ -1000,9 +994,9 @@ void FVoxelViewPublisher::AdvancePendingPlan()
 			IndexPublicationUpdate(Plan.Publication, Index);
 			Plan.Publication->Groups[*GroupIndex].UpdateIndices.Add(Index);
 		}
-		else if (Key && !PendingUpdateIndices.Contains(Update.Actor))
+		else if (Key && !PendingUpdateIndices.Contains(Update.SourceId))
 		{
-			PendingUpdateIndices.Add(Update.Actor, PendingUpdates.Num());
+			PendingUpdateIndices.Add(Update.SourceId, PendingUpdates.Num());
 			PendingUpdates.Add(MoveTemp(Update));
 		}
 		return;
@@ -1013,13 +1007,14 @@ void FVoxelViewPublisher::AdvancePendingPlan()
 		const auto Id = FSetElementId::FromInteger(Plan.Cursor++);
 		if (!Plan.Visibility.IsValidId(Id)) return;
 		const auto& Pair = Plan.Visibility.Get(Id);
-		const auto* Key = Plan.ActorKeys.Find(Pair.Key);
+		if (!Entries.Contains(Pair.Key)) return;
+		const auto* Key = Plan.SourceKeys.Find(Pair.Key);
 		const int32* GroupIndex = Key ? Plan.SelectedKeys.Find(*Key) : nullptr;
 		if (GroupIndex)
 		{
 			Plan.Publication->Visibility.Add(Pair);
-			ActorVisibilityGenerations.FindOrAdd(Pair.Key).Add({Plan.Publication, Pair.Value});
-			Plan.Publication->Groups[*GroupIndex].VisibilityActors.Add(Pair.Key);
+			SourceVisibilityGenerations.FindOrAdd(Pair.Key).Add({Plan.Publication, Pair.Value});
+			Plan.Publication->Groups[*GroupIndex].VisibilitySources.Add(Pair.Key);
 		}
 		else if (Key && !PendingVisibility.Contains(Pair.Key)) PendingVisibility.Add(Pair);
 		return;
@@ -1047,7 +1042,7 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 	if (!Publication->Plan) { Publication->Plan = MakeUnique<FPreparedPlan>(); return; }
 	auto& Plan = *Publication->Plan;
 	auto& Footprints = Plan.Footprints;
-	auto& ActorIndices = Plan.ActorIndices;
+	auto& SourceIndices = Plan.SourceIndices;
 	auto& Updates = Plan.Updates;
 	constexpr bool bInPreparedCoverage = true;
 	const auto Next = [&Plan] { ++Plan.Phase; Plan.Cursor = 0; };
@@ -1055,24 +1050,24 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 	{
 		if (!Publication->Updates.IsValidIndex(Plan.Cursor)) { Next(); return; }
 		const FUpdate& Update = Publication->Updates[Plan.Cursor++];
-		Updates.Add(Update.Actor, &Update);
+		Updates.Add(Update.SourceId, &Update);
 		return;
 	}
-	auto AddActor = [this, &Footprints, &ActorIndices, &Updates, &Publication, &Plan](
-		const TWeakObjectPtr<AActor> Actor)
+	auto AddSource = [this, &Footprints, &SourceIndices, &Updates, &Publication, &Plan](
+		const FVoxelViewSourceId SourceId)
 	{
-		if (ActorIndices.Contains(Actor)) return;
-		const FEntry* Entry = Entries.Find(Actor);
+		if (SourceIndices.Contains(SourceId)) return;
+		const FEntry* Entry = Entries.Find(SourceId);
 		const int32 FirstFootprint = Footprints.Num();
 		FVoxelPublishFootprint& Footprint = Footprints.AddDefaulted_GetRef();
 		if (Entry)
 		{
 			Footprint.Key = Entry->GroupKey;
-			const FUpdate* const* Update = Updates.Find(Actor);
-			const bool* Hidden = Publication->Visibility.Find(Actor);
-			bool PreviousHidden = Actor.IsValid() && Actor->IsHidden();
+			const FUpdate* const* Update = Updates.Find(SourceId);
+			const bool* Hidden = Publication->Visibility.Find(SourceId);
+			bool PreviousHidden = Entry->bHidden;
 			uint64 PreviousVisibilitySerial = 0;
-			if (const auto* Generations = ActorVisibilityGenerations.Find(Actor))
+			if (const auto* Generations = SourceVisibilityGenerations.Find(SourceId))
 				for (const auto& Generation : *Generations)
 				{
 					const auto& Older = Generation.Publication;
@@ -1080,7 +1075,7 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 					PreviousHidden = Generation.bHidden;
 					PreviousVisibilitySerial = Older->Serial;
 				}
-			const bool bVisibilityChange = Hidden && Actor.IsValid() && PreviousHidden != *Hidden;
+			const bool bVisibilityChange = Hidden && Entry && PreviousHidden != *Hidden;
 			const bool bMeshChange = Update && !(**Update).bUnchanged;
 			const bool bClippingChange = bInPreparedCoverage && bMeshChange && !(**Update).bSourceDirty;
 			const bool bPhysicalChange = !bInPreparedCoverage || bVisibilityChange ||
@@ -1109,20 +1104,20 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 				}
 			}
 		}
-		ActorIndices.Add(Actor, FirstFootprint);
-		Plan.ActorKeys.Add(Footprints[FirstFootprint].Key);
+		SourceIndices.Add(SourceId, FirstFootprint);
+		Plan.SourceKeys.Add(Footprints[FirstFootprint].Key);
 	};
 	if (Plan.Phase == 1)
 	{
 		if (!Publication->Updates.IsValidIndex(Plan.Cursor)) { Next(); return; }
-		AddActor(Publication->Updates[Plan.Cursor++].Actor);
+		AddSource(Publication->Updates[Plan.Cursor++].SourceId);
 		return;
 	}
 	if (Plan.Phase == 2)
 	{
 		if (Plan.Cursor >= Publication->Visibility.GetMaxIndex()) { Next(); return; }
 		const auto Id = FSetElementId::FromInteger(Plan.Cursor++);
-		if (Publication->Visibility.IsValidId(Id)) AddActor(Publication->Visibility.Get(Id).Key);
+		if (Publication->Visibility.IsValidId(Id)) AddSource(Publication->Visibility.Get(Id).Key);
 		return;
 	}
 	if (Plan.Phase == 3)
@@ -1131,7 +1126,7 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 		const auto Id = FSetElementId::FromInteger(Plan.Cursor++);
 		if (!Publication->Callbacks.IsValidId(Id)) return;
 		const auto& Key = Publication->Callbacks.Get(Id).Key;
-		if (Plan.ActorKeys.Contains(Key)) return;
+		if (Plan.SourceKeys.Contains(Key)) return;
 		auto& Footprint = Footprints.AddDefaulted_GetRef();
 		Footprint.Key = Key;
 		const bool bLogicalChange = Publication->OwnershipChanges.Contains(Key);
@@ -1177,7 +1172,7 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 		if (!Publication->Updates.IsValidIndex(Plan.Cursor)) { Next(); return; }
 		const int32 Index = Plan.Cursor++;
 		FUpdate& Update = Publication->Updates[Index];
-		Update.GroupIndex = Plan.Graph.GetGroupIndices()[ActorIndices.FindChecked(Update.Actor)];
+		Update.GroupIndex = Plan.Graph.GetGroupIndices()[SourceIndices.FindChecked(Update.SourceId)];
 		FGroup& Group = Plan.Groups[Update.GroupIndex];
 		Group.UpdateIndices.Add(Index);
 		if (Update.TerrainStage != INDEX_NONE) Group.TerrainStage = FMath::Min(Group.TerrainStage, Update.TerrainStage);
@@ -1188,8 +1183,8 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 		if (Plan.Cursor >= Publication->Visibility.GetMaxIndex()) { Next(); return; }
 		const auto Id = FSetElementId::FromInteger(Plan.Cursor++);
 		if (!Publication->Visibility.IsValidId(Id)) return;
-		const auto Actor = Publication->Visibility.Get(Id).Key;
-		Plan.Groups[Plan.Graph.GetGroupIndices()[ActorIndices.FindChecked(Actor)]].VisibilityActors.Add(Actor);
+		const auto SourceId = Publication->Visibility.Get(Id).Key;
+		Plan.Groups[Plan.Graph.GetGroupIndices()[SourceIndices.FindChecked(SourceId)]].VisibilitySources.Add(SourceId);
 		return;
 	}
 	if (Plan.Phase == 9)
@@ -1232,24 +1227,24 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const bool bInPreparedCoverage)
 {
 	TArray<FVoxelPublishFootprint> Footprints;
-	TMap<TWeakObjectPtr<AActor>, int32> ActorIndices;
-	TMap<TWeakObjectPtr<AActor>, const FUpdate*> Updates;
-	for (const FUpdate& Update : Publication->Updates) Updates.Add(Update.Actor, &Update);
-	auto AddActor = [this, &Footprints, &ActorIndices, &Updates, &Publication, bInPreparedCoverage](
-		const TWeakObjectPtr<AActor> Actor)
+	TMap<FVoxelViewSourceId, int32> SourceIndices;
+	TMap<FVoxelViewSourceId, const FUpdate*> Updates;
+	for (const FUpdate& Update : Publication->Updates) Updates.Add(Update.SourceId, &Update);
+	auto AddSource = [this, &Footprints, &SourceIndices, &Updates, &Publication, bInPreparedCoverage](
+		const FVoxelViewSourceId SourceId)
 	{
-		if (ActorIndices.Contains(Actor)) return;
-		const FEntry* Entry = Entries.Find(Actor);
+		if (SourceIndices.Contains(SourceId)) return;
+		const FEntry* Entry = Entries.Find(SourceId);
 		const int32 FirstFootprint = Footprints.Num();
 		FVoxelPublishFootprint& Footprint = Footprints.AddDefaulted_GetRef();
 		if (Entry)
 		{
 			Footprint.Key = Entry->GroupKey;
-			const FUpdate* const* Update = Updates.Find(Actor);
-			const bool* Hidden = Publication->Visibility.Find(Actor);
-			bool PreviousHidden = Actor.IsValid() && Actor->IsHidden();
+			const FUpdate* const* Update = Updates.Find(SourceId);
+			const bool* Hidden = Publication->Visibility.Find(SourceId);
+			bool PreviousHidden = Entry->bHidden;
 			uint64 PreviousVisibilitySerial = 0;
-			if (const auto* Generations = ActorVisibilityGenerations.Find(Actor))
+			if (const auto* Generations = SourceVisibilityGenerations.Find(SourceId))
 				for (const auto& Generation : *Generations)
 				{
 					const auto& Older = Generation.Publication;
@@ -1257,7 +1252,7 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 					PreviousHidden = Generation.bHidden;
 					PreviousVisibilitySerial = Older->Serial;
 				}
-			const bool bVisibilityChange = Hidden && Actor.IsValid() && PreviousHidden != *Hidden;
+			const bool bVisibilityChange = Hidden && Entry && PreviousHidden != *Hidden;
 			const bool bMeshChange = Update && !(**Update).bUnchanged;
 			const bool bClippingChange = bInPreparedCoverage && bMeshChange && !(**Update).bSourceDirty;
 			const bool bPhysicalChange = !bInPreparedCoverage || bVisibilityChange ||
@@ -1286,16 +1281,16 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 				}
 			}
 		}
-		ActorIndices.Add(Actor, FirstFootprint);
+		SourceIndices.Add(SourceId, FirstFootprint);
 	};
-	for (const FUpdate& Update : Publication->Updates) AddActor(Update.Actor);
-	for (const auto& Pair : Publication->Visibility) AddActor(Pair.Key);
+	for (const FUpdate& Update : Publication->Updates) AddSource(Update.SourceId);
+	for (const auto& Pair : Publication->Visibility) AddSource(Pair.Key);
 	// 空网格仍承担空间所有权，必须参与父子组并集；独立追加会提前交出旧覆盖。
-	TSet<FVoxelPublishGroupKey> ActorKeys;
-	for (const auto& Footprint : Footprints) ActorKeys.Add(Footprint.Key);
+	TSet<FVoxelPublishGroupKey> SourceKeys;
+	for (const auto& Footprint : Footprints) SourceKeys.Add(Footprint.Key);
 	for (const auto& Pair : Publication->Callbacks)
 	{
-		if (ActorKeys.Contains(Pair.Key)) continue;
+		if (SourceKeys.Contains(Pair.Key)) continue;
 		auto& Footprint = Footprints.AddDefaulted_GetRef();
 		Footprint.Key = Pair.Key;
 		const bool bLogicalChange = !bInPreparedCoverage || Publication->OwnershipChanges.Contains(Pair.Key);
@@ -1336,7 +1331,7 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 	}
 	for (FUpdate& Update : Publication->Updates)
 	{
-		Update.GroupIndex = GroupIndices[ActorIndices.FindChecked(Update.Actor)];
+		Update.GroupIndex = GroupIndices[SourceIndices.FindChecked(Update.SourceId)];
 	}
 	Publication->Updates.StableSort([](const FUpdate& A, const FUpdate& B)
 	{
@@ -1353,7 +1348,7 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 	}
 	for (const auto& Pair : Publication->Visibility)
 	{
-		Publication->Groups[GroupIndices[ActorIndices.FindChecked(Pair.Key)]].VisibilityActors.Add(Pair.Key);
+		Publication->Groups[GroupIndices[SourceIndices.FindChecked(Pair.Key)]].VisibilitySources.Add(Pair.Key);
 	}
 }
 
@@ -1374,7 +1369,7 @@ void FVoxelViewPublisher::DeferSaturatedGroups(const FPublicationRef& Publicatio
 	TArray<int32> Remap;
 	Remap.Init(INDEX_NONE, Publication->Groups.Num());
 	TArray<FGroup> Accepted;
-	TSet<TWeakObjectPtr<AActor>> DeferredActors;
+	TSet<FVoxelViewSourceId> DeferredSources;
 	for (int32 Index = 0; Index < Publication->Groups.Num(); ++Index)
 	{
 		FGroup& Group = Publication->Groups[Index];
@@ -1443,23 +1438,23 @@ void FVoxelViewPublisher::DeferSaturatedGroups(const FPublicationRef& Publicatio
 			Publication->TerrainStages.Remove(Key);
 			Publication->OwnershipChanges.Remove(Key);
 		}
-		for (const int32 UpdateIndex : Group.UpdateIndices) DeferredActors.Add(Publication->Updates[UpdateIndex].Actor);
-		for (const auto Actor : Group.VisibilityActors)
+		for (const int32 UpdateIndex : Group.UpdateIndices) DeferredSources.Add(Publication->Updates[UpdateIndex].SourceId);
+		for (const auto SourceId : Group.VisibilitySources)
 		{
-			if (!PendingVisibility.Contains(Actor)) PendingVisibility.Add(Actor, Publication->Visibility.FindChecked(Actor));
-			Publication->Visibility.Remove(Actor);
+			if (!PendingVisibility.Contains(SourceId)) PendingVisibility.Add(SourceId, Publication->Visibility.FindChecked(SourceId));
+			Publication->Visibility.Remove(SourceId);
 		}
 	}
 	TArray<FUpdate> Updates;
 	for (FUpdate& Update : Publication->Updates)
 	{
-		if (!DeferredActors.Contains(Update.Actor))
+		if (!DeferredSources.Contains(Update.SourceId))
 		{
 			Update.GroupIndex = Remap[Update.GroupIndex];
 			Updates.Add(MoveTemp(Update));
 			continue;
 		}
-		if (!PendingUpdateIndices.Contains(Update.Actor))
+		if (!PendingUpdateIndices.Contains(Update.SourceId))
 		{
 			// Exclusions 已转换为网格局部坐标；重试从原始世界格输入重新比较最新前代。
 			Update.Exclusions = Update.LocalWorldBoxes;
@@ -1467,7 +1462,7 @@ void FVoxelViewPublisher::DeferSaturatedGroups(const FPublicationRef& Publicatio
 			Update.ChangedBounds.Reset();
 			Update.bUnchanged = false;
 			Update.GroupIndex = INDEX_NONE;
-			PendingUpdateIndices.Add(Update.Actor, PendingUpdates.Num());
+			PendingUpdateIndices.Add(Update.SourceId, PendingUpdates.Num());
 			PendingUpdates.Add(MoveTemp(Update));
 		}
 	}
@@ -1878,14 +1873,14 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::PrepareCoverageSteps(FPublicat
 		for (;;)
 		{
 			const FPublication* Older = nullptr;
-			const FUpdate* Projected = FindProjectedUpdate(Update.Actor, InPublication.Serial, &Older);
+			const FUpdate* Projected = FindProjectedUpdate(Update.SourceId, InPublication.Serial, &Older);
 			if (Older && !Older->bCoveragePrepared)
 			{
 				co_await FVoxelGameThreadContinuation::Yield();
 				continue;
 			}
 			if (Projected) { Previous = *Projected; bHasPrevious = true; }
-			else if (const FEntry* Entry = Entries.Find(Update.Actor); Entry && Entry->PresentedSource)
+			else if (const FEntry* Entry = Entries.Find(Update.SourceId); Entry && Entry->PresentedSource)
 			{
 				Previous.Source = Entry->PresentedSource;
 				Previous.NativeStamp = Entry->PresentedNativeStamp;
@@ -2045,14 +2040,14 @@ bool FVoxelViewPublisher::CommitReadyGroups(const FPublicationRef& Publication, 
 			for (const auto& Key : Group.Keys) { SetOwnerActive(Key, Publication->Serial, false); RetryOwners.AddUnique(Key); }
 			for (const int32 Index : Group.UpdateIndices)
 			{
-				ReleaseActorGeneration(Publication->Updates[Index].Actor, Publication->Serial);
+				ReleaseSourceGeneration(Publication->Updates[Index].SourceId, Publication->Serial);
 				for (const auto& Component : Publication->Updates[Index].Components) if (Component) Component->DestroyComponent();
 				Publication->Updates[Index].Components.Reset();
 				Publication->Updates[Index].Source.Reset();
 				Publication->Updates[Index].NativeMesh.Reset();
 				if (Publication->PreparedMeshes.IsValidIndex(Index)) Publication->PreparedMeshes[Index].Reset();
 			}
-			for (const auto Actor : Group.VisibilityActors) ReleaseActorGeneration(Actor, Publication->Serial);
+			for (const auto SourceId : Group.VisibilitySources) ReleaseSourceGeneration(SourceId, Publication->Serial);
 			Group.bCommitted = true;
 			ReleaseNativeGroup(Group);
 			for (const auto& Key : Group.Keys) SetOwnerActive(Key, Publication->Serial, false);
@@ -2072,11 +2067,11 @@ bool FVoxelViewPublisher::CommitReadyGroups(const FPublicationRef& Publication, 
 		const bool bHasChanges = Group.UpdateIndices.ContainsByPredicate([&Publication](const int32 Index)
 		{
 			return !Publication->Updates[Index].bUnchanged;
-		}) || Group.VisibilityActors.ContainsByPredicate([&Publication](const TWeakObjectPtr<AActor>& Key)
+		}) || Group.VisibilitySources.ContainsByPredicate([this, &Publication](const FVoxelViewSourceId& Key)
 		{
-			const AActor* Actor = Key.Get();
+			const FEntry* Entry = Entries.Find(Key);
 			const bool* Hidden = Publication->Visibility.Find(Key);
-			return Actor && Hidden && Actor->IsHidden() != *Hidden;
+			return Entry && Hidden && Entry->bHidden != *Hidden;
 		});
 		if (bHasChanges && CommittedThisFrame >= Limit) continue;
 		bAdvanced |= CommitReadyGroup(Publication, Group);
@@ -2100,10 +2095,9 @@ bool FVoxelViewPublisher::CommitReadyGroup(const FPublicationRef& Publication, F
 	for (const int32 Index : InGroup.UpdateIndices)
 	{
 		FUpdate& Update = Publication->Updates[Index];
-		ReleaseActorGeneration(Update.Actor, Publication->Serial);
-		AActor* Actor = Update.Actor.Get();
-		FEntry* Entry = Entries.Find(Update.Actor);
-		if (!Actor || !Entry) continue;
+		ReleaseSourceGeneration(Update.SourceId, Publication->Serial);
+		FEntry* Entry = Entries.Find(Update.SourceId);
+		if (!Entry) continue;
 		Entry->LocalWorldBoxes = MoveTemp(Update.LocalWorldBoxes);
 		Update.CommonBoxes.Reset();
 		const bool bRetainedGeometry = !Update.bSourceDirty && Entry->NativeMesh &&
@@ -2116,7 +2110,6 @@ bool FVoxelViewPublisher::CommitReadyGroup(const FPublicationRef& Publication, F
 			Entry->bDirty = Entry->Source != Update.Source || Entry->Location != Update.Location || Entry->Scale != Update.Scale;
 			continue;
 		}
-		Actor->SetActorLocation(Update.Location);
 		Entry->NativeMesh = MoveTemp(Update.NativeMesh);
 		Entry->PresentedNativeStamp = Update.NativeStamp;
 		Entry->Exclusions = MoveTemp(Update.Exclusions);
@@ -2138,16 +2131,15 @@ bool FVoxelViewPublisher::CommitReadyGroup(const FPublicationRef& Publication, F
 				Update.Location + Update.Bounds.Max * Update.Scale)
 			: FBox(ForceInit);
 	}
-	for (const TWeakObjectPtr<AActor> ActorKey : InGroup.VisibilityActors)
+	for (const FVoxelViewSourceId SourceKey : InGroup.VisibilitySources)
 	{
-		ReleaseActorGeneration(ActorKey, Publication->Serial);
-		const bool* bHidden = Publication->Visibility.Find(ActorKey);
-		if (AActor* Actor = ActorKey.Get();
-			Actor && bHidden && Actor->IsHidden() != *bHidden)
+		ReleaseSourceGeneration(SourceKey, Publication->Serial);
+		const bool* bHidden = Publication->Visibility.Find(SourceKey);
+		if (FEntry* Entry = Entries.Find(SourceKey); Entry && bHidden)
 		{
-			Actor->SetActorHiddenInGame(*bHidden);
+			Entry->bHidden = *bHidden;
 		}
-		Publication->Visibility.Remove(ActorKey);
+		Publication->Visibility.Remove(SourceKey);
 	}
 	InGroup.bCommitted = true;
 	ReleaseNativeGroup(InGroup);
@@ -2197,8 +2189,8 @@ void FVoxelViewPublisher::DiscardGroups()
 	for (const auto& Publication : Publications) DiscardPublication(Publication);
 	check(ActiveNativeGroups == 0);
 	Publications.Reset();
-	ActorUpdateGenerations.Reset();
-	ActorVisibilityGenerations.Reset();
+	SourceUpdateGenerations.Reset();
+	SourceVisibilityGenerations.Reset();
 	ReadyPrepareGroups.Reset();
 	ReadyCommitGroups.Reset();
 	ReadySelectionCursors[0] = 0;
@@ -2252,17 +2244,17 @@ void FVoxelViewPublisher::DiscardPublication(const FPublicationRef& Publication,
 	bActiveBusyKeysDirty = true;
 	for (FUpdate& Update : Publication->Updates)
 	{
-		ReleaseActorGeneration(Update.Actor, Publication->Serial);
+		ReleaseSourceGeneration(Update.SourceId, Publication->Serial);
 		Update.NativeMesh.Reset();
 		Update.Source.Reset();
-		if (!Update.Actor.IsValid()) continue;
+		if (!Entries.Contains(Update.SourceId)) continue;
 		for (UVoxelMeshComponent* Component : Update.Components)
 		{
 			if (Component) RetiredComponents.Add(Component);
 		}
 		Update.Components.Reset();
 	}
-	for (const auto& Pair : Publication->Visibility) ReleaseActorGeneration(Pair.Key, Publication->Serial);
+	for (const auto& Pair : Publication->Visibility) ReleaseSourceGeneration(Pair.Key, Publication->Serial);
 	Publication->PreparedMeshes.Reset();
 }
 
@@ -2284,16 +2276,48 @@ void FVoxelViewPublisher::ReleaseNativeGroup(FGroup& InGroup)
 	InGroup.NativeGroupLease.Reset();
 }
 
-void FVoxelViewPublisher::Forget(AActor* InActor)
+void FVoxelViewPublisher::Forget(FVoxelViewSourceId InSourceId)
 {
-	const TWeakObjectPtr<AActor> Key(InActor);
+	const FVoxelViewSourceId Key(InSourceId);
+	// 值标识不会像弱 UObject 引用一样自动失效，撤销仍引用它的在途事务。
+	for (const auto& Publication : Publications)
+	{
+		if (Publication->bCanceled || Publication->bFinished) continue;
+		if (Publication->Updates.ContainsByPredicate([&](const FUpdate& Update)
+		{
+			return Update.SourceId == Key && Publication->Groups.IsValidIndex(Update.GroupIndex) &&
+				!Publication->Groups[Update.GroupIndex].bCommitted;
+		}) || Publication->Visibility.Contains(Key))
+		{
+			DiscardPublication(Publication);
+		}
+	}
 	PendingVisibility.Remove(Key);
 	if (const int32* Index = PendingUpdateIndices.Find(Key)) TakePendingUpdate(*Index);
 	if (const auto* Entry = Entries.Find(Key))
-		if (auto* Actors = OwnerActors.Find(Entry->GroupKey)) { Actors->Remove(Key); if (Actors->IsEmpty()) OwnerActors.Remove(Entry->GroupKey); }
+		if (auto* Sources = OwnerSources.Find(Entry->GroupKey)) { Sources->Remove(Key); if (Sources->IsEmpty()) OwnerSources.Remove(Entry->GroupKey); }
 	Entries.Remove(Key);
-	ActorUpdateGenerations.Remove(Key);
-	ActorVisibilityGenerations.Remove(Key);
+	SourceUpdateGenerations.Remove(Key);
+	SourceVisibilityGenerations.Remove(Key);
+}
+
+bool FVoxelViewPublisher::Retire(FVoxelViewSourceId InSourceId)
+{
+	FEntry* Entry = Entries.Find(InSourceId);
+	if (!Entry) return true;
+	if (IsGroupBusy(Entry->GroupKey)) return false;
+	if (!Entry->bPresented || Entry->bHidden)
+	{
+		Forget(InSourceId);
+		return true;
+	}
+	// 先取得原生根移除的真实回执，再释放源记录及生成层的所有权。
+	Entry->bRetiring = true;
+	const FGuid Group = BeginGroup(Entry->GroupKey);
+	SetTerrainStage(Group, Entry->TerrainStage);
+	if (!SetHidden(Group, InSourceId, true)) return false;
+	CommitGroup(Group);
+	return false;
 }
 
 void FVoxelViewPublisher::Reset()
@@ -2311,7 +2335,7 @@ void FVoxelViewPublisher::Reset()
 	}
 	RetiredComponents.Reset();
 	Entries.Reset();
-	OwnerActors.Reset();
+	OwnerSources.Reset();
 	RetryOwners.Reset();
 	ActiveBusyKeys.Reset();
 	bActiveBusyKeysDirty = true;
@@ -2338,44 +2362,50 @@ bool FVoxelViewPublisher::NeedsUpdate() const
 	return bRetry;
 }
 
-bool FVoxelViewPublisher::IsPresented(AActor* InActor) const
+bool FVoxelViewPublisher::IsHidden(FVoxelViewSourceId InSourceId) const
 {
-	const FEntry* Entry = Entries.Find(TWeakObjectPtr<AActor>(InActor));
+	const FEntry* Entry = Entries.Find(InSourceId);
+	return !Entry || Entry->bHidden;
+}
+
+bool FVoxelViewPublisher::IsPresented(FVoxelViewSourceId InSourceId) const
+{
+	const FEntry* Entry = Entries.Find(FVoxelViewSourceId(InSourceId));
 	return Entry && Entry->bPresented && Entry->NativeMesh;
 }
 
-bool FVoxelViewPublisher::IsCommitted(AActor* InActor) const
+bool FVoxelViewPublisher::IsCommitted(FVoxelViewSourceId InSourceId) const
 {
-	const FEntry* Entry = Entries.Find(TWeakObjectPtr<AActor>(InActor));
+	const FEntry* Entry = Entries.Find(FVoxelViewSourceId(InSourceId));
 	return Entry && Entry->bPresented && !Entry->bDirty;
 }
 
-bool FVoxelViewPublisher::HasPresentation(AActor* InActor) const
+bool FVoxelViewPublisher::HasPresentation(FVoxelViewSourceId InSourceId) const
 {
-	const FEntry* Entry = Entries.Find(TWeakObjectPtr<AActor>(InActor));
+	const FEntry* Entry = Entries.Find(FVoxelViewSourceId(InSourceId));
 	return Entry && Entry->bPresented;
 }
 
 void FVoxelViewPublisher::IndexPublicationUpdate(const FPublicationRef& Publication, const int32 InIndex)
 {
-	const auto Actor = Publication->Updates[InIndex].Actor;
-	if (!Actor.IsValid()) return;
-	auto& Queue = ActorUpdateGenerations.FindOrAdd(Actor);
+	const auto SourceId = Publication->Updates[InIndex].SourceId;
+	if (!Entries.Contains(SourceId)) return;
+	auto& Queue = SourceUpdateGenerations.FindOrAdd(SourceId);
 	if (!Queue.ContainsByPredicate([&Publication](const auto& Generation) { return Generation.Publication->Serial == Publication->Serial; }))
 		Queue.Add({Publication, InIndex});
 }
 
-void FVoxelViewPublisher::ReleaseActorGeneration(const TWeakObjectPtr<AActor> InActor, const uint64 InSerial)
+void FVoxelViewPublisher::ReleaseSourceGeneration(const FVoxelViewSourceId InSourceId, const uint64 InSerial)
 {
-	if (auto* Queue = ActorUpdateGenerations.Find(InActor))
+	if (auto* Queue = SourceUpdateGenerations.Find(InSourceId))
 	{
 		Queue->RemoveAll([InSerial](const auto& Generation) { return Generation.Publication->Serial == InSerial; });
-		if (Queue->IsEmpty()) ActorUpdateGenerations.Remove(InActor);
+		if (Queue->IsEmpty()) SourceUpdateGenerations.Remove(InSourceId);
 	}
-	if (auto* Queue = ActorVisibilityGenerations.Find(InActor))
+	if (auto* Queue = SourceVisibilityGenerations.Find(InSourceId))
 	{
 		Queue->RemoveAll([InSerial](const auto& Generation) { return Generation.Publication->Serial == InSerial; });
-		if (Queue->IsEmpty()) ActorVisibilityGenerations.Remove(InActor);
+		if (Queue->IsEmpty()) SourceVisibilityGenerations.Remove(InSourceId);
 	}
 }
 
@@ -2748,7 +2778,7 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 				{
 					const int32 UpdateIndex = Group.UpdateIndices[Group.PreparedUpdates];
 					const FUpdate& Update = Publication->Updates[UpdateIndex];
-					const auto* Entry = Entries.Find(Update.Actor);
+					const auto* Entry = Entries.Find(Update.SourceId);
 					const auto& Key = Update.NativeStamp.GeometryIdentity.Key;
 					UE_LOG(LogTemp, Display, TEXT("Publisher update diagnostic: serial=%llu index=%d representation=%d level=%d coordinate=(%d,%d,%d) retained=%d unchanged=%d dirty=%d source=%d native=%d meshPending=%d admissionWait=%d admissionVersion=%llu entryNative=%d samePresentedSource=%d"),
 						Publication->Serial, UpdateIndex, int32(Key.Representation), Key.Level, Key.Coordinate.X, Key.Coordinate.Y, Key.Coordinate.Z,
@@ -2963,13 +2993,13 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 	FrameTimings.bPublishBudgetOverrun = InBudget.HasOverrun(FPlatformTime::Seconds());
 }
 
-bool FVoxelViewPublisher::SetScopedCoverage(const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
+bool FVoxelViewPublisher::SetScopedCoverage(const FGuid& InGroup, FVoxelViewSourceId InSourceId, TArray<FBox> InWorldCellBoxes,
 	TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes,
 	TConstArrayView<FBox> InAffectedWorldCellBoxes, const bool bInRetainPresented)
 {
 	bool bSuccess = false;
 	auto Work =
-		SetScopedCoverageSteps(InGroup, InActor, MoveTemp(InWorldCellBoxes), MoveTemp(InCommonBoxes), InAffectedWorldCellBoxes, bSuccess, bInRetainPresented);
+		SetScopedCoverageSteps(InGroup, InSourceId, MoveTemp(InWorldCellBoxes), MoveTemp(InCommonBoxes), InAffectedWorldCellBoxes, bSuccess, bInRetainPresented);
 	while (!Work.IsComplete())
 	{
 		Work.Resume();
@@ -2977,14 +3007,14 @@ bool FVoxelViewPublisher::SetScopedCoverage(const FGuid& InGroup, AActor* InActo
 	return bSuccess;
 }
 
-FVoxelGameThreadContinuation FVoxelViewPublisher::SetScopedCoverageSteps(const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
+FVoxelGameThreadContinuation FVoxelViewPublisher::SetScopedCoverageSteps(const FGuid& InGroup, FVoxelViewSourceId InSourceId, TArray<FBox> InWorldCellBoxes,
 	TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, TConstArrayView<FBox> InAffectedWorldCellBoxes, bool& OutSuccess,
 	const bool bInRetainPresented)
 {
 	OutSuccess = false;
 	FUpdate Source;
-	if (!CaptureCoverageSource(InActor, bInRetainPresented, Source)) co_return;
-	FEntry* Entry = Entries.Find(TWeakObjectPtr<AActor>(InActor));
+	if (!CaptureCoverageSource(InSourceId, bInRetainPresented, Source)) co_return;
+	FEntry* Entry = Entries.Find(FVoxelViewSourceId(InSourceId));
 	if (!Entry)
 	{
 		co_return;
@@ -2994,7 +3024,7 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::SetScopedCoverageSteps(const F
 		co_await VoxelGameThread::AppendSteps(InWorldCellBoxes, Source.LocalWorldBoxes);
 	}
 	TArray<FBox> Previous;
-	Entry = Entries.Find(InActor);
+	Entry = Entries.Find(InSourceId);
 	if (!Entry)
 	{
 		co_return;
@@ -3064,7 +3094,7 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::SetScopedCoverageSteps(const F
 		}
 	}
 	co_await VoxelMeshClipper::NormalizeBoxesSteps(Previous);
-	co_await SetCoverageSourceSteps(InGroup, InActor, MoveTemp(Source), MoveTemp(Previous), nullptr, OutSuccess);
+	co_await SetCoverageSourceSteps(InGroup, InSourceId, MoveTemp(Source), MoveTemp(Previous), nullptr, OutSuccess);
 }
 
 bool FVoxelViewPublisher::RunBudgetedPhase(FVoxelPublishBudget& InBudget, const EVoxelPublishPhase InPhase,
@@ -3109,10 +3139,10 @@ bool FVoxelViewPublisher::RunBudgetedPhase(FVoxelPublishBudget& InBudget, const 
 	return bAdvanced;
 }
 
-bool FVoxelViewPublisher::GetPresentedMeshCost(AActor* InActor, uint64& OutVertices, uint64& OutTriangles, uint64& OutBytes) const
+bool FVoxelViewPublisher::GetPresentedMeshCost(FVoxelViewSourceId InSourceId, uint64& OutVertices, uint64& OutTriangles, uint64& OutBytes) const
 {
-	const FEntry* Entry = Entries.Find(InActor);
-	if (!Entry || !Entry->bPresented || !InActor || InActor->IsHidden())
+	const FEntry* Entry = Entries.Find(InSourceId);
+	if (!Entry || !Entry->bPresented || !InSourceId || Entry->bHidden)
 		return false;
 	OutVertices = Entry->PresentedVertices;
 	OutTriangles = Entry->PresentedTriangles;

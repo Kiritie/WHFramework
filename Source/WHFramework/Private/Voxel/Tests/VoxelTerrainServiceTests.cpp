@@ -300,4 +300,50 @@ bool FVoxelTerrainRefundAndAgingTest::RunTest(const FString& InParameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainPublicationDrainTest,
+	"WHFramework.Voxel.FineResidency.PublicationDrain",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelTerrainPublicationDrainTest::RunTest(const FString& InParameters)
+{
+	FVoxelTerrainServiceCandidate Generation;
+	Generation.Index = 0;
+	Generation.Priority.Band = EVoxelTerrainServiceBand::P2;
+	Generation.Priority.DistanceCells = 1.0;
+	Generation.FirstQueuedSeconds = 0.0;
+	Generation.Sequence = 1;
+	Generation.EstimatedMicroseconds = 100.0;
+	Generation.bRunnable = true;
+	FVoxelTerrainServiceCandidate Publication = Generation;
+	Publication.Index = 1;
+	Publication.Priority.DistanceCells = 1000.0;
+	Publication.FirstQueuedSeconds = 1.0;
+	Publication.Sequence = 2;
+	Publication.bPublicationContinuation = true;
+	TestTrue(TEXT("非近景发布续算优先于同带的新正文"),
+		FVoxelTerrainWorkSelection::HigherPriority(Publication, Generation));
+	FVoxelTerrainWorkSelection Selection;
+	FVoxelTerrainServiceCapacity Capacity;
+	Capacity.bPreserveDistanceOrder = true;
+	Capacity.MaximumWaitSeconds = 1000000.0;
+	for (int32 Turn = 0; Turn < 32; ++Turn)
+	{
+		FVoxelTerrainServiceCandidateSet Candidates;
+		Candidates.Add(Generation);
+		Candidates.Add(Publication);
+		FVoxelTerrainServiceCharge Charge;
+		const int32 Chosen = Selection.Select(Candidates.GetCandidates(), Capacity, 2.0, Charge);
+		TestEqual(TEXT("发布排空连续推进，同时每四次保留最老正文机会"), Chosen, Turn % 4 == 3 ? 0 : 1);
+		TestTrue(TEXT("发布优先仍按实际耗时结算"), Selection.Settle(Charge.Serial, 100.0));
+	}
+	TestFalse(TEXT("轮转不破坏服务账本"), Selection.HasAccountingFault());
+	for (const auto Band : {EVoxelTerrainServiceBand::P0, EVoxelTerrainServiceBand::P1})
+	{
+		Generation.Priority.Band = Publication.Priority.Band = Band;
+		TestTrue(TEXT("关键近景始终保持原距离顺序"),
+			FVoxelTerrainWorkSelection::HigherPriority(Generation, Publication));
+	}
+	return true;
+}
+
 #endif

@@ -81,16 +81,16 @@ struct FPreparedFine
 		return true;
 	}
 
-	bool InputsMatch(const FSnapshotPtr& Latest, const FAtomPublication& Publication) const
+	bool InputsMatch(const FAtomNodePtr& FineRoot, const FCoarseNodePtr& CoarseRoot, const FAtomPublication& Publication) const
 	{
-		if (!SameFineInput(Base, FineAfterPublication(Latest ? Latest->Root : nullptr, Base->Section, Publication))) return false;
+		if (!SameFineInput(Base, FineAfterPublication(FineRoot, Base->Section, Publication))) return false;
 		for (uint8 Face = 0; Face < 6; ++Face)
 		{
 			const FIntVector Section = Base->Section + VoxelCoord::Direction(Face);
-			const auto Fine = FineAfterPublication(Latest ? Latest->Root : nullptr, Section, Publication);
+			const auto Fine = FineAfterPublication(FineRoot, Section, Publication);
 			if (!SameFineInput(Fine, NeighborFine[Face])) return false;
 			if (Fine) continue;
-			const auto Coarse = FindCoarseOwner(Latest ? Latest->CoarseRoot : nullptr, Section, &Publication);
+			const auto Coarse = FindCoarseOwner(CoarseRoot, Section, &Publication);
 			if (bool(Coarse) != bool(NeighborCoarse[Face]) || (Coarse &&
 				!SameCoarseGeometry(Coarse, NeighborCoarse[Face]))) return false;
 		}

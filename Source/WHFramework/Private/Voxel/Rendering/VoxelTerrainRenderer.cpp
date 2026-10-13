@@ -5,6 +5,7 @@
 #include "Containers/Ticker.h"
 #include "DynamicMeshBuilder.h"
 #include "Engine/World.h"
+#include "GameFramework/Actor.h"
 #include "LocalVertexFactory.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialRenderProxy.h"
@@ -38,9 +39,9 @@
 
 namespace
 {
-	constexpr int32 VoxelNativeRootPreparationConcurrency = 32;
-	constexpr int32 VoxelNativePublicationCapacity = 2048;
-	constexpr int32 VoxelNativeNearPublicationReserve = 256;
+	constexpr int32 VoxelNativeRootPreparationConcurrency = 8;
+	constexpr int32 VoxelNativePublicationCapacity = 512;
+	constexpr int32 VoxelNativeNearPublicationReserve = 64;
 
 	template<typename ObjectType>
 	struct TVoxelRenderRootDeleteTask
@@ -283,8 +284,8 @@ namespace
 
 		uint64 Bytes = 0;
 		int32 LeaseCount = 0;
-		// 最多八个局部 Atom，另加 State、Component 和当前原生 Worker 控制来源。
-		const FVoxelTerrainResourceLease* Leases[16] = {};
+		// 八个准备事务及其直接租约，另加 State、当前原生 Worker 和待授予来源。
+		const FVoxelTerrainResourceLease* Leases[VoxelNativeRootPreparationConcurrency * 5 + 4] = {};
 	};
 
 	EVoxelTerrainResourceAdmission TryAcquirePublicationResident(
@@ -1143,16 +1144,55 @@ namespace
 		{
 		}
 
-		void Begin(const TSharedPtr<FRootPreparation, ESPMode::ThreadSafe>& InPreparation,
+		struct FEntry
+		{
+			TSharedPtr<FRootPreparation, ESPMode::ThreadSafe> Preparation;
+			FAtomNodePtr Root;
+			FCoarseNodePtr CoarseRoot;
+		};
+
+		void Begin(TConstArrayView<TSharedPtr<FRootPreparation, ESPMode::ThreadSafe>> InPreparations,
 			const FSnapshotPtr& InCurrent)
 		{
-			Preparation = InPreparation;
+			check(!InPreparations.IsEmpty() && InPreparations.Num() <= VoxelNativeRootPreparationConcurrency);
+			for (const auto& Prepared : InPreparations) Entries.Add({Prepared});
+			Preparation = Entries[0].Preparation;
 			Current = InCurrent;
-			InputCheck = Preparation->FirstFine;
-			Fine.Begin(Preparation->BaseSnapshot ? Preparation->BaseSnapshot->Root : nullptr,
-				Current ? Current->Root : nullptr, Preparation->Root);
-			Coarse.Begin(Preparation->BaseSnapshot ? Preparation->BaseSnapshot->CoarseRoot : nullptr,
-				Current ? Current->CoarseRoot : nullptr, Preparation->CoarseRoot);
+			MergedRoot = Current ? Current->Root : nullptr;
+			MergedCoarseRoot = Current ? Current->CoarseRoot : nullptr;
+			BeginEntry();
+		}
+
+		bool Contains(const TSharedPtr<FRootPreparation, ESPMode::ThreadSafe>& InPreparation) const
+		{
+			return InPreparation && Entries.ContainsByPredicate([&InPreparation](const FEntry& Entry)
+			{
+				return Entry.Preparation == InPreparation;
+			});
+		}
+
+		bool AddBindingInputs(FRendererBindingInputFloor& OutFloor) const
+		{
+			if (!OutFloor.Add(InputLease, Resources.Get())) return false;
+			for (const auto& Entry : Entries)
+			{
+				const auto& Prepared = *Entry.Preparation;
+				if (!OutFloor.Add(Prepared.ControlInputLease, Resources.Get()) ||
+					!OutFloor.Add(Prepared.InputLease, Resources.Get()) ||
+					!OutFloor.Add(Prepared.Publication->CoarseCallbackLease, Resources.Get()) ||
+					!OutFloor.Add(Prepared.PrimaryPathLease, Resources.Get()) ||
+					!OutFloor.Add(Prepared.Publication->Lease, Resources.Get())) return false;
+			}
+			return true;
+		}
+
+		void BeginEntry()
+		{
+			const auto& Prepared = *Entries[MergeIndex].Preparation;
+			InputCheck = Prepared.FirstFine;
+			Fine.Begin(Prepared.BaseSnapshot ? Prepared.BaseSnapshot->Root : nullptr, MergedRoot, Prepared.Root);
+			Coarse.Begin(Prepared.BaseSnapshot ? Prepared.BaseSnapshot->CoarseRoot : nullptr, MergedCoarseRoot, Prepared.CoarseRoot);
+			Phase = 0;
 		}
 
 		template<typename NodeType>
@@ -1171,16 +1211,13 @@ namespace
 			const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InPendingLease = nullptr)
 		{
 			FRendererBindingInputFloor Floor;
-			if (!Floor.Add(Preparation->ControlInputLease, Resources.Get()) || !Floor.Add(InputLease, Resources.Get()) || !Floor.Add(Preparation->InputLease, Resources.Get()) ||
-				!Floor.Add(Preparation->Publication->CoarseCallbackLease, Resources.Get()) ||
-				!Floor.Add(Preparation->PrimaryPathLease, Resources.Get()) || !Floor.Add(Preparation->Publication->Lease, Resources.Get()) ||
-				!Floor.Add(InPendingLease, Resources.Get()))
+			if (!AddBindingInputs(Floor) || !Floor.Add(InPendingLease, Resources.Get()))
 			{
 				NativeAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
 				return false;
 			}
 			NativeAdmission = TryAcquirePublicationResident(Resources, Consumer, Bytes, OutLease, 0,
-				Preparation->bAllowResidentOverlap, Floor.Bytes, Floor.LeaseCount);
+				Entries[MergeIndex].Preparation->bAllowResidentOverlap, Floor.Bytes, Floor.LeaseCount);
 			return NativeAdmission == EVoxelTerrainResourceAdmission::Granted;
 		}
 
@@ -1311,7 +1348,7 @@ namespace
 				if (Cancel.Load()) { Result.bCanceled = true; return Result; }
 				if (InputCheck)
 				{
-					if (!InputCheck->InputsMatch(Current, *Preparation->Publication))
+					if (!InputCheck->InputsMatch(MergedRoot, MergedCoarseRoot, *Entries[MergeIndex].Preparation->Publication))
 					{ Result.Error = TEXT("DependencyNotReady:NativeInterfaceInputsChanged"); return Result; }
 					InputCheck = InputCheck->Next;
 					continue;
@@ -1343,15 +1380,29 @@ namespace
 						[this](const auto& B, const auto& C, const auto& P, auto& Out) { return MergeCoarseLeaf(B, C, P, Out); },
 						[this](const auto&, const auto&, const auto&, auto& Out) { return AllocateNode(Out, &FCoarseTreeNode::Lease); },
 						[](FCoarseTreeNode& Node) { FinishCoarse(Node); });
-					if (Progress == EVoxelPersistentMergeProgress::Complete) { Result.bSuccess = true; return Result; }
+					if (Progress == EVoxelPersistentMergeProgress::Complete)
+					{
+						auto& Entry = Entries[MergeIndex];
+						Entry.Root = MergedRoot = Fine.GetResult();
+						Entry.CoarseRoot = MergedCoarseRoot = Coarse.GetResult();
+						Fine.Reset();
+						Coarse.Reset();
+						if (++MergeIndex == Entries.Num())
+						{
+							Result.bSuccess = true;
+							return Result;
+						}
+						BeginEntry();
+						continue;
+					}
 				}
 				if (Progress == EVoxelPersistentMergeProgress::Conflict)
 				{
 					Result.Error = TEXT("DependencyNotReady:RenderRootConflict");
 #if !UE_BUILD_SHIPPING
 					UE_LOG(LogTemp, Display, TEXT("Native render root merge conflict: request=%llu phase=%d atoms=%d coarse=%d base=%llu current=%llu"),
-						Consumer.RequestSerial, Phase, Preparation->Publication->Atoms.Num(), Preparation->Publication->CoarseChanges.Num(),
-						Preparation->BaseSnapshot ? Preparation->BaseSnapshot->Serial : 0, Current ? Current->Serial : 0);
+						Consumer.RequestSerial, Phase, Entries[MergeIndex].Preparation->Publication->Atoms.Num(), Entries[MergeIndex].Preparation->Publication->CoarseChanges.Num(),
+						Entries[MergeIndex].Preparation->BaseSnapshot ? Entries[MergeIndex].Preparation->BaseSnapshot->Serial : 0, Current ? Current->Serial : 0);
 #endif
 					return Result;
 				}
@@ -1379,6 +1430,10 @@ namespace
 		FVoxelGenerationConsumerKey Consumer;
 		TSharedPtr<FRootPreparation, ESPMode::ThreadSafe> Preparation;
 		FSnapshotPtr Current;
+		TArray<FEntry, TInlineAllocator<VoxelNativeRootPreparationConcurrency>> Entries;
+		FAtomNodePtr MergedRoot;
+		FCoarseNodePtr MergedCoarseRoot;
+		int32 MergeIndex = 0;
 		TSharedPtr<FPreparedFine, ESPMode::ThreadSafe> InputCheck;
 		TVoxelPersistentRootMerge<FAtomTreeNode, 8, 33> Fine;
 		TVoxelPersistentRootMerge<FCoarseTreeNode, 8, 79> Coarse;
@@ -1450,10 +1505,10 @@ struct FVoxelTerrainRendererState : TSharedFromThis<FVoxelTerrainRendererState, 
 	void AdvanceRootPreparations(double InDeadline);
 	void AdvanceRootUpload(FVoxelTerrainRenderer& InRenderer, double InDeadline);
 	void AdvanceRootUpload(FVoxelTerrainRenderer& InRenderer, FRootPreparation& InWork, int32 InMaximumSteps, double InDeadline);
-	bool BeginRootMerge(FReadyTransaction& InTransaction);
+	bool BeginRootMerge(FReadyTransaction& InTransaction, double InDeadline);
 	void ReleasePreparation(FReadyTransaction& InTransaction);
 	void TerminateTransaction(FReadyTransaction& InTransaction);
-	void ReleaseRootMerge();
+	void ReleaseRootMerge(TSharedPtr<FRootMerge, ESPMode::ThreadSafe> InMerge = nullptr);
 	FRetiringFrame& RegisterFrameSubmission(const FSnapshotPtr& InSnapshot, const FFrameSubmissionData& InData);
 	const FRenderSnapshot* NextRetiringFrame();
 	void RemoveRetiringFrame(const FRenderSnapshot& InSnapshot);
@@ -1481,6 +1536,7 @@ struct FVoxelTerrainRendererState : TSharedFromThis<FVoxelTerrainRendererState, 
 	uint64 LastFrame = MAX_uint64;
 	FGuid OwnerId;
 	TWeakObjectPtr<UVoxelTerrainPrimitiveComponent> Component;
+	TWeakObjectPtr<AActor> Host;
 	TStrongObjectPtr<UVoxelTerrainPrimitiveComponent> ComponentPin;
 	TSharedPtr<ISceneViewExtension, ESPMode::ThreadSafe> Extension;
 	TArray<FReadyTransaction> Ready;
@@ -1719,6 +1775,8 @@ namespace
 					Mesh.MaterialRenderProxy = Chunk->Material;
 					Mesh.Type = PT_TriangleList;
 					Mesh.DepthPriorityGroup = SDPG_World;
+					Mesh.bSelectable = true;
+					Mesh.bUseSelectionOutline = IsSelected();
 					Element.IndexBuffer = &Chunk->IndexBuffer;
 					Element.FirstIndex = FirstTriangle * 3;
 					Element.NumPrimitives = TriangleCount;
@@ -1836,6 +1894,16 @@ UVoxelTerrainPrimitiveComponent::~UVoxelTerrainPrimitiveComponent()
 int32 UVoxelTerrainPrimitiveComponent::GetNumMaterials() const
 {
 	return OverrideMaterials.Num();
+}
+
+UVoxelTerrainPrimitiveComponent* UVoxelTerrainPrimitiveComponent::DetachMaterialKeeper()
+{
+	check(IsInGameThread());
+	// 只迁移材质与授额；退休保持者不拥有场景组件、Actor 或已结束的 World。
+	auto* Keeper = NewObject<UVoxelTerrainPrimitiveComponent>(GetTransientPackage());
+	Keeper->OverrideMaterials = MoveTemp(OverrideMaterials);
+	Keeper->MaterialLease = MoveTemp(MaterialLease);
+	return Keeper;
 }
 
 int32 UVoxelTerrainPrimitiveComponent::RetainMaterial(UMaterialInterface* InMaterial, EVoxelTerrainResourceAdmission* OutAdmission)
@@ -2562,15 +2630,12 @@ void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 
 void FVoxelTerrainRendererState::ReleasePreparation(FReadyTransaction& InTransaction)
 {
-	if (InTransaction.SuspendedMerge)
+	if (RootMerge && RootMerge->Contains(InTransaction.Preparation)) ReleaseRootMerge();
+	for (auto& Pending : Ready)
 	{
-		const uint64 MergeToken = InTransaction.SuspendedMerge->Consumer.RequestSerial;
-		Scheduler.CancelMatching([this, MergeToken](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
-		{
-			return Kind == EVoxelTaskKind::BuildViewCoverage && Stamp.OwnerId == OwnerId &&
-				Stamp.OwnerIncarnation == 1 && Stamp.WorldEpoch == Epoch && Stamp.Token == MergeToken;
-		});
-		InTransaction.SuspendedMerge.Reset();
+		if (!Pending.SuspendedMerge || !Pending.SuspendedMerge->Contains(InTransaction.Preparation)) continue;
+		ReleaseRootMerge(Pending.SuspendedMerge);
+		break;
 	}
 	if (!InTransaction.Preparation) return;
 	const uint64 Token = InTransaction.Preparation->Consumer.RequestSerial;
@@ -2588,23 +2653,24 @@ void FVoxelTerrainRendererState::ReleasePreparation(FReadyTransaction& InTransac
 	InTransaction.Preparation.Reset();
 }
 
-void FVoxelTerrainRendererState::ReleaseRootMerge()
+void FVoxelTerrainRendererState::ReleaseRootMerge(TSharedPtr<FRootMerge, ESPMode::ThreadSafe> InMerge)
 {
-	if (!RootMerge) return;
-	// 实际 Current 输入已变或合并被取消时结束原尝试，后续输入使用新消费者。
-	if (auto* Pending = Ready.FindByPredicate([this](const FReadyTransaction& Candidate)
-		{ return Candidate.Preparation == RootMerge->Preparation && Candidate.MergeConsumer == RootMerge->Consumer; }))
+	if (!InMerge) InMerge = RootMerge;
+	if (!InMerge) return;
+	for (auto& Pending : Ready)
 	{
-		Pending->MergeConsumer = {};
-		Pending->bMergeCapacityBlocked = false;
+		if (Pending.MergeConsumer != InMerge->Consumer) continue;
+		Pending.SuspendedMerge.Reset();
+		Pending.MergeConsumer = {};
+		Pending.bMergeCapacityBlocked = false;
 	}
-	const uint64 Token = RootMerge->Consumer.RequestSerial;
+	const uint64 Token = InMerge->Consumer.RequestSerial;
 	Scheduler.CancelMatching([this, Token](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
 	{
 		return Kind == EVoxelTaskKind::BuildViewCoverage && Stamp.OwnerId == OwnerId &&
 			Stamp.OwnerIncarnation == 1 && Stamp.WorldEpoch == Epoch && Stamp.Token == Token;
 	});
-	RootMerge.Reset();
+	if (RootMerge == InMerge) RootMerge.Reset();
 }
 
 void FVoxelTerrainRendererState::TerminateTransaction(FReadyTransaction& InTransaction)
@@ -2615,7 +2681,7 @@ void FVoxelTerrainRendererState::TerminateTransaction(FReadyTransaction& InTrans
 	for (const auto& Change : InTransaction.Resources->CoarseChanges) PendingCoarseSources.Remove(Change.Item->SourceId);
 	TOptional<FVoxelFineHandoffTransaction> Canceled;
 	Handoff.RequestCancel(InTransaction.Id, Canceled);
-	if (RootMerge && RootMerge->Preparation == InTransaction.Preparation) ReleaseRootMerge();
+	if (RootMerge && RootMerge->Contains(InTransaction.Preparation)) ReleaseRootMerge();
 	ReleasePreparation(InTransaction);
 }
 
@@ -2813,32 +2879,43 @@ void FVoxelTerrainRendererState::AdvanceRootPreparations(const double InDeadline
 	}
 }
 
-bool FVoxelTerrainRendererState::BeginRootMerge(FReadyTransaction& InTransaction)
+bool FVoxelTerrainRendererState::BeginRootMerge(FReadyTransaction& InTransaction, const double InDeadline)
 {
 	check(InTransaction.Preparation && InTransaction.Preparation->bUploadComplete);
 	if (InTransaction.bTerminalFailure) return false;
-	if (InTransaction.Preparation->BaseSnapshot == LastSealedSnapshot) return true;
 	if (RootMerge && RootMerge->Current != LastSealedSnapshot) ReleaseRootMerge();
-	if (RootMerge) return RootMerge->Preparation == InTransaction.Preparation && RootMerge->bComplete;
+	if (RootMerge) return RootMerge->Contains(InTransaction.Preparation) && RootMerge->bComplete;
 	if (InTransaction.SuspendedMerge)
 	{
-		if (InTransaction.SuspendedMerge->Current == LastSealedSnapshot)
+		RootMerge = InTransaction.SuspendedMerge;
+		if (RootMerge->Current == LastSealedSnapshot)
 		{
-			RootMerge = MoveTemp(InTransaction.SuspendedMerge);
+			for (auto& Pending : Ready)
+				if (Pending.SuspendedMerge == RootMerge) Pending.SuspendedMerge.Reset();
 			RootMerge->bSuspended.Store(false);
 			return RootMerge->bComplete;
 		}
-		// 等待期间 Current 已推进，只撤销过期合并。已上传的局部 Prepared 仍可重用。
-		const uint64 Token = InTransaction.SuspendedMerge->Consumer.RequestSerial;
-		Scheduler.CancelMatching([this, Token](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
-		{
-			return Kind == EVoxelTaskKind::BuildViewCoverage && Stamp.OwnerId == OwnerId &&
-				Stamp.OwnerIncarnation == 1 && Stamp.WorldEpoch == Epoch && Stamp.Token == Token;
-		});
-		InTransaction.SuspendedMerge.Reset();
-		InTransaction.MergeConsumer = {};
-		InTransaction.bMergeCapacityBlocked = false;
+		ReleaseRootMerge();
 	}
+	TArray<TSharedPtr<FRootPreparation, ESPMode::ThreadSafe>, TInlineAllocator<VoxelNativeRootPreparationConcurrency>> Preparations;
+	Preparations.Add(InTransaction.Preparation);
+	for (auto& Pending : Ready)
+	{
+		if (Preparations.Num() == VoxelNativeRootPreparationConcurrency ||
+			PendingIssued.Num() + Preparations.Num() >= VoxelNativePublicationCapacity || FPlatformTime::Seconds() >= InDeadline) break;
+		if (&Pending == &InTransaction || Pending.bTerminalFailure || !Pending.Preparation ||
+			!Pending.Preparation->bUploadComplete || Pending.SuspendedMerge || Pending.bSealCapacityBlocked ||
+			Pending.bMergeCapacityBlocked) continue;
+		bool bConflict = false;
+		for (const auto& Prepared : Preparations)
+		{
+			bConflict |= Prepared->Publication->ConflictsWith(*Pending.Resources) ||
+				Prepared->Publication->SharesCoarseOwner(*Pending.Resources, LastSealedSnapshot ? LastSealedSnapshot->CoarseRoot : nullptr);
+		}
+		if (!bConflict) Preparations.Add(Pending.Preparation);
+	}
+	if (Preparations.Num() == 1 && InTransaction.Preparation->BaseSnapshot == LastSealedSnapshot) return true;
+
 	if (!InTransaction.MergeConsumer.IsValid())
 	{
 		if (NextMetadataSerial == MAX_uint64) { TerminateTransaction(InTransaction); return false; }
@@ -2859,9 +2936,14 @@ bool FVoxelTerrainRendererState::BeginRootMerge(FReadyTransaction& InTransaction
 	};
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 	FRendererBindingInputFloor InputFloor;
-	if (!InputFloor.Add(InputLease, Resources.Get()) || !InputFloor.Add(InTransaction.Preparation->InputLease, Resources.Get()) ||
-		!InputFloor.Add(InTransaction.Resources->CoarseCallbackLease, Resources.Get()))
-	{ RejectAdmission(true); return false; }
+	if (!InputFloor.Add(InputLease, Resources.Get())) { RejectAdmission(true); return false; }
+	for (const auto& Prepared : Preparations)
+	{
+		if (!InputFloor.Add(Prepared->InputLease, Resources.Get()) ||
+			!InputFloor.Add(Prepared->Publication->CoarseCallbackLease, Resources.Get()))
+		{ RejectAdmission(true); return false; }
+	}
+
 	const auto InputAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input,
 		RenderRootAllocationBytes<FRootMerge>(), Lease, 0, InputFloor.Bytes, InputFloor.LeaseCount);
 	if (InputAdmission != EVoxelTerrainResourceAdmission::Granted)
@@ -2870,7 +2952,14 @@ bool FVoxelTerrainRendererState::BeginRootMerge(FReadyTransaction& InTransaction
 		return false;
 	}
 	const auto Work = CreateRenderRoot<FRootMerge>(MoveTemp(Lease), Resources, Consumer);
-	Work->Begin(InTransaction.Preparation, LastSealedSnapshot);
+	Work->Begin(Preparations, LastSealedSnapshot);
+	// 根合并独占封帧通道：继承等待事务中的最高服务带，并排在该带距离前沿，避免被同带新任务长期越过。
+	EVoxelTerrainServiceBand MergeBand = InTransaction.Priority.Band;
+	for (const FReadyTransaction& Waiting : Ready)
+	{
+		if (MergeBand == EVoxelTerrainServiceBand::P0) break;
+		if (!Waiting.bTerminalFailure && uint8(Waiting.Priority.Band) < uint8(MergeBand)) MergeBand = Waiting.Priority.Band;
+	}
 	FVoxelTaskRequest Request;
 	Request.Kind = EVoxelTaskKind::BuildViewCoverage;
 	Request.Stamp.OwnerId = OwnerId;
@@ -2878,22 +2967,18 @@ bool FVoxelTerrainRendererState::BeginRootMerge(FReadyTransaction& InTransaction
 	Request.Stamp.WorldEpoch = Epoch;
 	Request.Stamp.Token = Consumer.RequestSerial;
 	Request.Stamp.Section = FIntVector(MIN_int32, 9, 0);
-	Request.WorkClass = InTransaction.Priority.Band == EVoxelTerrainServiceBand::P0 ? EVoxelWorkClass::Critical : EVoxelWorkClass::Visible;
-	Request.ServiceBand = InTransaction.Priority.Band;
+	Request.WorkClass = MergeBand == EVoxelTerrainServiceBand::P0 ? EVoxelWorkClass::Critical : EVoxelWorkClass::Visible;
+	Request.ServiceBand = MergeBand;
 	Request.SourceStableKey = InTransaction.Priority.SourceStableKey;
 	Request.SourcePriority = InTransaction.Priority.SourcePriority;
-	Request.DistanceScore = InTransaction.Priority.DistanceCells;
-	Request.ForwardScore = InTransaction.Priority.ForwardScore;
+	Request.DistanceScore = 0.0;
+	Request.ForwardScore = 1.0;
 	Request.FirstRunnableSeconds = InTransaction.FirstQueuedSeconds;
 	Request.bResumable = Request.bPublicationContinuation = true;
 	Request.InputBytes = Work->InputLease->Bytes();
 	Request.GenerationConsumer = Work->Consumer;
 	FRendererBindingInputFloor BindingInput;
-	if (!BindingInput.Add(Work->InputLease, Resources.Get()) ||
-		!BindingInput.Add(Work->Preparation->ControlInputLease, Resources.Get()) ||
-		!BindingInput.Add(Work->Preparation->InputLease, Resources.Get()) ||
-		!BindingInput.Add(Work->Preparation->PrimaryPathLease, Resources.Get()) ||
-		!BindingInput.Add(Work->Preparation->Publication->Lease, Resources.Get()))
+	if (!Work->AddBindingInputs(BindingInput))
 	{
 		RejectAdmission(true);
 		return false;
@@ -2939,24 +3024,27 @@ bool FVoxelTerrainRendererState::BeginRootMerge(FReadyTransaction& InTransaction
 		if (!Pinned || !Pinned->bActive.Load() || Result.Stamp.WorldEpoch != Pinned->Epoch ||
 			Result.Stamp.OwnerId != Pinned->OwnerId || Result.Stamp.OwnerIncarnation != 1 ||
 			Result.Stamp.Token != Work->Consumer.RequestSerial) return;
-		const int32 Index = Pinned->Ready.IndexOfByPredicate([&Pinned, &Work](const FReadyTransaction& Pending)
+		if (Pinned->RootMerge != Work && !Pinned->Ready.ContainsByPredicate([&Work](const FReadyTransaction& Pending)
 		{
-			return Pending.Preparation == Work->Preparation && Pending.MergeConsumer == Work->Consumer &&
-				(Pinned->RootMerge == Work || Pending.SuspendedMerge == Work);
-		});
-		if (Index == INDEX_NONE) return;
+			return Pending.SuspendedMerge == Work;
+		})) return;
 		if (Result.bSuccess && !Result.bCanceled)
 		{
 			Work->bComplete = true;
-			Work->Preparation->Publication->MergeReceipt = Result.WorkReceipt;
+			for (const auto& Entry : Work->Entries) Entry.Preparation->Publication->MergeReceipt = Result.WorkReceipt;
 			return;
 		}
-		// 叶子冲突只重做该事务；其他准备及 Current 不受影响。
+		const auto Failed = Work->Entries[FMath::Min(Work->MergeIndex, Work->Entries.Num() - 1)].Preparation;
+		Pinned->ReleaseRootMerge(Work);
+		const int32 Index = Pinned->Ready.IndexOfByPredicate([&Failed](const FReadyTransaction& Pending)
+		{
+			return Pending.Preparation == Failed;
+		});
+		if (Index == INDEX_NONE) return;
 		if (Pinned->Scheduler.IsTerminal({Result.Kind, Result.Stamp}) ||
 			Result.Error.StartsWith(TEXT("Oversized")) || Result.Error.StartsWith(TEXT("CapacityUnachievable")))
 			Pinned->TerminateTransaction(Pinned->Ready[Index]);
 		else Pinned->ReleasePreparation(Pinned->Ready[Index]);
-		if (Pinned->RootMerge == Work) Pinned->RootMerge.Reset();
 	}, CallbackBindingError))
 		{
 			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
@@ -2971,6 +3059,8 @@ bool FVoxelTerrainRendererState::BeginRootMerge(FReadyTransaction& InTransaction
 		RejectAdmission(RendererIsTerminalAdmission(Request.Blocked));
 		return false;
 	}
+	for (auto& Pending : Ready)
+		if (Work->Contains(Pending.Preparation)) Pending.MergeConsumer = Consumer;
 	RootMerge = Work;
 	return false;
 }
@@ -3058,61 +3148,105 @@ FSnapshotPtr FVoxelTerrainRendererState::SealFrameSnapshot(const uint64 InFrameC
 			SealCostMicroseconds = FMath::Lerp(SealCostMicroseconds, Actual, 0.15);
 		}
 	};
-	FReadyTransaction& Pending = Ready[Index];
-	if (!Pending.SealConsumer.IsValid())
-		Pending.SealConsumer = FVoxelGenerationConsumerKey::Section(Epoch, OwnerId, 1, {}, ++NextMetadataSerial);
-	if (Pending.bSealCapacityBlocked && !RendererHasExternalRelease(Resources, Pending.SealConsumer, Pending.SealCapacityVersion))
-		return LastSealedSnapshot;
-	Pending.bSealCapacityBlocked = false;
-	const uint64 BeforeSeal = Resources->ReleaseVersionExcludingOwner(Pending.SealConsumer);
+	if (!BeginRootMerge(Ready[Index], Deadline)) return LastSealedSnapshot;
+	TArray<FRootMerge::FEntry, TInlineAllocator<VoxelNativeRootPreparationConcurrency>> Entries;
+	if (RootMerge) Entries.Append(RootMerge->Entries);
+	else Entries.Add({Ready[Index].Preparation, Ready[Index].Preparation->Root, Ready[Index].Preparation->CoarseRoot});
+	const auto FindPending = [this](const FRootMerge::FEntry& Entry)
+	{
+		return Ready.IndexOfByPredicate([&Entry](const FReadyTransaction& Pending)
+		{
+			return Pending.Preparation == Entry.Preparation;
+		});
+	};
+	const auto InterfacesCurrent = [](const FReadyTransaction& Pending, const FVoxelFineHandoffTransaction& Transaction,
+		const FVoxelTaskCustomPayload& Publication)
+	{
+		if (&Publication != Pending.Resources.Get() || Transaction.Changes.Num() != Pending.Resources->Atoms.Num()) return false;
+		for (const auto& Atom : Pending.Resources->Atoms)
+		{
+			if (!Atom->IsResourceReady()) return false;
+			for (const auto& Boundary : Atom->Boundaries)
+				if (!Boundary || !Boundary->Validate() || Boundary->Input.WorldEpoch != Transaction.WorldEpoch ||
+					Boundary->Input.DataRevision != Atom->Evidence.Content.DataRevision ||
+					Boundary->Input.OverlayRevision != Atom->Evidence.Content.OverlayRevision) return false;
+		}
+		return true;
+	};
+	// 封存前检查完整批次；任何过期成员都不得出现在待发布的聚合根中。
+	for (const auto& Entry : Entries)
+	{
+		const int32 PendingIndex = FindPending(Entry);
+		if (PendingIndex == INDEX_NONE)
+		{
+			ReleaseRootMerge();
+			return LastSealedSnapshot;
+		}
+		auto& Pending = Ready[PendingIndex];
+		FString Error;
+		const bool bRemoveCurrent = !Pending.Resources->CoarseChanges.ContainsByPredicate([this](const FVoxelTerrainCoarseMutation& Change)
+		{
+			return Change.bRemove && (!LastSealedSnapshot || !SameCoarseGeometry(FindCoarseItem(LastSealedSnapshot->CoarseRoot,
+				Change.Item->Geometry->Stamp.GeometryIdentity.Key, Change.Item->SourceId), Change.Item));
+		});
+		const auto* Transaction = Pending.Resources->CoarseChanges.IsEmpty() ? Handoff.FindTransaction(Pending.Id) : nullptr;
+		const bool bCurrent = !Pending.Resources->CoarseChanges.IsEmpty() ?
+			bRemoveCurrent && Pending.IsCoarseCurrent && Pending.IsCoarseCurrent() :
+			Transaction && Handoff.ValidateBeforeSeal(Pending.Id, Pending.IsCurrent, Pending.IsCollisionCurrent, Error) &&
+			InterfacesCurrent(Pending, *Transaction, *Pending.Resources);
+		if (!bCurrent)
+		{
+			AdvanceCoarseAdmissionVersion();
+			for (const auto& Change : Pending.Resources->CoarseChanges) PendingCoarseSources.Remove(Change.Item->SourceId);
+			TOptional<FVoxelFineHandoffTransaction> Canceled;
+			Handoff.RequestCancel(Pending.Id, Canceled);
+			ReleasePreparation(Pending);
+			RemoveReady(PendingIndex);
+			return LastSealedSnapshot;
+		}
+		if (FPlatformTime::Seconds() >= Deadline) return LastSealedSnapshot;
+	}
+	FReadyTransaction& Head = Ready[Index];
+	if (!Head.SealConsumer.IsValid())
+		Head.SealConsumer = FVoxelGenerationConsumerKey::Section(Epoch, OwnerId, 1, {}, ++NextMetadataSerial);
+	const auto Consumer = Head.SealConsumer;
+	if (Head.bSealCapacityBlocked && !RendererHasExternalRelease(Resources, Consumer, Head.SealCapacityVersion)) return LastSealedSnapshot;
+	Head.bSealCapacityBlocked = false;
+	const uint64 BeforeSeal = Resources->ReleaseVersionExcludingOwner(Consumer);
 	const auto ObserveSealAdmission = [&](const EVoxelTerrainResourceAdmission Admission)
 	{
 		if (Admission == EVoxelTerrainResourceAdmission::Granted) return true;
 		if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
 		{
-			Pending.bSealCapacityBlocked = true;
-			Pending.SealCapacityVersion = BeforeSeal;
+			Head.bSealCapacityBlocked = true;
+			Head.SealCapacityVersion = BeforeSeal;
 		}
-		else TerminateTransaction(Pending);
+		else TerminateTransaction(Head);
 		return false;
 	};
-	FString Error;
-	const bool bRemoveCurrent = !Pending.Resources->CoarseChanges.ContainsByPredicate([this](const FVoxelTerrainCoarseMutation& Change)
+	FRendererBindingInputFloor Floor;
+	if (!Floor.Add(InputLease, Resources.Get()) || (RootMerge && !RootMerge->AddBindingInputs(Floor)))
 	{
-		return Change.bRemove && (!LastSealedSnapshot || !SameCoarseGeometry(FindCoarseItem(LastSealedSnapshot->CoarseRoot,
-			Change.Item->Geometry->Stamp.GeometryIdentity.Key, Change.Item->SourceId), Change.Item));
-	});
-	const bool bCurrent = !Pending.Resources->CoarseChanges.IsEmpty() ? bRemoveCurrent && Pending.IsCoarseCurrent && Pending.IsCoarseCurrent() :
-		Handoff.ValidateBeforeSeal(Pending.Id, Pending.IsCurrent, Pending.IsCollisionCurrent, Error);
-	if (!bCurrent)
-	{
-		AdvanceCoarseAdmissionVersion();
-		for (const auto& Change : Pending.Resources->CoarseChanges) PendingCoarseSources.Remove(Change.Item->SourceId);
-		TOptional<FVoxelFineHandoffTransaction> Canceled;
-		Handoff.RequestCancel(Pending.Id, Canceled);
-		ReleasePreparation(Pending);
-		AdvanceCoarseAdmissionVersion();
-		RemoveReady(Index);
-		if (RootMerge)
-		{
-			const uint64 Token = RootMerge->Consumer.RequestSerial;
-			Scheduler.CancelMatching([this, Token](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
-			{
-				return Kind == EVoxelTaskKind::BuildViewCoverage && Stamp.OwnerId == OwnerId &&
-					Stamp.OwnerIncarnation == 1 && Stamp.WorldEpoch == Epoch && Stamp.Token == Token;
-			});
-			RootMerge.Reset();
-		}
+		ObserveSealAdmission(EVoxelTerrainResourceAdmission::InvalidRequest);
 		return LastSealedSnapshot;
 	}
-	if (!ObserveSealAdmission(TryTransferPublicationLease(Resources.Get(), Pending.Resources->Lease,
-		Pending.Preparation->bAllowResidentOverlap))) return LastSealedSnapshot;
-	for (const auto& Atom : Pending.Resources->Atoms)
-		if (!ObserveSealAdmission(TryTransferPublicationLease(Resources.Get(), Atom->MetadataLease,
-			Pending.Preparation->bAllowResidentOverlap))) return LastSealedSnapshot;
-	if (!BeginRootMerge(Pending)) return LastSealedSnapshot;
-	int64 RetiredAtomCount = Pending.Resources->Atoms.Num();
-	int32 ReceiptAtomCount = Pending.Resources->Atoms.Num();
+	int64 RetiredAtomCount = 0;
+	int32 ReceiptAtomCount = 0;
+	for (const auto& Entry : Entries)
+	{
+		const auto& Prepared = *Entry.Preparation;
+		if (!ObserveSealAdmission(TryTransferPublicationLease(Resources.Get(), Prepared.Publication->Lease, Prepared.bAllowResidentOverlap))) return LastSealedSnapshot;
+		for (const auto& Atom : Prepared.Publication->Atoms)
+			if (!ObserveSealAdmission(TryTransferPublicationLease(Resources.Get(), Atom->MetadataLease, Prepared.bAllowResidentOverlap))) return LastSealedSnapshot;
+		if (!Floor.Add(Prepared.InputLease, Resources.Get()) || !Floor.Add(Prepared.Publication->CoarseCallbackLease, Resources.Get()) ||
+			!Floor.Add(Prepared.PrimaryPathLease, Resources.Get()) || !Floor.Add(Prepared.Publication->Lease, Resources.Get()))
+		{
+			ObserveSealAdmission(EVoxelTerrainResourceAdmission::InvalidRequest);
+			return LastSealedSnapshot;
+		}
+		RetiredAtomCount += Prepared.Publication->Atoms.Num();
+		ReceiptAtomCount = FMath::Max(ReceiptAtomCount, Prepared.Publication->Atoms.Num());
+	}
 	for (const auto& Issued : PendingIssued)
 	{
 		const int32 Atoms = Issued.Handoff ? Issued.Handoff->Transaction.Changes.Num() : 0;
@@ -3124,87 +3258,89 @@ FSnapshotPtr FVoxelTerrainRendererState::SealFrameSnapshot(const uint64 InFrameC
 		ObserveSealAdmission(EVoxelTerrainResourceAdmission::CapacityUnachievable);
 		return LastSealedSnapshot;
 	}
-	// 帧携带固定回执槽、退休头和全部潜在旧 Atom/事务/临时回执数组，先授予再分配。
+	const int32 IssuedCapacity = PendingIssued.Num() + Entries.Num();
 	const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FRenderSnapshot>() +
-		VoxelBoundedAllocation::ArrayBytes<FFrozenPublication>(PendingIssued.Num() + 1) +
+		VoxelBoundedAllocation::ArrayBytes<FFrozenPublication>(IssuedCapacity) +
 		VoxelBoundedAllocation::ArrayBytes<FVoxelFinePresentedAtom>(int32(RetiredAtomCount)) +
 		VoxelBoundedAllocation::ArrayBytes<FVoxelFineRenderReceiptAtom>(ReceiptAtomCount) +
-		VoxelBoundedAllocation::ArrayBytes<FGuid>(PendingIssued.Num() + 1);
-	const auto Consumer = Pending.SealConsumer;
+		VoxelBoundedAllocation::ArrayBytes<FGuid>(IssuedCapacity);
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	FRendererBindingInputFloor Floor;
-	if (!Floor.Add(Pending.Preparation->InputLease, Resources.Get()) ||
-		!Floor.Add(InputLease, Resources.Get()) ||
-		!Floor.Add(Pending.Resources->CoarseCallbackLease, Resources.Get()) ||
-		!Floor.Add(Pending.Preparation->PrimaryPathLease, Resources.Get()) || !Floor.Add(Pending.Resources->Lease, Resources.Get()) ||
-		!Floor.Add(RootMerge ? RootMerge->InputLease : nullptr, Resources.Get()))
-	{
-		ObserveSealAdmission(EVoxelTerrainResourceAdmission::InvalidRequest);
-		return LastSealedSnapshot;
-	}
 	if (!ObserveSealAdmission(TryAcquirePublicationResident(Resources, Consumer, Bytes, Lease, 0,
-		Pending.Preparation->bAllowResidentOverlap, Floor.Bytes, Floor.LeaseCount))) return LastSealedSnapshot;
+		Head.Preparation->bAllowResidentOverlap, Floor.Bytes, Floor.LeaseCount))) return LastSealedSnapshot;
 	auto Snapshot = VoxelBoundedAllocation::MakeWorkerShared<FRenderSnapshot>(Lease);
 	Snapshot->Lease = MoveTemp(Lease);
 	Snapshot->Retirement.PreviousAtoms.Reserve(int32(RetiredAtomCount));
 	Snapshot->Retirement.ReceiptScratch.Reserve(ReceiptAtomCount);
-	Snapshot->Retirement.SettledTransactions.Reserve(PendingIssued.Num() + 1);
+	Snapshot->Retirement.SettledTransactions.Reserve(IssuedCapacity);
 	Snapshot->WorldEpoch = Epoch;
 	Snapshot->Serial = ++NextPresentation;
 	Snapshot->FrameCounter = InFrameCounter;
-	Snapshot->Root = RootMerge ? RootMerge->Fine.GetResult() : Pending.Preparation->Root;
-	Snapshot->CoarseRoot = RootMerge ? RootMerge->Coarse.GetResult() : Pending.Preparation->CoarseRoot;
-	Snapshot->Issued.Reserve(PendingIssued.Num() + 1);
+	Snapshot->Root = LastSealedSnapshot ? LastSealedSnapshot->Root : nullptr;
+	Snapshot->CoarseRoot = LastSealedSnapshot ? LastSealedSnapshot->CoarseRoot : nullptr;
+	Snapshot->Issued.Reserve(IssuedCapacity);
 	check(VoxelBoundedAllocation::WorkerSharedBytes<FRenderSnapshot>() + Snapshot->Issued.GetAllocatedSize() +
 		Snapshot->Retirement.PreviousAtoms.GetAllocatedSize() + Snapshot->Retirement.ReceiptScratch.GetAllocatedSize() +
 		Snapshot->Retirement.SettledTransactions.GetAllocatedSize() <= Bytes);
 	Snapshot->Issued.Append(PendingIssued);
 	const FVoxelFinePublishStamp Stamp{Epoch, Snapshot->Serial, InFrameCounter};
-	TSharedPtr<const FVoxelFineFrozenHandoff, ESPMode::ThreadSafe> Frozen;
-	if (Pending.Resources->CoarseChanges.IsEmpty())
+	// 合并输出已完成且仍由本地引用持有；解除在途关联后逐项交给独立回执。
+	const auto Batch = MoveTemp(RootMerge);
+	for (auto& Pending : Ready)
 	{
-		const auto InterfacesCurrent = [&Pending](const FVoxelFineHandoffTransaction& Transaction, const FVoxelTaskCustomPayload& Publication)
-		{
-			if (&Publication != Pending.Resources.Get() || Transaction.Changes.Num() != Pending.Resources->Atoms.Num()) return false;
-			for (const auto& Atom : Pending.Resources->Atoms)
+		if (!Batch || Pending.MergeConsumer != Batch->Consumer) continue;
+		Pending.MergeConsumer = {};
+		Pending.bMergeCapacityBlocked = false;
+		Pending.SuspendedMerge.Reset();
+	}
+	int32 SealedCount = 0;
+	for (const auto& Entry : Entries)
+	{
+		if (FPlatformTime::Seconds() >= Deadline) break;
+		const int32 PendingIndex = FindPending(Entry);
+		check(PendingIndex != INDEX_NONE);
+		auto& Pending = Ready[PendingIndex];
+		TSharedPtr<const FVoxelFineFrozenHandoff, ESPMode::ThreadSafe> Frozen;
+		FString Error;
+		if (Pending.Resources->CoarseChanges.IsEmpty() && !Handoff.SealTransaction(Pending.Id, Stamp, Pending.Resources,
+			Pending.IsCurrent, Pending.IsCollisionCurrent,
+			[&Pending, &InterfacesCurrent](const FVoxelFineHandoffTransaction& Transaction, const FVoxelTaskCustomPayload& Publication)
 			{
-				if (!Atom->IsResourceReady()) return false;
-				for (const auto& Boundary : Atom->Boundaries)
-					if (!Boundary || !Boundary->Validate() || Boundary->Input.WorldEpoch != Transaction.WorldEpoch ||
-						Boundary->Input.DataRevision != Atom->Evidence.Content.DataRevision ||
-						Boundary->Input.OverlayRevision != Atom->Evidence.Content.OverlayRevision) return false;
-			}
-			return true;
-		};
-		if (!Handoff.SealTransaction(Pending.Id, Stamp, Pending.Resources, Pending.IsCurrent, Pending.IsCollisionCurrent,
-			InterfacesCurrent, Frozen, Error))
+				return InterfacesCurrent(Pending, Transaction, Publication);
+			}, Frozen, Error))
 		{
 			TOptional<FVoxelFineHandoffTransaction> Canceled;
 			Handoff.RequestCancel(Pending.Id, Canceled);
 			ReleasePreparation(Pending);
 			AdvanceCoarseAdmissionVersion();
-			RemoveReady(Index);
-			RootMerge.Reset();
-			return LastSealedSnapshot;
+			RemoveReady(PendingIndex);
+			break;
 		}
+		Pending.Resources->Stamp = Stamp;
+		Snapshot->Issued.Add({Frozen, Pending.Resources});
+		Pending.Resources->PendingIssuedIndex = PendingIssued.Add({Frozen, Pending.Resources});
+		SubmittedCallbacks.Add(Pending.Id, MoveTemp(Pending.OnSubmitted));
+		Snapshot->Root = Entry.Root;
+		Snapshot->CoarseRoot = Entry.CoarseRoot;
+		Pending.Resources->Lease->MarkPublished();
+		if (Pending.Resources->CoarseCallbackLease) Pending.Resources->CoarseCallbackLease->MarkPublished();
+		for (const auto& Atom : Pending.Resources->Atoms) Atom->MetadataLease->MarkPublished();
+		ReleasePreparation(Pending);
+		AdvanceCoarseAdmissionVersion();
+		RemoveReady(PendingIndex);
+		++SealedCount;
 	}
-	Pending.Resources->Stamp = Stamp;
-	Snapshot->Issued.Add({Frozen, Pending.Resources});
-	Pending.Resources->PendingIssuedIndex = PendingIssued.Add({Frozen, Pending.Resources});
-	SubmittedCallbacks.Add(Pending.Id, MoveTemp(Pending.OnSubmitted));
-	ReleasePreparation(Pending);
-	AdvanceCoarseAdmissionVersion();
-	RemoveReady(Index);
+	if (!SealedCount) return LastSealedSnapshot;
 	LastFrame = InFrameCounter;
 	LastSealedSnapshot = Snapshot;
 	Snapshot->Lease->MarkPublished();
-	const auto& Published = Snapshot->Issued.Last().Resources;
-	Published->Lease->MarkPublished();
-	if (Published->CoarseCallbackLease) Published->CoarseCallbackLease->MarkPublished();
-	for (const auto& Atom : Published->Atoms) Atom->MetadataLease->MarkPublished();
-	RootMerge.Reset();
+#if !UE_BUILD_SHIPPING
+	if (SealedCount > 1)
+		UE_LOG(LogTemp, Display, TEXT("Native batch sealed: serial=%llu transactions=%d prepared=%d ready=%d"),
+			Snapshot->Serial, SealedCount, Entries.Num(), Ready.Num());
+#endif
 	return Snapshot;
 }
+
 bool FVoxelTerrainRendererState::PrepareMetadata()
 {
 	if (MetadataLease) return true;
@@ -3288,7 +3424,14 @@ void FVoxelTerrainRenderer::AdvanceFramePublication()
 						State->Ready[Index].MergeCapacityVersion = State->RootMerge->CapacityVersion.Load();
 					}
 					State->RootMerge->bSuspended.Store(true);
-					State->Ready[Index].SuspendedMerge = MoveTemp(State->RootMerge);
+					for (auto& Pending : State->Ready)
+						if (State->RootMerge->Contains(Pending.Preparation))
+						{
+							Pending.SuspendedMerge = State->RootMerge;
+							Pending.bMergeCapacityBlocked = State->Ready[Index].bMergeCapacityBlocked;
+							Pending.MergeCapacityVersion = State->Ready[Index].MergeCapacityVersion;
+						}
+					State->RootMerge.Reset();
 				}
 				else if (Index == INDEX_NONE) State->ReleaseRootMerge();
 			}
@@ -3849,7 +3992,12 @@ void FVoxelTerrainRenderer::Reset()
 	{
 		Component->UnregisterComponent();
 		Component->TerrainState.Reset();
+		State->ComponentPin.Reset(Component->DetachMaterialKeeper());
+		Component->DestroyComponent();
 	}
+	State->Component.Reset();
+	if (AActor* Host = State->Host.Get()) Host->Destroy();
+	State->Host.Reset();
 	// 关闭之后继续由独立退休服务消费已发行帧；不依赖已销毁的 Module。
 	FTSTicker::GetCoreTicker().AddTicker(TEXT("VoxelTerrainRetirement"), 0.0f,
 		TUniqueFunction<bool(float)>(FVoxelRendererRetirement{State}));

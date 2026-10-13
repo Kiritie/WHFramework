@@ -351,7 +351,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 						Ready->Updates[UpdateIndex].GroupIndex = GroupIndex;
 				Publisher.RefreshGroupOrder(Ready);
 				for (int32 Index = 0; Index < Ready->Updates.Num(); ++Index) Publisher.IndexPublicationUpdate(Ready, Index);
-				for (const auto& Pair : Ready->Visibility) Publisher.ActorVisibilityGenerations.FindOrAdd(Pair.Key).Add({Ready, Pair.Value});
+				for (const auto& Pair : Ready->Visibility) Publisher.SourceVisibilityGenerations.FindOrAdd(Pair.Key).Add({Ready, Pair.Value});
 				for (const auto& Group : Ready->Groups)
 					for (const auto& Key : Group.Keys) Publisher.SetOwnerActive(Key, Ready->Serial, true);
 				Publisher.bPrioritiesDirty = true;
@@ -415,7 +415,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			InTest->TestEqual(TEXT("Empty child ownership joins its parent handoff"), LogicalPublication->Groups.Num(), 1);
 			if (LogicalPublication->Groups.Num() == 1)
 				InTest->TestEqual(TEXT("Both logical owner keys commit in one component"), LogicalPublication->Groups[0].Keys.Num(), 2);
-			AActor* Actor = FixtureWorld->SpawnActor<AActor>();
+			FVoxelViewSourceId SourceId = FVoxelViewSourceId::NewId();
 			const FVoxelPublishGroupKey Surface{1, {0, 0}, 1};
 			uint64 FixtureSourceToken = 0;
 			const FVoxelTerrainGeometry FixtureGeometry{{EVoxelTerrainRepresentation::VoxelProxy, FIntVector::ZeroValue, 1},
@@ -484,7 +484,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 				InTest->AddError(TEXT("Native fixture failed to complete its funded index tree"));
 				return TSharedPtr<const FVoxelTerrainCoarseMesh, ESPMode::ThreadSafe>();
 			};
-			auto& Entry = Publisher.Entries.Add(Actor);
+			auto& Entry = Publisher.Entries.Add(SourceId);
 			Entry.GroupKey = Surface;
 			Entry.Scale = Module->BlockSize();
 			Entry.Bounds = FBox(FVector::ZeroVector, FVector(32.0));
@@ -512,8 +512,8 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			const TArray<FBox> InitialLayer{FBox(FVector(0, 0, -100), FVector(4, 4, 100))};
 			const FGuid InitialGroup = Publisher.BeginGroup(Surface);
 			if (!InTest->TestTrue(TEXT("Initial source enters the actual native producer"), Publisher.StageImmutable(
-				InitialGroup, Actor, FVector::ZeroVector, Module->BlockSize(), CommittedSource, 2) &&
-				Publisher.SetCoverage(InitialGroup, Actor, InitialLayer) && Publisher.CommitGroup(InitialGroup))) co_return;
+				InitialGroup, SourceId, FVector::ZeroVector, Module->BlockSize(), CommittedSource, 2) &&
+				Publisher.SetCoverage(InitialGroup, SourceId, InitialLayer) && Publisher.CommitGroup(InitialGroup))) co_return;
 			const double InitialDeadline = FPlatformTime::Seconds() + 10.0;
 			while ((Publisher.IsBusy() || !Publisher.GetTerrainRenderer().HasPresentedCoverage(FBox(FVector::ZeroVector, FVector(32)))) &&
 				FPlatformTime::Seconds() < InitialDeadline)
@@ -543,7 +543,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			Shared->Add(FBox(FVector(8, 8, -100), FVector(12, 12, 100)));
 			const FGuid SharedGroup = Publisher.BeginGroup(Surface);
 			InTest->TestTrue(TEXT("Fine can clip a committed coarse owner while its replacement topology is pending"),
-				Publisher.SetSharedCoverage(SharedGroup, Actor, Shared));
+				Publisher.SetSharedCoverage(SharedGroup, SourceId, Shared));
 			InTest->TestTrue(TEXT("Shared clipping preserves the committed source instead of publishing the pending replacement"),
 				Publisher.PendingUpdates.Num() == 1 && Publisher.PendingUpdates[0].Source == CommittedSource);
 			InTest->TestTrue(TEXT("Retained source keeps its complete immutable identity and actual pose while a replacement pose is pending"),
@@ -574,7 +574,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			InTest->TestTrue(TEXT("Retained publication reaches the actual native presented coverage mirror"),
 				Publisher.GetTerrainRenderer().HasPresentedCoverage(FBox(FVector::ZeroVector, FVector(32))));
 			InTest->TestTrue(TEXT("Actual source commits at its frozen pose while the staged replacement pose stays dirty"),
-				Actor->GetActorLocation() == FVector::ZeroVector && Entry.Location == PendingLocation && Entry.bDirty);
+				Entry.NativeMesh && Entry.NativeMesh->WorldCellOrigin == FVector::ZeroVector && Entry.Location == PendingLocation && Entry.bDirty);
 			InTest->TestEqual(TEXT("Shared clipping preserves the committed coarse layer exclusion"), Entry.LocalWorldBoxes.Num(), 1);
 			InTest->TestEqual(TEXT("Both coarse and Fine exclusions reach the committed coverage"), Entry.Exclusions.Num(), 2);
 			InTest->TestTrue(TEXT("The pending coarse source remains dirty after retained-source clipping"), Entry.bDirty);
@@ -585,7 +585,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			const FGuid RetryGroup = Publisher.BeginGroup(Surface);
 			const auto ChangedShared = MakeShared<TArray<FBox>, ESPMode::ThreadSafe>();
 			ChangedShared->Add(FBox(FVector(16, 16, -100), FVector(20, 20, 100)));
-			Publisher.SetSharedCoverage(RetryGroup, Actor, ChangedShared);
+			Publisher.SetSharedCoverage(RetryGroup, SourceId, ChangedShared);
 			InTest->TestTrue(TEXT("Retained coverage accepts the exact native index and full source identity"),
 				Publisher.PendingUpdates.Num() == 1 && Publisher.PendingUpdates[0].NativeMesh == Entry.NativeMesh &&
 				Publisher.PendingUpdates[0].NativeStamp == CommittedSource->Stamp);
@@ -629,7 +629,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			const auto CancelSource = Entry.Source;
 			const FGuid NativeCancelGroup = Publisher.BeginGroup(Surface);
 			if (!InTest->TestTrue(TEXT("The pending replacement enters its actual native source publication"),
-				Publisher.SetCoverage(NativeCancelGroup, Actor, Entry.LocalWorldBoxes, ChangedShared))) co_return;
+				Publisher.SetCoverage(NativeCancelGroup, SourceId, Entry.LocalWorldBoxes, ChangedShared))) co_return;
 			Publisher.CommitGroup(NativeCancelGroup);
 			TSharedPtr<FVoxelViewPublisher::FPublication> NativeCancelPublication;
 			const double NativeCancelDeadline = FPlatformTime::Seconds() + 10.0;
@@ -684,7 +684,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			Publisher.Publications.Add(WaitingFine);
 			SignalFixtureReady(WaitingFine);
 			const FGuid NoopGroup = Publisher.BeginGroup(Surface);
-			Publisher.SetSharedCoverage(NoopGroup, Actor, ChangedShared);
+			Publisher.SetSharedCoverage(NoopGroup, SourceId, ChangedShared);
 			Publisher.SetOwnershipChanged(NoopGroup, false);
 			Publisher.CommitGroup(NoopGroup);
 			const double NoopDeadline = FPlatformTime::Seconds() + 10.0;
@@ -701,7 +701,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			const FGuid ChangedGroup = Publisher.BeginGroup(Surface);
 			const auto NewShared = MakeShared<TArray<FBox>, ESPMode::ThreadSafe>();
 			NewShared->Add(FBox(FVector(10, 10, -100), FVector(14, 14, 100)));
-			Publisher.SetSharedCoverage(ChangedGroup, Actor, NewShared);
+			Publisher.SetSharedCoverage(ChangedGroup, SourceId, NewShared);
 			Publisher.SetOwnershipChanged(ChangedGroup, false);
 			Publisher.CommitGroup(ChangedGroup);
 			for (int32 Tick = 0; Tick < 16; ++Tick)
@@ -741,7 +741,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			ProjectedOwner->Updates.SetNum(1);
 			ProjectedOwner->PreparedMeshes.SetNum(1);
 			auto& ProjectedUpdate = ProjectedOwner->Updates[0];
-			ProjectedUpdate.Actor = Actor;
+			ProjectedUpdate.SourceId = SourceId;
 			ProjectedUpdate.GroupIndex = 0;
 			const auto ProjectedSource = MakeNativeSource(Publisher, Scheduler);
 			ProjectedUpdate.NativeStamp = ProjectedSource->Stamp;
@@ -757,15 +757,15 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			ProjectedGroup.Keys.Add(Surface);
 			ProjectedGroup.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Surface, Module->BlockSize());
 			ProjectedGroup.UpdateIndices.Add(0);
-			ProjectedGroup.VisibilityActors.Add(Actor);
-			ProjectedOwner->Visibility.Add(Actor, true);
+			ProjectedGroup.VisibilitySources.Add(SourceId);
+			ProjectedOwner->Visibility.Add(SourceId, true);
 			Publisher.Publications.Add(ProjectedOwner);
 			SignalFixtureReady(ProjectedOwner);
 			const FGuid RestoreGroup = Publisher.BeginGroup(Surface);
-			Publisher.SetSharedCoverage(RestoreGroup, Actor, NewShared);
-			Publisher.SetHidden(RestoreGroup, Actor, false);
+			Publisher.SetSharedCoverage(RestoreGroup, SourceId, NewShared);
+			Publisher.SetHidden(RestoreGroup, SourceId, false);
 			InTest->TestTrue(TEXT("A later show request is retained while an earlier hide is in flight"),
-				Publisher.PendingVisibility.Contains(Actor));
+				Publisher.PendingVisibility.Contains(SourceId));
 			Publisher.SetOwnershipChanged(RestoreGroup, false);
 			Publisher.CommitGroup(RestoreGroup);
 			for (int32 Tick = 0; Tick < 16; ++Tick)
@@ -799,11 +799,11 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			InTest->TestTrue(TEXT("The later owner generation restores its requested coverage"), Entry.Exclusions.Contains((*NewShared)[0]));
 			InTest->TestTrue(TEXT("Shared clipping retains the preceding generation's source and layer exclusions"),
 				Entry.PresentedSource == ProjectedSource && Entry.LocalWorldBoxes == ProjectedLayerBoxes);
-			InTest->TestFalse(TEXT("The later visibility request wins after ordered commits"), Actor->IsHidden());
+			InTest->TestFalse(TEXT("The later visibility request wins after ordered commits"), Publisher.IsHidden(SourceId));
 			const auto EquivalentShared = MakeShared<TArray<FBox>, ESPMode::ThreadSafe>();
 			EquivalentShared->Add(FBox(FVector(10, 10, -90), FVector(14, 14, 90)));
 			const FGuid EquivalentGroup = Publisher.BeginGroup(Surface);
-			Publisher.SetSharedCoverage(EquivalentGroup, Actor, EquivalentShared);
+			Publisher.SetSharedCoverage(EquivalentGroup, SourceId, EquivalentShared);
 			Publisher.SetOwnershipChanged(EquivalentGroup, false);
 			Publisher.CommitGroup(EquivalentGroup);
 			const double EquivalentDeadline = FPlatformTime::Seconds() + 10.0;
@@ -818,21 +818,21 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			InTest->TestTrue(TEXT("A geometry reuse still commits the latest exclusion metadata"),
 				Entry.Exclusions.Contains((*EquivalentShared)[0]));
 			const FVoxelPublishGroupKey Middle{0, {2, 0}, 0}, Edge{0, {3, 0}, 0};
-			AActor* ClippedActor = FixtureWorld->SpawnActor<AActor>();
+			FVoxelViewSourceId ClippedSourceId = FVoxelViewSourceId::NewId();
 			const FVoxelPublishGroupKey ClippedKey{1, FIntPoint::ZeroValue, 2};
 			auto ClippedGeometry = FixtureGeometry;
 			ClippedGeometry.Key.Level = 2;
 			const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest()).Geometry.Add(ClippedGeometry.Key, ClippedGeometry);
 			const auto ClippedSource = MakeNativeSource(Publisher, Scheduler, &ClippedGeometry);
 			if (!ClippedSource) co_return;
-			auto& ClippedEntry = Publisher.Entries.Add(ClippedActor);
+			auto& ClippedEntry = Publisher.Entries.Add(ClippedSourceId);
 			ClippedEntry.GroupKey = ClippedKey;
 			ClippedEntry.Scale = Module->BlockSize();
 			ClippedEntry.Bounds = ClippedSource->LocalBounds;
 			const FGuid ClippedInitial = Publisher.BeginGroup(ClippedKey);
 			if (!InTest->TestTrue(TEXT("Sparse clipping starts from its own funded 64-cell native source"),
-				Publisher.StageImmutable(ClippedInitial, ClippedActor, FVector::ZeroVector, Module->BlockSize(), ClippedSource, 1) &&
-				Publisher.SetCoverage(ClippedInitial, ClippedActor, {}) && Publisher.CommitGroup(ClippedInitial))) co_return;
+				Publisher.StageImmutable(ClippedInitial, ClippedSourceId, FVector::ZeroVector, Module->BlockSize(), ClippedSource, 1) &&
+				Publisher.SetCoverage(ClippedInitial, ClippedSourceId, {}) && Publisher.CommitGroup(ClippedInitial))) co_return;
 			const double ClippedInitialDeadline = FPlatformTime::Seconds() + 10.0;
 			while (Publisher.IsBusy() && FPlatformTime::Seconds() < ClippedInitialDeadline)
 			{
@@ -850,7 +850,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			ClippedOwner->Updates.SetNum(1);
 			ClippedOwner->PreparedMeshes.SetNum(1);
 			auto& ClipUpdate = ClippedOwner->Updates[0];
-			ClipUpdate.Actor = ClippedActor;
+			ClipUpdate.SourceId = ClippedSourceId;
 			ClipUpdate.Source = ClippedSource;
 			ClipUpdate.NativeStamp = ClippedSource->Stamp;
 			ClipUpdate.NativeMesh = ClippedNativeMesh;
@@ -973,8 +973,8 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 				}, FixtureError))) co_return;
 				InTest->TestTrue(TEXT("Critical generation occupies the worker and pending slot"), Scheduler.Enqueue(MoveTemp(Request)));
 			}
-			AActor* IndependentActor = FixtureWorld->SpawnActor<AActor>();
-			auto& IndependentEntry = Publisher.Entries.Add(IndependentActor);
+			FVoxelViewSourceId IndependentSourceId = FVoxelViewSourceId::NewId();
+			auto& IndependentEntry = Publisher.Entries.Add(IndependentSourceId);
 			IndependentEntry.GroupKey = Distant;
 			IndependentEntry.Source = CommittedSource;
 			IndependentEntry.NativeStamp = CommittedSource->Stamp;
@@ -985,7 +985,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			BlockedPublication->Updates.SetNum(2);
 			BlockedPublication->PreparedMeshes.SetNum(2);
 			auto& BlockedUpdate = BlockedPublication->Updates[0];
-			BlockedUpdate.Actor = Actor;
+			BlockedUpdate.SourceId = SourceId;
 			BlockedUpdate.Source = ProjectedSource;
 			BlockedUpdate.NativeStamp = ProjectedSource->Stamp;
 			BlockedUpdate.Scale = Module->BlockSize();
@@ -1019,31 +1019,31 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 				BlockedPublication->Groups[1].bCommitted);
 			Scheduler.StopAndJoin();
 			Publisher.Reset();
-			const TArray<TWeakObjectPtr<AActor>> PendingActors{Actor, IndependentActor, ClippedActor};
+			const TArray<FVoxelViewSourceId> PendingSources{SourceId, IndependentSourceId, ClippedSourceId};
 			TArray<FGuid> PendingHandles;
-			for (int32 Index = 0; Index < PendingActors.Num(); ++Index)
+			for (int32 Index = 0; Index < PendingSources.Num(); ++Index)
 			{
 				const FVoxelPublishGroupKey Key{0, FIntPoint(4000 + Index * 1000, 0), 0};
-				auto& PendingEntry = Publisher.Entries.Add(PendingActors[Index]);
+				auto& PendingEntry = Publisher.Entries.Add(PendingSources[Index]);
 				PendingEntry.GroupKey = Key;
 				PendingEntry.Source = CommittedSource;
 				const FGuid Handle = Publisher.BeginGroup(Key);
 				PendingHandles.Add(Handle);
-				Publisher.SetCoverage(Handle, PendingActors[Index].Get(), {FBox(FVector::ZeroVector, FVector(1))});
+				Publisher.SetCoverage(Handle, PendingSources[Index], {FBox(FVector::ZeroVector, FVector(1))});
 			}
-			Publisher.SetCoverage(PendingHandles[0], Actor, {FBox(FVector::ZeroVector, FVector(2))});
+			Publisher.SetCoverage(PendingHandles[0], SourceId, {FBox(FVector::ZeroVector, FVector(2))});
 			InTest->TestEqual(TEXT("Replacing pending input keeps one update per actor"), Publisher.PendingUpdates.Num(), 3);
-			Publisher.Forget(IndependentActor);
-			InTest->TestFalse(TEXT("Forget removes the corresponding pending lookup"), Publisher.PendingUpdateIndices.Contains(PendingActors[1]));
-			InTest->TestEqual(TEXT("Removing a pending actor repairs the swapped actor index"), Publisher.PendingUpdateIndices.FindChecked(PendingActors[2]), 1);
-			Publisher.SetCoverage(PendingHandles[2], ClippedActor, {});
+			Publisher.Forget(IndependentSourceId);
+			InTest->TestFalse(TEXT("Forget removes the corresponding pending lookup"), Publisher.PendingUpdateIndices.Contains(PendingSources[1]));
+			InTest->TestEqual(TEXT("Removing a pending actor repairs the swapped actor index"), Publisher.PendingUpdateIndices.FindChecked(PendingSources[2]), 1);
+			Publisher.SetCoverage(PendingHandles[2], ClippedSourceId, {});
 			InTest->TestEqual(TEXT("A repaired index replaces input without appending another actor"), Publisher.PendingUpdates.Num(), 2);
 			Publisher.TakePendingUpdate(0);
 			InTest->TestEqual(TEXT("Moving input to an immutable publication repairs the remaining pending index"),
-				Publisher.PendingUpdateIndices.FindChecked(PendingActors[2]), 0);
+				Publisher.PendingUpdateIndices.FindChecked(PendingSources[2]), 0);
 			Publisher.Reset();
 			InTest->TestTrue(TEXT("Reset clears the pending input lookup"), Publisher.PendingUpdateIndices.IsEmpty());
-			auto& StableEntry = Publisher.Entries.Add(Actor);
+			auto& StableEntry = Publisher.Entries.Add(SourceId);
 			StableEntry.GroupKey = Surface;
 			StableEntry.Source = StableEntry.PresentedSource = CommittedSource;
 			StableEntry.bDirty = false;
@@ -1053,7 +1053,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			StableEntry.Exclusions = StableBoxes;
 			FGuid StableHandle = Publisher.BeginGroup(Surface);
 			for (int32 Iteration = 0; Iteration < 64; ++Iteration)
-				Publisher.SetCoverage(StableHandle, Actor, StableBoxes);
+				Publisher.SetCoverage(StableHandle, SourceId, StableBoxes);
 			InTest->TestTrue(TEXT("Repeated committed coverage does not enqueue comparison work"), Publisher.PendingUpdates.IsEmpty());
 			Publisher.SetOwnershipChanged(StableHandle, false);
 			InTest->TestTrue(TEXT("An unchanged owner does not enter publication planning"), Publisher.DiscardUnchangedGroup(StableHandle));
@@ -1065,22 +1065,22 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			const TArray<FBox> ChangedBoxes{FBox(FVector(3), FVector(4))};
 			StableEntry.Source = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
 			StableEntry.bDirty = true;
-			Publisher.SetCoverage(StableHandle, Actor, ChangedBoxes);
+			Publisher.SetCoverage(StableHandle, SourceId, ChangedBoxes);
 			InTest->TestEqual(TEXT("A real exclusion change queues one update"), Publisher.PendingUpdates.Num(), 1);
 			InTest->TestFalse(TEXT("Changed coverage is retained for publication"), Publisher.DiscardUnchangedGroup(StableHandle));
 			Publisher.CommitGroup(StableHandle);
 			for (int32 Step = 0; Step < 1024 && (Publisher.PendingPlan || !Publisher.PendingGroups.IsEmpty()); ++Step)
 				Publisher.AdvancePendingPlan();
 			const FGuid FollowingHandle = Publisher.BeginGroup(Surface);
-			Publisher.SetCoverage(FollowingHandle, Actor, ChangedBoxes);
+			Publisher.SetCoverage(FollowingHandle, SourceId, ChangedBoxes);
 			InTest->TestTrue(TEXT("Identical in-flight geometry and coverage do not create a second comparison"), Publisher.PendingUpdates.IsEmpty());
 			Publisher.SetOwnershipChanged(FollowingHandle, false);
 			InTest->TestFalse(TEXT("An outstanding generation retains owner ordering"), Publisher.DiscardUnchangedGroup(FollowingHandle));
-			Publisher.SetCoverage(FollowingHandle, Actor, StableBoxes);
+			Publisher.SetCoverage(FollowingHandle, SourceId, StableBoxes);
 			InTest->TestEqual(TEXT("Restoring committed coverage while a change is in flight still queues the restoration"), Publisher.PendingUpdates.Num(), 1);
 			const auto UnchangedPublication = MakeShared<FVoxelViewPublisher::FPublication>();
 			auto& UnchangedUpdate = UnchangedPublication->Updates.AddDefaulted_GetRef();
-			UnchangedUpdate.Actor = Actor;
+			UnchangedUpdate.SourceId = SourceId;
 			UnchangedUpdate.Source = StableEntry.Source;
 			UnchangedUpdate.Location = StableEntry.Location;
 			UnchangedUpdate.Scale = StableEntry.Scale;
@@ -1559,7 +1559,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 				auto& Update = AdmissionPublication->Updates[Index];
 				Update.GroupIndex = Index == DistantUpdates ? 1 : 0;
 				Update.TerrainStage = Index == DistantUpdates ? 0 : 2;
-				Update.Actor = Actor;
+				Update.SourceId = SourceId;
 				Update.Source = AdmissionMesh;
 				Update.NativeStamp = AdmissionMesh->Stamp;
 				Update.Scale = Module->BlockSize();

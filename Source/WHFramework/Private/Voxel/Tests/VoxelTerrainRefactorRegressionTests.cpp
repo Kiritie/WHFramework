@@ -760,10 +760,10 @@ bool FVoxelScopedCoverageContinuationTest::RunTest(const FString& InParameters)
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler(true);
 	FVoxelViewPublisher Publisher(*Module, Scheduler, 11);
-	AActor* Actor = World->SpawnActor<AActor>();
+	FVoxelViewSourceId SourceId = FVoxelViewSourceId::NewId();
 	const FVoxelPublishGroupKey Key{0, FIntVector::ZeroValue, 0};
 	const FGuid Group = Publisher.BeginGroup(Key);
-	auto& Entry = Publisher.Entries.Add(Actor);
+	auto& Entry = Publisher.Entries.Add(SourceId);
 	Entry.GroupKey = Key;
 	Entry.Source = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
 	Entry.Scale = Module->BlockSize();
@@ -771,14 +771,14 @@ bool FVoxelScopedCoverageContinuationTest::RunTest(const FString& InParameters)
 	Entry.DesiredWorldExclusions.Add(FBox(FVector(-32, -32, -16), FVector(32, 32, 16)));
 	const TArray<FBox> Scopes{FBox(FVector(-8, -8, -16), FVector(8, 8, 16))};
 	bool bSuccess = false;
-	auto Steps = Publisher.SetScopedCoverageSteps(Group, Actor, {}, nullptr, Scopes, bSuccess);
+	auto Steps = Publisher.SetScopedCoverageSteps(Group, SourceId, {}, nullptr, Scopes, bSuccess);
 	int32 Operations = 0;
 	while (!Steps.IsComplete() && Operations++ < 10000)
 	{
 		Steps.Resume();
 	}
 	TestTrue(TEXT("Scoped subtraction can pause inside an actor update"), Operations > 1 && Steps.IsComplete() && bSuccess);
-	const auto& Boxes = Publisher.Entries.FindChecked(Actor).DesiredWorldExclusions;
+	const auto& Boxes = Publisher.Entries.FindChecked(SourceId).DesiredWorldExclusions;
 	double Volume = 0.0;
 	for (const FBox& Box : Boxes)
 	{

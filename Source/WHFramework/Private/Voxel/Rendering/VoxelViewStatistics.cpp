@@ -70,14 +70,14 @@ FVoxelTerrainMetricEvidence FVoxelViewManager::SampleTerrainMetric(const FVoxelT
 	{
 		FVoxelViewAdmission Admission;
 		const FVoxelTerrainGeometry* Geometry = nullptr;
-		AActor* Actor = nullptr;
+		FVoxelViewSourceId SourceId;
 		uint8 Level = uint8(FMath::FloorLog2(uint32(FMath::Max(16, Side) / 16)));
 		if (InTarget.Representation == EVoxelTerrainMetricRepresentation::Proxy)
 		{
 			Admission.Kind = EVoxelViewAdmissionKind::VoxelProxy;
 			Admission.ProxyKey = {InTarget.Min / Side, Level};
 			Evidence.bWanted = Interest.VoxelProxy.Contains(Admission.ProxyKey);
-			Actor = VoxelProxyActors.FindRef(Admission.ProxyKey);
+			SourceId = VoxelProxySources.FindRef(Admission.ProxyKey);
 			Geometry = Interest.FindGeometry(Admission.ProxyKey);
 		}
 		else if (InTarget.Representation == EVoxelTerrainMetricRepresentation::Surface)
@@ -85,7 +85,7 @@ FVoxelTerrainMetricEvidence FVoxelViewManager::SampleTerrainMetric(const FVoxelT
 			Admission.Kind = EVoxelViewAdmissionKind::Surface;
 			Admission.SurfaceKey = {FIntPoint(InTarget.Min.X / Side, InTarget.Min.Y / Side), Level};
 			Evidence.bWanted = Interest.Surface.Contains(Admission.SurfaceKey);
-			Actor = SurfaceActors.FindRef(Admission.SurfaceKey);
+			SourceId = SurfaceSources.FindRef(Admission.SurfaceKey);
 			Geometry = Interest.FindGeometry(Admission.SurfaceKey);
 		}
 		else
@@ -93,7 +93,7 @@ FVoxelTerrainMetricEvidence FVoxelViewManager::SampleTerrainMetric(const FVoxelT
 			Admission.Kind = EVoxelViewAdmissionKind::Macro;
 			Admission.MacroKey = {FIntPoint(InTarget.Min.X / Side, InTarget.Min.Y / Side), Level};
 			Evidence.bWanted = Interest.Macro.Contains(Admission.MacroKey);
-			Actor = MacroActors.FindRef(Admission.MacroKey);
+			SourceId = MacroSources.FindRef(Admission.MacroKey);
 			Geometry = Interest.FindGeometry(Admission.MacroKey);
 		}
 		Evidence.bDataReady = IsAdmissionDataReady(Admission, false);
@@ -108,7 +108,7 @@ FVoxelTerrainMetricEvidence FVoxelViewManager::SampleTerrainMetric(const FVoxelT
 				Evidence.MeshBytes = Metrics->MeshBytes;
 			}
 		}
-		Evidence.bPresented = Actor && Publisher->IsPresented(Actor);
+		Evidence.bPresented = SourceId && Publisher->IsPresented(SourceId);
 		Evidence.bLatestPresented = IsAdmissionPresented(Admission);
 		Evidence.OwnershipAtoms = int64(Side / 16) * (Side / 16) * FMath::Max(1, (InTarget.Max.Z - InTarget.Min.Z) / 16);
 		Evidence.PresentedOwnershipAtoms = Evidence.bPresented ? Evidence.OwnershipAtoms : 0;

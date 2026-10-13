@@ -1,6 +1,5 @@
 ﻿#include "Voxel/Rendering/VoxelViewManager.h"
 
-#include "GameFramework/Actor.h"
 #include "Misc/ScopeExit.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
@@ -245,17 +244,18 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 		{
 			co_return;
 		}
+		if (!Publisher->Retire(VoxelProxySources.FindRef(Key))) co_return;
+		if (!Publisher->Retire(VolumeBoundarySources.FindRef(Key))) co_return;
 		while (!ReleaseRetirementGeometry({EVoxelTerrainRepresentation::VoxelProxy, Key.Coordinate, Key.Level}))
 		{
 			if (RetirementHierarchyAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) co_return;
 			co_await FVoxelGameThreadContinuation::Yield();
 		}
-		if (AActor* Actor = VoxelProxyActors.FindRef(Key))
+		if (FVoxelViewSourceId SourceId = VoxelProxySources.FindRef(Key))
 		{
-			Publisher->Forget(Actor);
-			Actor->Destroy();
+			Publisher->Forget(SourceId);
 		}
-		VoxelProxyActors.Remove(Key);
+		VoxelProxySources.Remove(Key);
 		bReadyTerrainBranchesDirty |= VoxelProxyReady.Remove(Key) > 0;
 		VoxelProxyData.Remove(Key);
 		AirVoxelProxyNodes.Remove(Key);
@@ -266,12 +266,11 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 		PreparedVolumeMeshes.Remove(Key);
 		VoxelProxyLastWanted.Remove(Key);
 		PreparedVolumeBoundaryMeshes.Remove(Key);
-		if (AActor* Boundary = VolumeBoundaryActors.FindRef(Key))
+		if (FVoxelViewSourceId Boundary = VolumeBoundarySources.FindRef(Key))
 		{
 			Publisher->Forget(Boundary);
-			Boundary->Destroy();
 		}
-		VolumeBoundaryActors.Remove(Key);
+		VolumeBoundarySources.Remove(Key);
 		IndexCoverage(Key);
 		RemoveRetirement(Candidate);
 		if (Candidate.Representation <= 3)
@@ -298,23 +297,23 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 		if (GetInputRoot().SurfaceWanted.Contains(Key) || !CanRetire(SurfaceLastWanted.FindRef(Key), bReplacement,
 			InsideCurrentDomain([this, Key] { return IsSurfaceInsideRenderDomain(Key); })))
 			co_return;
+		if (!Publisher->Retire(SurfaceSources.FindRef(Key))) co_return;
+		if (!Publisher->Retire(WaterSources.FindRef(Key))) co_return;
 		while (!ReleaseRetirementGeometry({EVoxelTerrainRepresentation::Surface, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0), Key.Level}))
 		{
 			if (RetirementHierarchyAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) co_return;
 			co_await FVoxelGameThreadContinuation::Yield();
 		}
-		if (AActor* Actor = SurfaceActors.FindRef(Key))
+		if (FVoxelViewSourceId SourceId = SurfaceSources.FindRef(Key))
 		{
-			Publisher->Forget(Actor);
-			Actor->Destroy();
+			Publisher->Forget(SourceId);
 		}
-		if (AActor* Water = WaterActors.FindRef(Key))
+		if (FVoxelViewSourceId Water = WaterSources.FindRef(Key))
 		{
 			Publisher->Forget(Water);
-			Water->Destroy();
 		}
-		SurfaceActors.Remove(Key);
-		WaterActors.Remove(Key);
+		SurfaceSources.Remove(Key);
+		WaterSources.Remove(Key);
 		bHeightfieldTopologyDirty |= SurfaceReady.Remove(Key) > 0;
 		SurfaceData.Remove(Key);
 		WaterData.Remove(Key);
@@ -345,17 +344,17 @@ FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationStep
 		if (GetInputRoot().MacroWanted.Contains(Key) || !CanRetire(MacroLastWanted.FindRef(Key), bReplacement,
 			InsideCurrentDomain([this, Key] { return IsMacroInsideRenderDomain(Key); })))
 			co_return;
+		if (!Publisher->Retire(MacroSources.FindRef(Key))) co_return;
 		while (!ReleaseRetirementGeometry({EVoxelTerrainRepresentation::Macro, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0), Key.Level}))
 		{
 			if (RetirementHierarchyAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) co_return;
 			co_await FVoxelGameThreadContinuation::Yield();
 		}
-		if (AActor* Actor = MacroActors.FindRef(Key))
+		if (FVoxelViewSourceId SourceId = MacroSources.FindRef(Key))
 		{
-			Publisher->Forget(Actor);
-			Actor->Destroy();
+			Publisher->Forget(SourceId);
 		}
-		MacroActors.Remove(Key);
+		MacroSources.Remove(Key);
 		bHeightfieldTopologyDirty |= MacroReady.Remove(Key) > 0;
 		MacroData.Remove(Key);
 		MacroRevisions.Remove(Key);

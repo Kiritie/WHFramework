@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Rendering/VoxelViewSourceId.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
 #include "Voxel/Rendering/VoxelPublishGroups.h"
 #include "Voxel/Rendering/VoxelPublishBudget.h"
@@ -8,7 +9,6 @@
 #include "Voxel/Task/VoxelTerrainWorkSelection.h"
 #include "Voxel/Rendering/VoxelTerrainRenderer.h"
 
-class AActor;
 class UVoxelModule;
 class UVoxelMeshComponent;
 class FVoxelTerrainRenderer;
@@ -32,31 +32,31 @@ public:
 	FGuid BeginGroup(const FVoxelPublishGroupKey& InKey);
 	bool Stage(
 		const FGuid& InGroup,
-		AActor*& InOutActor,
+		FVoxelViewSourceId& InOutSourceId,
 		const FVector& InLocation,
 		double InScale,
 		FVoxelSectionMeshResult&& InMesh,
 		int32 InTerrainStage,
 		bool bInTransition = false);
-	bool StageImmutable(const FGuid& InGroup, AActor*& InOutActor,
+	bool StageImmutable(const FGuid& InGroup, FVoxelViewSourceId& InOutSourceId,
 		const FVector& InLocation, double InScale,
 		TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe> InMesh,
 		int32 InTerrainStage, bool bInTransition = false);
-	bool SetCoverage(const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
+	bool SetCoverage(const FGuid& InGroup, FVoxelViewSourceId InSourceId, TArray<FBox> InWorldCellBoxes,
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes = nullptr);
-	bool SetSharedCoverage(const FGuid& InGroup, AActor* InActor,
+	bool SetSharedCoverage(const FGuid& InGroup, FVoxelViewSourceId InSourceId,
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes);
-	FVoxelGameThreadContinuation SetCoverageSteps(const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
+	FVoxelGameThreadContinuation SetCoverageSteps(const FGuid& InGroup, FVoxelViewSourceId InSourceId, TArray<FBox> InWorldCellBoxes,
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
 	FVoxelGameThreadContinuation SetSharedCoverageSteps(
-		const FGuid& InGroup, AActor* InActor, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
-	bool SetScopedCoverage(const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
+		const FGuid& InGroup, FVoxelViewSourceId InSourceId, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
+	bool SetScopedCoverage(const FGuid& InGroup, FVoxelViewSourceId InSourceId, TArray<FBox> InWorldCellBoxes,
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes,
 		TConstArrayView<FBox> InAffectedWorldCellBoxes, bool bInRetainPresented = false);
-	FVoxelGameThreadContinuation SetScopedCoverageSteps(const FGuid& InGroup, AActor* InActor, TArray<FBox> InWorldCellBoxes,
+	FVoxelGameThreadContinuation SetScopedCoverageSteps(const FGuid& InGroup, FVoxelViewSourceId InSourceId, TArray<FBox> InWorldCellBoxes,
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, TConstArrayView<FBox> InAffectedWorldCellBoxes, bool& OutSuccess,
 		bool bInRetainPresented = false);
-	bool SetHidden(const FGuid& InGroup, AActor* InActor, bool bInHidden);
+	bool SetHidden(const FGuid& InGroup, FVoxelViewSourceId InSourceId, bool bInHidden);
 	void SetCommitCallbacks(TFunction<void()> InOnCommitted,
 		TFunction<void(TConstArrayView<FVoxelPublishGroupKey>)> InOnGroupCommitted, TConstArrayView<FGuid> InGroups = {});
 	void SetCommitGate(TFunction<bool(const FVoxelPublishGroupKey&)> InGate)
@@ -75,7 +75,8 @@ public:
 	void Tick();
 	void Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommit = true, double InDeadlineSeconds = 0.0);
 	void InvalidatePriorities();
-	void Forget(AActor* InActor);
+	void Forget(FVoxelViewSourceId InSourceId);
+	bool Retire(FVoxelViewSourceId InSourceId);
 	void Reset();
 	bool IsBusy() const;
 	bool HasActiveGroups() const { return !Publications.IsEmpty(); }
@@ -85,10 +86,11 @@ public:
 	}
 	bool IsGroupBusy(const FVoxelPublishGroupKey& InKey) const;
 	bool NeedsUpdate() const;
-	bool IsPresented(AActor* InActor) const;
-	bool IsCommitted(AActor* InActor) const;
-	bool HasPresentation(AActor* InActor) const;
-	bool GetPresentedMeshCost(AActor* InActor, uint64& OutVertices, uint64& OutTriangles, uint64& OutBytes) const;
+	bool IsHidden(FVoxelViewSourceId InSourceId) const;
+	bool IsPresented(FVoxelViewSourceId InSourceId) const;
+	bool IsCommitted(FVoxelViewSourceId InSourceId) const;
+	bool HasPresentation(FVoxelViewSourceId InSourceId) const;
+	bool GetPresentedMeshCost(FVoxelViewSourceId InSourceId, uint64& OutVertices, uint64& OutTriangles, uint64& OutBytes) const;
 	FVoxelFrameTimings GetFrameTimings() const { return FrameTimings; }
 	FVoxelTerrainRenderer& GetTerrainRenderer() const { return *TerrainRenderer; }
 	bool IsCurrentAtomEvidence(const FIntVector& InSection, const FVoxelFineOwnerEvidence& InEvidence) const;
@@ -136,7 +138,6 @@ private:
 
 	struct FEntry
 	{
-		FGuid NativeSourceId = FGuid::NewGuid();
 		FVoxelTaskStamp NativeStamp;
 		FVoxelTaskStamp PresentedNativeStamp;
 		TSharedPtr<const FVoxelTerrainCoarseMesh, ESPMode::ThreadSafe> NativeMesh;
@@ -159,6 +160,8 @@ private:
 		bool bTransition = false;
 		bool bDirty = true;
 		bool bPresented = false;
+		bool bHidden = false;
+		bool bRetiring = false;
 	};
 
 	struct FUpdate
@@ -168,7 +171,7 @@ private:
 		bool bNativeMeshPending = false;
 		bool bNativeAdmissionWaiting = false;
 		uint64 NativeAdmissionVersion = 0;
-		TWeakObjectPtr<AActor> Actor;
+		FVoxelViewSourceId SourceId;
 		FMeshPtr Source;
 		int32 TerrainStage = INDEX_NONE;
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> CommonBoxes;
@@ -213,7 +216,7 @@ private:
 		int32 TerrainStage = 3;
 		bool bTransition = false;
 		TArray<int32> UpdateIndices;
-		TArray<TWeakObjectPtr<AActor>> VisibilityActors;
+		TArray<FVoxelViewSourceId> VisibilitySources;
 		TArray<FVoxelPublishGroupKey> Keys;
 		FGroupPriority Priority;
 		double FirstQueuedAt = 0.0;
@@ -246,9 +249,9 @@ private:
 	struct FPreparedPlan
 	{
 		TArray<FVoxelPublishFootprint> Footprints;
-		TMap<TWeakObjectPtr<AActor>, int32> ActorIndices;
-		TMap<TWeakObjectPtr<AActor>, const FUpdate*> Updates;
-		TSet<FVoxelPublishGroupKey> ActorKeys;
+		TMap<FVoxelViewSourceId, int32> SourceIndices;
+		TMap<FVoxelViewSourceId, const FUpdate*> Updates;
+		TSet<FVoxelPublishGroupKey> SourceKeys;
 		TSet<FVoxelPublishGroupKey> GroupKeys;
 		TArray<FGroup> Groups;
 		FVoxelPublishGroupContinuation Graph;
@@ -268,7 +271,7 @@ private:
 		TArray<FUpdate> Updates;
 		TArray<FGroup> Groups;
 		TArray<int32> GroupOrder;
-		TMap<TWeakObjectPtr<AActor>, bool> Visibility;
+		TMap<FVoxelViewSourceId, bool> Visibility;
 		TMap<FVoxelPublishGroupKey, FGroupCallbackPtr> Callbacks;
 		TMap<FVoxelPublishGroupKey, TSharedPtr<TFunction<bool()>>> Validations;
 		TMap<FVoxelPublishGroupKey, int32> TerrainStages;
@@ -295,15 +298,15 @@ private:
 		TMap<FGuid, FPendingGroup> Groups;
 		TMap<FVoxelPublishGroupKey, FGuid> GroupIds;
 		TArray<FUpdate> Updates;
-		TMap<TWeakObjectPtr<AActor>, int32> UpdateIndices;
-		TMap<TWeakObjectPtr<AActor>, bool> Visibility;
+		TMap<FVoxelViewSourceId, int32> UpdateIndices;
+		TMap<FVoxelViewSourceId, bool> Visibility;
 		TArray<FGuid> Handles;
 		TArray<FVoxelPublishFootprint> Footprints;
 		TMap<FVoxelPublishGroupKey, int32> KeyIndices;
 		TSet<int32> BlockedComponents;
 		TMap<int32, int32> SelectedComponents;
 		TMap<FVoxelPublishGroupKey, int32> SelectedKeys;
-		TMap<TWeakObjectPtr<AActor>, FVoxelPublishGroupKey> ActorKeys;
+		TMap<FVoxelViewSourceId, FVoxelPublishGroupKey> SourceKeys;
 		FVoxelPublishGroupContinuation Graph;
 		FPublicationRef Publication = MakeShared<FPublication>();
 		int32 Phase = 0;
@@ -339,12 +342,12 @@ private:
 		int32 PairCursor = 0;
 	};
 
-	struct FActorUpdateGeneration
+	struct FSourceUpdateGeneration
 	{
 		FPublicationRef Publication;
 		int32 UpdateIndex = INDEX_NONE;
 	};
-	struct FActorVisibilityGeneration
+	struct FSourceVisibilityGeneration
 	{
 		FPublicationRef Publication;
 		bool bHidden = false;
@@ -360,7 +363,7 @@ private:
 	void InsertReadyCommit(FReadyGroup InReady);
 	void InsertReadyPrepare(FReadyGroup InReady);
 	void IndexPublicationUpdate(const FPublicationRef& Publication, int32 InIndex);
-	void ReleaseActorGeneration(TWeakObjectPtr<AActor> InActor, uint64 InSerial);
+	void ReleaseSourceGeneration(FVoxelViewSourceId InSourceId, uint64 InSerial);
 	void QueueReadyGroup(const FPublicationRef& InPublication, int32 InGroupIndex);
 	void RebuildFirstOwners();
 	void SetOwnerActive(const FVoxelPublishGroupKey& InKey, uint64 InSerial, bool bInActive);
@@ -393,10 +396,10 @@ private:
 	void RefreshTaskPriorities();
 	bool AdmitCoveragePreparation(const FPublicationRef& Publication, double InDeadline = MAX_dbl);
 	FVoxelGameThreadContinuation PrepareCoverageSteps(FPublication& InPublication);
-	const FUpdate* FindProjectedUpdate(TWeakObjectPtr<AActor> InActor, uint64 InBeforeSerial = MAX_uint64,
+	const FUpdate* FindProjectedUpdate(FVoxelViewSourceId InSourceId, uint64 InBeforeSerial = MAX_uint64,
 		const FPublication** OutPublication = nullptr) const;
-	bool CaptureCoverageSource(TWeakObjectPtr<AActor> InActor, bool bInRetainPresented, FUpdate& OutSource) const;
-	FVoxelGameThreadContinuation SetCoverageSourceSteps(const FGuid& InGroup, AActor* InActor, FUpdate InSource,
+	bool CaptureCoverageSource(FVoxelViewSourceId InSourceId, bool bInRetainPresented, FUpdate& OutSource) const;
+	FVoxelGameThreadContinuation SetCoverageSourceSteps(const FGuid& InGroup, FVoxelViewSourceId InSourceId, FUpdate InSource,
 		TArray<FBox> InWorldCellBoxes, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
 	bool HigherBuildPriority(const FPublication& Publication, int32 First, int32 Second) const;
 	bool AdmitBuilds(const FPublicationRef& Publication, double InDeadline = MAX_dbl);
@@ -423,22 +426,22 @@ private:
 	mutable TOptional<FVoxelTerrainRenderer> TerrainRenderer;
 	uint64 BatchSerial = 0;
 	FGuid NativeOwnerId = FGuid::NewGuid();
-	static constexpr int32 MaximumNativeGroups = 32;
+	static constexpr int32 MaximumNativeGroups = 8;
 	int32 ActiveNativeGroups = 0;
 	uint64 NativeSourceSerial = 0;
-	TMap<TWeakObjectPtr<AActor>, FEntry> Entries;
+	TMap<FVoxelViewSourceId, FEntry> Entries;
 	TArray<FVoxelPublishGroupKey> RetryOwners;
-	TMap<FVoxelPublishGroupKey, TSet<TWeakObjectPtr<AActor>>> OwnerActors;
+	TMap<FVoxelPublishGroupKey, TSet<FVoxelViewSourceId>> OwnerSources;
 	TMap<FGuid, FPendingGroup> PendingGroups;
 	TMap<FVoxelPublishGroupKey, FGuid> PendingGroupIds;
 	TArray<FUpdate> PendingUpdates;
-	TMap<TWeakObjectPtr<AActor>, int32> PendingUpdateIndices;
-	TMap<TWeakObjectPtr<AActor>, bool> PendingVisibility;
+	TMap<FVoxelViewSourceId, int32> PendingUpdateIndices;
+	TMap<FVoxelViewSourceId, bool> PendingVisibility;
 	TUniquePtr<FPendingPlan> PendingPlan;
 	TArray<FPublicationRef> Publications;
-	TMap<TWeakObjectPtr<AActor>, TArray<FActorUpdateGeneration>> ActorUpdateGenerations;
-	TMap<TWeakObjectPtr<AActor>, TArray<FActorVisibilityGeneration>> ActorVisibilityGenerations;
-	// 发布分组的派生查询索引，避免每个 Actor 重扫全部在途 owner。
+	TMap<FVoxelViewSourceId, TArray<FSourceUpdateGeneration>> SourceUpdateGenerations;
+	TMap<FVoxelViewSourceId, TArray<FSourceVisibilityGeneration>> SourceVisibilityGenerations;
+	// 发布分组的派生查询索引，避免每个 SourceId 重扫全部在途 owner。
 	mutable TSet<FVoxelPublishGroupKey> ActiveBusyKeys;
 	mutable bool bActiveBusyKeysDirty = true;
 	TArray<FVector> Observers;

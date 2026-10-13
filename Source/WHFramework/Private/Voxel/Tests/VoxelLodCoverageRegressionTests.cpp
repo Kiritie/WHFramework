@@ -167,14 +167,14 @@ bool FVoxelPublisherStageAndIndexTest::RunTest(const FString& InParameters)
 	Publication->PreparedMeshes.SetNum(2);
 	for (int32 Index = 0; Index < 2; ++Index)
 	{
-		AActor* Actor = World->SpawnActor<AActor>();
-		auto& Entry = Publisher.Entries.Add(Actor);
+		FVoxelViewSourceId SourceId = FVoxelViewSourceId::NewId();
+		auto& Entry = Publisher.Entries.Add(SourceId);
 		Entry.GroupKey = {1, FIntPoint(Index == 0 ? 100 : 0, 0), 1};
 		Entry.Source = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
 		Entry.Bounds = FBox(FVector::ZeroVector, FVector(32));
 		Entry.Location = FVector(Index == 0 ? 10000 : 0, 0, 0);
 		auto& Update = Publication->Updates[Index];
-		Update.Actor = Actor;
+		Update.SourceId = SourceId;
 		Update.Source = Entry.Source;
 		Update.Location = Entry.Location;
 		Update.Bounds = Entry.Bounds;
@@ -276,7 +276,7 @@ bool FVoxelPublisherStageAndIndexTest::RunTest(const FString& InParameters)
 		Frame.End(FPlatformTime::Seconds());
 	}
 	TestTrue(TEXT("Logical seam completes across bounded shared-budget frames"), LogicalFrames < 256);
-	TestTrue(TEXT("Logical empty seam commits through the Fine gate without an Actor or mesh"), bLogicalCommitted);
+	TestTrue(TEXT("Logical empty seam commits through the Fine gate without an SourceId or mesh"), bLogicalCommitted);
 	Scheduler.StopAndJoin();
 	Publisher.Reset();
 	World->DestroyWorld(false);
@@ -326,7 +326,7 @@ bool FVoxelEmptyTransitionConvergenceTest::RunTest(const FString& InParameters)
 	Manager.PreparedVolumeMeshes.Add(Node, MakeShared<FVoxelSectionMeshResult, ESPMode::ThreadSafe>());
 	Manager.ResolveTransitionVisibility();
 	Manager.Publisher->Tick();
-	TestEqual(TEXT("Empty seam result commits its signature without an Actor"), Manager.VolumeTransitionSignatures.FindRef(Node), Signature);
+	TestEqual(TEXT("Empty seam result commits its signature without an SourceId"), Manager.VolumeTransitionSignatures.FindRef(Node), Signature);
 	TestFalse(TEXT("Empty seam preparation is released after its logical commit"), Manager.PreparedVolumeSignatures.Contains(Node));
 	Manager.bCoverageDirty = false;
 	Manager.bCoverageDirtyFull = false;

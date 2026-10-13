@@ -116,6 +116,17 @@ bool FVoxelTerrainWorkSelection::HigherPriority(const FVoxelTerrainServicePriori
 	return InFirst.SourceStableKey.D < InSecond.SourceStableKey.D;
 }
 
+bool FVoxelTerrainWorkSelection::HigherPriority(const FVoxelTerrainServiceCandidate& InFirst,
+	const FVoxelTerrainServiceCandidate& InSecond)
+{
+	if (InFirst.Priority.Band == InSecond.Priority.Band && !IsNear(InFirst.Priority.Band) &&
+		InFirst.bPublicationContinuation != InSecond.bPublicationContinuation)
+	{
+		return InFirst.bPublicationContinuation;
+	}
+	return HigherPriority(InFirst.Priority, InSecond.Priority);
+}
+
 FVoxelTerrainServicePriority FVoxelTerrainWorkSelection::Promote(const FVoxelTerrainServicePriority& InFirst,
 	const FVoxelTerrainServicePriority& InSecond)
 {
@@ -167,8 +178,10 @@ int32 FVoxelTerrainWorkSelection::Select(TConstArrayView<FVoxelTerrainServiceCan
 		bHasNear |= IsNear(Candidate.Priority.Band);
 		bHasNonNear |= !IsNear(Candidate.Priority.Band);
 		const int32 Previous = Normal[Band];
-		if (Previous == INDEX_NONE || HigherPriority(Candidate.Priority, InCandidates[Previous].Priority) ||
-			(Candidate.Priority == InCandidates[Previous].Priority && IsOlder(CandidateIndex, Previous)))
+		if (Previous == INDEX_NONE || HigherPriority(Candidate, InCandidates[Previous]) ||
+			(Candidate.Priority == InCandidates[Previous].Priority &&
+				(IsNear(Candidate.Priority.Band) ||
+				 Candidate.bPublicationContinuation == InCandidates[Previous].bPublicationContinuation) && IsOlder(CandidateIndex, Previous)))
 		{
 			Normal[Band] = CandidateIndex;
 		}
@@ -247,8 +260,11 @@ int32 FVoxelTerrainWorkSelection::Select(TConstArrayView<FVoxelTerrainServiceCan
 		{
 			continue;
 		}
-		const bool bOldestTurn = !InCapacity.bPreserveDistanceOrder && (State.DispatchCounts[Band] % 4 == 3 ||
-			InNowSeconds - InCandidates[Oldest[Band]].FirstQueuedSeconds >= InCapacity.MaximumWaitSeconds);
+		// 非近景发布优先排空；每四次仍让最老任务推进，避免新输入被持续续算饿死。
+		const bool bPublicationDrain = !IsNear(EVoxelTerrainServiceBand(Band)) && InCandidates[Normal[Band]].bPublicationContinuation;
+		const bool bOldestTurn = (bPublicationDrain && State.DispatchCounts[Band] % 4 == 3) ||
+			(!InCapacity.bPreserveDistanceOrder && (State.DispatchCounts[Band] % 4 == 3 ||
+				InNowSeconds - InCandidates[Oldest[Band]].FirstQueuedSeconds >= InCapacity.MaximumWaitSeconds));
 		Heads[Band] = bOldestTurn ? Oldest[Band] : Normal[Band];
 	}
 

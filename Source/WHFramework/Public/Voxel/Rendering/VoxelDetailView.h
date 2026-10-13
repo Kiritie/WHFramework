@@ -8,6 +8,8 @@
 #include "Voxel/Generation/VoxelGenerationConsumer.h"
 
 class AActor;
+class UHierarchicalInstancedStaticMeshComponent;
+class UVoxelCollisionComponent;
 class FVoxelTaskScheduler;
 class UVoxelModule;
 struct FVoxelTaskResult;
@@ -23,6 +25,19 @@ struct WHFRAMEWORK_API FVoxelDetailPlan
 	TArray<FVoxelStructureDetailPlacement> Placements;
 
 	uint64 GetAllocatedBytes() const;
+};
+
+struct FVoxelDetailPresentationBatch
+{
+	FIntPoint HostKey = FIntPoint::ZeroValue;
+	TWeakObjectPtr<UHierarchicalInstancedStaticMeshComponent> Instances;
+	TWeakObjectPtr<UVoxelCollisionComponent> Collision;
+};
+
+struct FVoxelDetailHost
+{
+	TWeakObjectPtr<AActor> Actor;
+	int32 BatchCount = 0;
 };
 
 /**
@@ -45,7 +60,8 @@ public:
 
 private:
 	bool BuildAssetBatch(int32 InAssetIndex, bool& bOutComplete, FString& OutError);
-	void DestroyActors(TArray<TWeakObjectPtr<AActor>>& InActors);
+	void DestroyBatch(const FVoxelDetailPresentationBatch& InBatch);
+	void DestroyBatches(TArray<FVoxelDetailPresentationBatch>& InBatches);
 	void AbortStaging();
 	void MarkDirty(const struct FVoxelEditBatch& InBatch);
 	void CancelPlanning();
@@ -72,9 +88,10 @@ private:
 	TSharedPtr<const FVoxelDetailPlan, ESPMode::ThreadSafe> PendingPlan;
 	TSharedPtr<FVoxelDetailAssetBatch, ESPMode::ThreadSafe> AssetBatch;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> StorageLease;
-	TArray<TWeakObjectPtr<AActor>> RetiringActors;
-	TArray<TWeakObjectPtr<AActor>> ActiveActors;
-	TArray<TWeakObjectPtr<AActor>> StagedActors;
+	TMap<FIntPoint, FVoxelDetailHost> Hosts;
+	TArray<FVoxelDetailPresentationBatch> RetiringBatches;
+	TArray<FVoxelDetailPresentationBatch> ActiveBatches;
+	TArray<FVoxelDetailPresentationBatch> StagedBatches;
 	FDelegateHandle CommitHandle;
 	int32 StagedAssetIndex = 0;
 	int32 PresentationCursor = 0;

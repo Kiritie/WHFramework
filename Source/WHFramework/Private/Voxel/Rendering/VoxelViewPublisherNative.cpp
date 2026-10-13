@@ -1,6 +1,5 @@
 #include "Voxel/Rendering/VoxelViewPublisher.h"
 
-#include "GameFramework/Actor.h"
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
 #include "Voxel/Rendering/VoxelTerrainCoarseMesh.h"
@@ -131,17 +130,17 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 	(void)InOutPreparedComponents;
 	FUpdate& Update = InPublication->Updates[InIndex];
 	if (Update.Source && Update.Source->Stamp.bHasGeometryIdentity && Update.Source->Stamp != Update.NativeStamp) return false;
-	const bool* Hidden = InPublication->Visibility.Find(Update.Actor);
-	const bool bVisibilityChange = Hidden && Update.Actor.IsValid() && Update.Actor->IsHidden() != *Hidden;
+	const bool* Hidden = InPublication->Visibility.Find(Update.SourceId);
+	const bool bVisibilityChange = Hidden && Entries.Contains(Update.SourceId) && IsHidden(Update.SourceId) != *Hidden;
 	if (!Update.bSourceDirty && !Update.NativeMesh)
-		if (const auto* Entry = Entries.Find(Update.Actor); Entry && Entry->NativeMesh &&
+		if (const auto* Entry = Entries.Find(Update.SourceId); Entry && Entry->NativeMesh &&
 			Entry->PresentedSource == Update.Source && Entry->PresentedNativeStamp == Update.NativeStamp &&
 			Entry->NativeMesh->WorldCellOrigin == Update.Location / Module.BlockSize() &&
 			Entry->NativeMesh->CellScale == Update.Scale / Module.BlockSize()) Update.NativeMesh = Entry->NativeMesh;
 	if (Update.NativeMesh && (Update.NativeMesh->Source != Update.Source || Update.NativeMesh->Stamp != Update.NativeStamp ||
 		Update.NativeMesh->WorldCellOrigin != Update.Location / Module.BlockSize() ||
 		Update.NativeMesh->CellScale != Update.Scale / Module.BlockSize())) Update.NativeMesh.Reset();
-	bOutComplete = (Update.bUnchanged && !bVisibilityChange) || Update.NativeMesh.IsValid() || !Update.Actor.IsValid();
+	bOutComplete = (Update.bUnchanged && !bVisibilityChange) || Update.NativeMesh.IsValid() || !Entries.Contains(Update.SourceId);
 	if (bOutComplete || Update.bNativeMeshPending || FPlatformTime::Seconds() >= InDeadline) return true;
 	// 保留前代尚未完成的正文，等待该代提交后复用其索引，不能再建同一源。
 	if (Update.bRetainSource && !Update.bSourceDirty) return true;
@@ -298,10 +297,10 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		++ActiveNativeGroups;
 		bOutAdvanced = true;
 	}
-	if (InGroup.VisibilityActors.IsEmpty() && !InGroup.UpdateIndices.ContainsByPredicate([&InPublication](const int32 Index)
+	if (InGroup.VisibilitySources.IsEmpty() && !InGroup.UpdateIndices.ContainsByPredicate([this, &InPublication](const int32 Index)
 	{
 		const auto& Update = InPublication->Updates[Index];
-		return Update.Actor.IsValid() && !Update.bUnchanged && Update.bSourceDirty;
+		return Entries.Contains(Update.SourceId) && !Update.bUnchanged && Update.bSourceDirty;
 	})) return true;
 	const auto NativeResources = Scheduler.GetTerrainResources();
 	struct FNativeGroupSources
@@ -326,7 +325,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 					Visit(Update.NativeMesh->MetadataLease);
 					if (Update.NativeMesh->Source) FVoxelTerrainRenderer::VisitMeshSources(*Update.NativeMesh->Source, Context.Resources, InVisit);
 				}
-				if (const auto* Entry = Context.Owner.Entries.Find(Update.Actor); Entry && Entry->NativeMesh)
+				if (const auto* Entry = Context.Owner.Entries.Find(Update.SourceId); Entry && Entry->NativeMesh)
 				{
 					Visit(Entry->NativeMesh->MetadataLease);
 					if (Entry->NativeMesh->Source) FVoxelTerrainRenderer::VisitMeshSources(*Entry->NativeMesh->Source, Context.Resources, InVisit);
@@ -434,7 +433,8 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 				{
 					if (!InPublication->Updates.IsValidIndex(Index)) return false;
 					const auto& Update = InPublication->Updates[Index];
-					const bool* Hidden = InPublication->Visibility.Find(Update.Actor);
+					if (!Entries.Contains(Update.SourceId)) return false;
+					const bool* Hidden = InPublication->Visibility.Find(Update.SourceId);
 					if ((!Hidden || !*Hidden) && (!IsNativeGeometryCurrent(Update.NativeStamp) ||
 						!Update.Source || (MeshValidator && !MeshValidator(*Update.Source)))) return false;
 				}
@@ -488,23 +488,23 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 	}
 	const int32 UpdateIndex = InGroup.UpdateIndices[InGroup.NativeSourceCursor];
 	const auto& Update = InPublication->Updates[UpdateIndex];
-	if (!Update.Actor.IsValid() || ((!Update.bSourceDirty || Update.bUnchanged) && !InPublication->Visibility.Contains(Update.Actor)))
+	if (!Entries.Contains(Update.SourceId) || ((!Update.bSourceDirty || Update.bUnchanged) && !InPublication->Visibility.Contains(Update.SourceId)))
 	{
 		++InGroup.NativeSourceCursor;
 		bOutAdvanced = true;
 		return false;
 	}
 	if (!Update.NativeMesh) return false;
-	const bool* Hidden = InPublication->Visibility.Find(Update.Actor);
+	const bool* Hidden = InPublication->Visibility.Find(Update.SourceId);
 	const bool bRemove = Hidden && *Hidden;
-	const auto* Entry = Entries.Find(Update.Actor);
+	const auto* Entry = Entries.Find(Update.SourceId);
 	if (!Entry)
 	{
 		DiscardPublication(InPublication, false);
 		bOutAdvanced = true;
 		return false;
 	}
-	if (bRemove && (!Entry->bPresented || Update.Actor->IsHidden()))
+	if (bRemove && (!Entry->bPresented || Entry->bHidden))
 	{
 		++InGroup.NativeSourceCursor;
 		bOutAdvanced = true;
@@ -591,7 +591,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		}
 		auto Item = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainRenderCoarse>(Lease);
 		Item->MetadataLease = MoveTemp(Lease);
-		Item->SourceId = Entry->NativeSourceId;
+		Item->SourceId = Update.SourceId.Value;
 		Item->bBoundaryOnly = bRemove ? Entry->bTransition : Update.bTransition;
 		Item->Geometry = RenderGeometry;
 		Item->SourceChunks.Reserve(RenderSource->Batches.Num());
