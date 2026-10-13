@@ -80,6 +80,9 @@ public:
 		const FVoxelGenerationConsumerKey& InConsumer,
 		FVoxelGenerationPlanDependencyCapture& OutDependencies,
 		FString& OutError) const;
+	bool GatherEnvironmentSamples(const FIntPoint& InOrigin, int32 InWidth, int32 InHeight, int32 InStep,
+		const FVoxelGenerationConsumerKey& InConsumer, FVoxelGenerationPlanDependencyCapture& OutDependencies,
+		FString& OutError) const;
 	// 每个事实只等待自己的采样闭包，远处事实未完成不阻塞本地计划。
 	bool GatherPrerequisites(const FVoxelGenerationPlanDependency& InDependency,
 		FVoxelGenerationPlanDependencyCapture& OutDependencies, FString& OutError) const;

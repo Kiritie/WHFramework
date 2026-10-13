@@ -1,5 +1,7 @@
 #include "Voxel/Rendering/VoxelViewManager.h"
 
+#include "HAL/IConsoleManager.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Rendering/VoxelFineShardBuild.h"
 #include "Voxel/Rendering/VoxelTerrainRenderer.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
@@ -8,6 +10,16 @@
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/VoxelModule.h"
+
+namespace
+{
+	TAutoConsoleVariable<int32> CVarVoxelFineWorkerMicrosteps(
+		TEXT("voxel.Fine.WorkerMicrosteps"), 8,
+		TEXT("同一次后台执行最多推进的 Fine 微步骤数量；1 保留单步执行。"), ECVF_Default);
+	TAutoConsoleVariable<float> CVarVoxelFineWorkerSliceMilliseconds(
+		TEXT("voxel.Fine.WorkerSliceMilliseconds"), 2.0f,
+		TEXT("Fine 后台微步骤之间的让出时间；不抢占正在执行的单一步骤。"), ECVF_Default);
+}
 
 struct FVoxelViewManager::FF0FineWorker
 {
@@ -36,7 +48,31 @@ struct FVoxelViewManager::FF0FineWorker
 
 	FVoxelTaskResult Advance(const TAtomic<bool>& InCancel)
 	{
+		const int32 MaximumSteps = FMath::Clamp(CVarVoxelFineWorkerMicrosteps.GetValueOnAnyThread(), 1, 64);
+		const double RequestedSlice = CVarVoxelFineWorkerSliceMilliseconds.GetValueOnAnyThread();
+		const double SliceMilliseconds = FMath::IsFinite(RequestedSlice) ? FMath::Clamp(RequestedSlice, 0.1, 8.0) : 2.0;
+		const double Deadline = FPlatformTime::Seconds() + SliceMilliseconds / 1000.0;
 		FVoxelTaskResult Result;
+		for (int32 Step = 0; Step < MaximumSteps; ++Step)
+		{
+			Result = AdvanceStep(InCancel);
+			if (!Result.bSuccess || !Result.bContinue || Result.bCanceled || InCancel.Load() ||
+				bWaitingCapacity.Load() || FPlatformTime::Seconds() >= Deadline)
+			{
+				break;
+			}
+		}
+		return Result;
+	}
+
+	FVoxelTaskResult AdvanceStep(const TAtomic<bool>& InCancel)
+	{
+		FVoxelTaskResult Result;
+		if (InCancel.Load())
+		{
+			Result.bCanceled = true;
+			return Result;
+		}
 		const FVoxelGenerationRequiredSourceScope WorkerSource(&Resources.Get(), WorkerLease.Get());
 		BeforeCapacityBuild = Resources->ReleaseVersionExcludingOwner(Consumer);
 		if (!Mesher)
@@ -145,6 +181,25 @@ struct FVoxelViewManager::FFineShardWorker
 	}
 
 	FVoxelTaskResult Advance(const TAtomic<bool>& InCancel)
+	{
+		const int32 MaximumSteps = FMath::Clamp(CVarVoxelFineWorkerMicrosteps.GetValueOnAnyThread(), 1, 64);
+		const double RequestedSlice = CVarVoxelFineWorkerSliceMilliseconds.GetValueOnAnyThread();
+		const double SliceMilliseconds = FMath::IsFinite(RequestedSlice) ? FMath::Clamp(RequestedSlice, 0.1, 8.0) : 2.0;
+		const double Deadline = FPlatformTime::Seconds() + SliceMilliseconds / 1000.0;
+		FVoxelTaskResult Result;
+		for (int32 Step = 0; Step < MaximumSteps; ++Step)
+		{
+			Result = AdvanceStep(InCancel);
+			if (!Result.bSuccess || !Result.bContinue || Result.bCanceled || InCancel.Load() ||
+				bWaitingFacts.Load() || bWaitingCapacity.Load() || FPlatformTime::Seconds() >= Deadline)
+			{
+				break;
+			}
+		}
+		return Result;
+	}
+
+	FVoxelTaskResult AdvanceStep(const TAtomic<bool>& InCancel)
 	{
 		FVoxelTaskResult Result;
 		if (InCancel.Load()) { Result.bCanceled = true; return Result; }
@@ -563,6 +618,7 @@ void FVoxelViewManager::ApplyF0FineShardResult(const FVoxelFineShardKey& InKey, 
 
 void FVoxelViewManager::ProcessFineShardAdmissions()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewFineShardAdmissions);
 	const auto& Interest = GetViewInterest();
 	if (!Interest.PublicationInputs || Interest.PublicationInputs->FineShards.IsEmpty()) return;
 	const double Deadline = TerrainDeadline(Module.GetViewSettings().Budget.AdmissionMilliseconds);
@@ -592,8 +648,14 @@ void FVoxelViewManager::ProcessFineShardAdmissions()
 	}
 	FVoxelTerrainServiceCapacity Capacity;
 	Capacity.MaximumWaitSeconds = Module.GetViewSettings().Fine.MaximumBackgroundWaitSeconds;
-	for (int32 Attempt = 0; Attempt < FMath::Min(1, Candidates.Num()) && FPlatformTime::Seconds() < Deadline; ++Attempt)
+	const int32 MaximumAdmissions = FMath::Min(FMath::Max(1, Module.GetViewSettings().Budget.FineAdmissionPerFrame), Candidates.Num());
+	const uint64 CapturedOwnerIncarnation = TaskOwnerIncarnation;
+	for (int32 Attempt = 0; Attempt < MaximumAdmissions && FPlatformTime::Seconds() < Deadline; ++Attempt)
 	{
+		if (Attempt > 0 && FPlatformTime::Seconds() + FineShardAdmissionCostMicroseconds * 0.000001 >= Deadline)
+		{
+			break;
+		}
 		Capacity.bAllowOverdueOpportunity = Module.GetTerrainFrameContext().IsOverdueOpportunityAvailable();
 		FVoxelTerrainServiceCharge Charge;
 		const int32 Chosen = FineShardAdmissionSelection.Select(Candidates, Capacity, FPlatformTime::Seconds(), Charge);
@@ -608,6 +670,12 @@ void FVoxelViewManager::ProcessFineShardAdmissions()
 		RequestFineShard(Captured[Chosen]);
 		const double Actual = FMath::Max(1.0, (FPlatformTime::Seconds() - Started) * 1000000.0);
 		verify(FineShardAdmissionSelection.Settle(Charge.Serial, Actual));
+		if (CapturedOwnerIncarnation != TaskOwnerIncarnation)
+		{
+			// 重置发生在原调用的结算之前；结束旧代批次后完成选择器清理。
+			verify(FineShardAdmissionSelection.Reset());
+			return;
+		}
 		FineShardAdmissionCostMicroseconds = FMath::Lerp(FineShardAdmissionCostMicroseconds, Actual, 0.15);
 		Candidates[Chosen].bRunnable = false;
 	}

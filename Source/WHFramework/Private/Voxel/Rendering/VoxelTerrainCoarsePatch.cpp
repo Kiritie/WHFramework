@@ -89,9 +89,52 @@ uint64 FVoxelTerrainCoarsePatch::GetResourceAccountedBytes() const
 struct FVoxelTerrainCoarsePatchBuilder::FState
 {
 	FState(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
-		const FVoxelGenerationConsumerKey& InConsumer)
-		: Resources(MoveTemp(InResources)), Consumer(InConsumer)
+		const FVoxelGenerationConsumerKey& InConsumer, const bool bInPublicationOutput, const bool bInAllowResidentOverlap)
+		: Resources(MoveTemp(InResources)), Consumer(InConsumer), bPublicationOutput(bInPublicationOutput),
+			bAllowResidentOverlap(bInPublicationOutput && bInAllowResidentOverlap)
 	{
+	}
+
+	bool AcquireOutput(const uint64 InBytes, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease)
+	{
+		OutputAdmission = Resources->TryAcquire(Consumer,
+			bPublicationOutput ? EVoxelTerrainResourcePool::Resident : EVoxelTerrainResourcePool::Staged, InBytes, OutLease);
+		if (OutputAdmission != EVoxelTerrainResourceAdmission::Granted && bAllowResidentOverlap)
+		{
+			const auto OverlapAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::ResidentOverlap, InBytes, OutLease);
+			OutputAdmission = OverlapAdmission == EVoxelTerrainResourceAdmission::Granted ? OverlapAdmission :
+				OutputAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked || OverlapAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
+				EVoxelTerrainResourceAdmission::CapacityBlocked : OverlapAdmission;
+		}
+		return OutputAdmission == EVoxelTerrainResourceAdmission::Granted;
+	}
+
+	bool ResizeOutput(const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InLease, const uint64 InBytes)
+	{
+		OutputAdmission = InLease->TryResize(InBytes);
+		if (OutputAdmission != EVoxelTerrainResourceAdmission::Granted && bAllowResidentOverlap)
+		{
+			const auto Alternative = InLease->GetPool() == EVoxelTerrainResourcePool::Resident ?
+				EVoxelTerrainResourcePool::ResidentOverlap : EVoxelTerrainResourcePool::Resident;
+			const auto Limits = Resources->Snapshot().Limits;
+			const uint64 AlternativeLimit = Alternative == EVoxelTerrainResourcePool::Resident ?
+				Limits.ResidentBytes - Limits.OverlapBytes : Limits.OverlapBytes;
+			const auto AlternativeAdmission = InLease->Transfer(Alternative) ? InLease->TryResize(InBytes) :
+				InBytes <= AlternativeLimit ? EVoxelTerrainResourceAdmission::CapacityBlocked : EVoxelTerrainResourceAdmission::CapacityUnachievable;
+			OutputAdmission = AlternativeAdmission == EVoxelTerrainResourceAdmission::Granted ? AlternativeAdmission :
+				OutputAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked || AlternativeAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
+				EVoxelTerrainResourceAdmission::CapacityBlocked : AlternativeAdmission;
+		}
+		return OutputAdmission == EVoxelTerrainResourceAdmission::Granted;
+	}
+
+	EVoxelTerrainCoarseMeshProgress OutputBlocked(FString& OutError) const
+	{
+		if (!bPublicationOutput || OutputAdmission == EVoxelTerrainResourceAdmission::Granted ||
+			OutputAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked) return EVoxelTerrainCoarseMeshProgress::CapacityBlocked;
+		OutError = OutputAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+			TEXT("CapacityUnachievable: native coarse patch") : TEXT("InvalidRequest: native coarse patch");
+		return EVoxelTerrainCoarseMeshProgress::Failed;
 	}
 
 	bool AllowGrowth(const uint64 InAdditionalBytes)
@@ -133,9 +176,7 @@ struct FVoxelTerrainCoarsePatchBuilder::FState
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PieceLease;
 			const uint64 PieceBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainCoarsePatchPiece>();
 			if (!AllowGrowth(MeshCapacity(0) + PieceBytes)) return false;
-			if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, MeshCapacity(0), MeshLease) ||
-				!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged,
-					PieceBytes, PieceLease)) return false;
+			if (!AcquireOutput(MeshCapacity(0), MeshLease) || !AcquireOutput(PieceBytes, PieceLease)) return false;
 			Building = VoxelBoundedAllocation::MakeWorkerShared<FVoxelSectionMeshResult>(MeshLease);
 			Building->Stamp = Geometry->Stamp;
 			Building->ResourceLease = MoveTemp(MeshLease);
@@ -166,7 +207,7 @@ struct FVoxelTerrainCoarsePatchBuilder::FState
 			if (!AllowGrowth(Bytes - Previous) || Bytes + Previous + Fragments.GetAllocatedSize() > MaximumPieceBytes)
 			{ bOutputLimitExceeded = true; return false; }
 			if (Mesh.Vertices.Max() && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, Previous, Overlap)) return false;
-			if (!Building->ResourceLease->Resize(Bytes)) return false;
+			if (!ResizeOutput(Building->ResourceLease, Bytes)) return false;
 			Mesh.Vertices.Reserve(Capacity);
 			Mesh.Normals.Reserve(Capacity);
 			Mesh.UV0.Reserve(Capacity);
@@ -224,16 +265,21 @@ struct FVoxelTerrainCoarsePatchBuilder::FState
 	bool bComplete = false;
 	bool bFragmentLimitExceeded = false;
 	bool bOutputLimitExceeded = false;
+	bool bPublicationOutput = false;
+	bool bAllowResidentOverlap = false;
+	EVoxelTerrainResourceAdmission OutputAdmission = EVoxelTerrainResourceAdmission::Granted;
 };
 
 FVoxelTerrainCoarsePatchBuilder::FVoxelTerrainCoarsePatchBuilder(
-	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources, const FVoxelGenerationConsumerKey& InConsumer)
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources, const FVoxelGenerationConsumerKey& InConsumer,
+	const bool bInPublicationOutput, const bool bInAllowResidentOverlap)
 {
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 	if (InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Input,
 		VoxelBoundedAllocation::WorkerSharedBytes<FState>(), Lease))
 	{
-		State = VoxelBoundedAllocation::MakeWorkerShared<FState>(Lease, MoveTemp(InResources), InConsumer);
+		State = VoxelBoundedAllocation::MakeWorkerShared<FState>(Lease, MoveTemp(InResources), InConsumer,
+			bInPublicationOutput, bInAllowResidentOverlap);
 		State->InputLease = MoveTemp(Lease);
 	}
 }
@@ -272,6 +318,7 @@ EVoxelTerrainCoarseMeshProgress FVoxelTerrainCoarsePatchBuilder::Advance(
 {
 	if (!State) return EVoxelTerrainCoarseMeshProgress::CapacityBlocked;
 	auto& S = *State;
+	S.OutputAdmission = EVoxelTerrainResourceAdmission::Granted;
 	const auto FragmentBlocked = [&S, &OutError]
 	{
 		if (!S.bFragmentLimitExceeded) return EVoxelTerrainCoarseMeshProgress::CapacityBlocked;
@@ -286,8 +333,7 @@ EVoxelTerrainCoarseMeshProgress FVoxelTerrainCoarsePatchBuilder::Advance(
 		const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainCoarsePatch>() +
 			VoxelBoundedAllocation::ArrayBytes<FNodePtr>(S.Geometry->Roots.Num());
 		if (Bytes > MaximumPatchBytes) { OutError = TEXT("CapacityUnachievable: 粗层裁切根超过64MiB"); return EVoxelTerrainCoarseMeshProgress::Failed; }
-		if (!S.Resources->Acquire(S.Consumer, EVoxelTerrainResourcePool::Staged, Bytes, Lease))
-			return EVoxelTerrainCoarseMeshProgress::CapacityBlocked;
+		if (!S.AcquireOutput(Bytes, Lease)) return S.OutputBlocked(OutError);
 		S.Result = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainCoarsePatch>(Lease);
 		S.Result->MetadataLease = MoveTemp(Lease);
 		S.Result->Geometry = S.Geometry;
@@ -377,7 +423,7 @@ EVoxelTerrainCoarseMeshProgress FVoxelTerrainCoarsePatchBuilder::Advance(
 				{
 					if (S.bOutputLimitExceeded)
 					{ OutError = TEXT("CapacityUnachievable: 粗层裁切输出或单Piece峰值超过硬上限"); return EVoxelTerrainCoarseMeshProgress::Failed; }
-					return EVoxelTerrainCoarseMeshProgress::CapacityBlocked;
+					return S.OutputBlocked(OutError);
 				}
 				S.Fragments.Pop(EAllowShrinking::No);
 				continue;
@@ -408,8 +454,7 @@ EVoxelTerrainCoarseMeshProgress FVoxelTerrainCoarsePatchBuilder::Advance(
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainCoarsePatchNode>();
 		if (!S.AllowGrowth(Bytes)) { OutError = TEXT("CapacityUnachievable: 粗层裁切节点超过64MiB"); return EVoxelTerrainCoarseMeshProgress::Failed; }
-		if (!S.Resources->Acquire(S.Consumer, EVoxelTerrainResourcePool::Staged, Bytes, Lease))
-			return EVoxelTerrainCoarseMeshProgress::CapacityBlocked;
+		if (!S.AcquireOutput(Bytes, Lease)) return S.OutputBlocked(OutError);
 		auto Node = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainCoarsePatchNode>(Lease);
 		Node->MetadataLease = MoveTemp(Lease);
 		Node->Range = Frame.Range;

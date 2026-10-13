@@ -114,8 +114,11 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Name
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	UPROPERTY(ReplicatedUsing = OnRep_Name, EditAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FName Name;
+
+	UFUNCTION()
+	virtual void OnRep_Name();
 
 public:
 	virtual FName GetNameP() const override
@@ -324,8 +327,11 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Primary Asset
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(ReplicatedUsing = OnRep_AssetID, EditDefaultsOnly, BlueprintReadOnly)
 	FPrimaryAssetId AssetID;
+
+	UFUNCTION()
+	virtual void OnRep_AssetID();
 
 public:
 	virtual FPrimaryAssetId GetAssetID_Implementation() const override

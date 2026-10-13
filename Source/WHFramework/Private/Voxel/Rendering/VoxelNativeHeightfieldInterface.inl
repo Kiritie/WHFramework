@@ -119,6 +119,7 @@ namespace NativeHeightfieldInterface
 		const double TextureStretch, TConstArrayView<int32> DistantIndices, FVoxelSectionMeshResult& Output, FString& Error,
 		const bool bCount, const FVoxelSectionMeshResult* Plan = nullptr)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_NativeHeightfieldTile);
 		const auto& Source = *Coarse.Geometry->Source;
 		const auto Surface = Source.FrozenSurface; const auto Macro = Source.FrozenMacro;
 		if ((!Surface && !Macro) || !Fine.FineGeometry || !Fine.FineGeometry->Boundary) return false;

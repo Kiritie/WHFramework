@@ -85,6 +85,7 @@ public:
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Split(uint64 InBytes);
 	uint64 Bytes() const;
 	EVoxelTerrainResourcePool GetPool() const;
+	bool ReadCapacity(EVoxelTerrainResourcePool& OutPool, uint64& OutBytes) const;
 	uint64 Serial() const;
 	// authority已成功发布的不可变正文；保持原账本、serial和consumer身份。
 	void MarkPublished();
@@ -123,6 +124,10 @@ public:
 	EVoxelTerrainResourceAdmission TryAcquire(const FVoxelGenerationConsumerKey& InAttempt, EVoxelTerrainResourcePool InPool,
 		uint64 InBytes, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease,
 		int32 InReservedSplits = 0, uint64 InRequiredInputBytes = 0, int32 InRequiredLeaseCount = 0);
+	// 不分配租约、不等待账本锁；查询成功只表示当前容量条件，不替代正式授额。
+	bool TryQueryAcquire(const FVoxelGenerationConsumerKey& InAttempt, EVoxelTerrainResourcePool InPool,
+		uint64 InBytes, EVoxelTerrainResourceAdmission& OutAdmission, int32 InReservedSplits = 0,
+		uint64 InRequiredInputBytes = 0, int32 InRequiredLeaseCount = 0) const;
 	FVoxelTerrainResourceSnapshot Snapshot() const;
 	// 从原账本读取各类总量及至多16条最大租约；使用调用者固定存储，不建立诊断副本表。
 	FVoxelTerrainResourceGrantDiagnostics SnapshotGrants(
@@ -162,6 +167,9 @@ private:
 	bool CanAdd(EVoxelTerrainResourcePool InPool, uint64 InBytes) const;
 	bool CanFitRequired(EVoxelTerrainResourcePool InPool, uint64 InBytes, int32 InReservedSplits,
 		uint64 InRequiredInputBytes, int32 InRequiredLeaseCount) const;
+	bool CanPrepareEntries(int32 InAdditionalEntries, uint64 InAdditionalInputBytes) const;
+	EVoxelTerrainResourceAdmission QueryAcquire(EVoxelTerrainResourcePool InPool, uint64 InBytes,
+		int32 InReservedSplits, uint64 InRequiredInputBytes, int32 InRequiredLeaseCount) const;
 	bool PrepareEntries(int32 InAdditionalEntries, uint64 InAdditionalInputBytes);
 	bool Resize(uint64 InSerial, uint64 InBytes);
 	EVoxelTerrainResourceAdmission TryResize(uint64 InSerial, uint64 InBytes, uint64 InRequiredInputBytes, int32 InRequiredLeaseCount);
@@ -174,6 +182,7 @@ private:
 	bool IsPublished(uint64 InSerial) const;
 	uint64 Bytes(uint64 InSerial) const;
 	EVoxelTerrainResourcePool GetPool(uint64 InSerial) const;
+	bool ReadCapacity(uint64 InSerial, EVoxelTerrainResourcePool& OutPool, uint64& OutBytes) const;
 	void AdvanceVersion(bool bInCapacityReleased = false, const FVoxelGenerationConsumerKey* InReleasingOwner = nullptr);
 	struct FReleaseEvent
 	{

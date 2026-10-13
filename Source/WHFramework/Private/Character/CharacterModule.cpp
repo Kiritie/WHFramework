@@ -102,7 +102,7 @@ void UCharacterModule::OnTermination(EPhase InPhase)
 void UCharacterModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	auto& SaveData = InSaveData.GetRef<FCharacterModuleSaveData>();
-	if(AWHPlayerController* Player = UCommonModuleStatics::GetPlayerController<AWHPlayerController>(); Player && Player->IsLocalController())
+	if(AWHPlayerController* Player = UCommonModuleStatics::GetPlayerController<AWHPlayerController>(); bSaveLocalPlayerController && Player && Player->IsLocalController())
 	{
 		if(ISaveDataAgentInterface* Controller = Cast<ISaveDataAgentInterface>(Player))
 		{
@@ -114,9 +114,9 @@ void UCharacterModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 	{
 		for(const FCharacterSaveRecord& Record : SaveData.Characters)
 		{
-			if(ACharacterBase* const* Character = Characters.FindByPredicate([&Record](const ACharacterBase* Candidate)
+			if(ACharacterBase* const* Character = Characters.FindByPredicate([this, &Record](const ACharacterBase* Candidate)
 			{
-				return Candidate && Candidate->GetActorID_Implementation() == Record.CharacterId;
+				return Candidate && ShouldSaveCharacter(Candidate) && Candidate->GetActorID_Implementation() == Record.CharacterId;
 			}))
 			{
 				(*Character)->LoadSaveData(Record.Data, EPhase::Primary);
@@ -127,9 +127,9 @@ void UCharacterModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 	{
 		for(const FCharacterSaveRecord& Record : SaveData.Characters)
 		{
-			if(ACharacterBase* const* Character = Characters.FindByPredicate([&Record](const ACharacterBase* Candidate)
+			if(ACharacterBase* const* Character = Characters.FindByPredicate([this, &Record](const ACharacterBase* Candidate)
 			{
-				return Candidate && Candidate->GetActorID_Implementation() == Record.CharacterId;
+				return Candidate && ShouldSaveCharacter(Candidate) && Candidate->GetActorID_Implementation() == Record.CharacterId;
 			}))
 			{
 				(*Character)->LoadSaveData(Record.Data, EPhase::Final);
@@ -145,10 +145,11 @@ void UCharacterModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 FParameter UCharacterModule::ToData()
 {
 	FCharacterModuleSaveData SaveData;
-	SaveData.CurrentCharacterId = CurrentCharacter ? CurrentCharacter->GetActorID_Implementation() : FGuid();
+	SaveData.CurrentCharacterId = CurrentCharacter && ShouldSaveCharacter(CurrentCharacter) ? CurrentCharacter->GetActorID_Implementation() : FGuid();
 	const TArray<ACharacterBase*> CapturedCharacters = Characters;
 	for (ACharacterBase* Character : CapturedCharacters)
 	{
+		if (::IsValid(Character) && !ShouldSaveCharacter(Character)) continue;
 		if (!::IsValid(Character) || Character->GetWorld() != GetWorld())
 		{
 			UE_LOG(LogTemp, Error, TEXT("Character module capture lost a registered character"));
@@ -168,7 +169,7 @@ FParameter UCharacterModule::ToData()
 		}
 		SaveData.Characters.Add(MoveTemp(Record));
 	}
-	if (UWorld* World = GetWorld())
+	if (UWorld* World = GetWorld(); bSaveLocalPlayerController && World)
 	{
 		for (FConstPlayerControllerIterator Iterator = World->GetPlayerControllerIterator(); Iterator; ++Iterator)
 		{
@@ -186,6 +187,11 @@ FParameter UCharacterModule::ToData()
 		}
 	}
 	return FParameter(MoveTemp(SaveData));
+}
+
+bool UCharacterModule::ShouldSaveCharacter(const ACharacterBase* InCharacter) const
+{
+	return true;
 }
 
 FString UCharacterModule::GetModuleDebugMessage()

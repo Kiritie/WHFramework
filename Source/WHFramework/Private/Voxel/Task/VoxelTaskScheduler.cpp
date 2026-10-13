@@ -1,4 +1,4 @@
-﻿#include "Voxel/Task/VoxelTaskScheduler.h"
+#include "Voxel/Task/VoxelTaskScheduler.h"
 
 #include "HAL/PlatformProcess.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
@@ -273,7 +273,12 @@ void FVoxelTaskScheduler::FTaskBody::operator()() const
 	const double Start = FPlatformTime::Seconds();
 	if (!Slot->Cancel.Load())
 	{
-		Slot->Result = Request.Execute(Slot->Cancel);
+		do
+		{
+			Slot->Result = Request.Execute(Slot->Cancel);
+		} while (Request.bResumable && Slot->Result.bSuccess && Slot->Result.bContinue &&
+			Slot->Result.bContinueImmediately && !Slot->Result.bCanceled && !Slot->Cancel.Load() &&
+			FPlatformTime::Seconds() < Start + 0.008);
 	}
 	const double End = FPlatformTime::Seconds();
 	Slot->Result.Stamp = Stamp;
@@ -309,6 +314,19 @@ void FVoxelTaskScheduler::FTaskBody::operator()() const
 		ErrorResult.Error = MoveTemp(Slot->BudgetError);
 		ErrorResult.InputResourceLease = Slot->BudgetErrorLease;
 		Slot->Result = MoveTemp(ErrorResult);
+	}
+	const bool bContinue = Request.bResumable && Slot->Result.bSuccess && Slot->Result.bContinue &&
+		!Slot->Result.bCanceled && !Slot->Cancel.Load();
+	if (!bContinue)
+	{
+		// 最终结果持有自身正文；后台计算结束即释放仅供执行的捕获与工作区。
+		Request.Execute = nullptr;
+		Request.GetBlockReason = nullptr;
+		Request.ExecuteBindingLease.Reset();
+		Request.BlockBindingLease.Reset();
+		Request.ExecuteBindingBytes = Request.BlockBindingBytes = 0;
+		Request.ExecuteBindingCount = Request.BlockBindingCount = 0;
+		Request.bExecuteBound = Request.bBlockBound = false;
 	}
 }
 
@@ -550,7 +568,7 @@ bool FVoxelTaskScheduler::PrepareAdmission(const FVoxelTaskKey& InKey)
 
 bool FVoxelTaskScheduler::PrepareQueues(const int32 InAdditionalTasks)
 {
-	const int64 Total = int64(Pending.Num()) + Running.Num() + InAdditionalTasks;
+	const int64 Total = int64(Pending.Num()) + Running.Num() + AwaitingApply.Num() + InAdditionalTasks;
 	const int64 CanceledTotal = Total + Canceled.Num();
 	const int64 Notifications = Total + SectionIdleNotifications.Num();
 	if (Total > MAX_int32 || CanceledTotal > MAX_int32 || Notifications > MAX_int32)
@@ -561,8 +579,8 @@ bool FVoxelTaskScheduler::PrepareQueues(const int32 InAdditionalTasks)
 	const int32 Capacity = int32(Total);
 	const int32 RunningCapacity = FMath::Min(Capacity, Budget.MaxConcurrentTasks);
 	return ReserveArray(Pending, Capacity) && ReserveArray(Running, RunningCapacity) &&
-		ReserveArray(Canceled, int32(CanceledTotal)) && ReserveArray(WorkerCandidates, Capacity) &&
-		ReserveArray(CompletedCandidates, RunningCapacity) && ReserveArray(DisplacedIndices, Pending.Num()) &&
+		ReserveArray(AwaitingApply, Capacity) && ReserveArray(Canceled, int32(CanceledTotal)) && ReserveArray(WorkerCandidates, Capacity) &&
+		ReserveArray(CompletedCandidates, Capacity) && ReserveArray(DisplacedIndices, Pending.Num()) &&
 		ReserveArray(SectionIdleNotifications, int32(Notifications)) &&
 		ReserveSet<FVoxelTaskKey>(ActiveKeys, Capacity) &&
 		ReserveSet<TPair<FIntVector, int32>>(SectionTaskCounts, Capacity);
@@ -572,6 +590,7 @@ void FVoxelTaskScheduler::FreeBacking()
 {
 	Pending.Empty();
 	Running.Empty();
+	AwaitingApply.Empty();
 	Canceled.Empty();
 	WorkerCandidates.Empty();
 	CompletedCandidates.Empty();
@@ -588,6 +607,11 @@ void FVoxelTaskScheduler::FreeBacking()
 
 void FVoxelTaskScheduler::FlushSectionIdleNotifications()
 {
+	if (EnqueueBatchDepth > 0)
+	{
+		bBatchPumpRequested |= !SectionIdleNotifications.IsEmpty();
+		return;
+	}
 	if (bFlushingIdle || bStopped) return;
 	TGuardValue<bool> NotifyGuard(bFlushingIdle, true);
 	while (!SectionIdleNotifications.IsEmpty())
@@ -985,6 +1009,7 @@ void FVoxelTaskScheduler::VisitPriorityStates(TFunctionRef<void(FVoxelTaskReques
 		};
 		for (const FVoxelTaskRequest& Request : Pending) Capture(Request);
 		for (const FRunning& Request : Running) Capture(Request);
+		for (const FRunning& Request : AwaitingApply) Capture(Request);
 		if (Next == MAX_uint64) break;
 		VisitedSequence = Next;
 		InUpdate(Identity);
@@ -1002,17 +1027,20 @@ void FVoxelTaskScheduler::VisitPriorityStates(TFunctionRef<void(FVoxelTaskReques
 			return true;
 		};
 		for (FVoxelTaskRequest& Request : Pending) if (Restore(Request)) break;
-		for (FRunning& Request : Running)
+		for (auto* Queue : {&Running, &AwaitingApply})
 		{
-			if (!Restore(Request)) continue;
-			Request.Slot->Request.WorkClass = Request.WorkClass;
-			Request.Slot->Request.SourcePriority = Request.SourcePriority;
-			Request.Slot->Request.DistanceScore = Request.DistanceScore;
-			Request.Slot->Request.ForwardScore = Request.ForwardScore;
-			Request.Slot->Request.SourceStableKey = Request.SourceStableKey;
-			Request.Slot->Request.ServiceBand = Request.ServiceBand;
-			Request.Slot->Request.TerrainStage = Request.TerrainStage;
-			break;
+			for (FRunning& Request : *Queue)
+			{
+				if (!Restore(Request)) continue;
+				Request.Slot->Request.WorkClass = Request.WorkClass;
+				Request.Slot->Request.SourcePriority = Request.SourcePriority;
+				Request.Slot->Request.DistanceScore = Request.DistanceScore;
+				Request.Slot->Request.ForwardScore = Request.ForwardScore;
+				Request.Slot->Request.SourceStableKey = Request.SourceStableKey;
+				Request.Slot->Request.ServiceBand = Request.ServiceBand;
+				Request.Slot->Request.TerrainStage = Request.TerrainStage;
+				break;
+			}
 		}
 	}
 }
@@ -1074,6 +1102,8 @@ void FVoxelTaskScheduler::Tick(
 		return;
 	}
 
+	RetireCompletedTasks();
+
 	int32 Applied = 0;
 	int32 HeavyApplied = 0;
 	int32 FineApplied = 0;
@@ -1108,14 +1138,22 @@ void FVoxelTaskScheduler::Tick(
 		const int32 HeavyLimit = Budget.MaxHeavyCompletedResultsPerFrame;
 		Applied = 0;
 		HeavyApplied = 0;
-		while (!Running.IsEmpty() && Applied < ApplyLimit && FPlatformTime::Seconds() <= EndTime)
+		while (!AwaitingApply.IsEmpty() && FPlatformTime::Seconds() <= EndTime)
 		{
 			CompletedCandidates.Reset();
-			for (int32 CandidateIndex = 0; CandidateIndex < Running.Num(); ++CandidateIndex)
+			for (int32 CandidateIndex = 0; CandidateIndex < AwaitingApply.Num(); ++CandidateIndex)
 			{
-				const FRunning& Task = Running[CandidateIndex];
-				if (!Task.Task.CanRetire() ||
-					!CanApplyTerrainKind(Task.Kind) || (Task.Slot->Result.HasHeavyApply() && HeavyApplied >= HeavyLimit)) continue;
+				const FRunning& Task = AwaitingApply[CandidateIndex];
+				if (!Task.Task.CanRetire())
+				{
+					continue;
+				}
+				const FVoxelTaskResult& CandidateResult = Task.Slot->Result;
+				if (Applied >= ApplyLimit || !CanApplyTerrainKind(Task.Kind) ||
+					(CandidateResult.HasHeavyApply() && HeavyApplied >= HeavyLimit))
+				{
+					continue;
+				}
 				FVoxelTaskRequest Identity;
 				Identity.Kind = Task.Kind;
 				Identity.WorkClass = Task.WorkClass;
@@ -1141,49 +1179,24 @@ void FVoxelTaskScheduler::Tick(
 			if (Index == INDEX_NONE) break;
 			if (ApplyCharge.bOverdueOpportunity) FrameContext->ConsumeOverdueOpportunity();
 			const double ServiceStart = FPlatformTime::Seconds();
-			if (Running[Index].Slot->Cancel.Load())
+			if (AwaitingApply[Index].Slot->Cancel.Load())
 			{
-				Running[Index].Slot->Result.bCanceled = true;
-				Running[Index].Slot->Result.bSuccess = false;
+				AwaitingApply[Index].Slot->Result.bCanceled = true;
+				AwaitingApply[Index].Slot->Result.bSuccess = false;
 			}
-			const bool bHeavy = Running[Index].Slot->Result.HasHeavyApply();
+			const bool bHeavy = AwaitingApply[Index].Slot->Result.HasHeavyApply();
 
 			FRunning Completed =
-				MoveTemp(Running[Index]);
+				MoveTemp(AwaitingApply[Index]);
 
-			Running.RemoveAt(Index, 1, EAllowShrinking::No);
-			Completed.Task.Retire();
-			if (!Completed.bServiceSettled)
-			{
-				WorkerSelection.Settle(Completed.ServiceChargeSerial, Completed.Slot->ExecuteMicroseconds);
-				Completed.ServiceChargeSerial = 0;
-				Completed.bServiceSettled = true;
-				const double ActualCost = FMath::Max(1.0, Completed.Slot->ExecuteMicroseconds);
-				double& Estimate = WorkerCostEstimates.FindOrAdd(Completed.Kind, ActualCost);
-				Estimate = FMath::Lerp(Estimate, ActualCost, 0.15);
-			}
+			AwaitingApply.RemoveAt(Index, 1, EAllowShrinking::No);
+			check(!Completed.Task.IsValid() && Completed.bServiceSettled);
 
 			ReservedBytes -=
 				Completed.ReservedBytes;
 
 			FVoxelTaskRequest& OriginalRequest = Completed.Slot->Request;
 			if (OriginalRequest.bResumable) RunningContinuationInputBytes -= OriginalRequest.InputBytes;
-			if (OriginalRequest.bResumable && Completed.Slot->Result.bSuccess && Completed.Slot->Result.bContinue && !Completed.Slot->Result.bCanceled)
-			{
-				OriginalRequest.AccumulatedExecuteMilliseconds = Completed.Slot->Result.ExecuteMilliseconds;
-				QueuedInputBytes += OriginalRequest.InputBytes;
-				FVoxelTaskRequest Continuation = MoveTemp(OriginalRequest);
-				// 每次原生执行切片完成后重新计算等待年龄，避免续跑永久占据同一服务带的最老位置。
-				Continuation.FirstRunnableSeconds = -1.0;
-				OriginalRequest = FVoxelTaskRequest();
-				Completed.Slot->Result = FVoxelTaskResult();
-				Continuation.ExecutionReservation = MoveTemp(Completed.ExecutionReservation);
-				check(Pending.Num() < Pending.Max());
-				Pending.Add(MoveTemp(Continuation));
-				CompletedSelection.Settle(ApplyCharge.Serial, (FPlatformTime::Seconds() - ServiceStart) * 1000000.0);
-				++Applied;
-				continue;
-			}
 			// 最后一次原生执行实际退休后才结算；续跑保留同一完整授额。
 			if (Completed.NativeLease)
 			{
@@ -1470,12 +1483,14 @@ void FVoxelTaskScheduler::CancelSection(
 			MoveTemp(Request));
 	}
 
-	for (FRunning& Task : Running)
+	for (auto* Queue : {&Running, &AwaitingApply})
 	{
-		if (UsesSectionKey(Task.Kind) &&
-			Task.Stamp.Section == InSection)
+		for (FRunning& Task : *Queue)
 		{
-			Task.Slot->Cancel.Store(true);
+			if (UsesSectionKey(Task.Kind) && Task.Stamp.Section == InSection)
+			{
+				Task.Slot->Cancel.Store(true);
+			}
 		}
 	}
 	FlushSectionIdleNotifications();
@@ -1516,10 +1531,13 @@ void FVoxelTaskScheduler::CancelMatching(
 			RemoveActive(Request.Stamp, Request.Kind, Request.WorkClass);
 			QueueCanceled(MoveTemp(Request));
 		}
-		for (FRunning& Request : Running)
+		for (auto* Queue : {&Running, &AwaitingApply})
 		{
-			if (Request.Sequence == Next && Request.Kind == Key.Kind && Request.Stamp == Key.Stamp)
-				Request.Slot->Cancel.Store(true);
+			for (FRunning& Request : *Queue)
+			{
+				if (Request.Sequence == Next && Request.Kind == Key.Kind && Request.Stamp == Key.Stamp)
+					Request.Slot->Cancel.Store(true);
+			}
 		}
 	}
 	FlushSectionIdleNotifications();
@@ -1528,43 +1546,49 @@ void FVoxelTaskScheduler::CancelMatching(
 void FVoxelTaskScheduler::StopAndJoin()
 {
 	if (bStopped &&
-		Running.IsEmpty())
+		Running.IsEmpty() && AwaitingApply.IsEmpty())
 	{
 		return;
 	}
 
 	bStopped = true;
 
-	for (FRunning& Task : Running)
+	for (auto* Queue : {&Running, &AwaitingApply})
 	{
-		Task.Slot->Cancel.Store(true);
+		for (FRunning& Task : *Queue)
+		{
+			Task.Slot->Cancel.Store(true);
+		}
 	}
 
-	for (FRunning& Task : Running)
+	for (auto* Queue : {&Running, &AwaitingApply})
 	{
-		Task.Task.Wait();
-		while (!Task.Task.CanRetire())
+		for (FRunning& Task : *Queue)
 		{
-			FPlatformProcess::YieldThread();
-		}
-		Task.Task.Retire();
-		if (Task.NativeLease) verify(Task.NativeLease->Resize(Task.BudgetErrorBytes));
-		if (Task.Slot->WorkReceipt)
-		{
-			Task.Slot->WorkReceipt->Complete(Task.Slot->Result.ExecuteMilliseconds);
-			Task.Slot->WorkReceipt->Resolve(false);
-		}
-		UE_LOG(
-			LogTemp,
-			Display,
-			TEXT("Waiting for voxel task shutdown: kind=%d executeMs=%.2f"),
-			static_cast<int32>(Task.Kind),
-			Task.Slot->Result.ExecuteMilliseconds);
-		if (!Task.bServiceSettled)
-		{
-			WorkerSelection.Settle(Task.ServiceChargeSerial, Task.Slot->ExecuteMicroseconds);
-			Task.ServiceChargeSerial = 0;
-			Task.bServiceSettled = true;
+			Task.Task.Wait();
+			while (!Task.Task.CanRetire())
+			{
+				FPlatformProcess::YieldThread();
+			}
+			Task.Task.Retire();
+			if (Task.NativeLease) verify(Task.NativeLease->Resize(Task.BudgetErrorBytes));
+			if (Task.Slot->WorkReceipt)
+			{
+				Task.Slot->WorkReceipt->Complete(Task.Slot->Result.ExecuteMilliseconds);
+				Task.Slot->WorkReceipt->Resolve(false);
+			}
+			UE_LOG(
+				LogTemp,
+				Display,
+				TEXT("Waiting for voxel task shutdown: kind=%d executeMs=%.2f"),
+				static_cast<int32>(Task.Kind),
+				Task.Slot->Result.ExecuteMilliseconds);
+			if (!Task.bServiceSettled)
+			{
+				WorkerSelection.Settle(Task.ServiceChargeSerial, Task.Slot->ExecuteMicroseconds);
+				Task.ServiceChargeSerial = 0;
+				Task.bServiceSettled = true;
+			}
 		}
 	}
 
@@ -1573,6 +1597,7 @@ void FVoxelTaskScheduler::StopAndJoin()
 	CompletedSelection.Reset();
 	AdmissionAttempts.Empty();
 	Running.Empty();
+	AwaitingApply.Empty();
 	Canceled.Empty();
 
 	ActiveKeys.Empty();
@@ -1626,7 +1651,7 @@ void FVoxelTaskScheduler::ClearSectionIdleCallback()
 
 int32 FVoxelTaskScheduler::ActiveCount() const
 {
-	return Running.Num();
+	return Running.Num() + AwaitingApply.Num();
 }
 
 int32 FVoxelTaskScheduler::CriticalCount() const
@@ -1718,6 +1743,7 @@ void FVoxelTaskScheduler::SetBudget(
 			1,
 			Budget.MaxPendingTasks);
 	Budget.MaxWaitingDependencyTasks = FMath::Max(0, InBudget.MaxWaitingDependencyTasks);
+	Budget.bBorrowIdleKindSlots = InBudget.bBorrowIdleKindSlots;
 }
 
 void FVoxelTaskScheduler::SetObservedTerrainStage(const int32 InStage)
@@ -1739,8 +1765,9 @@ FVoxelTaskScheduler::GetDiagnostics() const
 	Result.Pending =
 		Pending.Num();
 
-	Result.Running =
-		Running.Num();
+	Result.Running = 0;
+	Result.NativeInFlight = 0;
+	Result.CompletedAwaitingApply = AwaitingApply.Num();
 	Result.CriticalAdmissionDeferrals = CriticalAdmissionDeferrals;
 	Result.CriticalPending = 0;
 	for (const FVoxelTaskRequest& Request : Pending)
@@ -1750,7 +1777,7 @@ FVoxelTaskScheduler::GetDiagnostics() const
 	Result.CriticalRunning = 0;
 	for (const FRunning& Task : Running)
 	{
-		Result.CriticalRunning += Task.WorkClass == EVoxelWorkClass::Critical ? 1 : 0;
+		Result.CriticalRunning += !Task.Task.CanRetire() && Task.WorkClass == EVoxelWorkClass::Critical ? 1 : 0;
 	}
 
 	Result.Critical =
@@ -1794,9 +1821,24 @@ FVoxelTaskScheduler::GetDiagnostics() const
 		}
 	}
 	Result.RunningByKind.Reset();
+	Result.CompletedAwaitingApplyByKind.Reset();
+	for (const FRunning& Task : AwaitingApply)
+	{
+		++Result.CompletedAwaitingApplyByKind.FindOrAdd(Task.Kind);
+	}
 	for (const FRunning& Task : Running)
 	{
-		++Result.RunningByKind.FindOrAdd(Task.Kind);
+		if (Task.Task.CanRetire())
+		{
+			++Result.CompletedAwaitingApply;
+			++Result.CompletedAwaitingApplyByKind.FindOrAdd(Task.Kind);
+		}
+		else
+		{
+			++Result.NativeInFlight;
+			++Result.Running;
+			++Result.RunningByKind.FindOrAdd(Task.Kind);
+		}
 	}
 
 	return Result;
@@ -1874,7 +1916,7 @@ bool FVoxelTaskScheduler::IsHigherPriority(const FVoxelTaskRequest& InA, const F
 
 bool FVoxelTaskResult::HasHeavyApply() const
 {
-	if (bCanceled || !bSuccess) return false;
+	if (bCanceled || !bSuccess || bContinue) return false;
 	if (Kind == EVoxelTaskKind::BuildFineMesh || Kind == EVoxelTaskKind::BuildVoxelProxy)
 	{
 		// 空网格只更新就绪/版本状态，不占据实体网格每帧一次的重发布配额。
@@ -1958,23 +2000,84 @@ bool FVoxelTaskScheduler::CanStartKind(const EVoxelTaskKind InKind) const
 	}
 }
 
+void FVoxelTaskScheduler::RetireCompletedTasks()
+{
+	check(IsInGameThread());
+	for (int32 Index = Running.Num() - 1; Index >= 0; --Index)
+	{
+		if (!Running[Index].Task.CanRetire()) continue;
+		FRunning Completed = MoveTemp(Running[Index]);
+		Running.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+		Completed.Task.Retire();
+		check(!Completed.bServiceSettled);
+		verify(WorkerSelection.Settle(Completed.ServiceChargeSerial, Completed.Slot->ExecuteMicroseconds));
+		Completed.ServiceChargeSerial = 0;
+		Completed.bServiceSettled = true;
+		const double ActualCost = FMath::Max(1.0, Completed.Slot->ExecuteMicroseconds);
+		double& Estimate = WorkerCostEstimates.FindOrAdd(Completed.Kind, ActualCost);
+		Estimate = FMath::Lerp(Estimate, ActualCost, 0.15);
+		auto& Request = Completed.Slot->Request;
+		auto& Result = Completed.Slot->Result;
+		const bool bContinue = Request.bResumable && Result.bSuccess && Result.bContinue &&
+			!Result.bCanceled && !Completed.Slot->Cancel.Load();
+		if (bContinue)
+		{
+			// 续算没有 Apply 正文，原生任务退休后直接归还后台调度；最终结果单独等待主线程接收。
+			ReservedBytes -= Completed.ReservedBytes;
+			RunningContinuationInputBytes -= Request.InputBytes;
+			QueuedInputBytes += Request.InputBytes;
+			Request.AccumulatedExecuteMilliseconds = Result.ExecuteMilliseconds;
+			FVoxelTaskRequest Continuation = MoveTemp(Request);
+			Continuation.FirstRunnableSeconds = -1.0;
+			Request = FVoxelTaskRequest();
+			Result = FVoxelTaskResult();
+			Continuation.ExecutionReservation = MoveTemp(Completed.ExecutionReservation);
+			check(Pending.Num() < Pending.Max());
+			Pending.Add(MoveTemp(Continuation));
+			++Diagnostics.ContinuationSlicesRetired;
+			continue;
+		}
+		if (!bContinue && Completed.NativeLease)
+		{
+			verify(Completed.NativeLease->Resize(Completed.BudgetErrorBytes));
+		}
+		// 结果与原授额继续存活；已预留的队列转移不执行 Apply，也不占后台并发槽。
+		check(AwaitingApply.Num() < AwaitingApply.Max());
+		AwaitingApply.Add(MoveTemp(Completed));
+	}
+}
+
 void FVoxelTaskScheduler::Pump()
 {
+	if (EnqueueBatchDepth > 0)
+	{
+		bBatchPumpRequested = true;
+		return;
+	}
 	if (bPumping) return;
 	TGuardValue<bool> PumpGuard(bPumping, true);
+	RetireCompletedTasks();
 	const int32 MaximumWorkers = FrameContext ? FMath::Min(Budget.MaxConcurrentTasks, FrameContext->GetAllocation().MaximumWorkers) : Budget.MaxConcurrentTasks;
 	const double Deadline = FrameContext ? FrameContext->Deadline() : MAX_dbl;
 	TArray<uint64, TFixedAllocator<64>> ReceiptBlocked;
 	if (!PrepareQueues(0)) return;
-	while (!bStopped && Running.Num() < MaximumWorkers && !Pending.IsEmpty() && FPlatformTime::Seconds() < Deadline)
+	if (!bStopped && Running.Num() < MaximumWorkers && !Pending.IsEmpty() && FPlatformTime::Seconds() < Deadline)
 	{
 		RefreshBlockReasons();
+	}
+	using FReceiptController = SharedPointerInternals::TReferenceControllerWithDeleter<FVoxelTerrainWorkReceipt,
+		FReceiptDeleter, ESPMode::ThreadSafe>;
+	const uint64 ReceiptBytes = FMemory::QuantizeSize(sizeof(FVoxelTerrainWorkReceipt), alignof(FVoxelTerrainWorkReceipt)) +
+		FMemory::QuantizeSize(sizeof(FReceiptController), alignof(FReceiptController));
+	while (!bStopped && Running.Num() < MaximumWorkers && !Pending.IsEmpty() && FPlatformTime::Seconds() < Deadline)
+	{
 		const double Now = FPlatformTime::Seconds();
 		FVoxelTerrainServiceCapacity Capacity;
 		Capacity.MaximumWorkers = MaximumWorkers;
 		Capacity.RunningWorkers = Running.Num();
 		Capacity.NearReservedWorkers = FMath::Min(Budget.CriticalReservedTasks, MaximumWorkers);
 		Capacity.bAllowOverdueOpportunity = FrameContext && FrameContext->IsOverdueOpportunityAvailable();
+		Capacity.bPreserveDistanceOrder = true;
 		for (const FRunning& Task : Running)
 		{
 			Capacity.RunningNearWorkers += Task.bServiceNear ? 1 : 0;
@@ -1987,15 +2090,28 @@ void FVoxelTaskScheduler::Pump()
 			{
 				const auto Consumer = FVoxelGenerationConsumerKey::Section(StatisticsWorldEpoch, StatisticsOwnerId, 1,
 					Request.Stamp.Section, Request.Sequence);
-				if (RuntimeResources->ReleaseVersionExcludingOwner(Consumer) == Request.ReceiptCapacityVersion)
-					Request.Blocked = EVoxelTaskBlockReason::InputMemory;
-				else Request.bReceiptCapacityBlocked = false;
+				EVoxelTerrainResourceAdmission Admission;
+				uint64 RegistrationVersion = 0;
+				const bool bRegistrationWaiting = Request.bReceiptRegistrationBlocked &&
+					(!RuntimeResources->TryGetReleaseVersionExcludingOwner(Consumer, RegistrationVersion) ||
+						RegistrationVersion <= Request.ReceiptCapacityVersion);
+				if (bRegistrationWaiting || !RuntimeResources->TryQueryAcquire(Consumer, EVoxelTerrainResourcePool::Input,
+					ReceiptBytes, Admission, 0, Request.ReceiptRequiredInputBytes,
+					Request.ReceiptRequiredLeaseCount) || Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
+				{
+					Request.Blocked |= EVoxelTaskBlockReason::InputMemory;
+				}
+				else
+				{
+					Request.bReceiptCapacityBlocked = false;
+					Request.bReceiptRegistrationBlocked = false;
+				}
 			}
 			if (ReceiptBlocked.Contains(Request.Sequence) || (ReceiptBlocked.Num() == 64 && !Request.WorkReceipt))
 				Request.Blocked = EVoxelTaskBlockReason::Memory;
 			if (!CanStartKind(Request.Kind))
 			{
-				Request.Blocked = EVoxelTaskBlockReason::LaneSlots;
+				Request.Blocked |= EVoxelTaskBlockReason::LaneSlots;
 			}
 			if (ReservedBytes > Budget.MaxReservedBytes || Request.ReservedBytes > Budget.MaxReservedBytes - ReservedBytes)
 			{
@@ -2021,7 +2137,35 @@ void FVoxelTaskScheduler::Pump()
 			Candidate.bRunnable = bRunnable;
 		}
 		FVoxelTerrainServiceCharge Charge;
-		const int32 BestIndex = WorkerSelection.Select(WorkerCandidates, Capacity, Now, Charge);
+		bool bBorrowedKindSlot = false;
+		int32 BestIndex = WorkerSelection.Select(WorkerCandidates, Capacity, Now, Charge);
+		if (BestIndex == INDEX_NONE && Budget.bBorrowIdleKindSlots &&
+			!WorkerCandidates.ContainsByPredicate([](const FVoxelTerrainServiceCandidate& Candidate)
+			{
+				return Candidate.bRunnable;
+			}))
+		{
+			for (FVoxelTerrainServiceCandidate& Candidate : WorkerCandidates)
+			{
+				FVoxelTaskRequest& Request = Pending[Candidate.Index];
+				if (Request.Blocked != EVoxelTaskBlockReason::LaneSlots)
+				{
+					continue;
+				}
+				Candidate.bRunnable = true;
+				if (Request.FirstRunnableSeconds < 0.0)
+				{
+					Request.FirstRunnableSeconds = Now;
+				}
+				Candidate.FirstQueuedSeconds = Request.FirstRunnableSeconds;
+			}
+			BestIndex = WorkerSelection.Select(WorkerCandidates, Capacity, Now, Charge);
+			if (BestIndex != INDEX_NONE)
+			{
+				Pending[BestIndex].Blocked = EVoxelTaskBlockReason::None;
+				bBorrowedKindSlot = true;
+			}
+		}
 		if (BestIndex == INDEX_NONE)
 		{
 			break;
@@ -2031,13 +2175,11 @@ void FVoxelTaskScheduler::Pump()
 			const auto Consumer = FVoxelGenerationConsumerKey::Section(StatisticsWorldEpoch, StatisticsOwnerId, 1,
 				Pending[BestIndex].Stamp.Section, Pending[BestIndex].Sequence);
 			const uint64 BeforeReceiptAdmission = RuntimeResources->ReleaseVersionExcludingOwner(Consumer);
+			const uint64 RequiredReceiptInputBytes = StatisticsRootInputBytes + Statistics->GetStorageReservationBytes();
+			const int32 RequiredReceiptLeaseCount = 1 + Statistics->GetStorageReservationLeaseCount();
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-			using FReceiptController = SharedPointerInternals::TReferenceControllerWithDeleter<FVoxelTerrainWorkReceipt,
-				FReceiptDeleter, ESPMode::ThreadSafe>;
-			const uint64 ReceiptBytes = FMemory::QuantizeSize(sizeof(FVoxelTerrainWorkReceipt), alignof(FVoxelTerrainWorkReceipt)) +
-				FMemory::QuantizeSize(sizeof(FReceiptController), alignof(FReceiptController));
 			const auto ReceiptAdmission = RuntimeResources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, ReceiptBytes, Lease, 0,
-				StatisticsRootInputBytes + Statistics->GetStorageReservationBytes(), 1 + Statistics->GetStorageReservationLeaseCount());
+				RequiredReceiptInputBytes, RequiredReceiptLeaseCount);
 			if (ReceiptAdmission != EVoxelTerrainResourceAdmission::Granted)
 			{
 				WorkerSelection.RefundBeforeStart(Charge.Serial);
@@ -2058,7 +2200,10 @@ void FVoxelTaskScheduler::Pump()
 					continue;
 				}
 				Pending[BestIndex].bReceiptCapacityBlocked = true;
+				Pending[BestIndex].bReceiptRegistrationBlocked = false;
 				Pending[BestIndex].ReceiptCapacityVersion = BeforeReceiptAdmission;
+				Pending[BestIndex].ReceiptRequiredInputBytes = RequiredReceiptInputBytes;
+				Pending[BestIndex].ReceiptRequiredLeaseCount = RequiredReceiptLeaseCount;
 				ReceiptBlocked.Add(Pending[BestIndex].Sequence);
 				continue;
 			}
@@ -2069,7 +2214,10 @@ void FVoxelTaskScheduler::Pump()
 				WorkerSelection.RefundBeforeStart(Charge.Serial);
 				Pending[BestIndex].Blocked = EVoxelTaskBlockReason::Memory;
 				Pending[BestIndex].bReceiptCapacityBlocked = true;
+				Pending[BestIndex].bReceiptRegistrationBlocked = true;
 				Pending[BestIndex].ReceiptCapacityVersion = BeforeReceiptAdmission;
+				Pending[BestIndex].ReceiptRequiredInputBytes = RequiredReceiptInputBytes;
+				Pending[BestIndex].ReceiptRequiredLeaseCount = RequiredReceiptLeaseCount;
 				ReceiptBlocked.Add(Pending[BestIndex].Sequence);
 				continue;
 			}
@@ -2121,9 +2269,36 @@ void FVoxelTaskScheduler::Pump()
 		if (Request.bResumable) RunningContinuationInputBytes += Request.InputBytes;
 		RunningTask.Slot->Request = MoveTemp(Request);
 		RunningTask.Task.Launch(UE_SOURCE_LOCATION, FTaskBody{RunningTask.Slot, RunningTask.Stamp}, UE::Tasks::ETaskPriority::Normal);
+		if (bBorrowedKindSlot)
+		{
+			++Diagnostics.BorrowedKindSlots;
+		}
 		check(Running.Num() < Running.Max());
 		Running.Add(
 			MoveTemp(RunningTask));
+	}
+}
+
+void FVoxelTaskScheduler::BeginEnqueueBatch()
+{
+	check(IsInGameThread());
+	check(EnqueueBatchDepth < MAX_int32);
+	++EnqueueBatchDepth;
+}
+
+void FVoxelTaskScheduler::EndEnqueueBatch()
+{
+	check(IsInGameThread());
+	check(EnqueueBatchDepth > 0);
+	--EnqueueBatchDepth;
+	if (EnqueueBatchDepth == 0 && bBatchPumpRequested)
+	{
+		bBatchPumpRequested = false;
+		if (!bStopped)
+		{
+			Pump();
+			FlushSectionIdleNotifications();
+		}
 	}
 }
 

@@ -577,9 +577,10 @@ FVoxelOverlayPreflightStatus FVoxelGenerationPipeline::EnsureOverlayBoundsReady(
 }
 
 FVoxelOverlayPreflightStatus FVoxelGenerationPipeline::EnsureCoarseOverlayBoundsReady(
-	const FVoxelGenerationBounds& InBounds, const EVoxelWorkClass InWorkClass, const int32 InSourcePriority) const
+	const FVoxelGenerationBounds& InBounds, const EVoxelWorkClass InWorkClass, const int32 InSourcePriority,
+	const double InDistanceScore, const double InForwardScore) const
 {
-	return Overlay ? Overlay->EnsureCoarseBoundsReady(InBounds, InWorkClass, InSourcePriority) : FVoxelOverlayPreflightStatus();
+	return Overlay ? Overlay->EnsureCoarseBoundsReady(InBounds, InWorkClass, InSourcePriority, InDistanceScore, InForwardScore) : FVoxelOverlayPreflightStatus();
 }
 
 FVoxelOverlayPreflightStatus FVoxelGenerationPipeline::EnsureOverlaySectionReady(

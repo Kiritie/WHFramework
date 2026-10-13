@@ -102,7 +102,7 @@ struct FVoxelRemotePageBuild
 				if (Result.Error.StartsWith(TEXT("CapacityBlocked")))
 				{
 					Working.Reset();
-					Storage->DeferCapacity(Result, BeforeAdmission);
+					Storage->DeferUnspecifiedCapacity(Result, BeforeAdmission);
 					return Result;
 				}
 				if (Result.Error.IsEmpty()) Result.Error = TEXT("Remote content revision differs from reply envelope");

@@ -62,7 +62,9 @@ public:
 	void SetCommitGate(TFunction<bool(const FVoxelPublishGroupKey&)> InGate)
 	{
 		CommitGate = MoveTemp(InGate);
+		InvalidateCommitReadiness();
 	}
+	void InvalidateCommitReadiness();
 	bool CommitGroup(const FGuid& InGroup);
 	bool DiscardUnchangedGroup(const FGuid& InGroup);
 	void SetValidation(const FGuid& InGroup, TFunction<bool()> InValidation);
@@ -71,7 +73,7 @@ public:
 	bool SetTerrainStage(const FGuid& InGroup, int32 InTerrainStage);
 	void SetObservers(TConstArrayView<FVector> InObservers);
 	void Tick();
-	void Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommit = true);
+	void Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommit = true, double InDeadlineSeconds = 0.0);
 	void InvalidatePriorities();
 	void Forget(AActor* InActor);
 	void Reset();
@@ -103,6 +105,7 @@ private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelScopedCoverageContinuationTest;
 	friend class FVoxelPublishEstimateRecoveryTest;
+	friend class FVoxelPublisherProgressAndNearOrderTest;
 	friend class FVoxelConcurrentPublishCommitTest;
 	friend class FVoxelFrozenGenerationProgressTest;
 	friend class FVoxelPublisherStageAndIndexTest;
@@ -197,6 +200,8 @@ private:
 		int32 NativeBatchCursor = 0;
 		int32 NativeTriangleCursor = 0;
 		bool bNativeSubmitted = false;
+		// 从索引准备到呈现回执共用准入槽，避免等待提交的正文耗尽常驻池。
+		bool bNativeAdmitted = false;
 		FVoxelGenerationConsumerKey NativeControlConsumer;
 		uint64 NativeControlVersion = 0;
 		uint64 NativeFrontendVersion = 0;
@@ -218,6 +223,8 @@ private:
 		bool bPrepareQueued = false;
 		bool bCommitQueued = false;
 		bool bPriorityReady = false;
+		uint64 PrepareWaitTick = 0;
+		uint64 CommitWaitTick = 0;
 		mutable uint64 DependencyNextSerial = 0;
 		mutable uint64 DependencyQuerySerial = 0;
 		mutable uint64 DependencyQueryRevision = 0;
@@ -346,17 +353,22 @@ private:
 	{
 		FPublicationRef Publication;
 		int32 GroupIndex = INDEX_NONE;
+		FVoxelTerrainServicePriority Priority;
+		uint64 PriorityRevision = MAX_uint64;
 	};
+	static bool HigherReadyCommit(const FReadyGroup& InFirst, const FReadyGroup& InSecond);
+	void InsertReadyCommit(FReadyGroup InReady);
+	void InsertReadyPrepare(FReadyGroup InReady);
 	void IndexPublicationUpdate(const FPublicationRef& Publication, int32 InIndex);
 	void ReleaseActorGeneration(TWeakObjectPtr<AActor> InActor, uint64 InSerial);
 	void QueueReadyGroup(const FPublicationRef& InPublication, int32 InGroupIndex);
 	void RebuildFirstOwners();
 	void SetOwnerActive(const FVoxelPublishGroupKey& InKey, uint64 InSerial, bool bInActive);
 	int32 SelectReadyGroup(TConstArrayView<FReadyGroup> InReady, FVoxelTerrainWorkSelection& InSelection,
-		FVoxelTerrainServiceCharge& OutCharge, bool bInCommit = false);
+		FVoxelTerrainServiceCharge& OutCharge, bool bInCommit = false, double InDeadline = MAX_dbl, bool* bOutAdvanced = nullptr);
 	void SettleReadyGroup(FVoxelTerrainWorkSelection& InSelection, const FVoxelTerrainServiceCharge& InCharge,
 		double InStartedSeconds, bool bInCommit);
-	bool HasOlderDependency(const FPublicationRef& InPublication, const FGroup& InGroup) const;
+	bool HasOlderDependency(const FPublicationRef& InPublication, const FGroup& InGroup, bool* bOutNeedsContinuation = nullptr) const;
 	FPendingGroup* FindPendingGroup(const FGuid& InGroup);
 	void StartCommittedGroups();
 	void AdvancePendingPlan();
@@ -379,7 +391,7 @@ private:
 	static bool GroupsInteract(const FGroup& InFirst, const FGroup& InSecond);
 	void SetPublicationPriority(FVoxelTaskRequest& InOutRequest, const FPublication& InPublication, TConstArrayView<int32> InGroupIndices) const;
 	void RefreshTaskPriorities();
-	void AdmitCoveragePreparation(const FPublicationRef& Publication, double InDeadline = MAX_dbl);
+	bool AdmitCoveragePreparation(const FPublicationRef& Publication, double InDeadline = MAX_dbl);
 	FVoxelGameThreadContinuation PrepareCoverageSteps(FPublication& InPublication);
 	const FUpdate* FindProjectedUpdate(TWeakObjectPtr<AActor> InActor, uint64 InBeforeSerial = MAX_uint64,
 		const FPublication** OutPublication = nullptr) const;
@@ -387,14 +399,16 @@ private:
 	FVoxelGameThreadContinuation SetCoverageSourceSteps(const FGuid& InGroup, AActor* InActor, FUpdate InSource,
 		TArray<FBox> InWorldCellBoxes, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
 	bool HigherBuildPriority(const FPublication& Publication, int32 First, int32 Second) const;
-	void AdmitBuilds(const FPublicationRef& Publication);
+	bool AdmitBuilds(const FPublicationRef& Publication, double InDeadline = MAX_dbl);
 	bool PrepareUpdate(const FPublicationRef& Publication, int32 InIndex, double InDeadline, int32& InOutPreparedComponents, bool& bOutComplete);
-	void CommitReadyGroups(const FPublicationRef& Publication, int32& InOutCommitted, double InDeadline,
+	bool CommitReadyGroups(const FPublicationRef& Publication, int32& InOutCommitted, double InDeadline,
 		const TMap<FVoxelPublishGroupKey, uint64>& InFirstOwners, int32 InGroupIndex = INDEX_NONE);
-	void CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup);
-	bool AdvanceNativeGroup(const FPublicationRef& InPublication, FGroup& InGroup);
+	bool CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup);
+	bool AdvanceNativeGroup(const FPublicationRef& InPublication, FGroup& InGroup, bool& bOutAdvanced);
+	void ReleaseNativeGroup(FGroup& InGroup);
 	bool IsNativeGeometryCurrent(const FVoxelTaskStamp& InStamp) const;
-	bool RunBudgetedPhase(FVoxelPublishBudget& InBudget, EVoxelPublishPhase InPhase, TFunctionRef<void()> InOperation);
+	bool RunBudgetedPhase(FVoxelPublishBudget& InBudget, EVoxelPublishPhase InPhase, TFunctionRef<bool()> InOperation,
+		double InDeadlineSeconds = MAX_dbl);
 	double PhaseOperationEstimateMilliseconds[static_cast<uint8>(EVoxelPublishPhase::Count)] = {};
 	uint64 PhaseConsecutiveDeferrals[static_cast<uint8>(EVoxelPublishPhase::Count)] = {};
 	double NextPublisherDiagnostic = 0.0;
@@ -409,6 +423,8 @@ private:
 	mutable TOptional<FVoxelTerrainRenderer> TerrainRenderer;
 	uint64 BatchSerial = 0;
 	FGuid NativeOwnerId = FGuid::NewGuid();
+	static constexpr int32 MaximumNativeGroups = 8;
+	int32 ActiveNativeGroups = 0;
 	uint64 NativeSourceSerial = 0;
 	TMap<TWeakObjectPtr<AActor>, FEntry> Entries;
 	TArray<FVoxelPublishGroupKey> RetryOwners;
@@ -439,6 +455,14 @@ private:
 	FVoxelTerrainWorkSelection CommitSelection;
 	double ServiceCostEstimates[2][static_cast<uint8>(EVoxelTerrainServiceBand::Count)] = {};
 	int32 ReadySelectionCursors[2] = {};
+	uint64 PublisherTickSerial = 0;
+	uint64 PrepareReadinessRevision = 0;
+	uint64 CommitReadinessRevision = 0;
+	uint64 CommitResourceVersion = 0;
+	uint64 CommitFrontendVersion = 0;
+	bool bCommitOrderDirty = false;
+	bool bCommitSelectionComplete = false;
+	bool bCommitNeedsPolling = false;
 	uint64 ReadySequence = 0;
 	TMap<FVoxelPublishGroupKey, uint64> OwnerFirstSerial;
 	TMap<FVoxelPublishGroupKey, TArray<uint64>> OwnerSerialQueues;

@@ -77,7 +77,7 @@ class WHFRAMEWORK_API FVoxelTerrainCoarseMeshBuilder
 {
 public:
 	FVoxelTerrainCoarseMeshBuilder(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
-		const FVoxelGenerationConsumerKey& InConsumer);
+		const FVoxelGenerationConsumerKey& InConsumer, bool bInPublicationOutput = false, bool bInAllowResidentOverlap = false);
 	bool Initialize(TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe> InMesh,
 		const FVector& InWorldCellOrigin, double InCellScale, const FVoxelTaskStamp& InStamp, FString& OutError);
 	EVoxelTerrainCoarseMeshProgress Advance(int32 InMaximumSteps, const TAtomic<bool>& InCancel, FString& OutError);
@@ -102,6 +102,8 @@ private:
 	int32 MaximumRoots = 0;
 	int32 BatchCursor = 0;
 	bool bComplete = false;
+	bool bPublicationOutput = false;
+	bool bAllowResidentOverlap = false;
 };
 
 // 只重建变化区相交叶子。每次 continuation 推进一个节点、三角形或裁切片段。
@@ -109,7 +111,7 @@ class WHFRAMEWORK_API FVoxelTerrainCoarsePatchBuilder
 {
 public:
 	FVoxelTerrainCoarsePatchBuilder(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
-		const FVoxelGenerationConsumerKey& InConsumer);
+		const FVoxelGenerationConsumerKey& InConsumer, bool bInPublicationOutput = false, bool bInAllowResidentOverlap = false);
 	~FVoxelTerrainCoarsePatchBuilder();
 	bool Initialize(TSharedPtr<const FVoxelTerrainCoarseMesh, ESPMode::ThreadSafe> InGeometry,
 		TSharedPtr<const FVoxelTerrainCoarsePatch, ESPMode::ThreadSafe> InBase,

@@ -60,6 +60,9 @@ public:
 	FVoxelGenerationDependencyStatus QueryEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample);
 	FVoxelGenerationDependencyStatus EnsureEnvironmentBounds(const FVoxelGenerationBounds& InBounds,
 		EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore);
+	FVoxelGenerationDependencyStatus EnsureEnvironmentSamples(const FVoxelGenerationConsumerKey& InConsumer,
+		const FIntPoint& InOrigin, int32 InWidth, int32 InHeight, int32 InStep, double InDistanceScore,
+		bool& bOutNeedsAdvance);
 	uint64 GetWaitingPlanConsumers(EVoxelGenerationPlanKind InKind) const;
 	FVoxelGenerationDependencyStatus EnsureGenerationFacts(const FVoxelGenerationConsumerKey& InConsumer,
 		const FVoxelGenerationBounds& InBounds, const FVoxelTerrainServicePriority& InPriority);
@@ -77,6 +80,7 @@ private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelCriticalReadyQueueLivenessTest;
 	friend class FVoxelEmergeCapacityContinuationTest;
+	friend class FVoxelMapStyleEpochTest;
 #endif
 	static bool IsCriticalDemand(const FVoxelExactDemand& InDemand);
 	void WakeCriticalSection(const FIntVector& InKey);
@@ -219,6 +223,10 @@ private:
 		FVoxelGenerationBounds Bounds;
 		FVoxelGenerationPlanDependencyCapture Dependencies;
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
+		int32 SampleStep = 0;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SampleRetentionStorageLease;
+		TArray<TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>> SampleRetentions;
+		int32 SampleDependencyCursor = 0;
 		uint64 CapacityVersion = 0;
 		bool bWaitingCapacity = false;
 	};

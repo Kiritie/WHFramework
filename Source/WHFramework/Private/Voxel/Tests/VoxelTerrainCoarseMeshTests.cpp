@@ -60,7 +60,7 @@ namespace
 
 	FPatchPtr BuildPatch(const TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe>& Resources,
 		const FVoxelGenerationConsumerKey& Consumer, const FGeometryPtr& Geometry, const FPatchPtr& Base,
-		TConstArrayView<FBox> Boxes, TConstArrayView<FBox> Changes)
+		TConstArrayView<FBox> Boxes, TConstArrayView<FBox> Changes, const bool bPublicationOutput = false)
 	{
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input,
@@ -69,7 +69,7 @@ namespace
 		Exclusions->Lease = MoveTemp(Lease);
 		Exclusions->Boxes.Reserve(Boxes.Num());
 		Exclusions->Boxes.Append(Boxes.GetData(), Boxes.Num());
-		FVoxelTerrainCoarsePatchBuilder Builder(Resources, Consumer);
+		FVoxelTerrainCoarsePatchBuilder Builder(Resources, Consumer, bPublicationOutput);
 		FString Error;
 		if (!Builder.Initialize(Geometry, Base, Exclusions, Changes, Error)) return nullptr;
 		TAtomic<bool> Cancel{false};
@@ -162,6 +162,66 @@ bool FVoxelTerrainCoarseCapacityRecoveryTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("容量释放后同一构建继续完成"), Progress, EVoxelTerrainCoarseMeshProgress::Complete);
 	const auto Geometry = Builder.TakeResult();
 	TestTrue(TEXT("空间尺度不会扩大几何或节点数"), Geometry && Geometry->Ranges.Num() == 3 && Geometry->Source == Source);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelTerrainPublicationOutputCapacityTest,
+	"WHFramework.Voxel.FineRefactor.Rendering.PublicationOutputCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelTerrainPublicationOutputCapacityTest::RunTest(const FString& Parameters)
+{
+	auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(1, FGuid::NewGuid(), 1, {}, 1);
+	const auto External = FVoxelGenerationConsumerKey::Section(1, FGuid::NewGuid(), 1, {}, 1);
+	auto Source = MakeSource();
+	if (!TestTrue(TEXT("原完成正文如实持有 Staged 容量"), Resources->Acquire(Consumer,
+		EVoxelTerrainResourcePool::Staged, VoxelBoundedAllocation::SharedBytes<FVoxelSectionMeshResult>() +
+		Source->AllocatedBytes(), Source->ResourceLease))) return false;
+	const uint64 SourceSerial = Source->ResourceLease->Serial();
+	const auto Before = Resources->Snapshot();
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> StagedPressure, ResidentPressure;
+	if (!TestTrue(TEXT("外部完成结果占满剩余 Staged"), Resources->Acquire(External,
+		EVoxelTerrainResourcePool::Staged, Before.Limits.StagedBytes -
+		Before.Used[int32(EVoxelTerrainResourcePool::Staged)], StagedPressure))) return false;
+	if (!TestTrue(TEXT("同时模拟普通 Resident 的真实暂时容量阻塞"), Resources->Acquire(External,
+		EVoxelTerrainResourcePool::Resident, Before.Limits.ResidentBytes - Before.Limits.OverlapBytes -
+		Before.Used[int32(EVoxelTerrainResourcePool::Resident)], ResidentPressure))) return false;
+	FVoxelTerrainCoarseMeshBuilder Builder(Resources, Consumer, true, false);
+	FString Error;
+	if (!TestTrue(TEXT("初始化真实发布索引"), Builder.Initialize(Source, FVector::ZeroVector, 1.0, Source->Stamp, Error))) return false;
+	TAtomic<bool> Cancel{false};
+	TestEqual(TEXT("无已呈现内容时不借 Overlap 绕过 Resident 上限"),
+		Builder.Advance(1, Cancel, Error), EVoxelTerrainCoarseMeshProgress::CapacityBlocked);
+	TestEqual(TEXT("首次发布不消耗 Overlap"),
+		Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::ResidentOverlap)], uint64(0));
+	ResidentPressure.Reset();
+	EVoxelTerrainCoarseMeshProgress Progress = EVoxelTerrainCoarseMeshProgress::Working;
+	for (int32 Slice = 0; Slice < 1024 && Progress == EVoxelTerrainCoarseMeshProgress::Working; ++Slice)
+		Progress = Builder.Advance(1, Cancel, Error);
+	if (!TestEqual(TEXT("Resident 释放后，同一构建在 Staged 仍满时继续完成"),
+		Progress, EVoxelTerrainCoarseMeshProgress::Complete)) return false;
+	const auto Geometry = Builder.TakeResult();
+	if (!TestTrue(TEXT("发布索引持有真实 Resident 租约"), Geometry && Geometry->MetadataLease &&
+		Geometry->MetadataLease->GetPool() == EVoxelTerrainResourcePool::Resident)) return false;
+	TestEqual(TEXT("Prepare 不提前迁移完成正文"), Source->ResourceLease->GetPool(), EVoxelTerrainResourcePool::Staged);
+	TestEqual(TEXT("原正文租约身份保持"), Source->ResourceLease->Serial(), SourceSerial);
+	const FBox NearBox(FVector(0, 0, -1), FVector(8, 8, 1));
+	const auto Patch = BuildPatch(Resources, Consumer, Geometry, nullptr,
+		MakeArrayView(&NearBox, 1), MakeArrayView(&NearBox, 1), true);
+	if (!TestTrue(TEXT("满 Staged 下局部裁切的真实发布输出完成"), Patch && Patch->Roots[0] &&
+		Patch->Roots[0]->Children[0] && Patch->Roots[0]->Children[0]->FirstPiece)) return false;
+	const auto NearLeaf = Patch->Roots[0]->Children[0];
+	TestTrue(TEXT("原裁切面积规则保持"), FMath::IsNearlyEqual(PieceArea(NearLeaf->FirstPiece), 32.0 * 64.0, 1.0e-6));
+	TestTrue(TEXT("无变化远叶仍共享原始索引"), !Patch->Roots[0]->Children[1]);
+	for (auto Piece = NearLeaf->FirstPiece; Piece; Piece = Piece->Next)
+	{
+		TestEqual(TEXT("裁切正文按真实发布池收费"), Piece->Mesh->ResourceLease->GetPool(), EVoxelTerrainResourcePool::Resident);
+		TestTrue(TEXT("裁切数据和 8 MiB Piece 上限保持"), Piece->Mesh->bValidated &&
+			Piece->Mesh->ResourceLease->Bytes() <= 8ull * 1024 * 1024);
+	}
+	TestEqual(TEXT("整个准备过程没有释放或借用满 Staged 的外部额度"),
+		Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Staged)], Before.Limits.StagedBytes);
 	return true;
 }
 

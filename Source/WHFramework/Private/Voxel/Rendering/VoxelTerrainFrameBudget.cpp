@@ -1,5 +1,18 @@
 #include "Voxel/Rendering/VoxelTerrainFrameBudget.h"
 
+#include "HAL/PlatformMisc.h"
+
+int32 FVoxelTerrainFrameBudget::ResolveMaximumWorkers(const FVoxelTerrainFrameBudgetSettings& InSettings)
+{
+	const int32 LogicalProcessors = FMath::Max(1, FPlatformMisc::NumberOfCoresIncludingHyperthreads());
+	const int32 HardwareLimit = FMath::Min(4096, LogicalProcessors);
+	if (InSettings.bUseAutomaticWorkerCount)
+	{
+		return FMath::Clamp(LogicalProcessors - FMath::Max(0, InSettings.ReservedLogicalProcessors), 1, HardwareLimit);
+	}
+	return FMath::Clamp(InSettings.MaximumWorkers, 1, HardwareLimit);
+}
+
 bool FVoxelTerrainFrameBudget::Configure(const FVoxelTerrainFrameBudgetSettings& InSettings, FString& OutError)
 {
 	if (!FMath::IsFinite(InSettings.TargetFramesPerSecond) || InSettings.TargetFramesPerSecond <= 0.0 ||
@@ -10,7 +23,8 @@ bool FVoxelTerrainFrameBudget::Configure(const FVoxelTerrainFrameBudgetSettings&
 		InSettings.MinimumNearMilliseconds <= 0.0 || InSettings.MinimumBackgroundMilliseconds <= 0.0 ||
 		InSettings.MaximumTerrainMilliseconds < InSettings.MinimumNearMilliseconds + InSettings.MinimumBackgroundMilliseconds ||
 		!FMath::IsFinite(InSettings.SmoothingAlpha) || InSettings.SmoothingAlpha <= 0.0 || InSettings.SmoothingAlpha > 1.0 ||
-		InSettings.MinimumWorkers < 1 || InSettings.MaximumWorkers < InSettings.MinimumWorkers)
+		InSettings.ReservedLogicalProcessors < 0 || InSettings.MinimumWorkers < 1 ||
+		(!InSettings.bUseAutomaticWorkerCount && InSettings.MaximumWorkers < InSettings.MinimumWorkers))
 	{
 		OutError = TEXT("动态 Terrain 帧预算不合法");
 		return false;
@@ -70,8 +84,10 @@ FVoxelTerrainFrameAllocation FVoxelTerrainFrameBudget::Observe(const FVoxelTerra
 	// Worker 并发独立于渲染发布预算，避免 GPU 压力把后台数据生成也压成串行。
 	const double WorkerScale = InObservation.bInitialSpawn ? 1.0 :
 		FMath::Clamp(2.0 - FMath::Max(NonTerrain, SmoothedNonTerrainMilliseconds) / Target, 0.0, 1.0);
-	Result.MaximumWorkers = FMath::Clamp(FMath::RoundToInt(FMath::Lerp(double(Settings.MinimumWorkers),
-		double(Settings.MaximumWorkers), WorkerScale)), Settings.MinimumWorkers, Settings.MaximumWorkers);
+	const int32 MaximumWorkers = ResolveMaximumWorkers(Settings);
+	const int32 MinimumWorkers = FMath::Min(Settings.MinimumWorkers, MaximumWorkers);
+	Result.MaximumWorkers = FMath::Clamp(FMath::RoundToInt(FMath::Lerp(double(MinimumWorkers),
+		double(MaximumWorkers), WorkerScale)), MinimumWorkers, MaximumWorkers);
 	return Result;
 }
 

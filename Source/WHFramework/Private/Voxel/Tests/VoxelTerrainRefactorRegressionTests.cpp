@@ -814,16 +814,18 @@ bool FVoxelPublishEstimateRecoveryTest::RunTest(const FString& InParameters)
 			[&Executed]
 			{
 				++Executed;
+				return true;
 			});
 	}
 	TestEqual(TEXT("An expired hard deadline never executes work"), Executed, 0);
 	TestEqual(TEXT("Consecutive deferrals remain observable"), Publisher.PhaseConsecutiveDeferrals[Phase], uint64(64));
 	Budget.Begin(FPlatformTime::Seconds(), 0.1, 8);
 	TestTrue(TEXT("A fresh small budget recovers without forcing an oversized estimate"), Publisher.RunBudgetedPhase(Budget, EVoxelPublishPhase::Plan,
-																							  [&Executed]
-																							  {
-																								  ++Executed;
-																							  }));
+		[&Executed]
+		{
+			++Executed;
+			return true;
+		}));
 	TestEqual(TEXT("Successful progress clears consecutive deferrals"), Publisher.PhaseConsecutiveDeferrals[Phase], uint64(0));
 	TestTrue(TEXT("The estimate is bounded by a valid frame fraction"), Publisher.PhaseOperationEstimateMilliseconds[Phase] <=
 		double(Module->ViewSettings.Budget.TerrainPublishMilliseconds) * 0.5);

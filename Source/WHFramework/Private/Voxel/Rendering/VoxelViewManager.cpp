@@ -88,15 +88,6 @@ namespace
 		void operator()() const { Apply->Consume(MoveTemp(*Result)); }
 	};
 
-	bool RetainRawPublication(const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease,
-		const FVoxelTerrainGeometry& Geometry, FVoxelTerrainRenderer& Renderer)
-	{
-		if (!Lease || Lease->Transfer(EVoxelTerrainResourcePool::Resident)) return true;
-		FIntVector Min, Max;
-		return Geometry.Key.TryBounds(Geometry.WorldMinZ, Geometry.WorldMaxZ, Min, Max) &&
-			Renderer.HasPresentedCoverage(FBox(FVector(Min), FVector(Max))) &&
-			Lease->Transfer(EVoxelTerrainResourcePool::ResidentOverlap);
-	}
 struct FRepresentationOverlayRead
 {
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> FactResources;
@@ -304,6 +295,7 @@ struct FProxyMeshEstimate
 		const FVoxelTerrainGeometry& Geometry, const uint64 InControllerBytes,
 		const int32 InShardArrays = 2, const int32 InInitialShardArrays = 0)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewCoarseInputStorage);
 		const FVoxelGenerationConsumerKey Consumer = MakeCoarseGenerationConsumer(Geometry, Request.Stamp);
 		if (!Consumer.IsValid()) return nullptr;
 		int32 InitialShardCount = 0;
@@ -445,6 +437,7 @@ void FVoxelViewManager::Tick(
 	const double TickStart = FPlatformTime::Seconds();
 	bTerrainFrameBudgetActive = true;
 	FrameTimings = {};
+	const bool bCoverageDrainThisTick = bCoverageDrainPending;
 	LastServiceResourceAdmission = EVoxelTerrainResourceAdmission::None;
 	AdvanceCoverageIndexRecovery(TerrainDeadline(0.03));
 	{
@@ -477,7 +470,7 @@ void FVoxelViewManager::Tick(
 		const double Ceiling = FMath::Min(double(Policy.PublishOperationEstimateCeilingMilliseconds), double(Policy.TerrainPublishMilliseconds) * 0.5);
 		Estimate = FMath::Clamp(Estimate > 0.0 ? Estimate : Floor, Floor, Ceiling);
 		const bool bCanYield = Phase == EVoxelPublishPhase::Admission || Phase == EVoxelPublishPhase::Prepare ||
-			Phase == EVoxelPublishPhase::Retire;
+			Phase == EVoxelPublishPhase::Retire || Phase == EVoxelPublishPhase::Plan;
 		const double StartEstimate = bCanYield ? FMath::Min(Estimate, TerrainFrameBudget.RemainingMilliseconds(Start)) : Estimate;
 		if (!TerrainFrameBudget.TryStart(Phase, Start, StartEstimate))
 		{
@@ -529,7 +522,18 @@ void FVoxelViewManager::Tick(
 					[this](const FIntVector& Section) { OnPresentationReady(Section); }, Deadline);
 			});
 			const bool bAllowCommit = true;
-			Publisher->Tick(TerrainFrameBudget, bAllowCommit);
+			const double RemainingMilliseconds = TerrainFrameBudget.RemainingMilliseconds(FPlatformTime::Seconds());
+			if (RemainingMilliseconds > 0.0)
+			{
+				// 发布保留自己的续跑状态，给本帧覆盖与准入留下同一预算内的服务机会。
+				const bool bFullPublicationSlice = bCoverageDrainThisTick || FirstPhase == 1;
+				const double PublicationMilliseconds = RemainingMilliseconds * (bFullPublicationSlice ? 1.0 : 0.5);
+				Publisher->Tick(TerrainFrameBudget, bAllowCommit, TerrainDeadline(PublicationMilliseconds));
+				if (bCoverageDrainThisTick)
+				{
+					bCoverageDrainPending = false;
+				}
+			}
 			if (bAllowCommit)
 			{
 				for (const auto& Key : Publisher->TakeRetryOwners())
@@ -547,41 +551,14 @@ void FVoxelViewManager::Tick(
 				}
 			}
 		}
-		else if (Phase == 2 && bCurrentInterest && (CoverageContinuation.IsValid() || bCoverageDirty))
+		else if (Phase == 2 && bCurrentInterest && !bCoverageDrainThisTick &&
+			(CoverageContinuation.IsValid() || bCoverageDirty))
 			Run(EVoxelPublishPhase::Plan, [this]
 			{
-				const double Start = FPlatformTime::Seconds();
-				if (!CoverageContinuation.IsValid())
-				{
-					bActiveCoverageFull = bCoverageDirtyFull;
-					bCoverageDirtyFull = false;
-					const int32 Count = bActiveCoverageFull ? 0 : FMath::Min(DirtyCoverageRects.Num(), 1);
-					ActiveDirtyCoverageRects.Append(DirtyCoverageRects.GetData(), Count);
-					DirtyCoverageRects.RemoveAt(0, Count, EAllowShrinking::No);
-					bCoverageDirty = !DirtyCoverageRects.IsEmpty();
-					CoverageInterestSnapshot = AppliedInterestSnapshot ? AppliedInterestSnapshot : Module.GetCurrentInterestSnapshot();
-					CoverageInputRoot = AppliedInputRoot;
-					CoverageStartedSeconds = Start;
-					if (bActiveCoverageFull) ActiveCoveragePublishGroups = MoveTemp(OpenPublishGroups);
-					CoverageContinuation = ResolveTransitionVisibilitySteps();
-				}
-				const double Deadline = TerrainDeadline(0.25);
-				TGuardValue<bool> ReadScope(bCoverageReadScope, true);
-				for (int32 Steps = 0; Steps < 4096 && !CoverageContinuation.IsComplete() && FPlatformTime::Seconds() < Deadline; ++Steps)
-				{
-					CoverageContinuation.Resume();
-					++CoverageMicrosteps;
-				}
-				if (CoverageContinuation.IsComplete())
-				{
-					CoverageContinuation.Reset();
-					CoverageInterestSnapshot.Reset();
-					ReleaseInputRoot(CoverageInputRoot);
-					ActiveDirtyCoverageRects.Reset();
-					bActiveCoverageFull = true;
-				}
-				LastCoverageMilliseconds = (FPlatformTime::Seconds() - Start) * 1000.0;
-				FrameTimings.CoverageMilliseconds += LastCoverageMilliseconds;
+				const double SliceMilliseconds = FMath::Min(
+					double(Module.GetViewSettings().Budget.TerrainPublishMilliseconds) * 0.25,
+					TerrainFrameBudget.RemainingMilliseconds(FPlatformTime::Seconds()) * 0.5);
+				AdvanceCoveragePlan(TerrainDeadline(SliceMilliseconds));
 			});
 		else if (Phase == 3 && bCurrentInterest)
 		{
@@ -594,7 +571,11 @@ void FVoxelViewManager::Tick(
 				case 0:
 					Run(EVoxelPublishPhase::Prepare, [this]
 					{
-						const double Deadline = TerrainDeadline(0.25);
+						// 已完成 Fine 页的转账、Atom 创建和上传共享本帧额度，随配置上限扩展。
+						// 单次呈现微步仍受内部 0.25ms 量子约束，避免大页独占整个阶段。
+						const double SliceMilliseconds = FMath::Max(0.25,
+							double(Module.GetViewSettings().Budget.TerrainPublishMilliseconds) * 0.125);
+						const double Deadline = TerrainDeadline(SliceMilliseconds);
 						for (int32 Step = 0; Step < 32 && FPlatformTime::Seconds() < Deadline; ++Step)
 						{
 							PrepareFineShardPresentations(Deadline);
@@ -674,6 +655,54 @@ void FVoxelViewManager::Tick(
 #endif
 }
 
+void FVoxelViewManager::AdvanceCoveragePlan(const double InDeadline)
+{
+	if (bCoverageDrainPending || FPlatformTime::Seconds() >= InDeadline)
+	{
+		return;
+	}
+	const double Start = FPlatformTime::Seconds();
+	if (!CoverageContinuation.IsValid())
+	{
+		bActiveCoverageFull = bCoverageDirtyFull;
+		bCoverageDirtyFull = false;
+		const int32 Count = bActiveCoverageFull ? 0 : FMath::Min(DirtyCoverageRects.Num(), 1);
+		ActiveDirtyCoverageRects.Append(DirtyCoverageRects.GetData(), Count);
+		DirtyCoverageRects.RemoveAt(0, Count, EAllowShrinking::No);
+		bCoverageDirty = !DirtyCoverageRects.IsEmpty();
+		CoverageInterestSnapshot = AppliedInterestSnapshot ? AppliedInterestSnapshot : Module.GetCurrentInterestSnapshot();
+		CoverageInputRoot = AppliedInputRoot;
+		CoverageStartedSeconds = Start;
+		if (bActiveCoverageFull)
+		{
+			ActiveCoveragePublishGroups = MoveTemp(OpenPublishGroups);
+		}
+		CoverageContinuation = ResolveTransitionVisibilitySteps();
+		Publisher->InvalidateCommitReadiness();
+	}
+	{
+		TGuardValue<bool> ReadScope(bCoverageReadScope, true);
+		for (int32 Steps = 0; Steps < 4096 && !CoverageContinuation.IsComplete() && FPlatformTime::Seconds() < InDeadline; ++Steps)
+		{
+			CoverageContinuation.Resume();
+			++CoverageMicrosteps;
+		}
+	}
+	if (CoverageContinuation.IsComplete())
+	{
+		CoverageContinuation.Reset();
+		CoverageInterestSnapshot.Reset();
+		ReleaseInputRoot(CoverageInputRoot);
+		ActiveDirtyCoverageRects.Reset();
+		bActiveCoverageFull = true;
+		// 下一次完整 Tick 先消费已提交覆盖快照，不等待所有组或渲染回执清空。
+		bCoverageDrainPending = true;
+		Publisher->InvalidateCommitReadiness();
+	}
+	LastCoverageMilliseconds = (FPlatformTime::Seconds() - Start) * 1000.0;
+	FrameTimings.CoverageMilliseconds += LastCoverageMilliseconds;
+}
+
 bool FVoxelViewManager::IsAdmissionDataReady(const FVoxelViewAdmission& InAdmission, const bool bIncludePending) const
 {
 	if (InAdmission.Kind == EVoxelViewAdmissionKind::Fine)
@@ -739,6 +768,7 @@ bool FVoxelViewManager::IsAdmissionDataReady(const FVoxelViewAdmission& InAdmiss
 
 void FVoxelViewManager::ProcessDataAdmissions()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewDataAdmissions);
 	ProcessServiceAdmissions(true);
 }
 
@@ -945,9 +975,11 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly)
 		const auto& Lane = Interest.AdmissionLanes[Kind];
 		int32& Scan = ServiceAdmissionScans[Stage][Kind];
 		const int32 ScanCount = FMath::Min(32, Lane.Num());
+		int32 FirstCandidate = INDEX_NONE;
 		for (int32 Attempt = 0; Attempt < ScanCount && FPlatformTime::Seconds() < ScanDeadline; ++Attempt)
 		{
 			Scan %= Lane.Num();
+			const int32 LaneIndex = Scan;
 			const int32 Index = Lane[Scan++];
 			const auto& Admission = Admissions[Index];
 			FVoxelTaskKey Identity;
@@ -1030,7 +1062,10 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly)
 			Candidates.Add(Candidate);
 			Identities.Add(Identity);
 			CandidateAdmissions.Add(Index);
+			if (FirstCandidate == INDEX_NONE) FirstCandidate = LaneIndex;
 		}
+		// 未获准的近处正文保留扫描前沿；已排队/完成项会在下轮跳过，不循环预取整幅远景。
+		if (FirstCandidate != INDEX_NONE) Scan = FirstCandidate;
 	}
 	if (Candidates.IsEmpty() || FPlatformTime::Seconds() >= Deadline) return;
 	const uint64 BeforeSelection = Resources->ReleaseVersionExcludingOwner(GetServiceControlConsumer());
@@ -1058,6 +1093,7 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly)
 		FVoxelTerrainServiceCapacity Capacity;
 		Capacity.MaximumWaitSeconds = Policy.Fine.MaximumBackgroundWaitSeconds;
 		Capacity.bAllowOverdueOpportunity = Frame.IsOverdueOpportunityAvailable();
+		Capacity.bPreserveDistanceOrder = true;
 		FVoxelTerrainServiceCharge Charge;
 		const int32 Selected = AdmissionSelection[Stage].Select(Candidates, Capacity, FPlatformTime::Seconds(), Charge);
 		if (Selected == INDEX_NONE) break;
@@ -1214,16 +1250,18 @@ TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> FVoxelViewM
 	const FVoxelTaskKey& InKey, const FVoxelGenerationPipeline& InGenerator,
 	const FVoxelGenerationBounds& InBounds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewEnvironmentRetention);
 	auto& Retention = PreparedEnvironmentRetentions.FindOrAdd(InKey);
 	if (!Retention) Retention = RetainEnvironmentData(InGenerator, InBounds);
 	return Retention;
 }
 
-bool FVoxelViewManager::EnqueuePreparedData(FVoxelTaskRequest&& InRequest)
+bool FVoxelViewManager::EnqueuePreparedData(FVoxelTaskRequest&& InRequest, const uint64 InCompletionBytes)
 {
 	if (Scheduler.Has(InRequest.Stamp, InRequest.Kind) || HasDeferredRepresentation(InRequest.Stamp)) return false;
 	const uint64 Limit = (InRequest.WorkClass == EVoxelWorkClass::Prefetch ? 128ull : 256ull) * 1024ull * 1024ull;
-	const uint64 Reservation = InRequest.ReservedBytes + sizeof(FVoxelTaskResult) + sizeof(FVoxelTaskKey);
+	// ReservedBytes 对原生账本任务仅为占位值 1；数据队列的背压必须使用已授予的真实完成容量。
+	const uint64 Reservation = FMath::Max(InCompletionBytes, InRequest.ReservedBytes) + sizeof(FVoxelTaskResult) + sizeof(FVoxelTaskKey);
 	if (PreparedDataBytes + PendingDataBytes + Reservation > Limit)
 	{
 		Scheduler.ObserveDemand(InRequest.Kind, InRequest.Stamp,
@@ -1532,6 +1570,7 @@ void FVoxelViewManager::UpdateTaskPriorities()
 
 void FVoxelViewManager::ProcessAdmissions()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewMeshAdmissions);
 	ProcessServiceAdmissions(false);
 }
 
@@ -1574,6 +1613,8 @@ void FVoxelViewManager::RebuildAdmissions(TConstArrayView<FVector> InObservers)
 {
 	Admissions = GetViewInterest().Admissions;
 	AdmissionPriorities = GetViewInterest().AdmissionPriorities;
+	// 接纳了新的空间排序后，旧数组位置不能继续代表距当前观察者最近的候选。
+	FMemory::Memzero(ServiceAdmissionScans);
 }
 
 void FVoxelViewManager::TrackReadyTerrainNode(FVoxelViewKey InKey)
@@ -2318,6 +2359,7 @@ void FVoxelViewManager::RebuildHeightfieldTransitions(const FCoveragePassSnapsho
 
 void FVoxelViewManager::PumpHeightfieldTransitions()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewHeightfieldTransitionAdmissions);
 	if (UnsubmittedTransitionOwners.IsEmpty())
 		return;
 	const auto Config = Module.GetGenerationConfig();
@@ -2611,6 +2653,7 @@ bool FVoxelViewManager::AreHeightfieldInputsCurrent(const FVoxelFrozenHeightfiel
 
 void FVoxelViewManager::PumpVolumeTransitions()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewVolumeTransitionAdmissions);
 	if (UnsubmittedVolumeOwners.IsEmpty())
 		return;
 	const auto Registry = Module.GetRegistry();
@@ -2973,7 +3016,7 @@ bool FVoxelViewManager::ApplyRemoteRepresentation(const FVoxelRepresentationRepl
 			return false;
 		}
 	}
-	if (!EnqueuePreparedData(MoveTemp(Request)))
+	if (!EnqueuePreparedData(MoveTemp(Request), Storage->GeometryCapacityBytes))
 	{
 		OutError = TEXT("Remote terrain admission deferred");
 		return false;
@@ -3214,6 +3257,7 @@ void FVoxelViewManager::Reset()
 	RepresentationAttempts.Reset();
 	CoverageContinuation.Reset();
 	CoverageInterestSnapshot.Reset();
+	bCoverageDrainPending = false;
 	bCoverageReadScope = false;
 	bCoverageRetryRequested = false;
 	ReleaseInputRoot(CoverageInputRoot);
@@ -3713,6 +3757,7 @@ bool FVoxelViewManager::BuildVoxelProxySnapshot(
 
 bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int32 InPriority, const bool bDataOnly)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewRequestProxy);
 	const auto* DesiredGeometry = GetViewInterest().FindGeometry(InKey);
 	if (!DesiredGeometry)
 		return false;
@@ -3848,12 +3893,24 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 	Scheduler.ObserveDemand(Request.Kind, Request.Stamp, EVoxelTaskBlockReason::Dependency, Request.InputBytes, Request.ReservedBytes);
 	const auto EnvironmentRetention = bDataOnly ? RetainPreparedEnvironment(DataKey, *Generator, OverlayBounds) : nullptr;
 	if (bDataOnly && !EnvironmentRetention) return false;
-	if (bDataOnly && !Module.EnsureEnvironmentBounds(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
-		return false;
-	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(OverlayBounds, Request.WorkClass, InPriority).bReady)
-		return false;
-	if (bDataOnly && !Module.CaptureFineOverlays(OverlayBounds, OverlayCapture, OverlayError, &Request.GenerationConsumer))
-		return false;
+	if (bDataOnly)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewProxyEnvironment);
+		if (!Module.EnsureEnvironmentBounds(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
+			return false;
+	}
+	if (bDataOnly)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewProxyOverlayPreflight);
+		if (!Generator->EnsureCoarseOverlayBoundsReady(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
+			return false;
+	}
+	if (bDataOnly)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewProxyOverlayCapture);
+		if (!Module.CaptureFineOverlays(OverlayBounds, OverlayCapture, OverlayError, &Request.GenerationConsumer))
+			return false;
+	}
 	Request.InputBytes = Prepared ? Prepared->ResultBytes() : OverlayCapture.AllocatedBytes();
 
 	const auto BuildStorage = CreateCoarseBuildStorage(Scheduler, Request, Geometry,
@@ -4026,7 +4083,7 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 	}
 
 	if (bDataOnly)
-		return EnqueuePreparedData(MoveTemp(Request));
+		return EnqueuePreparedData(MoveTemp(Request), BuildStorage->GeometryCapacityBytes);
 	if (!EnqueueViewTask(MoveTemp(Request)))
 		return false;
 	RemovePreparedData(DataKey);
@@ -4035,6 +4092,7 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 
 bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const int32 InPriority, const bool bDataOnly)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewRequestSurface);
 	const auto* DesiredGeometry = GetViewInterest().FindGeometry(InKey);
 	if (!DesiredGeometry)
 		return false;
@@ -4143,7 +4201,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	if (bDataOnly && !EnvironmentRetention) return false;
 	if (bDataOnly && !Module.EnsureEnvironmentBounds(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
 		return false;
-	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(OverlayBounds, Request.WorkClass, InPriority).bReady)
+	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
 		return false;
 	if (bDataOnly && !Module.CaptureFineOverlays(OverlayBounds, OverlayCapture, OverlayError, &Request.GenerationConsumer))
 		return false;
@@ -4331,7 +4389,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	}
 
 	if (bDataOnly)
-		return EnqueuePreparedData(MoveTemp(Request));
+		return EnqueuePreparedData(MoveTemp(Request), BuildStorage->GeometryCapacityBytes);
 	if (!EnqueueViewTask(MoveTemp(Request)))
 		return false;
 	RemovePreparedData(DataKey);
@@ -4340,6 +4398,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 
 bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int32 InPriority, const bool bDataOnly)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewRequestMacro);
 	const auto* DesiredGeometry = GetViewInterest().FindGeometry(InKey);
 	if (!DesiredGeometry)
 		return false;
@@ -4448,7 +4507,7 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 	if (bDataOnly && !EnvironmentRetention) return false;
 	if (bDataOnly && !Module.EnsureEnvironmentBounds(Bounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
 		return false;
-	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(Bounds, Request.WorkClass, InPriority).bReady)
+	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(Bounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
 		return false;
 	if (bDataOnly && !Module.CaptureFineOverlays(Bounds, OverlayCapture, OverlayError, &Request.GenerationConsumer))
 	{
@@ -4622,7 +4681,7 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 	}
 
 	if (bDataOnly)
-		return EnqueuePreparedData(MoveTemp(Request));
+		return EnqueuePreparedData(MoveTemp(Request), BuildStorage->GeometryCapacityBytes);
 	if (!EnqueueViewTask(MoveTemp(Request)))
 		return false;
 	RemovePreparedData(DataKey);
@@ -4675,7 +4734,6 @@ bool FVoxelViewManager::PublishVoxelProxy(const FVoxelTaskResult& InResult)
 		return false;
 	}
 
-	if (!RetainRawPublication(InResult.VoxelProxy->ResourceLease, InResult.VoxelProxy->Geometry, Publisher->GetTerrainRenderer())) return false;
 	VoxelProxyData.Add(Key, InResult.VoxelProxy);
 	if (!InResult.VoxelProxy->Cells.IsEmpty() && !InResult.VoxelProxy->Cells.ContainsByPredicate(
 													 [](const FVoxelBlockState& State)
@@ -4735,7 +4793,6 @@ bool FVoxelViewManager::PublishSurface(const FVoxelTaskResult& InResult)
 		return false;
 	}
 
-	if (!RetainRawPublication(InResult.Surface->ResourceLease, InResult.Surface->Geometry, Publisher->GetTerrainRenderer())) return false;
 	AActor* Host = SurfaceActors.FindRef(Key);
 	const int32 TileSide = InResult.Surface->GetTileSide();
 	InResult.SurfaceMesh->Stamp = InResult.Stamp;
@@ -4798,7 +4855,6 @@ bool FVoxelViewManager::PublishMacro(const FVoxelTaskResult& InResult)
 		return false;
 	}
 
-	if (!RetainRawPublication(InResult.Macro->ResourceLease, InResult.Macro->Geometry, Publisher->GetTerrainRenderer())) return false;
 	AActor* Host = MacroActors.FindRef(Key);
 	const int32 TileSide = InResult.Macro->GetTileSide();
 	InResult.MacroMesh->Stamp = InResult.Stamp;

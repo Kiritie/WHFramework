@@ -164,7 +164,7 @@ public:
 	bool IsTransactionPending(const FGuid& InTransaction) const;
 	// 消费原事务的永久失败；调用方保留旧表示且不为同一请求自动构造新事务。
 	bool ConsumeTransactionFailure(const FGuid& InTransaction);
-	void PollRenderReceipts();
+	void PollRenderReceipts(double InDeadlineSeconds = 0.0);
 	void AdvanceFramePublication();
 	void AdvanceRetirement(TFunction<void(const FIntVector&)> InOnRetired, double InDeadline = MAX_dbl);
 	const FVoxelFinePresentedAtom* FindPresentedAtom(const FIntVector& InSection) const;

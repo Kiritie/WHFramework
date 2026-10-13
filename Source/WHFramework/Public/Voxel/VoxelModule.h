@@ -96,6 +96,7 @@ class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 	friend class FVoxelEmptyTransitionConvergenceTest;
 	friend class FVoxelFineProxyDependenciesTest;
 	friend class FVoxelFinePageCoverageTest;
+	friend class FVoxelSaveSuspensionOwnershipTest;
 #endif
 	friend class UVoxelSceneRegion;
 	GENERATED_BODY()
@@ -248,6 +249,10 @@ public:
 	void CancelTerrainNetworkTask(const FVoxelTaskStamp& InStamp);
 	bool BeginProjectMutation();
 	void EndProjectMutation();
+	bool BeginWorldSaveSuspension(const FGuid& InOwnerToken, FString& OutError);
+	bool EndWorldSaveSuspension(const FGuid& InOwnerToken, FString& OutError);
+	bool AdvanceSuspendedWorldSave(const FGuid& InOwnerToken, FString& OutError);
+	bool IsWorldSaveSuspended() const { return WorldSaveSuspensionToken.IsValid(); }
 	void PublishProjectEdit(const FVoxelEditBatch& InBatch);
 	void BindInventoryBridge(TSharedRef<FVoxelInventoryDomainBridge> InBridge, FInventoryVoxelContribution InContribution);
 	bool ExecuteInventoryWorldEdit(FVoxelInteractionPlan& InOutPlan, AActor* InSource, FInventoryBatchRequest& InOutRequest, const FInventoryAuthorityContext& InAuthority, FInventoryCommandResult& OutResult, FString& OutError);
@@ -506,6 +511,8 @@ private:
 	uint64 FailedInterestSourceRevision = MAX_uint64;
 	uint64 FailedInterestEpoch = 0;
 	uint64 SafetyCaptureSerial = 0;
+	FGuid WorldSaveSuspensionToken;
+	uint64 WorldSaveSuspensionEpoch = 0;
 	FGuid TerrainPlanningOwnerId = FGuid::NewGuid();
 	uint64 LastPlannedRenderCoverageSerial = 0;
 	uint64 LastPlannedPhysicsCoverageSerial = 0;

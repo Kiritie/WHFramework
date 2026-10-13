@@ -6,6 +6,7 @@
 #include "Main/MainModule.h"
 #include "Common/CommonModuleStatics.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
 #include "Task/Base/TaskBase.h"
 #include "Character/CharacterModuleTypes.h"
@@ -185,7 +186,11 @@ void UTaskModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 			}
 		// 任务状态在 Final 阶段才反序列化，恢复运行状态后再判断追踪目标是否仍然有效。
 		CurrentTask = ResolveTask(Data.CurrentTask);
-		if (CurrentTask && CurrentTask->IsLeaved()) CurrentTask = nullptr;
+		if (CurrentTask && (CurrentTask->IsLeaved() ||
+            (CurrentTask->GetTaskAsset() && CurrentTask->GetTaskAsset()->OwnerActorID.IsValid())))
+        {
+            CurrentTask = nullptr;
+        }
 		bLoadingTasks = false;
 		RequestTaskMarkersRefresh();
 		UEventModuleStatics::BroadcastEvent<FEventCurrentTaskChanged>(this, {CurrentTask});
@@ -203,26 +208,34 @@ void UTaskModule::UnloadData(EPhase InPhase)
 
 FParameter UTaskModule::ToData()
 {
-	FTaskModuleSaveData SaveData;
-	for (UTaskAsset* Asset : Assets)
-	{
-		if (!Asset || !Asset->SourceObject) continue;
-		FTaskAssetSaveData AssetData;
-		AssetData.Asset = Cast<UTaskAsset>(Asset->SourceObject);
-		AssetData.InstanceID = Asset->InstanceID;
-		AssetData.AgentID = Asset->AgentID;
-		AssetData.OwnerActorID = Asset->OwnerActorID;
-		AssetData.InstanceKey = Asset->InstanceKey;
-		AssetData.AgentLocation = Asset->AgentLocation;
-		SaveData.Assets.Add(AssetData);
-		for (const auto& Pair : Asset->TaskMap)
-			if (Pair.Value) SaveData.TaskRecords.Add(GetSaveKey(Asset, Pair.Key), Pair.Value->CaptureRuntimeData());
-	}
-	if (CurrentTask && CurrentTask->GetTaskAsset())
-	{
-		SaveData.CurrentTask = CurrentTask->GetTaskAsset()->MakeTaskReference(CurrentTask->TaskGUID);
-	}
-	return FParameter(MoveTemp(SaveData));
+    FTaskModuleSaveData SaveData;
+    for (UTaskAsset* Asset : Assets)
+    {
+        if (!Asset || !Asset->SourceObject || Asset->bPresentationOnly)
+        {
+            continue;
+        }
+        FTaskAssetSaveData AssetData;
+        AssetData.Asset = Cast<UTaskAsset>(Asset->SourceObject);
+        AssetData.InstanceID = Asset->InstanceID;
+        AssetData.AgentID = Asset->AgentID;
+        AssetData.OwnerActorID = Asset->OwnerActorID;
+        AssetData.InstanceKey = Asset->InstanceKey;
+        AssetData.AgentLocation = Asset->AgentLocation;
+        SaveData.Assets.Add(AssetData);
+        for (const auto& Pair : Asset->TaskMap)
+        {
+            if (Pair.Value)
+            {
+                SaveData.TaskRecords.Add(GetSaveKey(Asset, Pair.Key), Pair.Value->CaptureRuntimeData());
+            }
+        }
+    }
+    if (CurrentTask && CurrentTask->GetTaskAsset() && !CurrentTask->GetTaskAsset()->OwnerActorID.IsValid())
+    {
+        SaveData.CurrentTask = CurrentTask->GetTaskAsset()->MakeTaskReference(CurrentTask->TaskGUID);
+    }
+    return FParameter(MoveTemp(SaveData));
 }
 
 FString UTaskModule::GetModuleDebugMessage()
@@ -897,7 +910,8 @@ void UTaskModule::EnterEligibleAutomaticTasks(UTaskBase* InTask)
 
 void UTaskModule::RemoveTaskMarkers(const UTaskAsset* InAsset)
 {
-	if(!USceneModule::IsValid())
+	USceneModule* Scene = USceneModule::GetPtr(GetWorld());
+	if(!Scene)
 	{
 		if(!InAsset) TaskMarkerIDs.Reset();
 		return;
@@ -913,7 +927,7 @@ void UTaskModule::RemoveTaskMarkers(const UTaskAsset* InAsset)
 	}
 	for(const FGuid& MarkerID : Removed)
 	{
-		USceneModule::Get().RemoveMarker(MarkerID);
+		Scene->RemoveMarker(MarkerID);
 		TaskMarkerIDs.Remove(MarkerID);
 	}
 }
@@ -921,12 +935,13 @@ void UTaskModule::RemoveTaskMarkers(const UTaskAsset* InAsset)
 void UTaskModule::RefreshTaskMarkers()
 {
 	if(bLoadingTasks) return;
-	if(!USceneModule::IsValid())
+	USceneModule* SceneModule = USceneModule::GetPtr(GetWorld());
+	if(!SceneModule)
 	{
 		OnTaskAssetsChanged.Broadcast();
 		return;
 	}
-	USceneModule& Scene = USceneModule::Get();
+	USceneModule& Scene = *SceneModule;
 	TSet<FGuid> DesiredIDs;
 	FGuid CurrentMarkerID;
 	UTaskBase* GuidanceTask = GetGuidanceTask();
@@ -1035,10 +1050,29 @@ void UTaskModule::ApplyOwnerPresentation(const FGuid& InOwnerActorID, const TArr
 
 bool UTaskModule::IsLocallyVisible(const UTaskAsset* InAsset) const
 {
-	if(!InAsset) return false;
-	if(!InAsset->OwnerActorID.IsValid()) return true;
-	const APawn* Player = UCommonModuleStatics::GetPlayerPawn<APawn>();
-	return Player && Player->Implements<USceneActorInterface>() && ISceneActorInterface::Execute_GetActorID(Player) == InAsset->OwnerActorID;
+    if (!InAsset)
+    {
+        return false;
+    }
+    if (!InAsset->OwnerActorID.IsValid())
+    {
+        return true;
+    }
+    if (!GetWorld())
+    {
+        return false;
+    }
+    for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+    {
+        APlayerController* Player = It->Get();
+        APawn* Pawn = Player && Player->IsLocalController() ? Player->GetPawn() : nullptr;
+        if (Pawn && Pawn->Implements<USceneActorInterface>() &&
+            ISceneActorInterface::Execute_GetActorID(Pawn) == InAsset->OwnerActorID)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 TArray<UTaskAsset*> UTaskModule::GetVisibleAssets() const

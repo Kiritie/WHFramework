@@ -247,8 +247,8 @@ int32 FVoxelTerrainWorkSelection::Select(TConstArrayView<FVoxelTerrainServiceCan
 		{
 			continue;
 		}
-		const bool bOldestTurn = State.DispatchCounts[Band] % 4 == 3 ||
-			InNowSeconds - InCandidates[Oldest[Band]].FirstQueuedSeconds >= InCapacity.MaximumWaitSeconds;
+		const bool bOldestTurn = !InCapacity.bPreserveDistanceOrder && (State.DispatchCounts[Band] % 4 == 3 ||
+			InNowSeconds - InCandidates[Oldest[Band]].FirstQueuedSeconds >= InCapacity.MaximumWaitSeconds);
 		Heads[Band] = bOldestTurn ? Oldest[Band] : Normal[Band];
 	}
 

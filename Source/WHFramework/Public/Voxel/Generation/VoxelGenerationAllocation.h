@@ -16,12 +16,20 @@ struct WHFRAMEWORK_API FVoxelGenerationRequiredSource
 	EVoxelTerrainResourcePool Pool = EVoxelTerrainResourcePool::Input;
 	uint64 Bytes = 0;
 	int32 LeaseCount = 1;
+	// 先按身份去重，首次计入时才从原账本读取同一时刻的 pool/bytes。
+	const FVoxelTerrainResourceLease* Lease = nullptr;
 };
 
 struct WHFRAMEWORK_API FVoxelGenerationRequiredCapacity
 {
 	uint64 Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Count)] = {};
 	int32 LeaseCount = 0;
+};
+
+struct FVoxelGenerationSourceIdentity
+{
+	const void* Object = nullptr;
+	uint64 Serial = 0;
 };
 
 /** 栈上来源链，不分配 tracking backing；来源的原持有者必须覆盖整个 scope。 */
@@ -52,11 +60,13 @@ public:
 		const FVoxelTerrainResources& InResources,
 		const FVoxelTerrainResourceLease* InExcludedLease,
 		FVoxelGenerationRequiredCapacity& OutCapacity,
-		FString& OutError);
+		FString& OutError,
+		TArrayView<FVoxelGenerationSourceIdentity> InIdentities = {});
 
 private:
 	static bool MeasureSources(TFunctionRef<void(FVisit)> InEnumerate, uint64 InExcludedSerial,
-		FVoxelGenerationRequiredCapacity& OutCapacity, FString& OutError);
+		FVoxelGenerationRequiredCapacity& OutCapacity, FString& OutError,
+		TArrayView<FVoxelGenerationSourceIdentity> InIdentities = {});
 	static void Enumerate(const FVoxelTerrainResources& InResources, FVisit InVisit);
 	static FVoxelGenerationRequiredSourceScope*& ActiveScopeSlot();
 	FVoxelGenerationRequiredSourceScope* Previous = nullptr;

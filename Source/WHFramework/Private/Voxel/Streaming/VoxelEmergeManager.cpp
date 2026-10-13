@@ -484,6 +484,11 @@ void FVoxelEmergeManager::VisitStorageSources(const FVoxelTerrainResources& InRe
 	for (const auto& Pair : ExternalFactConsumers)
 	{
 		Visit(Pair.Value.Dependencies.Lease.Get());
+		Visit(Pair.Value.SampleRetentionStorageLease.Get());
+		for (const auto& Retention : Pair.Value.SampleRetentions)
+		{
+			Visit(&Retention->GetResourceLease().Get());
+		}
 		if (Pair.Value.Retention)
 		{
 			Visit(&Pair.Value.Retention->GetResourceLease().Get());
@@ -631,6 +636,12 @@ void FVoxelEmergeManager::Tick(const FVoxelInterestSet& InInterest, const uint64
 	{
 		return;
 	}
+	Generator->AdvanceOverlayConsumerWakes(Deadline, 64);
+	PlanCoordinator->AdvanceConsumerWakes(Deadline, 64);
+	if (FPlatformTime::Seconds() >= Deadline)
+	{
+		return;
+	}
 	const auto Resources = Scheduler.GetTerrainResources();
 	const auto Consumer = GetAdmissionConsumer();
 	const bool bChangedRebuild = DemandRebuild.bActive && DemandRebuild.Phase < 7 && (DemandRebuild.InterestRevision != InInterestRevision ||
@@ -715,8 +726,6 @@ void FVoxelEmergeManager::Tick(const FVoxelInterestSet& InInterest, const uint64
 	}
 	const int32 BuildLimit = FMath::Clamp(InMaxBuildsPerFrame, 1, 1024);
 	int32 Submitted = 0;
-	Generator->AdvanceOverlayConsumerWakes(Deadline, 64);
-	PlanCoordinator->AdvanceConsumerWakes(Deadline, 64);
 	constexpr int32 ReadySteps = 16;
 	constexpr int32 ExternalSteps = 32;
 	constexpr int32 LaneSteps = 32;
@@ -1316,6 +1325,182 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentBounds(
 {
 	return PlanCoordinator->EnsureEnvironmentBounds(InBounds, InWorkClass,
 		InSourcePriority, InDistanceScore, InForwardScore);
+}
+
+FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentSamples(
+	const FVoxelGenerationConsumerKey& InConsumer, const FIntPoint& InOrigin, const int32 InWidth,
+	const int32 InHeight, const int32 InStep, const double InDistanceScore, bool& bOutNeedsAdvance)
+{
+	check(IsInGameThread());
+	bOutNeedsAdvance = false;
+	if (!InConsumer.IsValid() || InConsumer.WorldEpoch != Runtime.Epoch() ||
+		InConsumer.Kind != EVoxelGenerationConsumerKind::Environment ||
+		InConsumer.SpatialKind != EVoxelGenerationSpatialKind::Bounds ||
+		InWidth <= 0 || InHeight <= 0 || InStep <= 0 || InWidth > 4096 || InHeight > 4096 / InWidth ||
+		!FMath::IsFinite(InDistanceScore) || InDistanceScore < 0.0)
+	{
+		return {false, true, TEXT("InvalidRequest: map sample grid or consumer")};
+	}
+	const int64 MaxX = int64(InOrigin.X) + int64(InWidth - 1) * InStep + 1;
+	const int64 MaxY = int64(InOrigin.Y) + int64(InHeight - 1) * InStep + 1;
+	if (InOrigin.X < InConsumer.Min.X || InOrigin.Y < InConsumer.Min.Y ||
+		MaxX > InConsumer.Max.X || MaxY > InConsumer.Max.Y)
+	{
+		return {false, true, TEXT("InvalidRequest: map sample batch outside original consumer")};
+	}
+	const FVoxelGenerationBounds Bounds{FIntVector(InOrigin.X, InOrigin.Y, InConsumer.Min.Z),
+		FIntVector(int32(MaxX), int32(MaxY), InConsumer.Max.Z)};
+	FExternalFactConsumer* Consumer = ExternalFactConsumers.Find(InConsumer);
+	if (Consumer && Consumer->SampleStep == 0)
+	{
+		return {false, true, TEXT("InvalidConsumer: map samples cannot replace a terrain fact consumer")};
+	}
+	if (!Consumer)
+	{
+		FString Error;
+		if (ExternalFactConsumers.Num() == MAX_int32 ||
+			!ReserveFactStorage(WaitingPlanSections.Num(), ExternalFactConsumers.Num() + 1, Error))
+		{
+			if (Error.IsEmpty())
+			{
+				Error = TEXT("Oversized: map fact consumer directory");
+			}
+			return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
+		}
+		Consumer = &ExternalFactConsumers.Add(InConsumer);
+		Consumer->Bounds = Bounds;
+		Consumer->SampleStep = InStep;
+		FactStorageLease->MarkPublished();
+	}
+	else if (Consumer->Bounds.Min != Bounds.Min || Consumer->Bounds.Max != Bounds.Max || Consumer->SampleStep != InStep)
+	{
+		PlanCoordinator->ReleaseConsumer(InConsumer);
+		Consumer = ExternalFactConsumers.Find(InConsumer);
+		if (!Consumer)
+		{
+			return {};
+		}
+		Consumer->SampleRetentions.Empty();
+		Consumer->SampleRetentionStorageLease.Reset();
+		*Consumer = FExternalFactConsumer{};
+		Consumer->Bounds = Bounds;
+		Consumer->SampleStep = InStep;
+	}
+	const auto Resources = Scheduler.GetRuntimeResources();
+	if (Consumer->bWaitingCapacity &&
+		Resources->ReleaseVersionExcludingOwner(InConsumer) <= Consumer->CapacityVersion)
+	{
+		return {false, false, TEXT("CapacityBlocked: map dependency capture or retention")};
+	}
+	Consumer->bWaitingCapacity = false;
+	const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(InConsumer);
+	FString Error;
+	if (!Consumer->Dependencies.Lease &&
+		!PlanCoordinator->GatherEnvironmentSamples(InOrigin, InWidth, InHeight, InStep,
+			InConsumer, Consumer->Dependencies, Error))
+	{
+		Consumer->bWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
+		Consumer->CapacityVersion = BeforeAdmission;
+		return {false, !Consumer->bWaitingCapacity, MoveTemp(Error)};
+	}
+	const int32 DependencyCount = Consumer->Dependencies.Values.Num();
+	if (DependencyCount > 64)
+	{
+		return {false, true, TEXT("InvalidRequest: map sample batch exceeds active dependency limit")};
+	}
+	if (!Consumer->SampleRetentionStorageLease)
+	{
+		const uint64 Bytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<
+			TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>, FDefaultAllocator>(DependencyCount);
+		const auto Admission = Resources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Input, Bytes,
+			Consumer->SampleRetentionStorageLease, 0, Consumer->Dependencies.Lease->Bytes() + FactStorageLease->Bytes(), 2);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
+		{
+			Consumer->bWaitingCapacity = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked;
+			Consumer->CapacityVersion = BeforeAdmission;
+			return {false, !Consumer->bWaitingCapacity, Consumer->bWaitingCapacity
+				? TEXT("CapacityBlocked: map retention directory") : TEXT("CapacityUnachievable: map retention directory")};
+		}
+		Consumer->SampleRetentions.Reserve(DependencyCount);
+		check(Consumer->SampleRetentions.GetAllocatedSize() <= Consumer->SampleRetentionStorageLease->Bytes());
+	}
+	struct FMapRetentionSources
+	{
+		const FVoxelEmergeManager* Manager;
+		FVoxelGenerationConsumerKey Consumer;
+	};
+	const FMapRetentionSources CapturedSources{this, InConsumer};
+	FVoxelGenerationRequiredSourceScope RetentionSources(&Resources.Get(), &CapturedSources,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			const auto& Sources = *static_cast<const FMapRetentionSources*>(InContext);
+			FVoxelGenerationRequiredSourceScope::VisitLease(Sources.Manager->FactStorageLease.Get(), InVisit);
+			const auto* Capture = Sources.Manager->ExternalFactConsumers.Find(Sources.Consumer);
+			if (!Capture) return;
+			FVoxelGenerationRequiredSourceScope::VisitLease(Capture->Dependencies.Lease.Get(), InVisit);
+			FVoxelGenerationRequiredSourceScope::VisitLease(Capture->SampleRetentionStorageLease.Get(), InVisit);
+			for (const auto& Retention : Capture->SampleRetentions)
+			{
+				FVoxelGenerationRequiredSourceScope::VisitLease(&Retention->GetResourceLease().Get(), InVisit);
+			}
+		});
+	const int32 RetentionEnd = FMath::Min(DependencyCount, Consumer->SampleRetentions.Num() + 8);
+	const auto& Settings = Generator->GetRuntimeConfig()->Recipe->Settings;
+	const int64 HydrologySide = int64(FMath::Max(8, Settings.HydrologyRegionSide)) * FMath::Max(1, Settings.HydrologyCellSize);
+	while (Consumer->SampleRetentions.Num() < RetentionEnd)
+	{
+		const auto& Dependency = Consumer->Dependencies.Values[Consumer->SampleRetentions.Num()];
+		const int64 CenterX = int64(Dependency.HydrologyKey.Coordinate.X) * HydrologySide + HydrologySide / 2;
+		const int64 CenterY = int64(Dependency.HydrologyKey.Coordinate.Y) * HydrologySide + HydrologySide / 2;
+		FVoxelGenerationCacheRetentionPoint Point;
+		Point.Center = FIntPoint(int32(FMath::Clamp<int64>(CenterX, MIN_int32, MAX_int32)),
+			int32(FMath::Clamp<int64>(CenterY, MIN_int32, MAX_int32)));
+		const int64 RetentionRadius = FMath::Max(FMath::Abs(CenterX - Point.Center.X), FMath::Abs(CenterY - Point.Center.Y));
+		if (RetentionRadius > MAX_int32)
+		{
+			return {false, true, TEXT("InvalidRequest: map hydrology retention outside supported world domain")};
+		}
+		Point.HydrologyRadiusCells = int32(RetentionRadius);
+		Point.NaturalRadiusCells = Point.PlanRadiusCells = -1;
+		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
+		if (!Generator->GetPlanCache()->RetainForTask(Point, Resources, InConsumer, Retention, Error))
+		{
+			Consumer->bWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
+			Consumer->CapacityVersion = BeforeAdmission;
+			return {false, !Consumer->bWaitingCapacity, MoveTemp(Error)};
+		}
+		Consumer->SampleRetentions.Add(MoveTemp(Retention));
+		Consumer->SampleRetentionStorageLease->MarkPublished();
+	}
+	if (Consumer->SampleRetentions.Num() < DependencyCount)
+	{
+		bOutNeedsAdvance = true;
+		return {};
+	}
+	if (Consumer->SampleDependencyCursor == Consumer->Dependencies.Values.Num())
+	{
+		return {true, false, {}};
+	}
+	const int32 Cursor = Consumer->SampleDependencyCursor;
+	const int32 Count = FMath::Min(8, Consumer->Dependencies.Values.Num() - Cursor);
+	const auto Dependencies = MakeArrayView(Consumer->Dependencies.Values).Slice(Cursor, Count);
+	const auto Status = PlanCoordinator->Ensure(Dependencies, EVoxelWorkClass::Background,
+		0, InDistanceScore, 0.0, InConsumer);
+	Consumer = ExternalFactConsumers.Find(InConsumer);
+	if (!Consumer || Consumer->Bounds.Min != Bounds.Min || Consumer->Bounds.Max != Bounds.Max ||
+		Consumer->SampleStep != InStep || Consumer->SampleDependencyCursor != Cursor)
+	{
+		return {};
+	}
+	if (!Status.bReady || Status.bFailed)
+	{
+		Consumer->bWaitingCapacity = Status.Error.StartsWith(TEXT("CapacityBlocked"));
+		Consumer->CapacityVersion = BeforeAdmission;
+		return Status;
+	}
+	Consumer->SampleDependencyCursor += Count;
+	bOutNeedsAdvance = Consumer->SampleDependencyCursor < Consumer->Dependencies.Values.Num();
+	return {!bOutNeedsAdvance, false, {}};
 }
 
 void FVoxelEmergeManager::Reset()

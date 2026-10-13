@@ -68,7 +68,10 @@ struct FResidentPromotion
 	static bool Promote(const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
 	{
 		// 普通池尚被旧 GPU 帧占满时保留原池，下一轮再尝试；不会丢弃或伪造资源释放。
-		return !Lease || Lease->Transfer(EVoxelTerrainResourcePool::Resident);
+		if (!Lease) return true;
+		// 已收呈现回执的正文释放必须推进 PublishedRetirementVersion，唤醒同 owner 的后续事务。
+		Lease->MarkPublished();
+		return Lease->Transfer(EVoxelTerrainResourcePool::Resident);
 	}
 
 	static bool PromoteChunk(const FVoxelTerrainRenderChunk* Chunk)

@@ -377,6 +377,7 @@ private:
 	friend class FVoxelCriticalDependencyAdmissionTest;
 	friend class FVoxelFinePageObsoleteDirtyCleanupTest;
 	friend class FVoxelManagerLocalCoverageTest;
+	friend class FVoxelCoverageDrainProgressTest;
 	friend class FVoxelInterestInputBudgetTest;
 	friend class FVoxelEmptyTransitionConvergenceTest;
 	friend class FVoxelFineProxyDependenciesTest;
@@ -415,7 +416,7 @@ private:
 	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainPreparedEnvironment(
 		const FVoxelTaskKey& InKey, const FVoxelGenerationPipeline& InGenerator,
 		const FVoxelGenerationBounds& InBounds);
-	bool EnqueuePreparedData(FVoxelTaskRequest&& InRequest);
+	bool EnqueuePreparedData(FVoxelTaskRequest&& InRequest, uint64 InCompletionBytes = 0);
 	void RemovePreparedData(const FVoxelTaskKey& InKey);
 	bool TryAcceptPreparedRevision(const FVoxelTaskKey& InKey, FVoxelTaskResult& InOutResult);
 	TSharedPtr<const FVoxelTaskResult, ESPMode::ThreadSafe> FindPreparedData(const FVoxelTaskKey& InKey);
@@ -608,7 +609,9 @@ private:
 	double NextPlanTimingLog = 0.0;
 	double NextPointHandoffLog = 0.0;
 	double NextTimingLog = 0.0;
+	void AdvanceCoveragePlan(double InDeadline);
 	FVoxelGameThreadContinuation CoverageContinuation;
+	bool bCoverageDrainPending = false;
 	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> CoverageInterestSnapshot;
 	FVoxelGameThreadContinuation RetirementContinuation;
 	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> RetirementInterestSnapshot;

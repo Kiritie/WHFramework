@@ -53,7 +53,8 @@ public:
 	void ReleaseOverlaySectionConsumer(const FIntVector& InSection) const;
 	FVoxelOverlayPreflightStatus EnsureOverlayBoundsReady(const FVoxelGenerationBounds& InBounds, EVoxelWorkClass InWorkClass, int32 InSourcePriority) const;
 	FVoxelOverlayPreflightStatus EnsureCoarseOverlayBoundsReady(
-		const FVoxelGenerationBounds& InBounds, EVoxelWorkClass InWorkClass, int32 InSourcePriority) const;
+		const FVoxelGenerationBounds& InBounds, EVoxelWorkClass InWorkClass, int32 InSourcePriority,
+		double InDistanceScore = 0.0, double InForwardScore = 0.0) const;
 	FVoxelOverlayPreflightStatus EnsureOverlaySectionReady(
 		const FIntVector& InSectionCoordinate, EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore) const;
 

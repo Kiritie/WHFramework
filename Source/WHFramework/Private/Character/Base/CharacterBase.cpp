@@ -237,6 +237,15 @@ bool ACharacterBase::IsCurrent_Implementation() const
 	return UCharacterModuleStatics::GetCurrentCharacter() == this;
 }
 
+void ACharacterBase::OnRep_Name()
+{
+	SetNameP(Name);
+}
+
+void ACharacterBase::OnRep_AssetID()
+{
+}
+
 void ACharacterBase::Turn_Implementation(float InValue)
 {
 }
@@ -534,4 +543,6 @@ void ACharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ACharacterBase, ActorID);
+	DOREPLIFETIME(ACharacterBase, Name);
+	DOREPLIFETIME(ACharacterBase, AssetID);
 }

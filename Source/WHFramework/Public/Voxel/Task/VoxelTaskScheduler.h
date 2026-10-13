@@ -165,6 +165,8 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 	bool bCanceled = false;
 	bool bKnownEmptyMesh = false;
 	bool bContinue = false;
+	// Worker 已证明下一片不需要主线程或外部准入；仅在同一有界执行时间片内续跑。
+	bool bContinueImmediately = false;
 	// 原准备结果的版本接纳状态；容量续跑不重建Worker或尝试身份。
 	EVoxelTerrainResourceAdmission PreparedRevisionAdmission = EVoxelTerrainResourceAdmission::None;
 	uint64 PreparedRevisionCapacityVersion = 0;
@@ -261,7 +263,10 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 	double AccumulatedExecuteMilliseconds = 0.0;
 	bool bResumable = false;
 	bool bReceiptCapacityBlocked = false;
+	bool bReceiptRegistrationBlocked = false;
 	uint64 ReceiptCapacityVersion = 0;
+	uint64 ReceiptRequiredInputBytes = 0;
+	int32 ReceiptRequiredLeaseCount = 0;
 	TFunction<EVoxelTaskBlockReason()> GetBlockReason;
 	TFunction<FVoxelTaskResult(const TAtomic<bool>&)> Execute;
 
@@ -459,6 +464,7 @@ struct WHFRAMEWORK_API FVoxelTaskBudget
 	int32 MaxConcurrentCoarseTerrainTasks = 1;
 	int32 MaxPendingCoarseTerrainTasks = 24;
 	int32 MaxWaitingDependencyTasks = 0;
+	bool bBorrowIdleKindSlots = false;
 };
 
 struct WHFRAMEWORK_API FVoxelTaskKindDiagnostics
@@ -542,6 +548,10 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 	using FKindBlockCounts = TCounts<EVoxelTaskKind, FBlockCounts, KindCapacity>;
 	int32 Pending = 0;
 	int32 Running = 0;
+	int32 NativeInFlight = 0;
+	int32 CompletedAwaitingApply = 0;
+	uint64 ContinuationSlicesRetired = 0;
+	uint64 BorrowedKindSlots = 0;
 	int32 Critical = 0;
 	int32 CriticalPending = 0;
 	int32 CriticalRunning = 0;
@@ -555,6 +565,7 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 	TCounts<EVoxelTaskKind, FVoxelTaskKindDiagnostics, KindCapacity> ByKind;
 	FKindCounts PendingByKind;
 	FKindCounts RunningByKind;
+	FKindCounts CompletedAwaitingApplyByKind;
 	// 单 flag 可重叠计数，不能求和解释为任务数。
 	FKindBlockCounts BlockedByKind;
 	int32 BlockedRequests = 0;
@@ -569,6 +580,37 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 class WHFRAMEWORK_API FVoxelTaskScheduler
 {
 public:
+	class FEnqueueBatch
+	{
+	public:
+		explicit FEnqueueBatch(FVoxelTaskScheduler& InScheduler)
+			: Scheduler(InScheduler)
+		{
+			Scheduler.BeginEnqueueBatch();
+		}
+
+		~FEnqueueBatch()
+		{
+			Finish();
+		}
+
+		FEnqueueBatch(const FEnqueueBatch&) = delete;
+		FEnqueueBatch& operator=(const FEnqueueBatch&) = delete;
+
+		void Finish()
+		{
+			if (bActive)
+			{
+				bActive = false;
+				Scheduler.EndEnqueueBatch();
+			}
+		}
+
+	private:
+		FVoxelTaskScheduler& Scheduler;
+		bool bActive = true;
+	};
+
 #if WITH_DEV_AUTOMATION_TESTS
 	FVoxelTaskScheduler();
 	explicit FVoxelTaskScheduler(bool bInAllowPassive);
@@ -740,7 +782,10 @@ private:
 	int32 RunningCount(EVoxelTaskKind InKind) const;
 	bool CanStartKind(EVoxelTaskKind InKind) const;
 
+	void RetireCompletedTasks();
 	void Pump();
+	void BeginEnqueueBatch();
+	void EndEnqueueBatch();
 	void QueueCanceled(FVoxelTaskRequest&& InRequest, EVoxelTaskBlockReason InFailure = EVoxelTaskBlockReason::None);
 
 	void AddActive(
@@ -803,6 +848,7 @@ private:
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> TerrainResources;
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> RuntimeResources;
 	TArray<FRunning> Running;
+	TArray<FRunning> AwaitingApply;
 	TArray<FCompleted> Canceled;
 	TArray<FVoxelTerrainServiceCandidate> WorkerCandidates;
 	TArray<FVoxelTerrainServiceCandidate> CompletedCandidates;
@@ -845,6 +891,8 @@ private:
 	bool bStopped = false;
 	bool bAllowPassive = false;
 	bool bPumping = false;
+	int32 EnqueueBatchDepth = 0;
+	bool bBatchPumpRequested = false;
 	bool bTicking = false;
 	bool bFlushingIdle = false;
 	int32 ObservedTerrainStage = 3;

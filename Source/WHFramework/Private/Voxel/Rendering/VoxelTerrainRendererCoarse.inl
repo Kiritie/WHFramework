@@ -222,7 +222,9 @@ bool FVoxelTerrainRenderer::PrepareCoarseTransaction(const TConstArrayView<FVoxe
 	if (InCallbackLease && (!InCallbackLease->IsOwnedBy(State->Resources.Get()) || InCallbackLease->GetPool() != EVoxelTerrainResourcePool::Input))
 		return Reject(EVoxelTerrainResourceAdmission::InvalidRequest);
 	if (!State->PrepareMetadata()) return Reject(State->MetadataAdmission);
-	if (State->Ready.Num() + State->SubmittedCallbacks.Num() >= 512 || State->PendingCoarseSources.Num() + InChanges.Num() > 32768)
+	const int32 QueueLimit = FVoxelTerrainWorkSelection::IsNear(InPriority.Band) ? VoxelNativePublicationCapacity :
+		VoxelNativePublicationCapacity - VoxelNativeNearPublicationReserve;
+	if (State->Ready.Num() + State->SubmittedCallbacks.Num() >= QueueLimit || State->PendingCoarseSources.Num() + InChanges.Num() > 32768)
 		return Reject(EVoxelTerrainResourceAdmission::CapacityBlocked);
 	TArray<FGuid, TInlineAllocator<8192>> Sources;
 	for (const auto& Change : InChanges)
@@ -248,8 +250,9 @@ bool FVoxelTerrainRenderer::PrepareCoarseTransaction(const TConstArrayView<FVoxe
 	const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FAtomPublication>() +
 		VoxelBoundedAllocation::ArrayBytes<FVoxelTerrainCoarseMutation>(InChanges.Num()) +
 		VoxelBoundedAllocation::WorkerSharedBytes<FPresentedSnapshot>();
-	const auto Admission = State->Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Staged, Bytes, Lease, 1,
-		Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	const bool bAllowOverlap = State->PresentedSnapshot && State->LastSealedSnapshot;
+	const auto Admission = TryAcquirePublicationResident(State->Resources, Consumer, Bytes, Lease, 1,
+		bAllowOverlap, Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
 	if (Admission != EVoxelTerrainResourceAdmission::Granted) return Reject(Admission);
 	auto Package = VoxelBoundedAllocation::MakeWorkerShared<FAtomPublication>(Lease);
 	Package->Lease = MoveTemp(Lease);
@@ -268,6 +271,6 @@ bool FVoxelTerrainRenderer::PrepareCoarseTransaction(const TConstArrayView<FVoxe
 	Ready.OnSubmitted = MoveTemp(InOnSubmitted);
 	OutTransaction = Ready.Id;
 	for (const auto& Change : InChanges) State->PendingCoarseSources.Add(Change.Item->SourceId);
-	State->Ready.Add(MoveTemp(Ready));
+	State->InsertReady(MoveTemp(Ready));
 	return true;
 }

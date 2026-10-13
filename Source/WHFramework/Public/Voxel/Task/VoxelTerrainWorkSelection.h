@@ -95,6 +95,8 @@ struct WHFRAMEWORK_API FVoxelTerrainServiceCapacity
 	int32 MinimumNonNearWorkers = 1;
 	double MaximumWaitSeconds = 0.5;
 	bool bAllowOverdueOpportunity = false;
+	// 新正文准入保持距离前沿；超期任务只使用显式的有界机会，不长期改写正常顺序。
+	bool bPreserveDistanceOrder = false;
 	double MaximumOverdueMicroseconds = 1000.0;
 };
 

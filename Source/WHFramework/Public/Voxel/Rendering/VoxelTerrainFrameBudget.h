@@ -21,6 +21,10 @@ struct WHFRAMEWORK_API FVoxelTerrainFrameBudgetSettings
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	double SmoothingAlpha = 0.15;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	bool bUseAutomaticWorkerCount = true;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "bUseAutomaticWorkerCount", ClampMin = "0"))
+	int32 ReservedLogicalProcessors = 2;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (EditCondition = "!bUseAutomaticWorkerCount", ClampMin = "1"))
 	int32 MaximumWorkers = 8;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 MinimumWorkers = 1;
@@ -53,6 +57,7 @@ struct WHFRAMEWORK_API FVoxelTerrainFrameAllocation
 class WHFRAMEWORK_API FVoxelTerrainFrameBudget
 {
 public:
+	static int32 ResolveMaximumWorkers(const FVoxelTerrainFrameBudgetSettings& InSettings);
 	bool Configure(const FVoxelTerrainFrameBudgetSettings& InSettings, FString& OutError);
 	FVoxelTerrainFrameAllocation Observe(const FVoxelTerrainFrameObservation& InObservation);
 	void Reset();

@@ -31,10 +31,10 @@ public:
 	TArray<UTaskAsset*> GetRuntimeAssets() const;
 
 	UFUNCTION(BlueprintPure)
-	TArray<UTaskAsset*> GetOfferedAssets() const;
+	virtual TArray<UTaskAsset*> GetOfferedAssets() const;
 
 	UFUNCTION(BlueprintPure)
-	UTaskBase* GetTask(ETaskStage InStage) const;
+	virtual UTaskBase* GetTask(ETaskStage InStage) const;
 
 	UFUNCTION(BlueprintPure)
 	UTaskBase* ResolveTask(const FTaskReference& InReference) const;

@@ -192,6 +192,13 @@ bool FVoxelFrozenGenerationProgressTest::RunTest(const FString& InParameters)
 		Publisher.Tick(Budget);
 	}
 	TestTrue(TEXT("Moving observers preserve publication progress under a single-operation frame"), Frames > 1 && Frames < 512);
+	if (Publisher.IsGroupBusy(Independent))
+	{
+		AddInfo(FString::Printf(TEXT("Moving publication: frames=%d priorityPhase=%d priorityCursor=%d priorityDirty=%d orderDirty=%d selectionComplete=%d pending=%d publications=%d commitQueue=%d"),
+			Frames, Publisher.PriorityPlan ? Publisher.PriorityPlan->Phase : -1, Publisher.PriorityPlan ? Publisher.PriorityPlan->Cursor : -1,
+			Publisher.bPrioritiesDirty, Publisher.bCommitOrderDirty, Publisher.bCommitSelectionComplete,
+			Publisher.PendingGroups.Num(), Publisher.Publications.Num(), Publisher.ReadyCommitGroups.Num()));
+	}
 	TestFalse(TEXT("Independent publication finishes while the other owner remains open"), Publisher.IsGroupBusy(Independent));
 	TestTrue(TEXT("The unrelated open owner remains outstanding"), Publisher.IsGroupBusy(Owner));
 	Scheduler.StopAndJoin();
@@ -389,6 +396,15 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			TickPublisherFrame(Publisher, *Module, Capture);
 			co_await FVoxelGameThreadContinuation::Yield();
 			InTest->TestEqual(TEXT("The old publication retains its own callback"), OldCallbacks, 1);
+			if (!OldCallbacks)
+			{
+				const auto& TimingBudget = Module->GetTerrainFrameContext().GetPublishBudget();
+				InTest->AddInfo(FString::Printf(TEXT("Old callback: priorityPhase=%d orderDirty=%d priorityReady=%d prepared=%d/%d prepareQueue=%d commitQueue=%d planOps=%d priorityOps=%d prepareOps=%d commitOps=%d"),
+					Publisher.PriorityPlan ? Publisher.PriorityPlan->Phase : -1, Publisher.bCommitOrderDirty, Group.bPriorityReady,
+					Group.PreparedUpdates, Group.UpdateIndices.Num(), Publisher.ReadyPrepareGroups.Num(), Publisher.ReadyCommitGroups.Num(),
+					TimingBudget.GetTiming(EVoxelPublishPhase::Plan).Operations, TimingBudget.GetTiming(EVoxelPublishPhase::Priority).Operations,
+					TimingBudget.GetTiming(EVoxelPublishPhase::Prepare).Operations, TimingBudget.GetTiming(EVoxelPublishPhase::Commit).Operations));
+			}
 			InTest->TestEqual(TEXT("The new callback is not reused for an old group"), NewCallbacks, 1);
 			InTest->TestFalse(TEXT("Both independent publications finish"), Publisher.IsBusy());
 			InTest->TestFalse(TEXT("Committing the final owner invalidates its cached busy lookup"), Publisher.IsGroupBusy(Slow));
@@ -481,6 +497,18 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			Entry.Source = CommittedSource;
 			Entry.bPresented = false;
 			Entry.bDirty = true;
+			// 占用持续保留到真实 SceneCapture 回执；纯发布阶段不得再借 Staged 派生输出。
+			if (!InTest->TestTrue(TEXT("已完成夹具索引保留真实 Resident 授额"),
+				Entry.NativeMesh->MetadataLease->Transfer(EVoxelTerrainResourcePool::Resident))) co_return;
+			const auto PublicationResources = Scheduler.GetTerrainResources();
+			const auto BeforeStagedPressure = PublicationResources->Snapshot();
+			const auto StagedConsumer = FVoxelGenerationConsumerKey::Section(1, FGuid::NewGuid(), 1, {}, 1);
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PublicationStagedBlocker;
+			if (!InTest->TestTrue(TEXT("真实原 Staged 池占满，Resident 保持可用"), PublicationResources->Acquire(StagedConsumer,
+				EVoxelTerrainResourcePool::Staged, BeforeStagedPressure.Limits.StagedBytes -
+				BeforeStagedPressure.Used[int32(EVoxelTerrainResourcePool::Staged)], PublicationStagedBlocker))) co_return;
+			InTest->TestFalse(TEXT("满 Staged 时初次发布仍须等待真实回执"),
+				Publisher.GetTerrainRenderer().HasPresentedCoverage(FBox(FVector::ZeroVector, FVector(32))));
 			const TArray<FBox> InitialLayer{FBox(FVector(0, 0, -100), FVector(4, 4, 100))};
 			const FGuid InitialGroup = Publisher.BeginGroup(Surface);
 			if (!InTest->TestTrue(TEXT("Initial source enters the actual native producer"), Publisher.StageImmutable(
@@ -497,6 +525,12 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			if (!InTest->TestTrue(TEXT("Initial source reaches a real view-bound native presented mirror"),
 				!Publisher.IsBusy() && Entry.PresentedSource == CommittedSource &&
 				Publisher.GetTerrainRenderer().HasPresentedCoverage(FBox(FVector::ZeroVector, FVector(32))))) co_return;
+			InTest->TestEqual(TEXT("从后台索引、原生粗事务到真实呈现的全链不消耗已满 Staged"),
+				PublicationResources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Staged)], BeforeStagedPressure.Limits.StagedBytes);
+			InTest->TestTrue(TEXT("实际呈现后的索引和正文保持原生产 Resident 账本"), Entry.NativeMesh &&
+				Entry.NativeMesh->MetadataLease->GetPool() == EVoxelTerrainResourcePool::Resident &&
+				CommittedSource->ResourceLease->GetPool() == EVoxelTerrainResourcePool::Resident);
+			PublicationStagedBlocker.Reset();
 			Entry.Source = MakeNativeSource(Publisher, Scheduler);
 			Entry.NativeStamp = Entry.Source->Stamp;
 			Entry.bDirty = true;
@@ -846,6 +880,13 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			InTest->TestTrue(TEXT("An unprepared clipped owner and its affected Fine edges remain pending"), Publisher.IsGroupBusy(ClippedKey));
 			InTest->TestFalse(TEXT("Fine between disjoint clipping changes commits without waiting on their aggregate bounds"),
 				Publisher.IsGroupBusy(Middle));
+			if (Publisher.IsGroupBusy(Middle))
+			{
+				InTest->AddInfo(FString::Printf(TEXT("Sparse independent: pendingPhase=%d priorityPhase=%d cursor=%d orderDirty=%d complete=%d readyCommit=%d"),
+					Publisher.PendingPlan ? Publisher.PendingPlan->Phase : -1, Publisher.PriorityPlan ? Publisher.PriorityPlan->Phase : -1,
+					Publisher.PriorityPlan ? Publisher.PriorityPlan->Cursor : -1, Publisher.bCommitOrderDirty,
+					Publisher.bCommitSelectionComplete, Publisher.ReadyCommitGroups.Num()));
+			}
 			ClippedOwner->PreparedMeshes[0] = ClippedSource;
 			SignalFixtureReady(ClippedOwner);
 			TickPublisherFrame(Publisher, *Module, Capture);
@@ -883,6 +924,13 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			co_await FVoxelGameThreadContinuation::Yield();
 			InTest->TestFalse(TEXT("Two unfinished generations of one owner do not block an independent new owner"),
 				Publisher.IsGroupBusy(Independent));
+			if (Publisher.IsGroupBusy(Independent))
+			{
+				InTest->AddInfo(FString::Printf(TEXT("Saturated independent: pendingPhase=%d priorityPhase=%d cursor=%d orderDirty=%d complete=%d readyCommit=%d"),
+					Publisher.PendingPlan ? Publisher.PendingPlan->Phase : -1, Publisher.PriorityPlan ? Publisher.PriorityPlan->Phase : -1,
+					Publisher.PriorityPlan ? Publisher.PriorityPlan->Cursor : -1, Publisher.bCommitOrderDirty,
+					Publisher.bCommitSelectionComplete, Publisher.ReadyCommitGroups.Num()));
+			}
 			InTest->TestTrue(TEXT("A saturated owner is coalesced back into the committed pending queue"),
 				Publisher.PendingGroupIds.Contains(Slow) &&
 				Publisher.PendingGroups.FindChecked(Publisher.PendingGroupIds.FindChecked(Slow)).bCommitted);
@@ -1162,6 +1210,13 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			co_await FVoxelGameThreadContinuation::Yield();
 			InTest->TestTrue(TEXT("A ready group near the moved observer commits within the unchanged one-group frame limit"),
 				MovingPublication->Groups[1].bCommitted);
+			if (!MovingPublication->Groups[1].bCommitted)
+			{
+				InTest->AddInfo(FString::Printf(TEXT("Moved group: priorityPhase=%d cursor=%d orderDirty=%d selectionComplete=%d ready=%d/%d commitQueue=%d prepareQueue=%d"),
+					Publisher.PriorityPlan ? Publisher.PriorityPlan->Phase : -1, Publisher.PriorityPlan ? Publisher.PriorityPlan->Cursor : -1,
+					Publisher.bCommitOrderDirty, Publisher.bCommitSelectionComplete, MovingPublication->Groups[0].bPriorityReady,
+					MovingPublication->Groups[1].bPriorityReady, Publisher.ReadyCommitGroups.Num(), Publisher.ReadyPrepareGroups.Num()));
+			}
 			InTest->TestFalse(TEXT("The old observer's independent group waits for the next frame"), MovingPublication->Groups[0].bCommitted);
 			InTest->TestTrue(TEXT("Moving priority retains stable in-flight update and group indices"),
 				MovingPublication->Updates[0].GroupIndex == 0 && MovingPublication->Updates[1].GroupIndex == 1);

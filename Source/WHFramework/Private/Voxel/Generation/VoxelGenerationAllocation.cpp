@@ -63,7 +63,7 @@ void FVoxelGenerationRequiredSourceScope::VisitLease(const FVoxelTerrainResource
 {
 	if (InLease)
 	{
-		InVisit({nullptr, InLease->Serial(), InLease->GetPool(), InLease->Bytes()});
+		InVisit({nullptr, InLease->Serial(), EVoxelTerrainResourcePool::Input, 0, 1, InLease});
 	}
 }
 
@@ -97,10 +97,11 @@ bool FVoxelGenerationRequiredSourceScope::Collect(
 	const FVoxelTerrainResources& InResources,
 	const FVoxelTerrainResourceLease* InExcludedLease,
 	FVoxelGenerationRequiredCapacity& OutCapacity,
-	FString& OutError)
+	FString& OutError,
+	TArrayView<FVoxelGenerationSourceIdentity> InIdentities)
 {
 	return MeasureSources([&InResources](FVisit InVisit) { Enumerate(InResources, InVisit); },
-		InExcludedLease ? InExcludedLease->Serial() : 0, OutCapacity, OutError);
+		InExcludedLease ? InExcludedLease->Serial() : 0, OutCapacity, OutError, InIdentities);
 }
 
 bool FVoxelGenerationRequiredSourceScope::Measure(const void* InContext, FEnumerate InEnumerate,
@@ -111,74 +112,106 @@ bool FVoxelGenerationRequiredSourceScope::Measure(const void* InContext, FEnumer
 }
 
 bool FVoxelGenerationRequiredSourceScope::MeasureSources(TFunctionRef<void(FVisit)> InEnumerate,
-	const uint64 InExcludedSerial, FVoxelGenerationRequiredCapacity& OutCapacity, FString& OutError)
+	const uint64 InExcludedSerial, FVoxelGenerationRequiredCapacity& OutCapacity, FString& OutError,
+	TArrayView<FVoxelGenerationSourceIdentity> InIdentities)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SourceCapacityMeasure);
-	struct FIdentity
+	FVoxelGenerationSourceIdentity StackIdentities[1024];
+	const auto Identities = InIdentities.IsEmpty() ? MakeArrayView(StackIdentities) : InIdentities;
+	const uint32 SlotCount = uint32(Identities.Num());
+	check(SlotCount >= 1024 && FMath::IsPowerOfTwo(SlotCount));
+	const uint32 MaximumTracked = SlotCount / 2;
+	struct FPartition
 	{
-		const void* Object = nullptr;
-		uint64 Serial = 0;
+		uint64 Prefix = 0;
+		uint8 Bits = 0;
+		// 0 同次遍历处理两类身份，只有溢出时才分开重放。
+		uint8 Kind = 0;
 	};
-	constexpr uint32 SlotCount = 1024;
-	constexpr uint32 MaximumTracked = SlotCount / 2;
-	FIdentity Identities[SlotCount] = {};
-	uint32 Tracked = 0;
+	// 常见情况只遍历一次；表满后按 serial / object 与身份位分区重放。
+	// 不再为每个未记录的来源重放整条强引用链；来源数量及精确 union 不变。
+	FPartition Pending[66] = {};
+	int32 PendingCount = 1;
 	FVoxelGenerationRequiredCapacity Capacity;
-	uint64 Index = 0;
 	bool bValid = true;
-	InEnumerate([&](const FVoxelGenerationRequiredSource& InSource)
+	while (PendingCount > 0 && bValid)
 	{
-		const uint64 SourceIndex = Index++;
-		if (!bValid || (InSource.Serial && InSource.Serial == InExcludedSerial)) return;
-		if ((!InSource.Serial && !InSource.Object) || InSource.Pool >= EVoxelTerrainResourcePool::Count || InSource.LeaseCount < 0)
+		const FPartition Partition = Pending[--PendingCount];
+		FMemory::Memzero(Identities.GetData(), Identities.Num() * sizeof(FVoxelGenerationSourceIdentity));
+		uint32 Tracked = 0;
+		bool bOverflow = false;
+		FVoxelGenerationRequiredCapacity PartCapacity;
+		const uint64 Mask = Partition.Bits == 64 ? MAX_uint64 : (uint64(1) << Partition.Bits) - 1;
+		InEnumerate([&](const FVoxelGenerationRequiredSource& InSource)
 		{
-			bValid = false;
-			return;
-		}
-		bool bDuplicate = false;
-		bool bTracked = false;
-		uint32 Slot = (InSource.Serial ? GetTypeHash(InSource.Serial) : PointerHash(InSource.Object)) & (SlotCount - 1);
-		for (uint32 Probe = 0; Probe < SlotCount; ++Probe, Slot = (Slot + 1) & (SlotCount - 1))
-		{
-			auto& Identity = Identities[Slot];
-			if (!Identity.Serial && !Identity.Object)
+			if (!bValid || (InSource.Serial && InSource.Serial == InExcludedSerial)) return;
+			if ((!InSource.Serial && !InSource.Object) || InSource.Pool >= EVoxelTerrainResourcePool::Count || InSource.LeaseCount < 0)
 			{
-				if (Tracked < MaximumTracked)
+				bValid = false;
+				return;
+			}
+			if (Partition.Kind && bool(InSource.Serial) != (Partition.Kind == 1)) return;
+			const uint64 Key = InSource.Serial ? InSource.Serial : uint64(reinterpret_cast<UPTRINT>(InSource.Object));
+			if ((Key & Mask) != Partition.Prefix) return;
+			uint32 Slot = (InSource.Serial ? GetTypeHash(InSource.Serial) : PointerHash(InSource.Object)) & (SlotCount - 1);
+			for (uint32 Probe = 0; Probe < SlotCount; ++Probe, Slot = (Slot + 1) & (SlotCount - 1))
+			{
+				auto& Identity = Identities[Slot];
+				if (!Identity.Serial && !Identity.Object)
 				{
+					if (Tracked == MaximumTracked) { bOverflow = true; return; }
 					Identity = {InSource.Serial ? nullptr : InSource.Object, InSource.Serial};
 					++Tracked;
-					bTracked = true;
+					break;
 				}
-				break;
+				if (InSource.Serial ? Identity.Serial == InSource.Serial : !Identity.Serial && Identity.Object == InSource.Object) return;
 			}
-			if (InSource.Serial ? Identity.Serial == InSource.Serial : !Identity.Serial && Identity.Object == InSource.Object)
+			EVoxelTerrainResourcePool Pool = InSource.Pool;
+			uint64 SourceBytes = InSource.Bytes;
+			if ((InSource.Lease && !InSource.Lease->ReadCapacity(Pool, SourceBytes)) || Pool >= EVoxelTerrainResourcePool::Count)
 			{
-				bDuplicate = true;
-				bTracked = true;
-				break;
+				bValid = false;
+				return;
 			}
-		}
-		if (!bTracked)
+			uint64& Bytes = PartCapacity.Bytes[static_cast<int32>(Pool)];
+			if (SourceBytes > MAX_uint64 - Bytes || InSource.LeaseCount > MAX_int32 - PartCapacity.LeaseCount)
+			{
+				bValid = false;
+				return;
+			}
+			Bytes += SourceBytes;
+			PartCapacity.LeaseCount += InSource.LeaseCount;
+		});
+		if (!bValid) break;
+		if (bOverflow)
 		{
-			uint64 PrefixIndex = 0;
-			// 固定栈表不改变来源数量上限；超出栈容量的身份仍按原前缀判定。
-			InEnumerate([&](const FVoxelGenerationRequiredSource& InPrevious)
+			if (!Partition.Kind)
 			{
-				if (PrefixIndex++ < SourceIndex && (InSource.Serial
-					? InPrevious.Serial == InSource.Serial
-					: !InPrevious.Serial && InPrevious.Object == InSource.Object)) bDuplicate = true;
-			});
+				Pending[PendingCount++] = {0, 0, 1};
+				Pending[PendingCount++] = {0, 0, 2};
+				continue;
+			}
+			check(Partition.Bits < 64 && PendingCount + 2 <= UE_ARRAY_COUNT(Pending));
+			Pending[PendingCount++] = {Partition.Prefix | (uint64(1) << Partition.Bits), uint8(Partition.Bits + 1), Partition.Kind};
+			Pending[PendingCount++] = {Partition.Prefix, uint8(Partition.Bits + 1), Partition.Kind};
+			continue;
 		}
-		if (bDuplicate) return;
-		uint64& Bytes = Capacity.Bytes[static_cast<int32>(InSource.Pool)];
-		if (InSource.Bytes > MAX_uint64 - Bytes || InSource.LeaseCount > MAX_int32 - Capacity.LeaseCount)
+		for (int32 Pool = 0; Pool < int32(EVoxelTerrainResourcePool::Count); ++Pool)
+		{
+			if (PartCapacity.Bytes[Pool] > MAX_uint64 - Capacity.Bytes[Pool])
+			{
+				bValid = false;
+				break;
+			}
+			Capacity.Bytes[Pool] += PartCapacity.Bytes[Pool];
+		}
+		if (PartCapacity.LeaseCount > MAX_int32 - Capacity.LeaseCount)
 		{
 			bValid = false;
-			return;
+			break;
 		}
-		Bytes += InSource.Bytes;
-		Capacity.LeaseCount += InSource.LeaseCount;
-	});
+		Capacity.LeaseCount += PartCapacity.LeaseCount;
+	}
 	if (!bValid)
 	{
 		OutError = TEXT("CapacityUnachievable: original generation source capacity overflow or inactive lease");

@@ -48,6 +48,11 @@ protected:
 
 	virtual FParameter ToData() override;
 
+	virtual bool ShouldSaveCharacter(const ACharacterBase* InCharacter) const;
+
+	UPROPERTY(EditAnywhere, Category = "Character")
+	bool bSaveLocalPlayerController = true;
+
 public:
 	virtual FString GetModuleDebugMessage() override;
 

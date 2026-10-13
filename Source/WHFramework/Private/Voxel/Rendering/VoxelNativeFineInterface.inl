@@ -123,42 +123,85 @@ struct FPreparedFine
 				FVoxelGenerationRequiredSourceScope::VisitLease(InLease.Get(), InVisit);
 		};
 		VisitLease(Lease); VisitLease(PathLease); VisitLease(ControlInputLease); VisitLease(PreparationInputLease);
-		VisitLease(PublicationLease); VisitLease(PublicationCallbackLease); VisitLease(PendingWorkingLease);
+		VisitLease(PublicationLease); VisitLease(PublicationCallbackLease); VisitLease(PendingWorkingLease); VisitLease(SourceIdentityLease);
+		if (Item) VisitLease(Item->MetadataLease);
+		TArray<const FVoxelFineShardGeometry*, TInlineAllocator<7>> FineSources;
 		const auto VisitAtom = [&](const FAtomPtr& Atom)
 		{
 			if (!Atom) return;
 			VisitLease(Atom->MetadataLease);
-			if (Atom->FineGeometry) FVoxelTerrainRenderer::VisitFineSources(*Atom->FineGeometry, Resources.Get(), InVisit);
+			if (Atom->FineGeometry && !FineSources.Contains(Atom->FineGeometry.Get()))
+			{
+				FineSources.Add(Atom->FineGeometry.Get());
+				FVoxelTerrainRenderer::VisitFineSources(*Atom->FineGeometry, Resources.Get(), InVisit);
+			}
 			for (const auto& Boundary : Atom->Boundaries) if (Boundary) VisitLease(Boundary->ResourceLease);
 			for (const auto& RootChunk : Atom->Chunks)
 				for (auto Chunk = RootChunk; Chunk; Chunk = Chunk->NextSourceChunk)
 				{
 					VisitLease(Chunk->ResidentLease);
-					if (Chunk->Source) FVoxelTerrainRenderer::VisitMeshSources(*Chunk->Source, Resources.Get(), InVisit);
+					// 原始 Chunk 均来自同一 FineGeometry.Pieces，正文来源已随几何完整枚举。
+					if (!Atom->FineGeometry && Chunk->Source) FVoxelTerrainRenderer::VisitMeshSources(*Chunk->Source, Resources.Get(), InVisit);
 				}
 		};
 		VisitAtom(Base);
+		TArray<const FVoxelTerrainRenderCoarse*, TInlineAllocator<6>> CoarseSources;
 		for (int32 Face = 0; Face < 6; ++Face)
 		{
 			VisitAtom(NeighborFine[Face]);
-			if (NeighborCoarse[Face]) FVoxelTerrainRenderer::VisitCoarseSources(*NeighborCoarse[Face], Resources.Get(), InVisit);
+			if (NeighborCoarse[Face] && !CoarseSources.Contains(NeighborCoarse[Face].Get()))
+			{
+				CoarseSources.Add(NeighborCoarse[Face].Get());
+				FVoxelTerrainRenderer::VisitCoarseSources(*NeighborCoarse[Face], Resources.Get(), InVisit);
+			}
 		}
 		if (DistantSlice) VisitLease(DistantSlice->Lease);
 		for (auto Piece = FirstPiece; Piece; Piece = Piece->Next)
 		{
 			VisitLease(Piece->Lease);
-			if (Piece->Mesh) FVoxelTerrainRenderer::VisitMeshSources(*Piece->Mesh, Resources.Get(), InVisit);
+			if (!Piece->Mesh) continue;
+			VisitLease(Piece->Mesh->ResourceLease);
+			// 本构建器只以 Base 与六个冻结邻居创建接口，几何来源已在上面完整枚举。
+			// 每个新 Tile 只增加自身租约和面切片；不能再次遍历同一大页的全部 Piece。
+			if (Piece->Mesh->FrozenBoundaryInputs) VisitLease(Piece->Mesh->FrozenBoundaryInputs->ResourceLease);
+			if (Piece->Mesh->FrozenNativeInterfaceInputs)
+			{
+				const auto Inputs = StaticCastSharedPtr<const FNativeHeightfieldInputs>(Piece->Mesh->FrozenNativeInterfaceInputs);
+				VisitLease(Inputs->Lease);
+				if (Inputs->DistantSlice) VisitLease(Inputs->DistantSlice->Lease);
+			}
 		}
 	}
 
 	bool MeasureRequired(const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& ExtraLease,
-		FVoxelGenerationRequiredCapacity& OutRequired, FString& OutError) const
+		FVoxelGenerationRequiredCapacity& OutRequired, FString& OutError)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_NativeFineSourceMeasure);
 		const FVoxelGenerationRequiredSourceScope Sources(&Resources.Get(), this,
 			[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
 			{ static_cast<const FPreparedFine*>(Context)->VisitRequiredSources(Visit); });
 		const FVoxelGenerationRequiredSourceScope Extra(&Resources.Get(), ExtraLease.Get());
-		return FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, OutRequired, OutError);
+		if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, OutRequired, OutError, SourceIdentities)) return false;
+		const int32 CurrentSlots = SourceIdentities.IsEmpty() ? 1024 : SourceIdentities.Num();
+		if (OutRequired.LeaseCount > CurrentSlots / 2 && CurrentSlots < 65536)
+		{
+			const int32 Slots = int32(FMath::RoundUpToPowerOfTwo(uint32(FMath::Min(65536, OutRequired.LeaseCount > 32767 ? 65536 : OutRequired.LeaseCount * 2 + 2))));
+			const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<FVoxelGenerationSourceIdentity>(Slots);
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> NewLease;
+			if (Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working, Bytes, NewLease,
+				0, OutRequired.Bytes[0], OutRequired.LeaseCount) == EVoxelTerrainResourceAdmission::Granted)
+			{
+				TArray<FVoxelGenerationSourceIdentity> NewIdentities;
+				NewIdentities.Reserve(Slots);
+				NewIdentities.SetNum(Slots);
+				check(NewIdentities.GetAllocatedSize() <= Bytes);
+				OutRequired.Bytes[int32(EVoxelTerrainResourcePool::Working)] += Bytes - (SourceIdentityLease ? SourceIdentityLease->Bytes() : 0);
+				OutRequired.LeaseCount += SourceIdentityLease ? 0 : 1;
+				SourceIdentities = MoveTemp(NewIdentities);
+				SourceIdentityLease = MoveTemp(NewLease);
+			}
+		}
+		return true;
 	}
 
 	bool AcquireNative(const EVoxelTerrainResourcePool Pool, const uint64 Bytes,
@@ -170,10 +213,20 @@ struct FPreparedFine
 		const auto Limits = Resources->Snapshot().Limits;
 		const uint64 PoolLimits[] = {Limits.InputBytes, Limits.WorkingBytes, Limits.StagedBytes,
 			Limits.ResidentBytes - Limits.OverlapBytes, Limits.OverlapBytes};
-		if (Bytes > PoolLimits[int32(Pool)] || Required.Bytes[int32(Pool)] > PoolLimits[int32(Pool)] - Bytes)
-		{ OutError = TEXT("CapacityUnachievable: Native Fine retained sources"); return false; }
-		const auto Admission = Resources->TryAcquire(Consumer, Pool, Bytes, OutLease, 0,
-			Required.Bytes[0], Required.LeaseCount);
+		const auto TryPool = [&](const EVoxelTerrainResourcePool Target)
+		{
+			if (Bytes > PoolLimits[int32(Target)] || Required.Bytes[int32(Target)] > PoolLimits[int32(Target)] - Bytes)
+				return EVoxelTerrainResourceAdmission::CapacityUnachievable;
+			return Resources->TryAcquire(Consumer, Target, Bytes, OutLease, 0, Required.Bytes[0], Required.LeaseCount);
+		};
+		auto Admission = TryPool(Pool);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted && Pool == EVoxelTerrainResourcePool::Resident && bAllowOverlap)
+		{
+			const auto OverlapAdmission = TryPool(EVoxelTerrainResourcePool::ResidentOverlap);
+			Admission = OverlapAdmission == EVoxelTerrainResourceAdmission::Granted ? OverlapAdmission :
+				Admission == EVoxelTerrainResourceAdmission::CapacityBlocked || OverlapAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
+				EVoxelTerrainResourceAdmission::CapacityBlocked : OverlapAdmission;
+		}
 		if (Admission == EVoxelTerrainResourceAdmission::Granted) return true;
 		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: Native Fine interface") :
 			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: Native Fine interface") :
@@ -195,7 +248,7 @@ struct FPreparedFine
 			VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelFineBoundarySnapshot, ESPMode::ThreadSafe>>(Base->Boundaries.Num()) +
 			VoxelBoundedAllocation::ArrayBytes<FVoxelTerrainAtomDrawRange>(RangeCount);
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> AtomLease;
-		if (!AcquireNative(EVoxelTerrainResourcePool::Staged, Bytes, AtomLease, OutError)) return false;
+		if (!AcquireNative(EVoxelTerrainResourcePool::Resident, Bytes, AtomLease, OutError)) return false;
 		FVoxelGenerationRequiredCapacity Required;
 		if (!MeasureRequired(AtomLease, Required, OutError)) return false;
 		const auto PathAdmission = TryAcquirePublicationResident(Resources, Consumer,
@@ -304,7 +357,7 @@ struct FPreparedFine
 			if (Bytes > MeshPieceLimit - Scratch || Bytes > GeometryLimit || OutputBytesTotal > GeometryLimit - Bytes)
 			{ OutError = TEXT("Oversized: Native heightfield interface Piece or Shard"); return EVoxelFineBuildProgress::Failed; }
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OutputLease, PieceLease;
-			if (!AcquireNative(EVoxelTerrainResourcePool::Staged, Bytes, OutputLease, OutError) ||
+			if (!AcquireNative(EVoxelTerrainResourcePool::Resident, Bytes, OutputLease, OutError) ||
 				!AcquireNative(EVoxelTerrainResourcePool::Input, VoxelBoundedAllocation::WorkerSharedBytes<FNativeInterfacePiece>(), PieceLease, OutError, OutputLease))
 				return RejectedAdmission(OutError);
 			auto Mesh = VoxelBoundedAllocation::MakeWorkerShared<FVoxelSectionMeshResult>(OutputLease);
@@ -336,6 +389,7 @@ struct FPreparedFine
 		const FVoxelGenerationRuntimeConfig& Config,
 		const TAtomic<bool>& Cancel, FString& OutError)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_NativeFineAdvance);
 		if (Cancel.Load()) return EVoxelFineBuildProgress::Canceled;
 		if (Phase < 2)
 		{
@@ -440,7 +494,7 @@ struct FPreparedFine
 		if (OutputBytes > GeometryLimit || OutputBytesTotal > GeometryLimit - OutputBytes)
 		{ OutError = TEXT("Oversized:Native interface geometry"); return EVoxelFineBuildProgress::Failed; }
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OutputLease, PieceLease;
-		if (!AcquireNative(EVoxelTerrainResourcePool::Staged, OutputBytes, OutputLease, OutError) ||
+		if (!AcquireNative(EVoxelTerrainResourcePool::Resident, OutputBytes, OutputLease, OutError) ||
 			!AcquireNative(EVoxelTerrainResourcePool::Input,
 				VoxelBoundedAllocation::WorkerSharedBytes<FNativeInterfacePiece>(), PieceLease, OutError, OutputLease)) return RejectedAdmission(OutError);
 		auto Mesh = VoxelBoundedAllocation::MakeWorkerShared<FVoxelSectionMeshResult>(OutputLease);
@@ -474,6 +528,8 @@ struct FPreparedFine
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PreparationInputLease;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PublicationLease, PublicationCallbackLease;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PendingWorkingLease;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SourceIdentityLease;
+	TArray<FVoxelGenerationSourceIdentity> SourceIdentities;
 	TOptional<FVoxelSectionMeshResult> PendingPlan;
 	TOptional<FVoxelSectionSnapshot> PendingSnapshot;
 	TOptional<FVoxelBoundaryTransitionContext> PendingContext;

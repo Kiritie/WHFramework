@@ -20,7 +20,11 @@ struct FVoxelCoarseBuildStorage
 	uint64 GeometryCapacityBytes = 0;
 	uint64 WorkingCapacityBytes = 8ull * 1024ull * 1024ull;
 	TAtomic<bool> bWaitingCapacity{false};
-	TAtomic<uint64> CapacityVersion{0};
+	EVoxelTerrainResourcePool WaitingPool = EVoxelTerrainResourcePool::Count;
+	uint64 WaitingBytes = 0;
+	uint64 WaitingRequiredInputBytes = 0;
+	int32 WaitingRequiredLeaseCount = 0;
+	uint64 WaitingCapacityVersion = 0;
 
 	FVoxelCoarseBuildStorage(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
 		const FVoxelGenerationConsumerKey& InConsumer,
@@ -33,22 +37,50 @@ struct FVoxelCoarseBuildStorage
 
 	EVoxelTaskBlockReason BlockReason() const
 	{
-		if (!bWaitingCapacity.Load()) return EVoxelTaskBlockReason::None;
-		uint64 Version = 0;
-		return !Resources->TryGetReleaseVersionExcludingOwner(Consumer, Version) || Version <= CapacityVersion.Load()
-			? EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
+		if (!bWaitingCapacity.Load())
+		{
+			return EVoxelTaskBlockReason::None;
+		}
+		if (WaitingPool == EVoxelTerrainResourcePool::Count)
+		{
+			uint64 ReleaseVersion = 0;
+			return !Resources->TryGetReleaseVersionExcludingOwner(Consumer, ReleaseVersion) ||
+				ReleaseVersion <= WaitingCapacityVersion ? EVoxelTaskBlockReason::Memory : EVoxelTaskBlockReason::None;
+		}
+		EVoxelTerrainResourceAdmission Admission;
+		if (!Resources->TryQueryAcquire(Consumer, WaitingPool, WaitingBytes, Admission, 0,
+			WaitingRequiredInputBytes, WaitingRequiredLeaseCount) ||
+			Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
+		{
+			return EVoxelTaskBlockReason::Memory;
+		}
+		// 不可满足或身份失效仍回到原执行入口产生确定性失败，不能永远停在等待态。
+		return EVoxelTaskBlockReason::None;
 	}
 
-	void DeferCapacity(FVoxelTaskResult& OutResult, const uint64 InBeforeAdmission)
+	void DeferCapacity(FVoxelTaskResult& OutResult, const EVoxelTerrainResourcePool InPool,
+		const uint64 InBytes, const uint64 InRequiredInputBytes = 0, const int32 InRequiredLeaseCount = 0)
 	{
-		CapacityVersion.Store(InBeforeAdmission);
+		WaitingPool = InPool;
+		WaitingBytes = InBytes;
+		WaitingRequiredInputBytes = InRequiredInputBytes;
+		WaitingRequiredLeaseCount = InRequiredLeaseCount;
+		bWaitingCapacity.Store(true);
+		OutResult.Error.Reset();
+		OutResult.bSuccess = OutResult.bContinue = true;
+	}
+
+	void DeferUnspecifiedCapacity(FVoxelTaskResult& OutResult, const uint64 InBeforeAdmission)
+	{
+		WaitingPool = EVoxelTerrainResourcePool::Count;
+		WaitingCapacityVersion = InBeforeAdmission;
 		bWaitingCapacity.Store(true);
 		OutResult.Error.Reset();
 		OutResult.bSuccess = OutResult.bContinue = true;
 	}
 
 	// 已知的完成正文在排队前授额；无可行输出容量时不长期吸收新的构建输入。
-	EVoxelTerrainResourceAdmission ReserveCompletion()
+	EVoxelTerrainResourceAdmission ReserveCompletion(uint64* OutRequiredInput = nullptr, int32* OutRequiredLeases = nullptr)
 	{
 		if (GeometryCapacityBytes == 0 || GeometryCapacityBytes > Resources->Snapshot().Limits.StagedBytes)
 			return EVoxelTerrainResourceAdmission::CapacityUnachievable;
@@ -66,6 +98,14 @@ struct FVoxelCoarseBuildStorage
 			}
 			++RequiredLeases;
 		}
+		if (OutRequiredInput)
+		{
+			*OutRequiredInput = RequiredInput;
+		}
+		if (OutRequiredLeases)
+		{
+			*OutRequiredLeases = RequiredLeases;
+		}
 		return Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Staged,
 			GeometryCapacityBytes, GeometryLease, 0, RequiredInput, RequiredLeases);
 	}
@@ -78,31 +118,43 @@ struct FVoxelCoarseBuildStorage
 			OutResult.Error = TEXT("Oversized: coarse completion cannot fit Staged capacity");
 			return false;
 		}
-		const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
-		const auto CompletionAdmission = ReserveCompletion();
+		uint64 RequiredInput = 0;
+		int32 RequiredLeases = 0;
+		const auto CompletionAdmission = ReserveCompletion(&RequiredInput, &RequiredLeases);
 		if (CompletionAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ||
 			CompletionAdmission == EVoxelTerrainResourceAdmission::InvalidRequest)
 		{
 			OutResult.Error = TEXT("Oversized: coarse completion reservation");
 			return false;
 		}
-		if (CompletionAdmission != EVoxelTerrainResourceAdmission::Granted ||
-			(WorkingCapacityBytes && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, WorkingCapacityBytes, OutWorking)))
+		if (CompletionAdmission != EVoxelTerrainResourceAdmission::Granted)
 		{
-			DeferCapacity(OutResult, BeforeAdmission);
+			DeferCapacity(OutResult, EVoxelTerrainResourcePool::Staged, GeometryCapacityBytes,
+				RequiredInput, RequiredLeases);
 			return false;
 		}
-		bWaitingCapacity.Store(false);
-		return true;
+		return BeginCount(OutResult, OutWorking);
 	}
 
 	bool BeginCount(FVoxelTaskResult& OutResult,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutWorking)
 	{
-		const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
-		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, WorkingCapacityBytes, OutWorking))
+		if (WorkingCapacityBytes == 0)
 		{
-			DeferCapacity(OutResult, BeforeAdmission);
+			bWaitingCapacity.Store(false);
+			return true;
+		}
+		const auto Admission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Working,
+			WorkingCapacityBytes, OutWorking);
+		if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
+		{
+			DeferCapacity(OutResult, EVoxelTerrainResourcePool::Working, WorkingCapacityBytes);
+			return false;
+		}
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
+		{
+			OutResult.Error = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+				TEXT("Oversized: coarse working capacity is unreachable") : TEXT("InvalidRequest: coarse working capacity");
 			return false;
 		}
 		bWaitingCapacity.Store(false);
@@ -121,7 +173,6 @@ struct FVoxelCoarseBuildStorage
 			OutResult.Error = TEXT("Invalid coarse array completion reservation");
 			return false;
 		}
-		const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
 		const uint64 NewArrayBytes = VoxelBoundedAllocation::ArrayBytes<ElementType>(InArray.Num());
 		if (InArray.Max() > InArray.Num() && NewArrayBytes)
 		{
@@ -135,7 +186,9 @@ struct FVoxelCoarseBuildStorage
 				const auto Admission = InWorking->TryResize(NewArrayBytes);
 				if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
 				{
-					DeferCapacity(OutResult, BeforeAdmission);
+					// 本切片退出会归还 Working；下一次必须能重新取得整个临时缓冲。
+					DeferCapacity(OutResult, EVoxelTerrainResourcePool::Working,
+						FMath::Max(WorkingCapacityBytes, NewArrayBytes));
 					return false;
 				}
 				if (Admission != EVoxelTerrainResourceAdmission::Granted)

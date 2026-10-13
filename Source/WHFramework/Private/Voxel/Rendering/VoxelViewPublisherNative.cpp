@@ -1,8 +1,11 @@
 #include "Voxel/Rendering/VoxelViewPublisher.h"
 
 #include "GameFramework/Actor.h"
+#include "Voxel/Rendering/VoxelMacroTerrain.h"
+#include "Voxel/Rendering/VoxelProxyBuilder.h"
 #include "Voxel/Rendering/VoxelTerrainCoarseMesh.h"
 #include "Voxel/Rendering/VoxelTerrainRenderer.h"
+#include "Voxel/Rendering/VoxelWaterView.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/VoxelModule.h"
@@ -31,10 +34,13 @@ namespace
 		FVoxelTaskStamp InputStamp;
 		TAtomic<bool> bWaitingCapacity{false};
 		TAtomic<uint64> CapacityVersion{0};
+		uint64 SourceTriangles = 0;
+		uint64 SliceCount = 0;
+		double NextDiagnosticSeconds = 0.0;
 
 		FNativeMeshWorker(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
-			const FVoxelGenerationConsumerKey& InConsumer)
-			: Resources(InResources), Consumer(InConsumer), Builder(InResources, InConsumer)
+			const FVoxelGenerationConsumerKey& InConsumer, const bool bInAllowResidentOverlap)
+			: Resources(InResources), Consumer(InConsumer), Builder(InResources, InConsumer, true, bInAllowResidentOverlap)
 		{
 		}
 
@@ -43,7 +49,32 @@ namespace
 			FVoxelTaskResult Result;
 			bWaitingCapacity.Store(false);
 			const uint64 BeforeBuild = Resources->ReleaseVersionExcludingOwner(Consumer);
-			const auto Progress = Builder.Advance(32, InCancel, Result.Error);
+			const double Started = FPlatformTime::Seconds();
+			const double Deadline = Started + 0.002;
+			int32 Microsteps = 1;
+			auto Progress = Builder.Advance(128, InCancel, Result.Error);
+			for (; Microsteps < 64 && Progress == EVoxelTerrainCoarseMeshProgress::Working &&
+				FPlatformTime::Seconds() < Deadline; ++Microsteps)
+			{
+				Progress = Builder.Advance(128, InCancel, Result.Error);
+			}
+			++SliceCount;
+#if !UE_BUILD_SHIPPING
+			const double Finished = FPlatformTime::Seconds();
+			if (Finished >= NextDiagnosticSeconds)
+			{
+				const auto& Key = InputStamp.GeometryIdentity.Key;
+				const auto State = Resources->Snapshot();
+				UE_LOG(LogTemp, Display, TEXT("Native coarse index slice: publication=%llu representation=%d level=%d coordinate=(%d,%d,%d) triangles=%llu slice=%llu microsteps=%d elapsedMs=%.3f progress=%d input=%llu/%llu working=%llu/%llu staged=%llu/%llu resident=%llu/%llu"),
+					Consumer.OwnerIncarnation, int32(Key.Representation), Key.Level, Key.Coordinate.X, Key.Coordinate.Y, Key.Coordinate.Z,
+					SourceTriangles, SliceCount, Microsteps, (Finished - Started) * 1000.0, int32(Progress),
+					State.Used[int32(EVoxelTerrainResourcePool::Input)], State.Limits.InputBytes,
+					State.Used[int32(EVoxelTerrainResourcePool::Working)], State.Limits.WorkingBytes,
+					State.Used[int32(EVoxelTerrainResourcePool::Staged)], State.Limits.StagedBytes,
+					State.Used[int32(EVoxelTerrainResourcePool::Resident)], State.Limits.ResidentBytes);
+				NextDiagnosticSeconds = Finished + 10.0;
+			}
+#endif
 			if (Progress == EVoxelTerrainCoarseMeshProgress::Complete)
 			{
 				Result.CustomPayload = Builder.TakeResult();
@@ -52,6 +83,7 @@ namespace
 			else if (Progress == EVoxelTerrainCoarseMeshProgress::Working || Progress == EVoxelTerrainCoarseMeshProgress::CapacityBlocked)
 			{
 				Result.bSuccess = Result.bContinue = true;
+				Result.bContinueImmediately = Progress == EVoxelTerrainCoarseMeshProgress::Working;
 				if (Progress == EVoxelTerrainCoarseMeshProgress::CapacityBlocked)
 				{
 					CapacityVersion.Store(BeforeBuild);
@@ -136,6 +168,14 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 			Update.bNativeAdmissionWaiting = true;
 		}
 	};
+	FIntVector OwnershipMin, OwnershipMax;
+	if (!Update.NativeStamp.GeometryIdentity.Key.TryBounds(Update.NativeStamp.GeometryIdentity.WorldMinZ,
+		Update.NativeStamp.GeometryIdentity.WorldMaxZ, OwnershipMin, OwnershipMax))
+	{
+		RejectAdmission(true, EVoxelTaskBlockReason::TerminalFailure);
+		return true;
+	}
+	const bool bAllowResidentOverlap = TerrainRenderer->HasPresentedCoverage(FBox(FVector(OwnershipMin), FVector(OwnershipMax)));
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
 	const auto InputAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input,
 		VoxelBoundedAllocation::WorkerSharedBytes<FNativeMeshWorker>(), InputLease);
@@ -145,9 +185,13 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 		RejectAdmission(bTerminal, bTerminal ? EVoxelTaskBlockReason::TerminalFailure : EVoxelTaskBlockReason::InputMemory);
 		return true;
 	}
-	auto Worker = VoxelBoundedAllocation::MakeWorkerShared<FNativeMeshWorker>(InputLease, Resources, Consumer);
+	auto Worker = VoxelBoundedAllocation::MakeWorkerShared<FNativeMeshWorker>(InputLease, Resources, Consumer, bAllowResidentOverlap);
 	Worker->InputLease = MoveTemp(InputLease);
 	Worker->InputStamp = Update.NativeStamp;
+	for (const auto& Batch : Update.Source->Batches)
+	{
+		Worker->SourceTriangles += uint64(Batch.Mesh.Triangles.Num() / 3);
+	}
 	FString Error;
 	if (!Worker->Builder.Initialize(Update.Source, Update.Location / Module.BlockSize(), Update.Scale / Module.BlockSize(), Update.NativeStamp, Error))
 	{
@@ -244,8 +288,16 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 	return true;
 }
 
-bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublication, FGroup& InGroup)
+bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublication, FGroup& InGroup, bool& bOutAdvanced)
 {
+	bOutAdvanced = false;
+	if (!InGroup.bNativeAdmitted)
+	{
+		if (ActiveNativeGroups >= MaximumNativeGroups) return false;
+		InGroup.bNativeAdmitted = true;
+		++ActiveNativeGroups;
+		bOutAdvanced = true;
+	}
 	if (InGroup.VisibilityActors.IsEmpty() && !InGroup.UpdateIndices.ContainsByPredicate([&InPublication](const int32 Index)
 	{
 		const auto& Update = InPublication->Updates[Index];
@@ -303,31 +355,40 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		if (!bBootstrapReady && TerrainRenderer->GetCoarseAdmissionVersion() == InGroup.NativeFrontendVersion &&
 			!NativePublisherHasExternalRelease(NativeResources, InGroup.NativeControlConsumer, InGroup.NativeControlVersion)) return false;
 		InGroup.bNativeControlWaiting = false;
+		bOutAdvanced = true;
 	}
 	const auto RejectNativeAdmission = [&](const EVoxelTerrainResourceAdmission Admission,
 		const FVoxelGenerationConsumerKey& Consumer, const uint64 BeforeAdmission, const bool bBootstrap)
 	{
 		if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
 		{
+			bOutAdvanced |= !InGroup.bNativeControlWaiting || InGroup.NativeControlConsumer != Consumer ||
+				InGroup.NativeControlVersion != BeforeAdmission;
 			InGroup.NativeControlConsumer = Consumer;
 			InGroup.NativeControlVersion = BeforeAdmission;
 			InGroup.NativeFrontendVersion = TerrainRenderer->GetCoarseAdmissionVersion();
 			InGroup.bNativeControlWaiting = true;
 			InGroup.bNativeBootstrapWaiting = bBootstrap;
 		}
-		else DiscardPublication(InPublication, false);
+		else
+		{
+			DiscardPublication(InPublication, false);
+			bOutAdvanced = true;
+		}
 	};
 	if (InGroup.NativeTransaction.IsValid())
 	{
 		if (TerrainRenderer->ConsumeTransactionFailure(InGroup.NativeTransaction))
 		{
 			DiscardPublication(InPublication, false);
+			bOutAdvanced = true;
 			return false;
 		}
 		if (!InGroup.bNativeSubmitted)
 		{
 			if (TerrainRenderer->IsTransactionPending(InGroup.NativeTransaction)) return false;
 			InGroup.NativeTransaction.Invalidate();
+			bOutAdvanced = true;
 			return false;
 		}
 		InGroup.NativeTransaction.Invalidate();
@@ -354,6 +415,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		}
 		InGroup.NativeChanges.Reserve(InGroup.UpdateIndices.Num());
 		check(InGroup.NativeChanges.GetAllocatedSize() <= InGroup.NativeGroupLease->Bytes());
+		bOutAdvanced = true;
 	}
 	if (!InGroup.UpdateIndices.IsValidIndex(InGroup.NativeSourceCursor))
 	{
@@ -416,7 +478,10 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		if (TerrainRenderer->PrepareCoarseTransaction(InGroup.NativeChanges,
 			TFunction<bool()>(MakeCurrent(CallbackLease)), TFunction<void()>(MakeSubmitted(CallbackLease)),
 			Transaction, InGroup.Priority.Service, InGroup.FirstQueuedAt, &Admission, Consumer, CallbackLease))
+		{
 			InGroup.NativeTransaction = Transaction;
+			bOutAdvanced = true;
+		}
 		else RejectNativeAdmission(Admission, Consumer, BeforeAdmission,
 			TerrainRenderer->GetNativeStateAdmission() == EVoxelTerrainResourceAdmission::CapacityBlocked);
 		return false;
@@ -426,28 +491,79 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 	if (!Update.Actor.IsValid() || ((!Update.bSourceDirty || Update.bUnchanged) && !InPublication->Visibility.Contains(Update.Actor)))
 	{
 		++InGroup.NativeSourceCursor;
+		bOutAdvanced = true;
 		return false;
 	}
 	if (!Update.NativeMesh) return false;
 	const bool* Hidden = InPublication->Visibility.Find(Update.Actor);
 	const bool bRemove = Hidden && *Hidden;
 	const auto* Entry = Entries.Find(Update.Actor);
-	if (!Entry) { DiscardPublication(InPublication, false); return false; }
+	if (!Entry)
+	{
+		DiscardPublication(InPublication, false);
+		bOutAdvanced = true;
+		return false;
+	}
 	if (bRemove && (!Entry->bPresented || Update.Actor->IsHidden()))
 	{
 		++InGroup.NativeSourceCursor;
+		bOutAdvanced = true;
 		return false;
 	}
 	// 移除当前根中的旧几何；本代新源只保留为下一次显示的不可变正文。
 	const auto RenderGeometry = bRemove ? Entry->NativeMesh : Update.NativeMesh;
-	if (!RenderGeometry || !RenderGeometry->Source) { DiscardPublication(InPublication, false); return false; }
+	if (!RenderGeometry || !RenderGeometry->Source)
+	{
+		DiscardPublication(InPublication, false);
+		bOutAdvanced = true;
+		return false;
+	}
 	const auto& RenderSource = RenderGeometry->Source;
 	const auto& RenderStamp = RenderGeometry->Stamp;
 	const auto Resources = Scheduler.GetTerrainResources();
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, NativeOwnerId, InPublication->Serial,
 		Update.NativeStamp.GeometryIdentity.Key.Coordinate, Update.NativeStamp.Token);
+	FIntVector OwnershipMin;
+	FIntVector OwnershipMax;
+	const uint64 BeforeRetain = Resources->ReleaseVersionExcludingOwner(Consumer);
+	if (!RenderStamp.GeometryIdentity.Key.TryBounds(RenderStamp.GeometryIdentity.WorldMinZ,
+		RenderStamp.GeometryIdentity.WorldMaxZ, OwnershipMin, OwnershipMax))
+	{
+		RejectNativeAdmission(EVoxelTerrainResourceAdmission::InvalidRequest, Consumer, BeforeRetain, false);
+		return false;
+	}
+	const FBox OwnershipBounds{FVector(OwnershipMin), FVector(OwnershipMax)};
+	const bool bAllowOverlap = TerrainRenderer->HasPresentedCoverage(OwnershipBounds);
+	const auto Retain = [&](const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
+	{
+		if (!Lease) return true;
+		if (!Lease->IsOwnedBy(Resources.Get()))
+		{
+			RejectNativeAdmission(EVoxelTerrainResourceAdmission::InvalidRequest, Consumer, BeforeRetain, false);
+			return false;
+		}
+		const auto PreviousPool = Lease->GetPool();
+		if (Lease->Transfer(EVoxelTerrainResourcePool::Resident) ||
+			(bAllowOverlap && Lease->Transfer(EVoxelTerrainResourcePool::ResidentOverlap)))
+		{
+			bOutAdvanced |= Lease->GetPool() != PreviousPool;
+			return true;
+		}
+		const auto Limits = Resources->Snapshot().Limits;
+		const bool bFitsPrimary = Lease->Bytes() <= Limits.ResidentBytes - Limits.OverlapBytes;
+		const bool bFitsOverlap = bAllowOverlap && Lease->Bytes() <= Limits.OverlapBytes;
+		RejectNativeAdmission(bFitsPrimary || bFitsOverlap ? EVoxelTerrainResourceAdmission::CapacityBlocked :
+			EVoxelTerrainResourceAdmission::CapacityUnachievable, Consumer, BeforeRetain, false);
+		return false;
+	};
 	if (!InGroup.NativeCoarse)
 	{
+		// 只对当前实际提交的正文迁池，不代表已经提交或呈现。
+		if (!Retain(RenderGeometry->MetadataLease) || !Retain(RenderSource->ResourceLease) ||
+			(RenderSource->FrozenVoxelProxy && !Retain(RenderSource->FrozenVoxelProxy->ResourceLease)) ||
+			(RenderSource->FrozenSurface && !Retain(RenderSource->FrozenSurface->ResourceLease)) ||
+			(RenderSource->FrozenMacro && !Retain(RenderSource->FrozenMacro->ResourceLease)) ||
+			(RenderSource->FrozenWater && !Retain(RenderSource->FrozenWater->ResourceLease))) return false;
 		const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainRenderCoarse>() +
 			VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>>(RenderSource->Batches.Num());
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
@@ -458,8 +574,16 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 			RejectNativeAdmission(EVoxelTerrainResourceAdmission::CapacityUnachievable, Consumer, BeforeAdmission, false);
 			return false;
 		}
-		const auto Admission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Staged, Bytes, Lease, 0,
+		auto Admission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Resident, Bytes, Lease, 0,
 			Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted && bAllowOverlap)
+		{
+			const auto OverlapAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::ResidentOverlap, Bytes, Lease, 0,
+				Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+			Admission = OverlapAdmission == EVoxelTerrainResourceAdmission::Granted ? OverlapAdmission :
+				Admission == EVoxelTerrainResourceAdmission::CapacityBlocked || OverlapAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
+				EVoxelTerrainResourceAdmission::CapacityBlocked : OverlapAdmission;
+		}
 		if (Admission != EVoxelTerrainResourceAdmission::Granted)
 		{
 			RejectNativeAdmission(Admission, Consumer, BeforeAdmission, false);
@@ -473,14 +597,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		Item->SourceChunks.Reserve(RenderSource->Batches.Num());
 		Item->SourceChunks.SetNum(RenderSource->Batches.Num());
 		const auto& Input = RenderStamp;
-		FIntVector Min;
-		FIntVector Max;
-		if (!Input.GeometryIdentity.Key.TryBounds(Input.GeometryIdentity.WorldMinZ, Input.GeometryIdentity.WorldMaxZ, Min, Max))
-		{
-			RejectNativeAdmission(EVoxelTerrainResourceAdmission::InvalidRequest, Consumer, BeforeAdmission, false);
-			return false;
-		}
-		Item->OwnershipBounds = FBox(FVector(Min), FVector(Max));
+		Item->OwnershipBounds = OwnershipBounds;
 		const auto Kind = Input.GeometryIdentity.Key.Representation;
 		Item->Evidence.Owner = {Kind == EVoxelTerrainRepresentation::VoxelProxy ? EVoxelFineOwnerKind::Proxy :
 			Kind == EVoxelTerrainRepresentation::Surface ? EVoxelFineOwnerKind::Surface : EVoxelFineOwnerKind::Macro,
@@ -492,6 +609,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		Item->Evidence.bKnownEmpty = !RenderSource->Batches.ContainsByPredicate([](const auto& Batch) { return !Batch.Mesh.Triangles.IsEmpty(); });
 		Item->Evidence.GeometryLease = RenderGeometry;
 		InGroup.NativeCoarse = MoveTemp(Item);
+		bOutAdvanced = true;
 		return false;
 	}
 	if (!bRemove && Update.Source->Batches.IsValidIndex(InGroup.NativeBatchCursor))
@@ -513,33 +631,22 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 			}
 			TerrainRenderer->AppendSourceChunk(*InGroup.NativeCoarse, Batch, InGroup.NativeLastChunk, MoveTemp(Chunk));
 			InGroup.NativeTriangleCursor += Count;
+			bOutAdvanced = true;
 			return false;
 		}
 		++InGroup.NativeBatchCursor;
 		InGroup.NativeTriangleCursor = 0;
 		InGroup.NativeLastChunk.Reset();
+		bOutAdvanced = true;
 		return false;
 	}
 	if (!bRemove && !InGroup.NativeCoarse->IsResourceReady()) return false;
-	const bool bAllowOverlap = TerrainRenderer->HasPresentedCoverage(InGroup.NativeCoarse->OwnershipBounds);
-	const uint64 BeforeRetain = Resources->ReleaseVersionExcludingOwner(Consumer);
-	const auto Retain = [&](const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
-	{
-		if (!Lease || Lease->Transfer(EVoxelTerrainResourcePool::Resident) ||
-			(bAllowOverlap && Lease->Transfer(EVoxelTerrainResourcePool::ResidentOverlap))) return true;
-		const auto Limits = Resources->Snapshot().Limits;
-		const bool bFitsPrimary = Lease->Bytes() <= Limits.ResidentBytes - Limits.OverlapBytes;
-		const bool bFitsOverlap = bAllowOverlap && Lease->Bytes() <= Limits.OverlapBytes;
-		RejectNativeAdmission(bFitsPrimary || bFitsOverlap ? EVoxelTerrainResourceAdmission::CapacityBlocked :
-			EVoxelTerrainResourceAdmission::CapacityUnachievable, Consumer, BeforeRetain, false);
-		return false;
-	};
-	if (!Retain(InGroup.NativeCoarse->MetadataLease) || !Retain(Update.NativeMesh->MetadataLease) ||
-		!Retain(Update.Source->ResourceLease)) return false;
+	if (!Retain(InGroup.NativeCoarse->MetadataLease)) return false;
 	InGroup.NativeChanges.Add({InGroup.NativeCoarse, bRemove});
 	InGroup.NativeCoarse.Reset();
 	InGroup.NativeLastChunk.Reset();
 	InGroup.NativeBatchCursor = InGroup.NativeTriangleCursor = 0;
 	++InGroup.NativeSourceCursor;
+	bOutAdvanced = true;
 	return false;
 }

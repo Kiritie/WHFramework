@@ -83,7 +83,7 @@ public:
 	}
 
 	virtual FVoxelOverlayPreflightStatus EnsureCoarseBoundsReady(const FVoxelGenerationBounds& InBounds,
-		EVoxelWorkClass InWorkClass, int32 InSourcePriority) const
+		EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore = 0.0, double InForwardScore = 0.0) const
 	{
 		return {};
 	}

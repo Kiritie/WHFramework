@@ -120,6 +120,11 @@ EVoxelTerrainResourcePool FVoxelTerrainResourceLease::GetPool() const
 	return Owner->GetPool(LeaseSerial);
 }
 
+bool FVoxelTerrainResourceLease::ReadCapacity(EVoxelTerrainResourcePool& OutPool, uint64& OutBytes) const
+{
+	return Owner->ReadCapacity(LeaseSerial, OutPool, OutBytes);
+}
+
 uint64 FVoxelTerrainResourceLease::Serial() const
 {
 	return LeaseSerial;
@@ -199,15 +204,31 @@ bool FVoxelTerrainResources::Configure(const FVoxelTerrainResourceLimits& InLimi
 	return true;
 }
 
-bool FVoxelTerrainResources::PrepareEntries(const int32 InAdditionalEntries, const uint64 InAdditionalInputBytes)
+bool FVoxelTerrainResources::CanPrepareEntries(const int32 InAdditionalEntries, const uint64 InAdditionalInputBytes) const
 {
 	const int64 Required = int64(State.LeaseCount) + State.ReservedSplitCount + InAdditionalEntries;
-	if (InAdditionalEntries <= 0 || Required > MaximumTerrainResourceLeases) return false;
-	if (Required <= EntryCapacity) return CanAdd(EVoxelTerrainResourcePool::Input, InAdditionalInputBytes);
+	if (InAdditionalEntries <= 0 || Required > MaximumTerrainResourceLeases)
+	{
+		return false;
+	}
+	const uint64 Bytes = AdditionalLedgerBytes(Required);
+	return Bytes <= MAX_uint64 - InAdditionalInputBytes &&
+		CanAdd(EVoxelTerrainResourcePool::Input, Bytes + InAdditionalInputBytes);
+}
+
+bool FVoxelTerrainResources::PrepareEntries(const int32 InAdditionalEntries, const uint64 InAdditionalInputBytes)
+{
+	if (!CanPrepareEntries(InAdditionalEntries, InAdditionalInputBytes))
+	{
+		return false;
+	}
+	const int64 Required = int64(State.LeaseCount) + State.ReservedSplitCount + InAdditionalEntries;
+	if (Required <= EntryCapacity)
+	{
+		return true;
+	}
 	const uint64 Bytes = AdditionalLedgerBytes(Required);
 	// 只新增固定大小的页；指针目录扩容仍预授予旧、新目录并存的峰值。
-	if (Bytes > MAX_uint64 - InAdditionalInputBytes ||
-		!CanAdd(EVoxelTerrainResourcePool::Input, Bytes + InAdditionalInputBytes)) return false;
 	uint64& Used = State.Used[static_cast<int32>(EVoxelTerrainResourcePool::Input)];
 	Used += Bytes;
 	const int32 RequiredPages = int32((Required + FEntryPage::Size - 1) / FEntryPage::Size);
@@ -317,14 +338,15 @@ EVoxelTerrainResourceAdmission FVoxelTerrainResources::TryAcquire(const FVoxelGe
 		return EVoxelTerrainResourceAdmission::InvalidRequest;
 	}
 	FScopeLock Lock(&Mutex);
-	if (!CanFitRequired(InPool, InBytes, InReservedSplits, InRequiredInputBytes, InRequiredLeaseCount))
+	const EVoxelTerrainResourceAdmission Admission = QueryAcquire(InPool, InBytes,
+		InReservedSplits, InRequiredInputBytes, InRequiredLeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
 	{
-		return EVoxelTerrainResourceAdmission::CapacityUnachievable;
+		return Admission;
 	}
 	const uint64 InputBytes = InPool == EVoxelTerrainResourcePool::Input ? InBytes : 0;
 	const uint64 Handles = uint64(InReservedSplits + 1) * TerrainLeaseHandleBytes();
-	if (!CanAdd(InPool, InBytes) || InputBytes > MAX_uint64 - Handles ||
-		!PrepareEntries(InReservedSplits + 1, InputBytes + Handles))
+	if (!PrepareEntries(InReservedSplits + 1, InputBytes + Handles))
 	{
 		return EVoxelTerrainResourceAdmission::CapacityBlocked;
 	}
@@ -337,6 +359,46 @@ EVoxelTerrainResourceAdmission FVoxelTerrainResources::TryAcquire(const FVoxelGe
 	OutLease = MakeShared<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>(AsShared(), Serial);
 	AdvanceVersion();
 	return EVoxelTerrainResourceAdmission::Granted;
+}
+
+EVoxelTerrainResourceAdmission FVoxelTerrainResources::QueryAcquire(const EVoxelTerrainResourcePool InPool,
+	const uint64 InBytes, const int32 InReservedSplits, const uint64 InRequiredInputBytes,
+	const int32 InRequiredLeaseCount) const
+{
+	if (!CanFitRequired(InPool, InBytes, InReservedSplits, InRequiredInputBytes, InRequiredLeaseCount))
+	{
+		return EVoxelTerrainResourceAdmission::CapacityUnachievable;
+	}
+	const uint64 InputBytes = InPool == EVoxelTerrainResourcePool::Input ? InBytes : 0;
+	const uint64 Handles = uint64(InReservedSplits + 1) * TerrainLeaseHandleBytes();
+	if (!CanAdd(InPool, InBytes) || InputBytes > MAX_uint64 - Handles ||
+		!CanPrepareEntries(InReservedSplits + 1, InputBytes + Handles))
+	{
+		return EVoxelTerrainResourceAdmission::CapacityBlocked;
+	}
+	return EVoxelTerrainResourceAdmission::Granted;
+}
+
+bool FVoxelTerrainResources::TryQueryAcquire(const FVoxelGenerationConsumerKey& InAttempt,
+	const EVoxelTerrainResourcePool InPool, const uint64 InBytes,
+	EVoxelTerrainResourceAdmission& OutAdmission, const int32 InReservedSplits,
+	const uint64 InRequiredInputBytes, const int32 InRequiredLeaseCount) const
+{
+	OutAdmission = EVoxelTerrainResourceAdmission::None;
+	if (!InAttempt.IsValid() || (ControlConsumer.IsValid() && InAttempt.WorldEpoch != ControlConsumer.WorldEpoch) ||
+		InBytes == 0 || InReservedSplits < 0 || InReservedSplits >= MaximumTerrainResourceLeases ||
+		InRequiredLeaseCount < 0 || InPool >= EVoxelTerrainResourcePool::Count)
+	{
+		OutAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
+		return true;
+	}
+	if (!Mutex.TryLock())
+	{
+		return false;
+	}
+	OutAdmission = QueryAcquire(InPool, InBytes, InReservedSplits, InRequiredInputBytes, InRequiredLeaseCount);
+	Mutex.Unlock();
+	return true;
 }
 
 bool FVoxelTerrainResources::Resize(const uint64 InSerial, const uint64 InBytes)
@@ -551,6 +613,16 @@ EVoxelTerrainResourcePool FVoxelTerrainResources::GetPool(const uint64 InSerial)
 	FScopeLock Lock(&Mutex);
 	const FEntry* Entry = FindEntry(InSerial);
 	return Entry ? Entry->Pool : EVoxelTerrainResourcePool::Count;
+}
+
+bool FVoxelTerrainResources::ReadCapacity(const uint64 InSerial, EVoxelTerrainResourcePool& OutPool, uint64& OutBytes) const
+{
+	FScopeLock Lock(&Mutex);
+	const FEntry* Entry = FindEntry(InSerial);
+	if (!Entry) return false;
+	OutPool = Entry->Pool;
+	OutBytes = Entry->Bytes;
+	return true;
 }
 
 uint64 FVoxelTerrainResources::ReleaseVersionExcludingOwner(const FVoxelGenerationConsumerKey& InOwner) const

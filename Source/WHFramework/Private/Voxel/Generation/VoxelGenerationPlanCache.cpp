@@ -1880,17 +1880,19 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 		return;
 	}
 	bool bNaturalCapacityPressure = false;
+	uint64 NaturalHeadroom = 0;
 	// 自然列由冻结配置确定；容量紧张时退休仅由 Cache 持有的正文，为新采样腾出空间。
 	// 正在读取的 shared ref 及依赖就绪所需的五族计划继续保持原有生命周期。
 	if (Resources)
 	{
 		const auto State = Resources->Snapshot();
 		const uint64 NativeLimit = State.Limits.ResidentBytes - State.Limits.OverlapBytes;
-		const uint64 Headroom = FMath::Min(NativeLimit / 16,
+		// 至少留出一轮自然列和常规驻留区的 1/16，不能只在剩余不足一个计划正文时才开始退休。
+		NaturalHeadroom = FMath::Min(NativeLimit, FMath::Max(NativeLimit / 16,
 			uint64(MaximumRetiredEntriesPerGroup * ShardCount) *
 			(VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelBaseColumnEntry>() +
-				VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelNaturalColumnEntry>()));
-		bNaturalCapacityPressure = State.Used[int32(EVoxelTerrainResourcePool::Resident)] >= NativeLimit - Headroom;
+				VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelNaturalColumnEntry>())));
+		bNaturalCapacityPressure = State.Used[int32(EVoxelTerrainResourcePool::Resident)] >= NativeLimit - NaturalHeadroom;
 	}
 
 	int32 RemainingGroups = 7;
@@ -1907,9 +1909,12 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 			return GroupBudget;
 		};
 
+	const int32 PressureColumnBudget = bNaturalCapacityPressure ?
+		FMath::Min(MaximumRetiredEntriesPerGroup, RemainingBudget / 4) : 0;
+	RemainingBudget -= PressureColumnBudget * 2;
 	int32 HydrologyBudget = TakeGroupBudget();
-	int32 BaseColumnBudget = TakeGroupBudget();
-	int32 NaturalColumnBudget = TakeGroupBudget();
+	int32 BaseColumnBudget = TakeGroupBudget() + PressureColumnBudget;
+	int32 NaturalColumnBudget = TakeGroupBudget() + PressureColumnBudget;
 	int32 CaveBudget = TakeGroupBudget();
 	int32 EcologyBudget = TakeGroupBudget();
 	int32 FeatureBudget = TakeGroupBudget();
@@ -2065,6 +2070,18 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 		MaintenanceShardCursor = (ShardIndex + 1) % ShardCount;
 	}
 	RetentionScope.Reset();
+#if !UE_BUILD_SHIPPING
+	static double NextPressureDiagnostic = 0.0;
+	if (bNaturalCapacityPressure && FPlatformTime::Seconds() >= NextPressureDiagnostic)
+	{
+		const auto State = Resources->Snapshot();
+		UE_LOG(LogTemp, Display, TEXT("Voxel natural cache pressure: epoch=%llu resident=%llu nativeLimit=%llu headroom=%llu checkedLimit=%d retiredBase=%d retiredNatural=%d shard=%d"),
+			ControlConsumer.WorldEpoch, State.Used[int32(EVoxelTerrainResourcePool::Resident)],
+			State.Limits.ResidentBytes - State.Limits.OverlapBytes, NaturalHeadroom, InMaxEntries,
+			RetiredBaseColumns.Num(), RetiredNaturalColumns.Num(), ShardIndex);
+		NextPressureDiagnostic = FPlatformTime::Seconds() + 5.0;
+	}
+#endif
 	RetiredBaseColumns.Reset();
 	RetiredNaturalColumns.Reset();
 	RetiredHydrology.Reset();

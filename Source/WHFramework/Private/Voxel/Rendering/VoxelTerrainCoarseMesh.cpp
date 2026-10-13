@@ -34,8 +34,10 @@ void FVoxelTerrainCoarseMesh::VisitIntersecting(const FBox& InWorldCellBounds, T
 }
 
 FVoxelTerrainCoarseMeshBuilder::FVoxelTerrainCoarseMeshBuilder(
-	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources, const FVoxelGenerationConsumerKey& InConsumer)
-	: Resources(MoveTemp(InResources)), Consumer(InConsumer)
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources, const FVoxelGenerationConsumerKey& InConsumer,
+	const bool bInPublicationOutput, const bool bInAllowResidentOverlap)
+	: Resources(MoveTemp(InResources)), Consumer(InConsumer), bPublicationOutput(bInPublicationOutput),
+		bAllowResidentOverlap(bInPublicationOutput && bInAllowResidentOverlap)
 {
 }
 
@@ -84,8 +86,24 @@ EVoxelTerrainCoarseMeshProgress FVoxelTerrainCoarseMeshBuilder::Advance(const in
 			VoxelBoundedAllocation::ArrayBytes<FVoxelTerrainCoarseRange>(MaximumNodes) +
 			VoxelBoundedAllocation::ArrayBytes<int32>(MaximumRoots);
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, Bytes, Lease))
-			return EVoxelTerrainCoarseMeshProgress::CapacityBlocked;
+		// 发布索引直接授予最终持有池，不能等已满的 Staged 再给同一源增加元数据。
+		auto Admission = Resources->TryAcquire(Consumer,
+			bPublicationOutput ? EVoxelTerrainResourcePool::Resident : EVoxelTerrainResourcePool::Staged, Bytes, Lease);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted && bAllowResidentOverlap)
+		{
+			const auto OverlapAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::ResidentOverlap, Bytes, Lease);
+			Admission = OverlapAdmission == EVoxelTerrainResourceAdmission::Granted ? OverlapAdmission :
+				Admission == EVoxelTerrainResourceAdmission::CapacityBlocked || OverlapAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
+				EVoxelTerrainResourceAdmission::CapacityBlocked : OverlapAdmission;
+		}
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
+		{
+			if (!bPublicationOutput || Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
+				return EVoxelTerrainCoarseMeshProgress::CapacityBlocked;
+			OutError = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+				TEXT("CapacityUnachievable: native coarse index") : TEXT("InvalidRequest: native coarse index");
+			return EVoxelTerrainCoarseMeshProgress::Failed;
+		}
 		Result = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainCoarseMesh>(Lease);
 		Result->MetadataLease = MoveTemp(Lease);
 		Result->Stamp = Stamp;

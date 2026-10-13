@@ -43,6 +43,7 @@
 #include "Voxel/Network/VoxelModuleNetworkComponent.h"
 #include "Voxel/Network/VoxelOverlayReplica.h"
 #include "Voxel/Map/VoxelMapTileCache.h"
+#include "Voxel/Rendering/VoxelTerrainFrameBudget.h"
 #include "Voxel/Map/VoxelMapSurfaceResolver.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
 #include "Voxel/Save/VoxelDeltaCodec.h"
@@ -324,6 +325,7 @@ void UVoxelModule::OnRefresh(
 	const float InDeltaSeconds,
 	const bool bInEditor)
 {
+	if (IsWorldSaveSuspended()) return;
 	Super::OnRefresh(
 		InDeltaSeconds,
 		bInEditor);
@@ -376,6 +378,12 @@ void UVoxelModule::OnRefresh(
 			Statistics->AddFrame(Observation.RenderThreadMilliseconds, EVoxelTerrainFrameMetric::RenderThread);
 			Statistics->AddFrame(Observation.GPUMilliseconds, EVoxelTerrainFrameMetric::GPU);
 		}
+	}
+
+	const bool bMapFirst = (GFrameCounter & 3) == 0;
+	if (MapTileCache && bMapFirst)
+	{
+		MapTileCache->Tick(TerrainFrameContext.Deadline(0.25));
 	}
 
 	if (IsAuthority()) RegionStore.AdvanceDirectoryLoad(*Scheduler, Epoch,
@@ -582,6 +590,11 @@ void UVoxelModule::OnRefresh(
 	if (!bViewFirst && !TickView()) return;
 
 	const double AfterView = FPlatformTime::Seconds();
+
+	if (MapTileCache && !bMapFirst)
+	{
+		MapTileCache->Tick(TerrainFrameContext.Deadline(0.25));
+	}
 
 	if (DetailView)
 	{
@@ -917,7 +930,8 @@ bool UVoxelModule::StartWorld(
 		return false;
 	}
 	FVoxelTaskBudget TaskBudget;
-	TaskBudget.MaxConcurrentTasks = FMath::Clamp(FPlatformMisc::NumberOfCores() * 2, 1, 16);
+	TaskBudget.MaxConcurrentTasks = FVoxelTerrainFrameBudget::ResolveMaximumWorkers(ViewSettings.FrameBudget);
+	TaskBudget.bBorrowIdleKindSlots = ViewSettings.FrameBudget.bUseAutomaticWorkerCount;
 	TaskBudget.CriticalReservedTasks = ViewSettings.Budget.CriticalReservedTasks;
 	TaskBudget.MaxConcurrentSurfaceTasks = ViewSettings.Budget.MaxConcurrentSurfaceTasks;
 	TaskBudget.MaxConcurrentMacroTasks = ViewSettings.Budget.MaxConcurrentMacroTasks;
@@ -1032,12 +1046,6 @@ bool UVoxelModule::StartWorld(
 	if (IsAuthority() && RegionStore.IsDirectoryReady()) Runtime->GetChangeIndex().SetBaseline(RegionStore.GetDirectorySnapshot());
 	if (!IsAuthority()) OverlayReplica = MakeUnique<FVoxelOverlayReplica>(Epoch, Scheduler->GetRuntimeResources());
 	Scheduler->BindFrameContext(TerrainFrameContext);
-	if (GetWorld()->GetNetMode() != NM_DedicatedServer)
-	{
-		MapTileCache = MakeUnique<FVoxelMapTileCache>(
-			*Scheduler, Generator.ToSharedRef(), GenerationConfig.ToSharedRef(),
-			Epoch, BlockSize());
-	}
 	UE_LOG(LogTemp, Display, TEXT("Voxel worker budget: cores=%d workers=%d reservedMiB=%llu"),
 		FPlatformMisc::NumberOfCores(), TaskBudget.MaxConcurrentTasks, TaskBudget.MaxReservedBytes / (1024ull * 1024ull));
 	UE_LOG(LogTemp, Display, TEXT("Voxel frame budget: Fine=%d Proxy=%d Surface=%d Macro=%d Data=%d Results=%d Heavy=%d AdmissionMs=%.2f"),
@@ -1055,6 +1063,12 @@ bool UVoxelModule::StartWorld(
 		RegionStore,
 		Manifest,
 		Registry.GetSnapshot().ToSharedRef());
+	if (GetWorld()->GetNetMode() != NM_DedicatedServer)
+	{
+		MapTileCache = MakeUnique<FVoxelMapTileCache>(
+			*Scheduler, *EmergeManager, Generator.ToSharedRef(), GenerationConfig.ToSharedRef(),
+			Epoch, BlockSize());
+	}
 	if (OverlayReplica)
 	{
 		OverlayReplica->SetTaskBindingDomain(Scheduler->GetTerrainResources(), Scheduler->GetControlConsumer());
@@ -1108,6 +1122,7 @@ bool UVoxelModule::StartWorld(
 		EmergeManager->SetExternalConsumerWakeCallback([this](const FVoxelGenerationConsumerKey& Consumer)
 		{
 			if (ViewManager) ViewManager->OnGenerationDependencyReady(Consumer);
+			if (MapTileCache) MapTileCache->OnGenerationDependencyReady(Consumer);
 		});
 	}
 	// 服务端同样需要权威碰撞，碰撞发布不依赖视觉地形模块。
@@ -1233,6 +1248,8 @@ bool UVoxelModule::StopWorld(const bool bDiscardDirty, FString& OutError)
 	WorldState = EVoxelWorldState::Closing;
 	check(Epoch < MAX_uint64);
 	++Epoch;
+	WorldSaveSuspensionToken.Invalidate();
+	WorldSaveSuspensionEpoch = 0;
 	PendingTerrainWorldControl.Reset();
 	if (Scheduler)
 	{
@@ -2200,7 +2217,7 @@ bool UVoxelModule::EnqueueNetworkRepresentationTask(FVoxelTaskRequest&& InReques
 
 bool UVoxelModule::BeginProjectMutation()
 {
-	if (bMutating || !IsAuthority() || !IsReady())
+	if (IsWorldSaveSuspended() || bMutating || !IsAuthority() || !IsReady())
 	{
 		return false;
 	}
@@ -2211,6 +2228,71 @@ bool UVoxelModule::BeginProjectMutation()
 void UVoxelModule::EndProjectMutation()
 {
 	bMutating = false;
+}
+
+bool UVoxelModule::BeginWorldSaveSuspension(const FGuid& InOwnerToken, FString& OutError)
+{
+	check(IsInGameThread());
+	OutError.Reset();
+	if (!InOwnerToken.IsValid() || WorldSaveSuspensionToken.IsValid() || !IsAuthority() || !IsReady() ||
+		bMutating || bSceneTransitionActive || SceneLoadingCount > 0 || TerrainFrameContext.IsActive() ||
+		!Runtime || !Scheduler || !RegionStore.IsDirectoryReady())
+	{
+		OutError = TEXT("世界正在处理场景或地形事务，暂不能冻结最终存档切点。");
+		return false;
+	}
+	WorldSaveSuspensionToken = InOwnerToken;
+	WorldSaveSuspensionEpoch = Epoch;
+	return true;
+}
+
+bool UVoxelModule::EndWorldSaveSuspension(const FGuid& InOwnerToken, FString& OutError)
+{
+	check(IsInGameThread());
+	OutError.Reset();
+	if (!InOwnerToken.IsValid() || InOwnerToken != WorldSaveSuspensionToken || WorldSaveSuspensionEpoch != Epoch ||
+		TerrainFrameContext.IsActive())
+	{
+		OutError = TEXT("最终存档冻结释放的所有者或世界代次不匹配。");
+		return false;
+	}
+	WorldSaveSuspensionToken.Invalidate();
+	WorldSaveSuspensionEpoch = 0;
+	return true;
+}
+
+bool UVoxelModule::AdvanceSuspendedWorldSave(const FGuid& InOwnerToken, FString& OutError)
+{
+	check(IsInGameThread());
+	OutError.Reset();
+	if (!InOwnerToken.IsValid() || InOwnerToken != WorldSaveSuspensionToken || WorldSaveSuspensionEpoch != Epoch ||
+		!GetWorld() || !GetWorld()->IsPaused() || !IsAuthority() || !IsReady())
+	{
+		OutError = TEXT("最终存档推进缺少原世界的暂停与冻结所有权。");
+		return false;
+	}
+	USaveGameModule* Saves = USaveGameModule::GetPtr(GetWorld());
+	if (!Saves)
+	{
+		OutError = TEXT("最终存档推进缺少原世界保存模块。");
+		return false;
+	}
+	const double Started = FPlatformTime::Seconds();
+	const bool bDedicated = GetWorld()->GetNetMode() == NM_DedicatedServer;
+	const double MissingTiming = std::numeric_limits<double>::quiet_NaN();
+	FVoxelTerrainFrameObservation Observation;
+	Observation.GameThreadMilliseconds = GGameThreadTime > 0 ? FPlatformTime::ToMilliseconds(GGameThreadTime) : MissingTiming;
+	Observation.TerrainGameThreadMilliseconds = TerrainFrameContext.GetLastTerrainMilliseconds();
+	Observation.RenderThreadMilliseconds = bDedicated ? 0.0 :
+		(GRenderThreadTime > 0 ? FPlatformTime::ToMilliseconds(GRenderThreadTime) : MissingTiming);
+	const uint32 GPUCycles = bDedicated ? 0 : RHIGetGPUFrameCycles();
+	Observation.GPUMilliseconds = bDedicated ? 0.0 :
+		(GPUCycles > 0 ? FPlatformTime::ToMilliseconds(GPUCycles) : MissingTiming);
+	if (!TerrainFrameContext.Begin(Epoch, GFrameCounter, Started, Observation)) return true;
+	AdvanceSaveCapture();
+	Saves->AdvanceWorldSaveCapture(*this);
+	TerrainFrameContext.End(FPlatformTime::Seconds());
+	return true;
 }
 
 void UVoxelModule::PublishProjectEdit(const FVoxelEditBatch& InBatch)
@@ -3007,7 +3089,7 @@ FVoxelEditReply UVoxelModule::ExecuteIntent(
 	FVoxelEditReply Reply;
 	Reply.RequestId = InIntent.RequestId;
 	Reply.Code = EVoxelEditCode::Rejected;
-	if (!InIntent.RequestId || !InSource || bMutating || !IsReady() || !IsAuthority())
+	if (!InIntent.RequestId || !InSource || IsWorldSaveSuspended() || bMutating || !IsReady() || !IsAuthority())
 	{
 		Reply.Code = EVoxelEditCode::Busy;
 		return Reply;
@@ -3195,7 +3277,7 @@ bool UVoxelModule::ApplyPrefab(
 	const FIntVector& InOrigin,
 	FString& OutError)
 {
-	if (!IsAuthority() || !IsReady() || bMutating || InPrefab.Cells.IsEmpty())
+	if (!IsAuthority() || !IsReady() || IsWorldSaveSuspended() || bMutating || InPrefab.Cells.IsEmpty())
 	{
 		OutError = TEXT("Invalid prefab operation");
 		return false;
@@ -4412,7 +4494,7 @@ bool UVoxelModule::ExecuteInventoryWorldEdit(FVoxelInteractionPlan& InOutPlan, A
     FInventoryCommandResult& OutResult, FString& OutError)
 {
     UInventoryWorldSubsystem* System = GetWorld()->GetSubsystem<UInventoryWorldSubsystem>();
-    if(!System || !System->IsReady() || !IsAuthority() || !IsReady() || bMutating || !InventoryBridge || !InventoryContribution)
+    if(!System || !System->IsReady() || !IsAuthority() || !IsReady() || IsWorldSaveSuspended() || bMutating || !InventoryBridge || !InventoryContribution)
     {
         OutError = TEXT("Inventory.WorldEditUnavailable");
         return false;

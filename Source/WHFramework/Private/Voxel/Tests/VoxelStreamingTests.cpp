@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Misc/ScopeExit.h"
 #include "Voxel/Geometry/VoxelSectionMesher.h"
 #include "Voxel/Map/VoxelMapTileCache.h"
 #include "HAL/PlatformProcess.h"
@@ -9,6 +10,8 @@
 #include "Voxel/Streaming/VoxelInterestManager.h"
 #include "Voxel/Streaming/VoxelInterestRuntime.h"
 #include "Voxel/Streaming/VoxelResidencyManager.h"
+#include "Voxel/Streaming/VoxelEmergeManager.h"
+#include "Voxel/Save/VoxelRegionStore.h"
 #include "Voxel/Rendering/VoxelViewManager.h"
 #include "Voxel/Rendering/VoxelCoveragePartition.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
@@ -1963,10 +1966,27 @@ bool FVoxelMapTileBuildTest::RunTest(const FString& InParameters)
 	MapRecipe.Settings.RiverSourceAccumulation = MAX_int32;
 	MapConfig.Recipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(MapRecipe));
 	const auto Config = MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(MapConfig));
-	const auto Generator = MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
-		Config, MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>());
+	const auto Plans = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+	FVoxelGenerationCacheRetention Retention;
+	Retention.HydrologyRegionSide = Config->Recipe->Settings.HydrologyRegionSide;
+	Retention.HydrologyCellSize = Config->Recipe->Settings.HydrologyCellSize;
+	Plans->UpdateRetention(Retention);
+	const auto Generator = MakeShared<const FVoxelGenerationPipeline, ESPMode::ThreadSafe>(Config, Plans, nullptr, true);
 	FVoxelTaskScheduler Scheduler(true);
-	FVoxelMapTileCache Cache(Scheduler, Generator, Config, 1, 25.0);
+	const auto Registry = VoxelTest::MakeRegistry();
+	FVoxelWorldRuntime Runtime(1, true, Registry, Generator, Scheduler.GetRuntimeResources());
+	FVoxelRegionStore RegionStore;
+	FVoxelWorldManifest Manifest;
+	FVoxelEmergeManager Emerge(Runtime, Scheduler, Generator, Config, Plans, RegionStore, Manifest, Registry);
+	FVoxelMapTileCache Cache(Scheduler, Emerge, Generator, Config, 1, 25.0);
+	ON_SCOPE_EXIT
+	{
+		Scheduler.StopAndJoin();
+	};
+	Emerge.SetExternalConsumerWakeCallback([&Cache](const FVoxelGenerationConsumerKey& Consumer)
+	{
+		Cache.OnGenerationDependencyReady(Consumer);
+	});
 	// 此夹具只验证栅格发布；正式配色由项目资产契约测试覆盖。
 	Cache.SetColorResolver([](const FVoxelColumnSample&, const FVoxelGenerationRuntimeConfig&)
 	{
@@ -1984,7 +2004,9 @@ bool FVoxelMapTileBuildTest::RunTest(const FString& InParameters)
 	while ((!Cache.FindBrush(Key) || !Cache.FindBrush(WorldKey)) &&
 		FPlatformTime::Seconds() < Deadline)
 	{
-		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+		Emerge.Tick(FVoxelInterestSet{}, 0, FPlatformTime::Seconds(), 1, 8.0);
+		Cache.Tick(FPlatformTime::Seconds() + 0.008);
+		Scheduler.Tick([&Emerge](FVoxelTaskResult&& Result) { Emerge.OnTask(MoveTemp(Result)); }, 8.0);
 		FPlatformProcess::Sleep(0.01f);
 	}
 	const FSlateBrush* Brush = Cache.FindBrush(Key);
