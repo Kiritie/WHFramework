@@ -305,6 +305,7 @@ int32 FVoxelTerrainWorkSelection::Select(TConstArrayView<FVoxelTerrainServiceCan
 		}
 		if (!FMath::IsFinite(AdditionalRounds) || AdditionalRounds == MAX_dbl)
 		{
+			UE_LOG(LogTemp, Error, TEXT("Voxel selection skipped rounds invalid: pool=%d rounds=%.3f"), int32(Pool), AdditionalRounds);
 			bAccountingFault = true;
 			return INDEX_NONE;
 		}
@@ -328,12 +329,15 @@ bool FVoxelTerrainWorkSelection::Settle(const uint64 InChargeSerial, const doubl
 	const FVoxelTerrainServiceCharge* Found = OutstandingCharges.Find(InChargeSerial);
 	if (!Found)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Voxel selection settle miss: serial=%llu outstanding=%d fault=%d"),
+			InChargeSerial, OutstandingCharges.Num(), bAccountingFault);
 		return false;
 	}
 	const FVoxelTerrainServiceCharge Charge = *Found;
 	OutstandingCharges.Remove(InChargeSerial);
 	if (!IsValidCost(InActualMicroseconds))
 	{
+		UE_LOG(LogTemp, Error, TEXT("Voxel selection invalid cost: serial=%llu actualUs=%.3f"), InChargeSerial, InActualMicroseconds);
 		bAccountingFault = true;
 		return false;
 	}
@@ -358,6 +362,8 @@ bool FVoxelTerrainWorkSelection::Reset()
 {
 	if (!OutstandingCharges.IsEmpty())
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Voxel selection reset deferred: outstanding=%d fault=%d"),
+			OutstandingCharges.Num(), bAccountingFault);
 		return false;
 	}
 	for (FPoolState& State : Pools)
@@ -383,6 +389,8 @@ bool FVoxelTerrainWorkSelection::TryChangeCredit(FPoolState& InOutState, const i
 	const double Candidate = InOutState.Deficits[InBand] + InDelta;
 	if (!FMath::IsFinite(InDelta) || !FMath::IsFinite(Candidate) || FMath::Abs(Candidate) > MaximumAccountingMagnitude)
 	{
+		UE_LOG(LogTemp, Error, TEXT("Voxel selection credit invalid: band=%d previous=%.3f delta=%.3f candidate=%.3f"),
+			InBand, InOutState.Deficits[InBand], InDelta, Candidate);
 		bAccountingFault = true;
 		return false;
 	}

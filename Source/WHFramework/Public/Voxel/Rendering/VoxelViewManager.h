@@ -609,6 +609,15 @@ private:
 	double InterestMicrostepEstimateMilliseconds = 0.01;
 	uint64 ManagerPhaseDeferrals[static_cast<uint8>(EVoxelPublishPhase::Count)] = {};
 	double NextInterestProgressLog = 0.0;
+	uint64 CommitGateQueriedFrames = 0;
+	uint64 CommitGateClosedFrames = 0;
+	uint64 CommitGateQueryCount = 0;
+	uint64 CommitGateClosedQueryCount = 0;
+	uint64 CommitGateQueryFrame = MAX_uint64;
+	uint64 CommitGateClosedFrame = MAX_uint64;
+	uint64 CommitGateConsecutiveClosedFrames = 0;
+	uint64 CoveragePassFirstFrame = 0;
+	uint64 CoveragePassFrameBuckets[4] = {};
 	double NextPlanTimingLog = 0.0;
 	double NextPointHandoffLog = 0.0;
 	double NextTimingLog = 0.0;

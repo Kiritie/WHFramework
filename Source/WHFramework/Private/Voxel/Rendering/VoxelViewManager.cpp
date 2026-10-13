@@ -418,9 +418,28 @@ FVoxelViewManager::FVoxelViewManager(
 	Publisher->SetCommitGate([this](const FVoxelPublishGroupKey& Key)
 	{
 		const auto Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Key, Module.BlockSize(), Module.GetViewSettings().Lod);
-		return !Bounds.IsValid || !ShouldDeferCoverage(FVoxelCoverageRect{
+		const bool bDefer = Bounds.IsValid && ShouldDeferCoverage(FVoxelCoverageRect{
 			FIntPoint(FMath::FloorToInt(Bounds.Min.X / Module.BlockSize()), FMath::FloorToInt(Bounds.Min.Y / Module.BlockSize())),
 			FIntPoint(FMath::CeilToInt(Bounds.Max.X / Module.BlockSize()), FMath::CeilToInt(Bounds.Max.Y / Module.BlockSize()))});
+		const uint64 Frame = Module.GetTerrainFrameContext().GetFrameCounter();
+		++CommitGateQueryCount;
+		if (CommitGateQueryFrame != Frame)
+		{
+			CommitGateQueryFrame = Frame;
+			++CommitGateQueriedFrames;
+		}
+		if (bDefer)
+		{
+			++CommitGateClosedQueryCount;
+			if (CommitGateClosedFrame != Frame)
+			{
+				CommitGateConsecutiveClosedFrames = CommitGateClosedFrame != MAX_uint64 && CommitGateClosedFrame + 1 == Frame ?
+					CommitGateConsecutiveClosedFrames + 1 : 1;
+				CommitGateClosedFrame = Frame;
+				++CommitGateClosedFrames;
+			}
+		}
+		return !bDefer;
 	});
 }
 
@@ -622,6 +641,15 @@ void FVoxelViewManager::Tick(
 #if !UE_BUILD_SHIPPING
 	if (TickStart >= NextInterestProgressLog)
 	{
+		const uint64 Frame = Module.GetTerrainFrameContext().GetFrameCounter();
+		const uint64 ActivePassFrames = CoverageContinuation.IsValid() ? Frame - CoveragePassFirstFrame + 1 : 0;
+		const uint64 ConsecutiveClosedFrames = CommitGateClosedFrame == Frame ? CommitGateConsecutiveClosedFrames : 0;
+		UE_LOG(LogTemp, Display,
+			TEXT("Voxel commit gate: queriedFrames=%llu closedFrames=%llu closedRatio=%.4f queries=%llu blockedQueries=%llu consecutiveClosedFrames=%llu activePassFrames=%llu passFrames=1:%llu 2-4:%llu 5-16:%llu 17+:%llu"),
+			CommitGateQueriedFrames, CommitGateClosedFrames,
+			CommitGateQueriedFrames ? double(CommitGateClosedFrames) / double(CommitGateQueriedFrames) : 0.0,
+			CommitGateQueryCount, CommitGateClosedQueryCount, ConsecutiveClosedFrames, ActivePassFrames,
+			CoveragePassFrameBuckets[0], CoveragePassFrameBuckets[1], CoveragePassFrameBuckets[2], CoveragePassFrameBuckets[3]);
 		UE_LOG(LogTemp, Display,
 			TEXT("Voxel publication input progress: desired=%llu applied=%llu pending=%llu phase=%d cursor=%d fine=%d admissions=%d geometry=%d"),
 			InInterestRevision, AppliedInterestRevision, PendingInterestRevision, InterestInputPhase, InterestInputCursor, GetInputRoot().FineWanted.Num(), Admissions.Num(),
@@ -672,6 +700,7 @@ void FVoxelViewManager::AdvanceCoveragePlan(const double InDeadline)
 	const double Start = FPlatformTime::Seconds();
 	if (!CoverageContinuation.IsValid())
 	{
+		CoveragePassFirstFrame = Module.GetTerrainFrameContext().GetFrameCounter();
 		bActiveCoverageFull = bCoverageDirtyFull;
 		bCoverageDirtyFull = false;
 		const int32 Count = bActiveCoverageFull ? 0 : FMath::Min(DirtyCoverageRects.Num(), 1);
@@ -698,6 +727,9 @@ void FVoxelViewManager::AdvanceCoveragePlan(const double InDeadline)
 	}
 	if (CoverageContinuation.IsComplete())
 	{
+		const uint64 Frames = Module.GetTerrainFrameContext().GetFrameCounter() - CoveragePassFirstFrame + 1;
+		const int32 Bucket = Frames <= 1 ? 0 : Frames <= 4 ? 1 : Frames <= 16 ? 2 : 3;
+		++CoveragePassFrameBuckets[Bucket];
 		CoverageContinuation.Reset();
 		CoverageInterestSnapshot.Reset();
 		ReleaseInputRoot(CoverageInputRoot);
@@ -3273,6 +3305,15 @@ void FVoxelViewManager::Reset()
 	BindCoverageIndexResources();
 	RepresentationAttempts.Reset();
 	CoverageContinuation.Reset();
+	CommitGateQueriedFrames = 0;
+	CommitGateClosedFrames = 0;
+	CommitGateQueryCount = 0;
+	CommitGateClosedQueryCount = 0;
+	CommitGateQueryFrame = MAX_uint64;
+	CommitGateClosedFrame = MAX_uint64;
+	CommitGateConsecutiveClosedFrames = 0;
+	CoveragePassFirstFrame = 0;
+	for (uint64& Count : CoveragePassFrameBuckets) Count = 0;
 	CoverageInterestSnapshot.Reset();
 	bCoverageDrainPending = false;
 	bCoverageReadScope = false;

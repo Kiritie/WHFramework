@@ -72,8 +72,13 @@ struct FVoxelTerrainServiceCandidateSet
 		for (int32 Band = 1; Band < BandCount; ++Band)
 		{
 			if (NormalHeads[Band].Index == INDEX_NONE) continue;
+			check(Count < UE_ARRAY_COUNT(Heads));
 			Heads[Count++] = NormalHeads[Band];
-			if (OldestHeads[Band].Index != NormalHeads[Band].Index) Heads[Count++] = OldestHeads[Band];
+			if (OldestHeads[Band].Index != NormalHeads[Band].Index)
+			{
+				check(Count < UE_ARRAY_COUNT(Heads));
+				Heads[Count++] = OldestHeads[Band];
+			}
 		}
 		return MakeArrayView(Heads, Count);
 	}

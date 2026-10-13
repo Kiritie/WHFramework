@@ -2673,6 +2673,11 @@ void FVoxelTerrainRendererState::AdvanceRootPreparations(const double InDeadline
 	if (FPlatformTime::Seconds() >= NextPreparationDiagnostic)
 	{
 		NextPreparationDiagnostic = FPlatformTime::Seconds() + 5.0;
+		UE_LOG(LogTemp, Display,
+			TEXT("Native seal state: ready=%d issued=%d merge=%d mergeSerial=%llu mergeComplete=%d mergeWaiting=%d mergeSuspended=%d sealFault=%d preparationFault=%d uploadFault=%d estimateUs=%.3f"),
+			Ready.Num(), PendingIssued.Num(), RootMerge.IsValid(), RootMerge ? RootMerge->Consumer.RequestSerial : 0,
+			RootMerge && RootMerge->bComplete, RootMerge && RootMerge->bWaitingCapacity.Load(), RootMerge && RootMerge->bSuspended.Load(),
+			SealSelection.HasAccountingFault(), PreparationSelection.HasAccountingFault(), UploadSelection.HasAccountingFault(), SealCostMicroseconds);
 		for (const FRootPreparation* Work : ActivePreparations)
 		{
 			const FIntVector Section = Work->Publication->Atoms.IsEmpty() ? FIntVector::ZeroValue : Work->Publication->Atoms[0]->Section;
@@ -2931,25 +2936,27 @@ bool FVoxelTerrainRendererState::BeginRootMerge(FReadyTransaction& InTransaction
 			[WeakState, Work](FVoxelTaskResult&& Result)
 	{
 		const auto Pinned = WeakState.Pin();
-		if (!Pinned || !Pinned->bActive.Load() || Pinned->RootMerge != Work) return;
-		if (Result.bSuccess && !Result.bCanceled && Result.Stamp.WorldEpoch == Pinned->Epoch &&
-			Result.Stamp.OwnerId == Pinned->OwnerId && Result.Stamp.OwnerIncarnation == 1 &&
-			Result.Stamp.Token == Work->Consumer.RequestSerial)
+		if (!Pinned || !Pinned->bActive.Load() || Result.Stamp.WorldEpoch != Pinned->Epoch ||
+			Result.Stamp.OwnerId != Pinned->OwnerId || Result.Stamp.OwnerIncarnation != 1 ||
+			Result.Stamp.Token != Work->Consumer.RequestSerial) return;
+		const int32 Index = Pinned->Ready.IndexOfByPredicate([&Pinned, &Work](const FReadyTransaction& Pending)
+		{
+			return Pending.Preparation == Work->Preparation && Pending.MergeConsumer == Work->Consumer &&
+				(Pinned->RootMerge == Work || Pending.SuspendedMerge == Work);
+		});
+		if (Index == INDEX_NONE) return;
+		if (Result.bSuccess && !Result.bCanceled)
 		{
 			Work->bComplete = true;
 			Work->Preparation->Publication->MergeReceipt = Result.WorkReceipt;
 			return;
 		}
 		// 叶子冲突只重做该事务；其他准备及 Current 不受影响。
-		const int32 Index = Pinned->Ready.IndexOfByPredicate([&Work](const FReadyTransaction& Pending) { return Pending.Preparation == Work->Preparation; });
-		if (Index != INDEX_NONE)
-		{
-			if (Pinned->Scheduler.IsTerminal({Result.Kind, Result.Stamp}) ||
-				Result.Error.StartsWith(TEXT("Oversized")) || Result.Error.StartsWith(TEXT("CapacityUnachievable")))
-				Pinned->TerminateTransaction(Pinned->Ready[Index]);
-			else Pinned->ReleasePreparation(Pinned->Ready[Index]);
-		}
-		Pinned->RootMerge.Reset();
+		if (Pinned->Scheduler.IsTerminal({Result.Kind, Result.Stamp}) ||
+			Result.Error.StartsWith(TEXT("Oversized")) || Result.Error.StartsWith(TEXT("CapacityUnachievable")))
+			Pinned->TerminateTransaction(Pinned->Ready[Index]);
+		else Pinned->ReleasePreparation(Pinned->Ready[Index]);
+		if (Pinned->RootMerge == Work) Pinned->RootMerge.Reset();
 	}, CallbackBindingError))
 		{
 			Scheduler.ObserveDemand(Request.Kind, Request.Stamp,
@@ -3011,14 +3018,13 @@ FSnapshotPtr FVoxelTerrainRendererState::SealFrameSnapshot(const uint64 InFrameC
 				(Candidate.FirstQueuedSeconds == Ready[Oldest[Band]].FirstQueuedSeconds && Candidate.Sequence < Ready[Oldest[Band]].Sequence))
 				Oldest[Band] = CandidateIndex;
 		};
-		// Always expose the safety head; the rotating scan also exposes non-near bands to DRR.
-		for (int32 Near = 0; Near < Ready.Num() && FVoxelTerrainWorkSelection::IsNear(Ready[Near].Priority.Band) &&
-			FPlatformTime::Seconds() < ScanDeadline; ++Near) Consider(Near);
 		for (int32 Scan = 0; Scan < FMath::Min(64, Ready.Num()) && FPlatformTime::Seconds() < ScanDeadline; ++Scan)
 		{
 			SealScanCursor %= Ready.Num();
 			Consider(SealScanCursor++);
 		}
+		for (int32 Near = 0; Near < FMath::Min(8, Ready.Num()) && FVoxelTerrainWorkSelection::IsNear(Ready[Near].Priority.Band) &&
+			FPlatformTime::Seconds() < ScanDeadline; ++Near) Consider(Near);
 		const auto AddHead = [&](const int32 CandidateIndex)
 		{
 			if (CandidateIndex == INDEX_NONE) return;
