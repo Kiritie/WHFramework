@@ -108,6 +108,8 @@ public:
 		Next.resume();
 	}
 
+	WHFRAMEWORK_API void RunToCompletion();
+
 	bool await_ready() const noexcept
 	{
 		return IsComplete();

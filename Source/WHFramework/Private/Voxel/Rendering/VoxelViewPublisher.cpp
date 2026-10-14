@@ -196,10 +196,7 @@ bool FVoxelViewPublisher::SetCoverage(const FGuid& InGroup, FVoxelViewSourceId I
 {
 	bool bSuccess = false;
 	auto Work = SetCoverageSteps(InGroup, InSourceId, MoveTemp(InWorldCellBoxes), MoveTemp(InCommonBoxes), bSuccess);
-	while (!Work.IsComplete())
-	{
-		Work.Resume();
-	}
+	Work.RunToCompletion();
 	return bSuccess;
 }
 
@@ -364,10 +361,7 @@ bool FVoxelViewPublisher::SetSharedCoverage(const FGuid& InGroup, FVoxelViewSour
 {
 	bool bSuccess = false;
 	auto Work = SetSharedCoverageSteps(InGroup, InSourceId, MoveTemp(InCommonBoxes), bSuccess);
-	while (!Work.IsComplete())
-	{
-		Work.Resume();
-	}
+	Work.RunToCompletion();
 	return bSuccess;
 }
 
@@ -3088,10 +3082,7 @@ bool FVoxelViewPublisher::SetScopedCoverage(const FGuid& InGroup, FVoxelViewSour
 	bool bSuccess = false;
 	auto Work =
 		SetScopedCoverageSteps(InGroup, InSourceId, MoveTemp(InWorldCellBoxes), MoveTemp(InCommonBoxes), InAffectedWorldCellBoxes, bSuccess, bInRetainPresented);
-	while (!Work.IsComplete())
-	{
-		Work.Resume();
-	}
+	Work.RunToCompletion();
 	return bSuccess;
 }
 

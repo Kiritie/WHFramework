@@ -1063,7 +1063,9 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			InTest->TestFalse(TEXT("Empty geometry still publishes an ownership change"), Publisher.DiscardUnchangedGroup(StableHandle));
 			Publisher.SetOwnershipChanged(StableHandle, false);
 			const TArray<FBox> ChangedBoxes{FBox(FVector(3), FVector(4))};
-			StableEntry.Source = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
+			StableEntry.Source = MakeNativeSource(Publisher, Scheduler);
+			if (!StableEntry.Source) co_return;
+			StableEntry.NativeStamp = StableEntry.Source->Stamp;
 			StableEntry.bDirty = true;
 			Publisher.SetCoverage(StableHandle, SourceId, ChangedBoxes);
 			InTest->TestEqual(TEXT("A real exclusion change queues one update"), Publisher.PendingUpdates.Num(), 1);
@@ -1082,10 +1084,15 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			auto& UnchangedUpdate = UnchangedPublication->Updates.AddDefaulted_GetRef();
 			UnchangedUpdate.SourceId = SourceId;
 			UnchangedUpdate.Source = StableEntry.Source;
+			UnchangedUpdate.NativeStamp = StableEntry.NativeStamp;
+			UnchangedUpdate.bSourceDirty = false;
 			UnchangedUpdate.Location = StableEntry.Location;
 			UnchangedUpdate.Scale = StableEntry.Scale;
 			UnchangedUpdate.bUnchanged = true;
 			StableEntry.PresentedSource = StableEntry.Source;
+			StableEntry.PresentedNativeStamp = StableEntry.NativeStamp;
+			StableEntry.NativeMesh = BuildNativeGeometry(Scheduler, StableEntry.Source);
+			if (!StableEntry.NativeMesh) co_return;
 			auto& UnchangedGroup = UnchangedPublication->Groups.AddDefaulted_GetRef();
 			UnchangedGroup.UpdateIndices.Add(0);
 			Publisher.CommitReadyGroup(UnchangedPublication, UnchangedGroup);
@@ -1554,6 +1561,12 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			AdmissionPublication->Groups[1].Bounds = NearChange;
 			const auto AdmissionMesh = MakeNativeSource(AdmissionPublisher, AdmissionScheduler);
 			if (!AdmissionMesh) { ReleaseAdmissionWorker.Store(true); AdmissionScheduler.StopAndJoin(); co_return; }
+			auto& AdmissionEntry = AdmissionPublisher.Entries.Add(SourceId);
+			AdmissionEntry.GroupKey = Slow;
+			AdmissionEntry.Source = AdmissionMesh;
+			AdmissionEntry.NativeStamp = AdmissionMesh->Stamp;
+			AdmissionEntry.Scale = Module->BlockSize();
+			AdmissionEntry.Bounds = AdmissionMesh->LocalBounds;
 			for (int32 Index = 0; Index <= DistantUpdates; ++Index)
 			{
 				auto& Update = AdmissionPublication->Updates[Index];
