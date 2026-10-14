@@ -59,8 +59,12 @@ public:
 	bool SetHidden(const FGuid& InGroup, FVoxelViewSourceId InSourceId, bool bInHidden);
 	void SetCommitCallbacks(TFunction<void()> InOnCommitted,
 		TFunction<void(TConstArrayView<FVoxelPublishGroupKey>)> InOnGroupCommitted, TConstArrayView<FGuid> InGroups = {});
-	void SetCommitGate(TFunction<bool(const FVoxelPublishGroupKey&)> InGate)
+	// 状态版本由门禁拥有者保管，须比Publisher存活更久；状态变化后仍通知提交就绪失效。
+	void SetCommitGate(TFunction<bool(const FVoxelPublishGroupKey&)> InGate, const uint64& InStateRevision)
 	{
+		check(CommitGateBindingRevision < MAX_uint64);
+		++CommitGateBindingRevision;
+		CommitGateStateRevision = &InStateRevision;
 		CommitGate = MoveTemp(InGate);
 		InvalidateCommitReadiness();
 	}
@@ -228,6 +232,10 @@ private:
 		bool bPriorityReady = false;
 		uint64 PrepareWaitTick = 0;
 		uint64 CommitWaitTick = 0;
+		mutable uint64 CommitGateBlockedRevision = 0;
+		mutable uint64 CommitGateBlockedBindingRevision = 0;
+		mutable uint64 CommitGateBlockedGroupRevision = 0;
+		mutable uint64 DependencyProofRevision = 0;
 		mutable uint64 DependencyNextSerial = 0;
 		mutable uint64 DependencyQuerySerial = 0;
 		mutable uint64 DependencyQueryRevision = 0;
@@ -367,6 +375,7 @@ private:
 	void QueueReadyGroup(const FPublicationRef& InPublication, int32 InGroupIndex);
 	void RebuildFirstOwners();
 	void SetOwnerActive(const FVoxelPublishGroupKey& InKey, uint64 InSerial, bool bInActive);
+	void InvalidateDependencyProofs(FPublication& InPublication);
 	int32 SelectReadyGroup(TConstArrayView<FReadyGroup> InReady, FVoxelTerrainWorkSelection& InSelection,
 		FVoxelTerrainServiceCharge& OutCharge, bool bInCommit = false, double InDeadline = MAX_dbl, bool* bOutAdvanced = nullptr);
 	void SettleReadyGroup(FVoxelTerrainWorkSelection& InSelection, const FVoxelTerrainServiceCharge& InCharge,
@@ -374,8 +383,8 @@ private:
 	bool HasOlderDependency(const FPublicationRef& InPublication, const FGroup& InGroup, bool* bOutNeedsContinuation = nullptr) const;
 	FPendingGroup* FindPendingGroup(const FGuid& InGroup);
 	void StartCommittedGroups();
-	void AdvancePendingPlan();
-	void AdvancePreparedPlan(const FPublicationRef& Publication);
+	void AdvancePendingPlan(double InDeadlineSeconds = MAX_dbl);
+	void AdvancePreparedPlan(const FPublicationRef& Publication, double InDeadlineSeconds = MAX_dbl);
 	void BuildGroups(const FPublicationRef& Publication, bool bInPreparedCoverage = false);
 	void DeferSaturatedGroups(const FPublicationRef& Publication, TMap<FVoxelPublishGroupKey, FGroupPriority>& OutPriorities);
 	void AdvancePriorities();
@@ -403,6 +412,14 @@ private:
 		TArray<FBox> InWorldCellBoxes, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
 	bool HigherBuildPriority(const FPublication& Publication, int32 First, int32 Second) const;
 	bool AdmitBuilds(const FPublicationRef& Publication, double InDeadline = MAX_dbl);
+	enum class ENativeUpdateWork : uint8
+	{
+		None,
+		Upload,
+		Remove
+	};
+	ENativeUpdateWork GetNativeUpdateWork(const FPublication& InPublication, const FUpdate& InUpdate) const;
+	bool HasNativeGroupWork(const FPublication& InPublication, const FGroup& InGroup) const;
 	bool PrepareUpdate(const FPublicationRef& Publication, int32 InIndex, double InDeadline, int32& InOutPreparedComponents, bool& bOutComplete);
 	bool CommitReadyGroups(const FPublicationRef& Publication, int32& InOutCommitted, double InDeadline,
 		const TMap<FVoxelPublishGroupKey, uint64>& InFirstOwners, int32 InGroupIndex = INDEX_NONE);
@@ -448,6 +465,8 @@ private:
 	TArray<TWeakObjectPtr<UVoxelMeshComponent>> RetiredComponents;
 	TFunction<void()> OnCommitted;
 	TFunction<bool(const FVoxelPublishGroupKey&)> CommitGate;
+	const uint64* CommitGateStateRevision = nullptr;
+	uint64 CommitGateBindingRevision = 0;
 	TFunction<bool(const FVoxelTaskStamp&)> GeometryValidator;
 	TFunction<bool(const FVoxelSectionMeshResult&)> MeshValidator;
 	FGroupCallbackPtr CurrentGroupCallback;
@@ -459,6 +478,9 @@ private:
 	double ServiceCostEstimates[2][static_cast<uint8>(EVoxelTerrainServiceBand::Count)] = {};
 	int32 ReadySelectionCursors[2] = {};
 	uint64 PublisherTickSerial = 0;
+	uint64 CommitGateCacheHits = 0;
+	uint64 DependencyProofRevision = 1;
+	double NextReadyCandidateDiagnostic[2] = {};
 	uint64 PrepareReadinessRevision = 0;
 	uint64 CommitReadinessRevision = 0;
 	uint64 CommitResourceVersion = 0;

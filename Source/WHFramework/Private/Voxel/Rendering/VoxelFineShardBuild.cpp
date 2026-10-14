@@ -384,22 +384,37 @@ bool FVoxelFineShardSampler::Initialize(const FVoxelFineBuildAttempt& InAttempt,
 	return true;
 }
 
-void FVoxelFineShardSampler::CopySection(const FIntVector& InSection, TConstArrayView<FVoxelBlockState> InBlocks)
+FVoxelSectionWindow FVoxelFineShardSampler::RequiredWindow(const FIntVector& InSection) const
 {
-	check(InBlocks.Num() == 4096 && Samples);
+	check(Samples);
+	const FIntVector SectionMin = InSection * 16;
+	const FIntVector ShardMin = Samples->Attempt.Input.Shard.Min;
+	const int32 Side = Samples->Snapshot.GridSide;
+	FVoxelSectionWindow Window;
+	for (int32 Axis = 0; Axis < 3; ++Axis)
+	{
+		Window.Min[Axis] = FMath::Clamp(ShardMin[Axis] - 1 - SectionMin[Axis], 0, 16);
+		Window.Max[Axis] = FMath::Clamp(ShardMin[Axis] + Side + 1 - SectionMin[Axis], 0, 16);
+	}
+	return Window;
+}
+
+void FVoxelFineShardSampler::CopySection(const FIntVector& InSection, const FVoxelSectionWindow& InWindow, TConstArrayView<FVoxelBlockState> InBlocks)
+{
+	check(InWindow.IsValid() && InBlocks.Num() == InWindow.Num() && Samples);
 	auto& Snapshot = Samples->Snapshot;
 	const int32 Side = Snapshot.GridSide;
 	const FIntVector SectionMin = InSection * 16;
 	const FIntVector ShardMin = Samples->Attempt.Input.Shard.Min;
-	for (int32 CellZ = 0; CellZ < 16; ++CellZ)
+	for (int32 CellZ = InWindow.Min.Z; CellZ < InWindow.Max.Z; ++CellZ)
 	{
-		for (int32 CellY = 0; CellY < 16; ++CellY)
+		for (int32 CellY = InWindow.Min.Y; CellY < InWindow.Max.Y; ++CellY)
 		{
-			for (int32 CellX = 0; CellX < 16; ++CellX)
+			for (int32 CellX = InWindow.Min.X; CellX < InWindow.Max.X; ++CellX)
 			{
 				const FIntVector World = SectionMin + FIntVector(CellX, CellY, CellZ);
 				const FIntVector Local = World - ShardMin;
-				FVoxelBlockState State = InBlocks[CellX + 16 * (CellY + 16 * CellZ)];
+				FVoxelBlockState State = InBlocks[InWindow.Index(FIntVector(CellX, CellY, CellZ))];
 				if (World.Z >= WorldMinZ && World.Z < WorldMaxZ)
 				{
 					Overlay->ApplyAt(World, State);
@@ -451,12 +466,18 @@ EVoxelFineBuildProgress FVoxelFineShardSampler::Advance(const int32 InMaximumSec
 	for (int32 Work = 0; Work < InMaximumSections && RequiredSections.IsValidIndex(NextSection); ++Work)
 	{
 		const FIntVector Key = RequiredSections[NextSection];
+		const FVoxelSectionWindow Window = RequiredWindow(Key);
+		if (!Window.IsValid())
+		{
+			OutError = TEXT("Fine 采样 Section 没有实际消费窗口");
+			return EVoxelFineBuildProgress::Failed;
+		}
 		TArray<FVoxelBlockState, TFixedAllocator<4096>> Blocks;
-		Blocks.SetNumUninitialized(4096);
+		Blocks.SetNumUninitialized(Window.Num());
 		const int64 SectionMinZ = int64(Key.Z) * 16;
 		if (SectionMinZ >= WorldMinZ && SectionMinZ + 16 <= WorldMaxZ)
 		{
-			if (!Generator->GenerateSection(Key, MakeArrayView(Blocks), OutError, &InCancel))
+			if (!Generator->GenerateSectionWindow(Key, Window, MakeArrayView(Blocks), OutError, &InCancel))
 			{
 				if (InCancel.Load())
 				{
@@ -469,14 +490,14 @@ EVoxelFineBuildProgress FVoxelFineShardSampler::Advance(const int32 InMaximumSec
 		}
 		else
 		{
-			Blocks.Init(FVoxelBlockState(), 4096);
+			Blocks.Init(FVoxelBlockState(), Window.Num());
 		}
-		if (Blocks.Num() != 4096)
+		if (Blocks.Num() != Window.Num())
 		{
 			OutError = TEXT("精确生成器返回的 Section 大小错误");
 			return EVoxelFineBuildProgress::Failed;
 		}
-		CopySection(Key, Blocks);
+		CopySection(Key, Window, Blocks);
 		++NextSection;
 		if (InCancel.Load())
 		{
@@ -491,6 +512,19 @@ EVoxelFineBuildProgress FVoxelFineShardSampler::Advance(const int32 InMaximumSec
 			bKnown = true;
 		}
 		bComplete = true;
+#if !UE_BUILD_SHIPPING
+		uint64 OutputCells = 0;
+		uint64 NaturalCells = 0;
+		for (const FIntVector& Section : RequiredSections)
+		{
+			const uint64 Cells = uint64(RequiredWindow(Section).Num());
+			OutputCells += Cells;
+			if (int64(Section.Z) * 16 >= WorldMinZ && int64(Section.Z) * 16 + 16 <= WorldMaxZ) NaturalCells += Cells;
+		}
+		const FIntVector Min = Samples->Attempt.Input.Shard.Min;
+		UE_LOG(LogTemp, Display, TEXT("Fine section window sample: min=(%d,%d,%d) side=%d sections=%d outputCells=%llu naturalCells=%llu fullSectionCells=%llu"),
+			Min.X, Min.Y, Min.Z, Samples->Snapshot.GridSide, RequiredSections.Num(), OutputCells, NaturalCells, uint64(RequiredSections.Num()) * 4096);
+#endif
 	}
 	OutError.Reset();
 	return bComplete ? EVoxelFineBuildProgress::Complete : EVoxelFineBuildProgress::Working;

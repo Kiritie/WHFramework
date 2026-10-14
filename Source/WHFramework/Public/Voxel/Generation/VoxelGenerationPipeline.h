@@ -71,6 +71,15 @@ public:
 		const TAtomic<bool>* InCancel = nullptr,
 		const FVoxelTerrainResourceLease* InOutputLease = nullptr) const;
 
+	// 保留完整 Section 事实预检，只计算窗口内实际消费的格子；失败不改写调用者输出。
+	bool GenerateSectionWindow(
+		const FIntVector& InSectionCoordinate,
+		const FVoxelSectionWindow& InWindow,
+		TArrayView<FVoxelBlockState> OutBaseBlocks,
+		FString& OutError,
+		const TAtomic<bool>* InCancel = nullptr,
+		const FVoxelTerrainResourceLease* InOutputLease = nullptr) const;
+
 #if WITH_DEV_AUTOMATION_TESTS
 	// 只兼容无账本夹具；绑定原账本时拒绝隐式分配 caller 数组。
 	bool GenerateSection(

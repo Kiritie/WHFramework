@@ -1096,6 +1096,17 @@ void FVoxelTaskScheduler::Tick(
 	TGuardValue<bool> TickGuard(bTicking, true);
 	Diagnostics.LastAdmissionMilliseconds = 0.0;
 	Diagnostics.LastResultApplyMilliseconds = 0.0;
+	const auto LogFailure = [this](const FVoxelTaskResult& InResult)
+	{
+		if (InResult.bSuccess || InResult.bCanceled) return;
+		const uint64 Failed = Diagnostics.ByKind.FindOrAdd(InResult.Kind).Failed + 1;
+		// 在结果移交前记录真实原因；原失败计数仍在Apply完成后累加。
+		if ((Failed & (Failed - 1)) == 0)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Voxel completed failure diagnostic: kind=%d failed=%llu token=%llu error=%s"),
+				int32(InResult.Kind), Failed, InResult.Stamp.Token, *InResult.Error);
+		}
+	};
 
 	if (bStopped)
 	{
@@ -1259,6 +1270,7 @@ void FVoxelTaskScheduler::Tick(
 			}
 #endif
 
+			LogFailure(Result);
 			/**
 			 * Move 前缓存 diagnostics。
 			 */
@@ -1336,6 +1348,7 @@ void FVoxelTaskScheduler::Tick(
 			Sample.Stamp = Completed.Result.Stamp;
 			Sample.bCanceled = Completed.Result.bCanceled;
 			Sample.bSuccess = Completed.Result.bSuccess;
+			LogFailure(Completed.Result);
 
 #if !UE_BUILD_SHIPPING
 			if (!Completed.Result.bCanceled)

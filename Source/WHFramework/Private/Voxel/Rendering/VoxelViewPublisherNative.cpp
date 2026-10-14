@@ -124,14 +124,44 @@ bool FVoxelViewPublisher::IsCurrentAtomEvidence(const FIntVector& InSection, con
 		(!MeshValidator || MeshValidator(*Geometry->Source));
 }
 
+FVoxelViewPublisher::ENativeUpdateWork FVoxelViewPublisher::GetNativeUpdateWork(const FPublication& InPublication, const FUpdate& InUpdate) const
+{
+	const FEntry* Entry = Entries.Find(InUpdate.SourceId);
+	if (!Entry) return ENativeUpdateWork::None;
+	const bool* Hidden = InPublication.Visibility.Find(InUpdate.SourceId);
+	// 未声明显隐变化时继承当前状态；保留源正文变化不能复活已隐藏/退休几何。
+	const bool bHidden = Entry->bRetiring || (Hidden ? *Hidden : Entry->bHidden);
+	if (bHidden)
+	{
+		return Entry->bPresented && !Entry->bHidden ? ENativeUpdateWork::Remove : ENativeUpdateWork::None;
+	}
+	if (Hidden)
+	{
+		const bool bPresentedMatches = Entry->bPresented && !Entry->bHidden && Entry->NativeMesh &&
+			Entry->PresentedSource == InUpdate.Source && Entry->PresentedNativeStamp == InUpdate.NativeStamp &&
+			Entry->NativeMesh->Source == InUpdate.Source && Entry->NativeMesh->Stamp == InUpdate.NativeStamp &&
+			Entry->NativeMesh->WorldCellOrigin == InUpdate.Location / Module.BlockSize() &&
+			Entry->NativeMesh->CellScale == InUpdate.Scale / Module.BlockSize();
+		if (!bPresentedMatches) return ENativeUpdateWork::Upload;
+	}
+	return !InUpdate.bUnchanged && InUpdate.bSourceDirty ? ENativeUpdateWork::Upload : ENativeUpdateWork::None;
+}
+
+bool FVoxelViewPublisher::HasNativeGroupWork(const FPublication& InPublication, const FGroup& InGroup) const
+{
+	return InGroup.NativeTransaction.IsValid() || InGroup.NativeCoarse || !InGroup.NativeChanges.IsEmpty() ||
+		InGroup.UpdateIndices.ContainsByPredicate([this, &InPublication](const int32 Index)
+	{
+		return GetNativeUpdateWork(InPublication, InPublication.Updates[Index]) != ENativeUpdateWork::None;
+	});
+}
+
 bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, const int32 InIndex,
 	const double InDeadline, int32& InOutPreparedComponents, bool& bOutComplete)
 {
 	(void)InOutPreparedComponents;
 	FUpdate& Update = InPublication->Updates[InIndex];
 	if (Update.Source && Update.Source->Stamp.bHasGeometryIdentity && Update.Source->Stamp != Update.NativeStamp) return false;
-	const bool* Hidden = InPublication->Visibility.Find(Update.SourceId);
-	const bool bVisibilityChange = Hidden && Entries.Contains(Update.SourceId) && IsHidden(Update.SourceId) != *Hidden;
 	if (!Update.bSourceDirty && !Update.NativeMesh)
 		if (const auto* Entry = Entries.Find(Update.SourceId); Entry && Entry->NativeMesh &&
 			Entry->PresentedSource == Update.Source && Entry->PresentedNativeStamp == Update.NativeStamp &&
@@ -140,10 +170,28 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 	if (Update.NativeMesh && (Update.NativeMesh->Source != Update.Source || Update.NativeMesh->Stamp != Update.NativeStamp ||
 		Update.NativeMesh->WorldCellOrigin != Update.Location / Module.BlockSize() ||
 		Update.NativeMesh->CellScale != Update.Scale / Module.BlockSize())) Update.NativeMesh.Reset();
-	bOutComplete = (Update.bUnchanged && !bVisibilityChange) || Update.NativeMesh.IsValid() || !Entries.Contains(Update.SourceId);
+	bOutComplete = GetNativeUpdateWork(InPublication.Get(), Update) != ENativeUpdateWork::Upload || Update.NativeMesh.IsValid();
 	if (bOutComplete || Update.bNativeMeshPending || FPlatformTime::Seconds() >= InDeadline) return true;
-	// 保留前代尚未完成的正文，等待该代提交后复用其索引，不能再建同一源。
-	if (Update.bRetainSource && !Update.bSourceDirty) return true;
+	// 只等待会生产同一冻结网格的前代；无索引工作的控制更新不是生产者。
+	if (Update.bRetainSource && !Update.bSourceDirty)
+	{
+		const FPublication* PreviousPublication = nullptr;
+		const FUpdate* Previous = FindProjectedUpdate(Update.SourceId, InPublication->Serial, &PreviousPublication);
+		if (Previous && Previous->Source == Update.Source && Previous->NativeStamp == Update.NativeStamp &&
+			Previous->Location == Update.Location && Previous->Scale == Update.Scale)
+		{
+			if (Previous->NativeMesh && Previous->NativeMesh->Source == Update.Source &&
+				Previous->NativeMesh->Stamp == Update.NativeStamp &&
+				Previous->NativeMesh->WorldCellOrigin == Update.Location / Module.BlockSize() &&
+				Previous->NativeMesh->CellScale == Update.Scale / Module.BlockSize())
+			{
+				Update.NativeMesh = Previous->NativeMesh;
+				bOutComplete = true;
+				return true;
+			}
+			if (PreviousPublication && GetNativeUpdateWork(*PreviousPublication, *Previous) == ENativeUpdateWork::Upload) return true;
+		}
+	}
 	if (!Update.Source || !IsNativeGeometryCurrent(Update.NativeStamp) ||
 		(Update.Source->Stamp.bHasGeometryIdentity && Update.Source->Stamp != Update.NativeStamp) ||
 		(MeshValidator && !MeshValidator(*Update.Source))) return false;
@@ -290,6 +338,8 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublication, FGroup& InGroup, bool& bOutAdvanced)
 {
 	bOutAdvanced = false;
+	// 无几何与可见性工作的控制组沿原提交门禁完成，不占用原生准备并发槽位。
+	if (!HasNativeGroupWork(InPublication.Get(), InGroup)) return true;
 	if (!InGroup.bNativeAdmitted)
 	{
 		if (ActiveNativeGroups >= MaximumNativeGroups) return false;
@@ -297,11 +347,6 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		++ActiveNativeGroups;
 		bOutAdvanced = true;
 	}
-	if (InGroup.VisibilitySources.IsEmpty() && !InGroup.UpdateIndices.ContainsByPredicate([this, &InPublication](const int32 Index)
-	{
-		const auto& Update = InPublication->Updates[Index];
-		return Entries.Contains(Update.SourceId) && !Update.bUnchanged && Update.bSourceDirty;
-	})) return true;
 	const auto NativeResources = Scheduler.GetTerrainResources();
 	struct FNativeGroupSources
 	{
@@ -488,15 +533,21 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 	}
 	const int32 UpdateIndex = InGroup.UpdateIndices[InGroup.NativeSourceCursor];
 	const auto& Update = InPublication->Updates[UpdateIndex];
-	if (!Entries.Contains(Update.SourceId) || ((!Update.bSourceDirty || Update.bUnchanged) && !InPublication->Visibility.Contains(Update.SourceId)))
+	const ENativeUpdateWork Work = GetNativeUpdateWork(InPublication.Get(), Update);
+	if (Work == ENativeUpdateWork::None)
 	{
 		++InGroup.NativeSourceCursor;
 		bOutAdvanced = true;
 		return false;
 	}
-	if (!Update.NativeMesh) return false;
-	const bool* Hidden = InPublication->Visibility.Find(Update.SourceId);
-	const bool bRemove = Hidden && *Hidden;
+	if (Work == ENativeUpdateWork::Upload && !Update.NativeMesh)
+	{
+		// 前代回执可能改变显隐基线；重新进入准备，不能在已完成准备的游标上死等。
+		InGroup.PreparedUpdates = FMath::Min(InGroup.PreparedUpdates, InGroup.NativeSourceCursor);
+		bOutAdvanced = true;
+		return false;
+	}
+	const bool bRemove = Work == ENativeUpdateWork::Remove;
 	const auto* Entry = Entries.Find(Update.SourceId);
 	if (!Entry)
 	{

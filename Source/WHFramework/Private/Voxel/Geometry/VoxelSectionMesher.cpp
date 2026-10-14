@@ -462,7 +462,22 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
                         };
                         const double ExtentU = FMath::Min(U + TileStep, LastU) - U;
                         const double ExtentV = FMath::Min(V + TileStep, LastV) - V;
-                        for (int32 Y = 0; Y < 16; ++Y)
+                        // 单个凸盒同时包含栅格首尾采样点时，整个 16x16 mask 必为可见。
+                        // 对侧不遮挡才使用此等价路径；部分形状及遮挡仍走原规范栅格。
+                        bool bUniformVisible = false;
+                        if (!bOtherOccludes && Shape->SelectionBoxes.Num() == 1)
+                        {
+                            FVector FirstPoint(0.0), LastPoint(0.0);
+                            FirstPoint[Axis] = LastPoint[Axis] = Plane + ((OutputFace & 1) ? 1.e-6 : -1.e-6);
+                            FirstPoint[UAxis] = U + .5 * ExtentU / 16;
+                            FirstPoint[VAxis] = V + .5 * ExtentV / 16;
+                            LastPoint[UAxis] = U + 15.5 * ExtentU / 16;
+                            LastPoint[VAxis] = V + 15.5 * ExtentV / 16;
+                            const FBox& Box = Shape->SelectionBoxes[0];
+                            bUniformVisible = Box.IsInside((FirstPoint - CellMin) / StateStep) &&
+                                Box.IsInside((LastPoint - CellMin) / StateStep);
+                        }
+                        if (!bUniformVisible) for (int32 Y = 0; Y < 16; ++Y)
                             for (int32 X = 0; X < 16; ++X)
                             {
                                 FVector Point(0.0);
@@ -475,6 +490,32 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
                             }
                         const uint8 MaterialFace = FVoxelShapeRegistry::RotateFace(OutputFace, uint8((4 - (State.State & 3)) & 3));
                         const auto Texture = Definition->Face(State.State, MaterialFace);
+                        const auto EmitRectangle = [&](const int32 X, const int32 Y, const int32 Width, const int32 Height)
+                        {
+                            FVector Points[4]; FVector2D UV[4];
+                            const double Us[4] = {double(X), double(X + Width), double(X + Width), double(X)};
+                            const double Vs[4] = {double(Y), double(Y), double(Y + Height), double(Y + Height)};
+                            for (int32 Vertex = 0; Vertex < 4; ++Vertex)
+                            {
+                                FVector WorldPoint(0.0);
+                                WorldPoint[Axis] = Plane;
+                                WorldPoint[UAxis] = U + Us[Vertex] * ExtentU / 16;
+                                WorldPoint[VAxis] = V + Vs[Vertex] * ExtentV / 16;
+                                Points[Vertex] = (WorldPoint - FVector(OwnerBounds.Min)) / OwnerStep;
+                                const double Period = FMath::Clamp(double(StateStep), 1.0,
+                                    InTransition->MaximumTextureStretchCells);
+                                UV[Vertex] = MakeFaceUV(OutputFace, Points[Vertex], Side) * (OwnerStep / Period);
+                            }
+                            // U/V 为 BoundaryRaster 轴序，与普通 voxel face 的循环轴序不同。
+                            const bool bReverse = (Axis != 1) != ((OutputFace & 1) == 0);
+                            if (bReverse) { Swap(Points[1], Points[3]); Swap(UV[1], UV[3]); }
+                            AppendQuad(Batch(Definition->RenderGroup, Texture.Bank), Points, UV,
+                                Texture, Definition->RenderGroup, FVector::ZeroVector);
+                            TotalVertices += 4;
+                            if (OverBudget()) return false;
+                            return true;
+                        };
+                        if (bUniformVisible) return EmitRectangle(0, 0, 16, 16);
                         for (int32 Y = 0; Y < 16; ++Y)
                             for (int32 X = 0; X < 16;)
                             {
@@ -488,27 +529,7 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
                                         if (!Mask[X + Delta + (Y + Height) * 16]) { bStop = true; break; }
                                     if (!bStop) ++Height;
                                 }
-                                FVector Points[4]; FVector2D UV[4];
-                                const double Us[4] = {double(X), double(X + Width), double(X + Width), double(X)};
-                                const double Vs[4] = {double(Y), double(Y), double(Y + Height), double(Y + Height)};
-                                for (int32 Vertex = 0; Vertex < 4; ++Vertex)
-                                {
-                                    FVector WorldPoint(0.0);
-                                    WorldPoint[Axis] = Plane;
-                                    WorldPoint[UAxis] = U + Us[Vertex] * ExtentU / 16;
-                                    WorldPoint[VAxis] = V + Vs[Vertex] * ExtentV / 16;
-                                    Points[Vertex] = (WorldPoint - FVector(OwnerBounds.Min)) / OwnerStep;
-                                    const double Period = FMath::Clamp(double(StateStep), 1.0,
-                                        InTransition->MaximumTextureStretchCells);
-                                    UV[Vertex] = MakeFaceUV(OutputFace, Points[Vertex], Side) * (OwnerStep / Period);
-                                }
-                                // U/V 为 BoundaryRaster 轴序，与普通 voxel face 的循环轴序不同。
-                                const bool bReverse = (Axis != 1) != ((OutputFace & 1) == 0);
-                                if (bReverse) { Swap(Points[1], Points[3]); Swap(UV[1], UV[3]); }
-                                AppendQuad(Batch(Definition->RenderGroup, Texture.Bank), Points, UV,
-                                    Texture, Definition->RenderGroup, FVector::ZeroVector);
-                                TotalVertices += 4;
-                                if (OverBudget()) return false;
+                                if (!EmitRectangle(X, Y, Width, Height)) return false;
                                 for (int32 DY = 0; DY < Height; ++DY)
                                     for (int32 DX = 0; DX < Width; ++DX) Mask[X + DX + (Y + DY) * 16] = false;
                                 X += Width;

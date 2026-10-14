@@ -65,6 +65,25 @@ struct FVoxelVolumeCoveragePlan final : FVoxelTaskCustomPayload
 
 namespace
 {
+	struct FScopedCoverageGateRead
+	{
+		bool& ReadScope;
+		uint64& Revision;
+		bool bPrevious;
+		FScopedCoverageGateRead(bool& InReadScope, uint64& InRevision)
+			: ReadScope(InReadScope), Revision(InRevision), bPrevious(InReadScope)
+		{
+			ReadScope = true;
+			Revision |= uint64(1);
+		}
+		~FScopedCoverageGateRead()
+		{
+			ReadScope = bPrevious;
+			// 保留Scope内扩展覆盖导致的状态版本变化，仅恢复临时读标记。
+			Revision = (Revision & ~uint64(1)) | uint64(bPrevious);
+		}
+	};
+
 	struct FGrantedCoverageApply
 	{
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
@@ -437,7 +456,7 @@ FVoxelViewManager::FVoxelViewManager(
 			}
 		}
 		return !bDefer;
-	});
+	}, CoverageCommitGateRevision);
 }
 
 FVoxelViewManager::~FVoxelViewManager()
@@ -715,10 +734,10 @@ void FVoxelViewManager::AdvanceCoveragePlan(const double InDeadline)
 			ActiveCoveragePublishGroups = MoveTemp(OpenPublishGroups);
 		}
 		CoverageContinuation = ResolveTransitionVisibilitySteps();
-		Publisher->InvalidateCommitReadiness();
+		InvalidateCoverageCommitGate();
 	}
 	{
-		TGuardValue<bool> ReadScope(bCoverageReadScope, true);
+		FScopedCoverageGateRead ReadScope(bCoverageReadScope, CoverageCommitGateRevision);
 		while (!CoverageContinuation.IsComplete() && FPlatformTime::Seconds() < InDeadline)
 		{
 			CoverageContinuation.Resume();
@@ -740,7 +759,7 @@ void FVoxelViewManager::AdvanceCoveragePlan(const double InDeadline)
 		FailedPublishCoverageRects.Reset();
 		// 下一次完整 Tick 先消费已提交覆盖快照，不等待所有组或渲染回执清空。
 		bCoverageDrainPending = true;
-		Publisher->InvalidateCommitReadiness();
+		InvalidateCoverageCommitGate();
 	}
 	LastCoverageMilliseconds = (FPlatformTime::Seconds() - Start) * 1000.0;
 	FrameTimings.CoverageMilliseconds += LastCoverageMilliseconds;
@@ -2244,16 +2263,25 @@ void FVoxelViewManager::MergeCoverageRect(TArray<FVoxelCoverageRect>& InOutRects
 	InOutRects.Add(Merged);
 }
 
+void FVoxelViewManager::InvalidateCoverageCommitGate()
+{
+	check(CoverageCommitGateRevision <= MAX_uint64 - 2);
+	CoverageCommitGateRevision += 2;
+	if (Publisher) Publisher->InvalidateCommitReadiness();
+}
+
 void FVoxelViewManager::ExpandActiveCoverage(const FVoxelCoverageRect& InBounds)
 {
 	if (bActiveCoverageFull) return;
 	if (!InBounds.IsValid())
 	{
 		bActiveCoverageFull = true;
+		InvalidateCoverageCommitGate();
 		return;
 	}
 	if (CoverageAffects(InBounds)) return;
 	MergeCoverageRect(ActiveDirtyCoverageRects, InBounds);
+	InvalidateCoverageCommitGate();
 }
 
 void FVoxelViewManager::ApplyInterestDelta(const FVoxelInterestDelta& InDelta)
@@ -2406,7 +2434,7 @@ FVoxelCoverageRect FVoxelViewManager::CoverageBounds(const FVoxelTaskStamp& InSt
 void FVoxelViewManager::ResolveTransitionVisibility()
 {
 	{
-		TGuardValue<bool> ReadScope(bCoverageReadScope, true);
+		FScopedCoverageGateRead ReadScope(bCoverageReadScope, CoverageCommitGateRevision);
 		auto Steps = ResolveTransitionVisibilitySteps();
 		while (!Steps.IsComplete())
 			Steps.Resume();
@@ -3354,6 +3382,7 @@ void FVoxelViewManager::Reset()
 	BindCoverageIndexResources();
 	RepresentationAttempts.Reset();
 	CoverageContinuation.Reset();
+	InvalidateCoverageCommitGate();
 	CommitGateQueriedFrames = 0;
 	CommitGateClosedFrames = 0;
 	CommitGateQueryCount = 0;
@@ -3367,6 +3396,7 @@ void FVoxelViewManager::Reset()
 	CoverageInterestSnapshot.Reset();
 	bCoverageDrainPending = false;
 	bCoverageReadScope = false;
+	CoverageCommitGateRevision &= ~uint64(1);
 	bCoverageRetryRequested = false;
 	ReleaseInputRoot(CoverageInputRoot);
 	ReleaseInputRoot(AppliedInputRoot);
@@ -5495,26 +5525,83 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildHeightfieldTransitionStep
 		if (CoverageAffects(MacroCoverageRect(Key)))
 			LocalOwners.Add({EVoxelHeightfieldRepresentation::Macro, Key.Coordinate, Key.Level});
 	}
-	if (!bActiveCoverageFull)
+	const double NeighborStarted = FPlatformTime::Seconds();
+	int32 NeighborRecords = 0;
+	if (!bActiveCoverageFull && !LocalOwners.IsEmpty())
+	{
+		const auto OwnerRect = [this](const FVoxelHeightfieldNodeKey& Owner)
+		{
+			return Owner.Representation == EVoxelHeightfieldRepresentation::Surface
+				? SurfaceCoverageRect({Owner.Coordinate, Owner.Level}) : MacroCoverageRect({Owner.Coordinate, Owner.Level});
+		};
+		FIntPoint QueryMin(MAX_int32, MAX_int32), QueryMax(MIN_int32, MIN_int32);
 		for (const auto& Owner : LocalOwners)
 		{
 			co_await FVoxelGameThreadContinuation::Yield();
-			const auto Rect = Owner.Representation == EVoxelHeightfieldRepresentation::Surface ? SurfaceCoverageRect({Owner.Coordinate, Owner.Level})
-																							   : MacroCoverageRect({Owner.Coordinate, Owner.Level});
-			FVoxelCoverageLocalSnapshot Neighbors;
-			co_await HeightfieldCoverageIndex.CaptureSteps(
-				FIntVector(Rect.Min.X - 1, Rect.Min.Y - 1, MIN_int32 + 1), FIntVector(Rect.Max.X + 1, Rect.Max.Y + 1, MAX_int32), Neighbors, true, false);
-			if (Neighbors.bCountOnly) { RetryActiveCoverage(); co_return; }
-			for (const auto& Record : Neighbors.Records)
-			{
-				co_await FVoxelGameThreadContinuation::Yield();
-				const auto& Key = Record->Geometry.Key;
-				if (Key.Representation == EVoxelTerrainRepresentation::Surface)
-					SurfaceCandidates.Add({FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level});
-				else if (Key.Representation == EVoxelTerrainRepresentation::Macro)
-					MacroCandidates.Add({FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level});
-			}
+			const auto Rect = OwnerRect(Owner);
+			QueryMin.X = FMath::Min(QueryMin.X, Rect.Min.X - 1);
+			QueryMin.Y = FMath::Min(QueryMin.Y, Rect.Min.Y - 1);
+			QueryMax.X = FMath::Max(QueryMax.X, Rect.Max.X + 1);
+			QueryMax.Y = FMath::Max(QueryMax.Y, Rect.Max.Y + 1);
 		}
+		// 一次捕获同一冻结根，再以原每个 owner 的精确范围过滤；不扩大依赖集合。
+		FVoxelCoverageLocalSnapshot Neighbors;
+		co_await HeightfieldCoverageIndex.CaptureSteps(FIntVector(QueryMin.X, QueryMin.Y, MIN_int32 + 1),
+			FIntVector(QueryMax.X, QueryMax.Y, MAX_int32), Neighbors, true, false);
+		if (Neighbors.bCountOnly) { RetryActiveCoverage(); co_return; }
+		NeighborRecords = Neighbors.Records.Num();
+		int64 SurfaceCapacity = SurfaceCandidates.Num(), MacroCapacity = MacroCandidates.Num();
+		for (const auto& Record : Neighbors.Records)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			SurfaceCapacity += Record->Geometry.Key.Representation == EVoxelTerrainRepresentation::Surface;
+			MacroCapacity += Record->Geometry.Key.Representation == EVoxelTerrainRepresentation::Macro;
+		}
+		if (SurfaceCapacity > MAX_int32 || MacroCapacity > MAX_int32) { RetryActiveCoverage(); co_return; }
+		// 新邻居可能位于最初候选范围之外；集合扩容峰值必须先取得原 Working 授额。
+		const uint64 StableBytes = VoxelGenerationAllocation::AllocatedBytes(FineCandidates) + VoxelGenerationAllocation::AllocatedBytes(ProxyCandidates);
+		const uint64 OldBytes = StableBytes + VoxelGenerationAllocation::AllocatedBytes(SurfaceCandidates) + VoxelGenerationAllocation::AllocatedBytes(MacroCandidates);
+		const uint64 NewBytes = StableBytes +
+			FMath::Max<uint64>(VoxelGenerationAllocation::AllocatedBytes(SurfaceCandidates),
+				VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelSurfaceTileKey>(SurfaceCandidates, int32(SurfaceCapacity))) +
+			FMath::Max<uint64>(VoxelGenerationAllocation::AllocatedBytes(MacroCandidates),
+				VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelMacroTileKey>(MacroCandidates, int32(MacroCapacity)));
+		bool bCapacity = false;
+		co_await AcquireCoverageCapacitySteps(OldBytes + NewBytes, CandidateLease, bCapacity);
+		if (!bCapacity) { RetryActiveCoverage(); co_return; }
+		SurfaceCandidates.Reserve(int32(SurfaceCapacity));
+		MacroCandidates.Reserve(int32(MacroCapacity));
+		const uint64 ActualBytes = StableBytes + VoxelGenerationAllocation::AllocatedBytes(SurfaceCandidates) + VoxelGenerationAllocation::AllocatedBytes(MacroCandidates);
+		check(ActualBytes <= NewBytes);
+		if (CandidateLease) verify(CandidateLease->Resize(ActualBytes));
+		uint32 FilterSteps = 0;
+		for (const auto& Record : Neighbors.Records)
+		{
+			co_await FVoxelGameThreadContinuation::Yield();
+			bool bNeighbor = false;
+			for (const auto& Owner : LocalOwners)
+			{
+				if ((FilterSteps++ & 31u) == 0) co_await FVoxelGameThreadContinuation::Yield();
+				const auto Rect = OwnerRect(Owner);
+				if (Record->Min.X < Rect.Max.X + 1 && Record->Max.X > Rect.Min.X - 1 &&
+					Record->Min.Y < Rect.Max.Y + 1 && Record->Max.Y > Rect.Min.Y - 1 &&
+					Record->Min.Z < MAX_int32 && Record->Max.Z > MIN_int32 + 1)
+				{
+					bNeighbor = true;
+					break;
+				}
+			}
+			if (!bNeighbor) continue;
+			const auto& Key = Record->Geometry.Key;
+			if (Key.Representation == EVoxelTerrainRepresentation::Surface)
+				SurfaceCandidates.Add({FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level});
+			else if (Key.Representation == EVoxelTerrainRepresentation::Macro)
+				MacroCandidates.Add({FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level});
+		}
+	}
+	if (CVarVoxelDebugRepresentation.GetValueOnGameThread() > 0 && FPlatformTime::Seconds() >= NextTimingLog)
+		UE_LOG(LogTemp, Display, TEXT("Voxel heightfield neighbors elapsed ms: neighbors=%.3f owners=%d records=%d candidates=%d/%d activeRects=%d"),
+			(FPlatformTime::Seconds() - NeighborStarted) * 1000.0, LocalOwners.Num(), NeighborRecords, SurfaceCandidates.Num(), MacroCandidates.Num(), ActiveDirtyCoverageRects.Num());
 	Views.Reserve(SurfaceCandidates.Num() + MacroCandidates.Num());
 	for (const auto& Key : SurfaceCandidates)
 	{
@@ -6797,6 +6884,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 			MarkPublishGroupCoverageDirty(Group);
 		}
 	};
+	const double HeightfieldPlanStarted = FPlatformTime::Seconds();
 	if (bHeightfieldTopologyDirty)
 	{
 		co_await RebuildHeightfieldTransitionSteps(CoverageSnapshot);
@@ -6805,6 +6893,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 		++HeightfieldTopologyRebuildCount;
 	}
 
+	const double HeightfieldPlanMilliseconds = (FPlatformTime::Seconds() - HeightfieldPlanStarted) * 1000.0;
 	TMap<FVoxelHeightfieldNodeKey, uint64> HeightfieldToCommit;
 	for (const auto& LocalOwner : LocalHeightfieldOwners)
 	{
@@ -7016,6 +7105,8 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 			if (GetInputRoot().FineWanted.Contains(Key) && IsFineCoverageReady(Key, PresentedFine.Get()))
 				FineBoxes.Add(Box(FineCoverageBox(Key)));
 	}
+	const double NormalizeStarted = FPlatformTime::Seconds();
+	const int32 RawFineBoxes = FineBoxes.Num(), RawProxyBoxes = ProxyBoxes.Num(), RawProxySurfaceBoxes = ProxySurfaceBoxes.Num();
 	co_await VoxelMeshClipper::NormalizeBoxesSteps(FineBoxes);
 	co_await VoxelMeshClipper::NormalizeBoxesSteps(ProxyBoxes);
 	co_await VoxelMeshClipper::NormalizeBoxesSteps(ProxySurfaceBoxes);
@@ -7030,6 +7121,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 		CommonTransitionBoxes->Add(Bounds);
 	}
 	co_await VoxelMeshClipper::NormalizeBoxesSteps(*CommonTransitionBoxes);
+	const double NormalizeMilliseconds = (FPlatformTime::Seconds() - NormalizeStarted) * 1000.0;
 	const double BoxesMilliseconds = (FPlatformTime::Seconds() - ResolveStart) * 1000.0 - PlanMilliseconds;
 	TArray<FVoxelCoverageRect> PresentedHeightfieldRects;
 	for (const auto& Key : LocalSurfaceKeys)
@@ -7432,6 +7524,10 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 	{
 		UE_LOG(LogTemp, Display, TEXT("Voxel coverage phase elapsed ms: plan=%.3f boxes=%.3f actors=%.3f commit=%.3f"), PlanMilliseconds, BoxesMilliseconds,
 			SourcesMilliseconds, (Now - ResolveStart) * 1000.0 - PlanMilliseconds - BoxesMilliseconds - SourcesMilliseconds);
+		// boxes 总阶段还包含高度场拓扑及交接；单独计量，避免误判为排序耗时。
+		UE_LOG(LogTemp, Display, TEXT("Voxel coverage boxes elapsed ms: heightfieldPlan=%.3f normalize=%.3f raw=%d/%d/%d compact=%d/%d/%d"),
+			HeightfieldPlanMilliseconds, NormalizeMilliseconds, RawFineBoxes, RawProxyBoxes, RawProxySurfaceBoxes,
+			FineBoxes.Num(), ProxyBoxes.Num(), ProxySurfaceBoxes.Num());
 		NextTimingLog = Now + 5.0;
 	}
 }

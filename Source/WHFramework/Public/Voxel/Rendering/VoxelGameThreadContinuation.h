@@ -132,15 +132,18 @@ namespace VoxelGameThread
 {
 template <typename Element, typename Predicate> FVoxelGameThreadContinuation SortSteps(TArray<Element>& Values, Predicate Less)
 {
+	// 有界批次减少逐元素协程切换；排序顺序、完整元素数和调用者的截止时间不变。
+	constexpr int32 ElementsPerStep = 32;
 	TArray<Element> Buffer;
 	Buffer.Reserve(Values.Num());
 	for (int32 Index = 0; Index < Values.Num(); ++Index)
 	{
-		co_await FVoxelGameThreadContinuation::Yield();
+		if (Index % ElementsPerStep == 0) co_await FVoxelGameThreadContinuation::Yield();
 		Buffer.AddDefaulted();
 	}
 	for (int64 Width = 1; Width < Values.Num(); Width *= 2)
 	{
+		int32 MergedElements = 0;
 		for (int64 Begin = 0; Begin < Values.Num(); Begin += Width * 2)
 		{
 			const int32 Middle = FMath::Min<int64>(Begin + Width, Values.Num());
@@ -149,7 +152,7 @@ template <typename Element, typename Predicate> FVoxelGameThreadContinuation Sor
 			int32 Right = Middle;
 			for (int32 Out = Begin; Out < End; ++Out)
 			{
-				co_await FVoxelGameThreadContinuation::Yield();
+				if (MergedElements++ % ElementsPerStep == 0) co_await FVoxelGameThreadContinuation::Yield();
 				Buffer[Out] = Right >= End || (Left < Middle && !Less(Values[Right], Values[Left])) ? MoveTemp(Values[Left++]) : MoveTemp(Values[Right++]);
 			}
 		}

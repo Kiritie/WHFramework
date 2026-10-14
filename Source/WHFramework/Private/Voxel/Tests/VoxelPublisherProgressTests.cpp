@@ -13,6 +13,7 @@ bool FVoxelPublisherProgressAndNearOrderTest::RunTest(const FString& Parameters)
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler(true);
 	if (!TestTrue(TEXT("发布选择夹具初始化真实账本"), Scheduler.InitializeStatistics(1))) return false;
+	uint64 GateStateRevision = 0;
 	FVoxelViewPublisher Publisher(*Module, Scheduler, 1);
 	FVoxelPublishBudget Budget;
 	Budget.Begin(FPlatformTime::Seconds(), 100.0, 64);
@@ -58,7 +59,7 @@ bool FVoxelPublisherProgressAndNearOrderTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("257 个远组之后加入的最近组仍首先提交，后台服务带不反转距离"), Select(), NearIndex);
 	const int32 SafetyIndex = AddReady(2000.0, EVoxelTerrainServiceBand::P0);
 	TestEqual(TEXT("原 P0 安全职责优先级保持"), Select(), SafetyIndex);
-	Publisher.SetCommitGate([](const FVoxelPublishGroupKey&) { return false; });
+	Publisher.SetCommitGate([](const FVoxelPublishGroupKey&) { return false; }, GateStateRevision);
 	Budget.Begin(FPlatformTime::Seconds(), 100.0, 64);
 	Publisher.Tick(Budget);
 	TestTrue(TEXT("全部门禁阻塞时 Commit 仅扫描一次而不耗尽 64 次操作"),
@@ -73,9 +74,10 @@ bool FVoxelPublisherProgressAndNearOrderTest::RunTest(const FString& Parameters)
 	Publisher.SetCommitGate([&](const FVoxelPublishGroupKey& Key)
 	{
 		return Key.Coordinate.X != SafetyIndex && (Key.Coordinate.X != NearIndex || bAllowNear);
-	});
+	}, GateStateRevision);
 	TestEqual(TEXT("真实门禁阻塞的近组不冻结独立可运行组"), Select(), 0);
 	bAllowNear = true;
+	++GateStateRevision;
 	Publisher.InvalidateCommitReadiness();
 	TestEqual(TEXT("覆盖门禁改变后重新检查最近组"), Select(), NearIndex);
 	const auto Older = MakeShared<FVoxelViewPublisher::FPublication>();

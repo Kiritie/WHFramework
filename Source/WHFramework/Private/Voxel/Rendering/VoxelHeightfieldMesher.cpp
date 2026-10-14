@@ -346,8 +346,17 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 			return FLinearColor(Value, Value, Value, 1.0f);
 		};
 
+	auto TopTint =
+		[&InTopTints, &CellIndex, &Window, InVertexSide](const int32 InX, const int32 InY)
+		{
+			if (InTopTints.IsEmpty()) return FLinearColor::White;
+			return InTopTints[InTopTints.Num() == InVertexSide * InVertexSide ? CellIndex(InX, InY)
+				: (FMath::Clamp(InX, Window.Min.X, Window.Max.X - 1) - Window.Min.X) + Window.Width() *
+				(FMath::Clamp(InY, Window.Min.Y, Window.Max.Y - 1) - Window.Min.Y)];
+		};
+
 	auto AppendMaterialQuad =
-		[&Mesh, &InConfig, &InRegistry, &InMaterials, &InHeights, &InTopTints, &CellIndex, &OutError, &Window, InVertexSide](
+		[&Mesh, &InConfig, &InRegistry, &InMaterials, &InHeights, &TopTint, &CellIndex, &OutError](
 			const int32 InMaterialX,
 			const int32 InMaterialY,
 			const uint8 InFaceIndex,
@@ -377,10 +386,8 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 			}
 
 			FVoxelRenderBatch& Batch = FindOrAddBatch(Mesh, Definition->RenderGroup, Face->Bank);
-			const FLinearColor Tint = InFaceIndex == FacePositiveZ && !InTopTints.IsEmpty()
-				? InTopTints[InTopTints.Num() == InVertexSide * InVertexSide ? CellIndex(InMaterialX, InMaterialY)
-				: (FMath::Clamp(InMaterialX, Window.Min.X, Window.Max.X - 1) - Window.Min.X) + Window.Width() *
-				(FMath::Clamp(InMaterialY, Window.Min.Y, Window.Max.Y - 1) - Window.Min.Y)] : FLinearColor::White;
+			const FLinearColor Tint = InFaceIndex == FacePositiveZ
+				? TopTint(InMaterialX, InMaterialY) : FLinearColor::White;
 			AppendQuad(Batch.Mesh, InA, InB, InC, InD, *Face, InColor * Tint);
 			return true;
 		};
@@ -393,6 +400,7 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 			return false;
 		}
 
+		int32 TopRunEnd = Window.Min.X;
 		for (int32 X = Window.Min.X; X < Window.Max.X; ++X)
 		{
 			const double X0 = static_cast<double>(X * InStep);
@@ -402,17 +410,28 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 			const double CurrentTop = TopZ(X, Y);
 			const FLinearColor Color = CoverageColor(X, Y);
 
-			if (!AppendMaterialQuad(
-					X,
-					Y,
-					FacePositiveZ,
-					FVector(X0, Y0, CurrentTop),
-					FVector(X1, Y0, CurrentTop),
-					FVector(X1, Y1, CurrentTop),
-					FVector(X0, Y1, CurrentTop),
-					Color))
+			if (X >= TopRunEnd)
 			{
-				return false;
+				// 只合并原采样高度、材质、覆盖色和顶面着色完全相同的行内平面。
+				// UV 来自原世界坐标，侧面仍逐单元生成；Count/Build 使用同一条规则。
+				TopRunEnd = X + 1;
+				const int32 CurrentIndex = CellIndex(X, Y);
+				const FLinearColor Tint = TopTint(X, Y);
+				while (TopRunEnd < Window.Max.X)
+				{
+					const int32 NextIndex = CellIndex(TopRunEnd, Y);
+					if (InHeights[NextIndex] != InHeights[CurrentIndex] ||
+						InMaterials[NextIndex] != InMaterials[CurrentIndex] ||
+						CoverageColor(TopRunEnd, Y) != Color || TopTint(TopRunEnd, Y) != Tint) break;
+					++TopRunEnd;
+				}
+				const double RunX1 = static_cast<double>(TopRunEnd * InStep);
+				if (!AppendMaterialQuad(X, Y, FacePositiveZ,
+					FVector(X0, Y0, CurrentTop), FVector(RunX1, Y0, CurrentTop),
+					FVector(RunX1, Y1, CurrentTop), FVector(X0, Y1, CurrentTop), Color))
+				{
+					return false;
+				}
 			}
 
 			if (X + 1 < CellSide && InHeights[CellIndex(X, Y)] != MIN_int32 &&

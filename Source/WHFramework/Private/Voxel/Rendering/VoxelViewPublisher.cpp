@@ -712,7 +712,7 @@ void FVoxelViewPublisher::SortGroups(const FPublicationRef& Publication)
 		Sorted.Add(MoveTemp(Publication->Groups[Index]));
 	}
 	Publication->Groups = MoveTemp(Sorted);
-	++Publication->GroupRevision;
+	InvalidateDependencyProofs(Publication.Get());
 	for (FUpdate& Update : Publication->Updates) Update.GroupIndex = Remap[Update.GroupIndex];
 	Publication->Updates.StableSort([](const FUpdate& A, const FUpdate& B)
 	{
@@ -870,7 +870,7 @@ void FVoxelViewPublisher::StartCommittedGroups()
 }
 
 
-void FVoxelViewPublisher::AdvancePendingPlan()
+void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 {
 	if (!PendingPlan)
 	{
@@ -925,7 +925,7 @@ void FVoxelViewPublisher::AdvancePendingPlan()
 	}
 	if (Plan.Phase == 1)
 	{
-		if (Plan.bCapacityFailure || Plan.Graph.Advance(1)) Next();
+		if (Plan.bCapacityFailure || Plan.Graph.Advance(32, InDeadlineSeconds)) Next();
 		return;
 	}
 	if (Plan.Phase == 2)
@@ -1037,7 +1037,7 @@ void FVoxelViewPublisher::AdvancePendingPlan()
 	PendingPlan.Reset();
 }
 
-void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication)
+void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication, const double InDeadlineSeconds)
 {
 	if (!Publication->Plan) { Publication->Plan = MakeUnique<FPreparedPlan>(); return; }
 	auto& Plan = *Publication->Plan;
@@ -1079,7 +1079,8 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 			const bool bMeshChange = Update && !(**Update).bUnchanged;
 			const bool bClippingChange = bInPreparedCoverage && bMeshChange && !(**Update).bSourceDirty;
 			const bool bPhysicalChange = !bInPreparedCoverage || bVisibilityChange ||
-				(bMeshChange && (**Update).bSourceDirty);
+				(bMeshChange && (**Update).bSourceDirty) ||
+				(Update && GetNativeUpdateWork(Publication.Get(), **Update) != ENativeUpdateWork::None);
 			const bool bLogicalChange = !bInPreparedCoverage || Publication->OwnershipChanges.Contains(Entry->GroupKey);
 			Footprint.bTransition = Entry->bTransition && (bPhysicalChange || bLogicalChange || bClippingChange);
 			const FBox Bounds = Update ? (**Update).Bounds : Entry->Bounds;
@@ -1146,7 +1147,7 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 		}
 		return;
 	}
-	if (Plan.Phase == 5) { if (Plan.Graph.Advance(1)) Next(); return; }
+	if (Plan.Phase == 5) { if (Plan.Graph.Advance(32, InDeadlineSeconds)) Next(); return; }
 	if (Plan.Phase == 6)
 	{
 		if (!Footprints.IsValidIndex(Plan.Cursor)) { Next(); return; }
@@ -1191,7 +1192,7 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 	{
 		if (!Plan.Groups.IsValidIndex(Plan.Cursor))
 		{
-			++Publication->GroupRevision;
+			InvalidateDependencyProofs(Publication.Get());
 			Publication->Groups = MoveTemp(Plan.Groups);
 			Publication->GroupOrder.Reset();
 			Next();
@@ -1256,7 +1257,8 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 			const bool bMeshChange = Update && !(**Update).bUnchanged;
 			const bool bClippingChange = bInPreparedCoverage && bMeshChange && !(**Update).bSourceDirty;
 			const bool bPhysicalChange = !bInPreparedCoverage || bVisibilityChange ||
-				(bMeshChange && (**Update).bSourceDirty);
+				(bMeshChange && (**Update).bSourceDirty) ||
+				(Update && GetNativeUpdateWork(Publication.Get(), **Update) != ENativeUpdateWork::None);
 			const bool bLogicalChange = !bInPreparedCoverage || Publication->OwnershipChanges.Contains(Entry->GroupKey);
 			Footprint.bTransition = Entry->bTransition && (bPhysicalChange || bLogicalChange || bClippingChange);
 			const FBox Bounds = Update ? (**Update).Bounds : Entry->Bounds;
@@ -1307,6 +1309,7 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 		GroupCount = FMath::Max(GroupCount, Index + 1);
 	}
 	Publication->Groups.Reset();
+	InvalidateDependencyProofs(Publication.Get());
 	Publication->GroupOrder.Reset();
 	Publication->Groups.SetNum(GroupCount);
 	TSet<FVoxelPublishGroupKey> GroupKeys;
@@ -1467,6 +1470,7 @@ void FVoxelViewPublisher::DeferSaturatedGroups(const FPublicationRef& Publicatio
 		}
 	}
 	Publication->Groups = MoveTemp(Accepted);
+	InvalidateDependencyProofs(Publication.Get());
 	Publication->GroupOrder.Reset();
 	Publication->Updates = MoveTemp(Updates);
 	for (FGroup& Group : Publication->Groups) Group.UpdateIndices.Reset();
@@ -2064,9 +2068,10 @@ bool FVoxelViewPublisher::CommitReadyGroups(const FPublicationRef& Publication, 
 			return First && *First < Publication->Serial;
 		})) continue;
 		if (HasOlderDependency(Publication, Group)) continue;
-		const bool bHasChanges = Group.UpdateIndices.ContainsByPredicate([&Publication](const int32 Index)
+		const bool bHasChanges = Group.UpdateIndices.ContainsByPredicate([this, &Publication](const int32 Index)
 		{
-			return !Publication->Updates[Index].bUnchanged;
+			return !Publication->Updates[Index].bUnchanged ||
+				GetNativeUpdateWork(Publication.Get(), Publication->Updates[Index]) != ENativeUpdateWork::None;
 		}) || Group.VisibilitySources.ContainsByPredicate([this, &Publication](const FVoxelViewSourceId& Key)
 		{
 			const FEntry* Entry = Entries.Find(Key);
@@ -2104,10 +2109,13 @@ bool FVoxelViewPublisher::CommitReadyGroup(const FPublicationRef& Publication, F
 			Entry->PresentedSource == Update.Source && Entry->PresentedNativeStamp == Update.NativeStamp &&
 			Entry->NativeMesh->WorldCellOrigin == Update.Location / Module.BlockSize() &&
 			Entry->NativeMesh->CellScale == Update.Scale / Module.BlockSize();
-		if (Update.bUnchanged || bRetainedGeometry)
+		if (GetNativeUpdateWork(Publication.Get(), Update) != ENativeUpdateWork::Upload || bRetainedGeometry)
 		{
 			Entry->Exclusions = MoveTemp(Update.Exclusions);
-			Entry->bDirty = Entry->Source != Update.Source || Entry->Location != Update.Location || Entry->Scale != Update.Scale;
+			Entry->bDirty = !Entry->NativeMesh || Entry->Source != Entry->PresentedSource ||
+				Entry->NativeStamp != Entry->PresentedNativeStamp ||
+				Entry->NativeMesh->WorldCellOrigin != Entry->Location / Module.BlockSize() ||
+				Entry->NativeMesh->CellScale != Entry->Scale / Module.BlockSize();
 			continue;
 		}
 		Entry->NativeMesh = MoveTemp(Update.NativeMesh);
@@ -2196,6 +2204,7 @@ void FVoxelViewPublisher::DiscardGroups()
 	ReadySelectionCursors[0] = 0;
 	ReadySelectionCursors[1] = 0;
 	PublisherTickSerial = 0;
+	CommitGateCacheHits = 0;
 	CommitResourceVersion = 0;
 	CommitFrontendVersion = 0;
 	bCommitOrderDirty = false;
@@ -2492,10 +2501,24 @@ void FVoxelViewPublisher::QueueReadyGroup(const FPublicationRef& InPublication, 
 	}
 }
 
+void FVoxelViewPublisher::InvalidateDependencyProofs(FPublication& InPublication)
+{
+	check(InPublication.GroupRevision < MAX_uint64 && DependencyProofRevision < MAX_uint64);
+	++InPublication.GroupRevision;
+	++DependencyProofRevision;
+}
+
 bool FVoxelViewPublisher::HasOlderDependency(const FPublicationRef& InPublication, const FGroup& InGroup,
 	bool* bOutNeedsContinuation) const
 {
 	if (bOutNeedsContinuation) *bOutNeedsContinuation = false;
+	if (InGroup.DependencyProofRevision != DependencyProofRevision)
+	{
+		InGroup.DependencyProofRevision = DependencyProofRevision;
+		InGroup.DependencyNextSerial = 0;
+		InGroup.bDependencyQueryActive = false;
+		InGroup.DependencyQuery = {};
+	}
 	int32 Operations = 0;
 	for (const auto& Older : Publications)
 	{
@@ -2541,9 +2564,10 @@ bool FVoxelViewPublisher::HasOlderDependency(const FPublicationRef& InPublicatio
 			const FGroup& Dependency = Older->Groups[Index];
 			if (!Dependency.bCommitted && GroupsInteract(InGroup, Dependency))
 			{
-				// 被阻塞的候选在下一次重读，旧组提交后无需从头遍历索引。
+				// 保留同一索引快照的查询位置，只重读当前阻塞候选，不重走根路径。
+				check(InGroup.DependencyQuery.bHasCurrent && InGroup.DependencyQuery.OwnCursor > 0);
 				InGroup.DependencyQuery.Seen.Remove(Index);
-				InGroup.bDependencyQueryActive = false;
+				--InGroup.DependencyQuery.OwnCursor;
 				return true;
 			}
 		}
@@ -2563,6 +2587,8 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 	if (bInCommit && (bCommitOrderDirty || bCommitSelectionComplete)) return INDEX_NONE;
 	const int32 CandidateCount = FMath::Max(0, InReady.Num() - Cursor);
 	int32 FirstRunnableIndex = INDEX_NONE;
+	bool NearHeadFound[3] = {};
+	int32 Scanned = 0;
 	for (int32 Attempt = 0; Attempt < CandidateCount && FPlatformTime::Seconds() < InDeadline; ++Attempt)
 	{
 		Cursor %= InReady.Num();
@@ -2574,10 +2600,22 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 			return Index;
 		}
 		const FGroup& Group = Ready.Publication->Groups[Ready.GroupIndex];
+		++Scanned;
 		if (Group.bCommitted)
 		{
 			if (bInCommit) Cursor = 0;
 			return Index;
+		}
+		// 队列已按安全带/距离/源优先/朝向排序；公平选择只在同一可运行前沿内轮转。
+		if (FirstRunnableIndex != INDEX_NONE)
+		{
+			const auto& First = InReady[FirstRunnableIndex].Priority;
+			const auto& Current = Ready.Priority;
+			const bool bFirstSafety = FVoxelTerrainWorkSelection::IsNear(First.Band);
+			const bool bCurrentSafety = FVoxelTerrainWorkSelection::IsNear(Current.Band);
+			if (bFirstSafety != bCurrentSafety || (bFirstSafety && First.Band != Current.Band) ||
+				First.DistanceCells != Current.DistanceCells || First.SourcePriority != Current.SourcePriority ||
+				First.ForwardScore != Current.ForwardScore) break;
 		}
 		if (PublisherTickSerial != 0 &&
 			(bInCommit ? Group.CommitWaitTick : Group.PrepareWaitTick) == PublisherTickSerial) continue;
@@ -2588,9 +2626,21 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 			return Index;
 		}
 		if (!Group.bPriorityReady) continue;
+		// 失败证明只依赖门禁状态、绑定和本组结构；无关资源/其他owner不使它失效。
+		if (bInCommit && CommitGateStateRevision &&
+			Group.CommitGateBlockedBindingRevision == CommitGateBindingRevision &&
+			Group.CommitGateBlockedRevision == *CommitGateStateRevision &&
+			Group.CommitGateBlockedGroupRevision == Ready.Publication->GroupRevision)
+		{
+			++CommitGateCacheHits;
+			continue;
+		}
+		const int32 Band = int32(Group.Priority.Service.Band);
+		const bool bNear = FVoxelTerrainWorkSelection::IsNear(Group.Priority.Service.Band);
+		if (bNear && NearHeadFound[Band]) continue;
 		if (!Group.bNativeAdmitted)
 		{
-			if (ActiveNativeGroups >= MaximumNativeGroups) continue;
+			if (HasNativeGroupWork(Ready.Publication.Get(), Group) && ActiveNativeGroups >= MaximumNativeGroups) continue;
 			// 完成所需的旧代先准入，否则新代持有槽位和资源会反过来阻塞它的前置依赖。
 			if (Group.Keys.ContainsByPredicate([this, &Ready](const auto& Key)
 			{
@@ -2604,7 +2654,7 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 				{
 					Cursor = Index;
 					if (bOutAdvanced) *bOutAdvanced = true;
-					return INDEX_NONE;
+					break;
 				}
 				continue;
 			}
@@ -2634,7 +2684,16 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 		}
 		if (bInCommit)
 		{
-			if (CommitGate && Group.Keys.ContainsByPredicate([this](const auto& Key) { return !CommitGate(Key); })) continue;
+			const uint64 GateRevision = CommitGateStateRevision ? *CommitGateStateRevision : 0;
+			const uint64 GateBindingRevision = CommitGateBindingRevision;
+			const uint64 GateGroupRevision = Ready.Publication->GroupRevision;
+			if (CommitGate && Group.Keys.ContainsByPredicate([this](const auto& Key) { return !CommitGate(Key); }))
+			{
+				Group.CommitGateBlockedRevision = GateRevision;
+				Group.CommitGateBlockedBindingRevision = GateBindingRevision;
+				Group.CommitGateBlockedGroupRevision = GateGroupRevision;
+				continue;
+			}
 			const bool bCurrent = !Group.Keys.ContainsByPredicate([&Ready](const auto& Key)
 			{
 				const auto Validation = Ready.Publication->Validations.FindRef(Key);
@@ -2655,7 +2714,7 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 					Cursor = Index;
 					bCommitNeedsPolling = true;
 					if (bOutAdvanced) *bOutAdvanced = true;
-					return INDEX_NONE;
+					break;
 				}
 				if (bDependencyBlocked) continue;
 			}
@@ -2668,14 +2727,27 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 		const double Estimate = ServiceCostEstimates[bInCommit ? 1 : 0][uint8(Candidate.Priority.Band)];
 		Candidate.EstimatedMicroseconds = Estimate > 0.0 ? Estimate : 50.0;
 		Candidate.bRunnable = true;
+		Candidate.bPublicationContinuation = true;
 		Candidates.Add(Candidate);
-		FirstRunnableIndex = Index;
-		break;
+		if (bNear) NearHeadFound[Band] = true;
+		if (FirstRunnableIndex == INDEX_NONE) FirstRunnableIndex = Index;
 	}
 	FVoxelTerrainServiceCapacity Capacity;
 	Capacity.MaximumWaitSeconds = Module.GetViewSettings().Fine.MaximumBackgroundWaitSeconds;
 	Capacity.bAllowOverdueOpportunity = !bInCommit && Module.GetTerrainFrameContext().IsOverdueOpportunityAvailable();
-	const int32 Selected = InSelection.Select(Candidates.GetCandidates(), Capacity, FPlatformTime::Seconds(), OutCharge);
+	Capacity.bPreserveDistanceOrder = true;
+	const auto Heads = Candidates.GetCandidates();
+#if !UE_BUILD_SHIPPING
+	if (FPlatformTime::Seconds() >= NextReadyCandidateDiagnostic[bInCommit ? 1 : 0])
+	{
+		uint32 BandMask = 0;
+		for (const auto& Head : Heads) BandMask |= 1u << uint8(Head.Priority.Band);
+		UE_LOG(LogTemp, Display, TEXT("Publisher candidate diagnostic: commit=%d scanned=%d candidates=%d bandMask=%u cursor=%d/%d gateCached=%llu"),
+			bInCommit, Scanned, Heads.Num(), BandMask, Cursor, InReady.Num(), CommitGateCacheHits);
+		NextReadyCandidateDiagnostic[bInCommit ? 1 : 0] = FPlatformTime::Seconds() + 5.0;
+	}
+#endif
+	const int32 Selected = InSelection.Select(Heads, Capacity, FPlatformTime::Seconds(), OutCharge);
 	if (bInCommit)
 	{
 		if (Selected != INDEX_NONE) Cursor = 0;
@@ -2745,60 +2817,76 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 #if !UE_BUILD_SHIPPING
 	if (FPlatformTime::Seconds() >= NextPublisherDiagnostic)
 	{
-		UE_LOG(LogTemp, Display, TEXT("Publisher continuation diagnostic: pending=%d frozen=%d phase=%d cursor=%d selected=%d blocked=%d publications=%d priorityPhase=%d readyPrepare=%d readyCommit=%d activeNative=%d/%d"),
+		UE_LOG(LogTemp, Display, TEXT("Publisher continuation diagnostic: pending=%d frozen=%d phase=%d cursor=%d selected=%d blocked=%d publications=%d priorityPhase=%d readyPrepare=%d readyCommit=%d activeNative=%d/%d pendingGraphCompared=%llu"),
 			PendingGroups.Num(), PendingPlan ? PendingPlan->Groups.Num() : 0, PendingPlan ? PendingPlan->Phase : -1,
 			PendingPlan ? PendingPlan->Cursor : -1, PendingPlan ? PendingPlan->SelectedKeys.Num() : 0,
 			PendingPlan ? PendingPlan->BlockedComponents.Num() : 0, Publications.Num(), PriorityPlan ? PriorityPlan->Phase : -1,
-			ReadyPrepareGroups.Num(), ReadyCommitGroups.Num(), ActiveNativeGroups, MaximumNativeGroups);
+			ReadyPrepareGroups.Num(), ReadyCommitGroups.Num(), ActiveNativeGroups, MaximumNativeGroups, PendingPlan ? PendingPlan->Graph.GetComparedFootprints() : 0);
 		int32 LoggedGroups = 0;
-		for (const auto& Publication : Publications)
+		const int32 DiagnosticLimit = MaximumNativeGroups + 6;
+		// 先显示真正占用槽位的组，再显示最旧等待组，避免关键等待被截断。
+		for (int32 DiagnosticPass = 0; DiagnosticPass < 2; ++DiagnosticPass)
 		{
-			if (LoggedGroups >= 6)
+			for (const auto& Publication : Publications)
 			{
-				break;
-			}
-			if (Publication->bFinished || Publication->bCanceled) continue;
-			for (const int32 Index : Publication->GroupOrder)
-			{
-				if (LoggedGroups >= 6)
+				if (LoggedGroups >= DiagnosticLimit)
 				{
 					break;
 				}
-				const FGroup& Group = Publication->Groups[Index];
-				if (Group.bCommitted)
-					continue;
-				uint64 FirstSerial = Publication->Serial;
-				for (const auto& Key : Group.Keys)
-					if (const uint64* First = OwnerFirstSerial.Find(Key)) FirstSerial = FMath::Min(FirstSerial, *First);
-				UE_LOG(LogTemp, Display, TEXT("Publisher group diagnostic: serial=%llu index=%d keys=%d prepared=%d/%d priorityReady=%d class=%d source=%d first=%llu queued=%d/%d coverage=%d/%d"),
-					Publication->Serial, Index, Group.Keys.Num(), Group.PreparedUpdates, Group.UpdateIndices.Num(),
-					Group.bPriorityReady, static_cast<int32>(Group.Priority.WorkClass), Group.Priority.SourcePriority, FirstSerial,
-					Group.bPrepareQueued, Group.bCommitQueued, Publication->CoverageIndex, Publication->Updates.Num());
-				if (Group.UpdateIndices.IsValidIndex(Group.PreparedUpdates))
+				if (Publication->bFinished || Publication->bCanceled) continue;
+				for (const int32 Index : Publication->GroupOrder)
 				{
-					const int32 UpdateIndex = Group.UpdateIndices[Group.PreparedUpdates];
-					const FUpdate& Update = Publication->Updates[UpdateIndex];
-					const auto* Entry = Entries.Find(Update.SourceId);
-					const auto& Key = Update.NativeStamp.GeometryIdentity.Key;
-					UE_LOG(LogTemp, Display, TEXT("Publisher update diagnostic: serial=%llu index=%d representation=%d level=%d coordinate=(%d,%d,%d) retained=%d unchanged=%d dirty=%d source=%d native=%d meshPending=%d admissionWait=%d admissionVersion=%llu entryNative=%d samePresentedSource=%d"),
-						Publication->Serial, UpdateIndex, int32(Key.Representation), Key.Level, Key.Coordinate.X, Key.Coordinate.Y, Key.Coordinate.Z,
-						Update.bRetainSource, Update.bUnchanged, Update.bSourceDirty, Update.Source.IsValid(), Update.NativeMesh.IsValid(),
-						Update.bNativeMeshPending, Update.bNativeAdmissionWaiting, Update.NativeAdmissionVersion,
-						Entry && Entry->NativeMesh.IsValid(), Entry && Entry->PresentedSource == Update.Source);
+					if (LoggedGroups >= DiagnosticLimit)
+					{
+						break;
+					}
+					const FGroup& Group = Publication->Groups[Index];
+					if (Group.bCommitted || (DiagnosticPass == 0 ? !Group.bNativeAdmitted : Group.bNativeAdmitted))
+						continue;
+					uint64 FirstSerial = Publication->Serial;
+					for (const auto& Key : Group.Keys)
+						if (const uint64* First = OwnerFirstSerial.Find(Key)) FirstSerial = FMath::Min(FirstSerial, *First);
+					UE_LOG(LogTemp, Display, TEXT("Publisher group diagnostic: serial=%llu index=%d keys=%d prepared=%d/%d priorityReady=%d class=%d source=%d first=%llu queued=%d/%d coverage=%d/%d"),
+						Publication->Serial, Index, Group.Keys.Num(), Group.PreparedUpdates, Group.UpdateIndices.Num(),
+						Group.bPriorityReady, static_cast<int32>(Group.Priority.WorkClass), Group.Priority.SourcePriority, FirstSerial,
+						Group.bPrepareQueued, Group.bCommitQueued, Publication->CoverageIndex, Publication->Updates.Num());
+					if (Group.UpdateIndices.IsValidIndex(Group.PreparedUpdates))
+					{
+						const int32 UpdateIndex = Group.UpdateIndices[Group.PreparedUpdates];
+						const FUpdate& Update = Publication->Updates[UpdateIndex];
+						const auto* Entry = Entries.Find(Update.SourceId);
+						const auto& Key = Update.NativeStamp.GeometryIdentity.Key;
+						UE_LOG(LogTemp, Display, TEXT("Publisher update diagnostic: serial=%llu index=%d representation=%d level=%d coordinate=(%d,%d,%d) retained=%d unchanged=%d dirty=%d source=%d native=%d meshPending=%d admissionWait=%d admissionVersion=%llu entryNative=%d samePresentedSource=%d"),
+							Publication->Serial, UpdateIndex, int32(Key.Representation), Key.Level, Key.Coordinate.X, Key.Coordinate.Y, Key.Coordinate.Z,
+							Update.bRetainSource, Update.bUnchanged, Update.bSourceDirty, Update.Source.IsValid(), Update.NativeMesh.IsValid(),
+							Update.bNativeMeshPending, Update.bNativeAdmissionWaiting, Update.NativeAdmissionVersion,
+							Entry && Entry->NativeMesh.IsValid(), Entry && Entry->PresentedSource == Update.Source);
+					}
+					const bool bGateBlocked = CommitGate && Group.Keys.ContainsByPredicate(
+						[this](const auto& Key) { return !CommitGate(Key); });
+					uint64 ControlReleaseVersion = 0;
+					const bool bControlReleaseKnown = Group.bNativeControlWaiting &&
+						Scheduler.GetTerrainResources()->TryGetReleaseVersionExcludingOwner(Group.NativeControlConsumer, ControlReleaseVersion);
+					const FUpdate* NativeUpdate = Group.UpdateIndices.IsValidIndex(Group.NativeSourceCursor)
+						? &Publication->Updates[Group.UpdateIndices[Group.NativeSourceCursor]] : nullptr;
+					const FEntry* NativeEntry = NativeUpdate ? Entries.Find(NativeUpdate->SourceId) : nullptr;
+					const bool* DesiredHidden = NativeUpdate ? Publication->Visibility.Find(NativeUpdate->SourceId) : nullptr;
+					UE_LOG(LogTemp, Display, TEXT("Publisher gate diagnostic: serial=%llu index=%d allowCommit=%d coverageGate=%d ownerGate=%d controlWait=%d bootstrapWait=%d controlVersion=%llu releaseKnown=%d releaseVersion=%llu frontendVersion=%llu currentFrontendVersion=%llu stateAdmission=%d transaction=%d submitted=%d sourceCursor=%d/%d visibilitySources=%d nativeChanges=%d currentNativeReady=%d currentNativePending=%d currentRetained=%d currentUnchanged=%d currentDirty=%d nativeWork=%d desiredHidden=%d entryHidden=%d entryPresented=%d entryNative=%d dependencyActive=%d dependencySerial=%llu dependencyNext=%llu nativeAdmitted=%d nativeBatch=%d nativeTriangle=%d"),
+						Publication->Serial, Index, bInAllowCommit, bGateBlocked, FirstSerial < Publication->Serial,
+						Group.bNativeControlWaiting, Group.bNativeBootstrapWaiting, Group.NativeControlVersion,
+						bControlReleaseKnown, ControlReleaseVersion, Group.NativeFrontendVersion, TerrainRenderer->GetCoarseAdmissionVersion(),
+						static_cast<int32>(TerrainRenderer->GetNativeStateAdmission()), Group.NativeTransaction.IsValid(),
+						Group.bNativeSubmitted, Group.NativeSourceCursor, Group.UpdateIndices.Num(),
+						Group.VisibilitySources.Num(), Group.NativeChanges.Num(), NativeUpdate && NativeUpdate->NativeMesh.IsValid(),
+						NativeUpdate && NativeUpdate->bNativeMeshPending, NativeUpdate && NativeUpdate->bRetainSource,
+						NativeUpdate && NativeUpdate->bUnchanged, NativeUpdate && NativeUpdate->bSourceDirty,
+						NativeUpdate ? int32(GetNativeUpdateWork(Publication.Get(), *NativeUpdate)) : 0,
+						DesiredHidden ? int32(*DesiredHidden) : -1, NativeEntry && NativeEntry->bHidden,
+						NativeEntry && NativeEntry->bPresented, NativeEntry && NativeEntry->NativeMesh.IsValid(),
+						Group.bDependencyQueryActive, Group.DependencyQuerySerial, Group.DependencyNextSerial,
+						Group.bNativeAdmitted, Group.NativeBatchCursor, Group.NativeTriangleCursor);
+					++LoggedGroups;
 				}
-				const bool bGateBlocked = CommitGate && Group.Keys.ContainsByPredicate(
-					[this](const auto& Key) { return !CommitGate(Key); });
-				uint64 ControlReleaseVersion = 0;
-				const bool bControlReleaseKnown = Group.bNativeControlWaiting &&
-					Scheduler.GetTerrainResources()->TryGetReleaseVersionExcludingOwner(Group.NativeControlConsumer, ControlReleaseVersion);
-				UE_LOG(LogTemp, Display, TEXT("Publisher gate diagnostic: serial=%llu index=%d allowCommit=%d coverageGate=%d ownerGate=%d controlWait=%d bootstrapWait=%d controlVersion=%llu releaseKnown=%d releaseVersion=%llu frontendVersion=%llu currentFrontendVersion=%llu stateAdmission=%d transaction=%d submitted=%d sourceCursor=%d/%d dependencyActive=%d dependencySerial=%llu dependencyNext=%llu"),
-					Publication->Serial, Index, bInAllowCommit, bGateBlocked, FirstSerial < Publication->Serial,
-					Group.bNativeControlWaiting, Group.bNativeBootstrapWaiting, Group.NativeControlVersion,
-					bControlReleaseKnown, ControlReleaseVersion, Group.NativeFrontendVersion, TerrainRenderer->GetCoarseAdmissionVersion(),
-					static_cast<int32>(TerrainRenderer->GetNativeStateAdmission()), Group.NativeTransaction.IsValid(),
-					Group.bNativeSubmitted, Group.NativeSourceCursor, Group.NativeChanges.Num(),
-					Group.bDependencyQueryActive, Group.DependencyQuerySerial, Group.DependencyNextSerial);
-				++LoggedGroups;
 			}
 		}
 		NextPublisherDiagnostic = FPlatformTime::Seconds() + 5.0;
@@ -2839,18 +2927,18 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 			for (const auto& Publication : Publications)
 			{
 				if (Publication->bCanceled || !Publication->bCoveragePrepared || (Publication->bGroupsPrepared && !Publication->Plan)) continue;
-				bWorked = Run(EVoxelPublishPhase::Plan, [this, Publication]
+				bWorked = Run(EVoxelPublishPhase::Plan, [this, Publication, ServiceDeadline]
 				{
-					AdvancePreparedPlan(Publication);
+					AdvancePreparedPlan(Publication, ServiceDeadline);
 					return true;
 				});
 				break;
 			}
 			if (!bWorked && (PendingPlan || !PendingGroups.IsEmpty()) && !bAttemptedPendingPlan)
 			{
-				bWorked = Run(EVoxelPublishPhase::Plan, [this]
+				bWorked = Run(EVoxelPublishPhase::Plan, [this, ServiceDeadline]
 				{
-					AdvancePendingPlan();
+					AdvancePendingPlan(ServiceDeadline);
 					return true;
 				});
 				bAttemptedPendingPlan = !PendingPlan;
@@ -2905,7 +2993,7 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 				if (Group.bCommitted || Group.PreparedUpdates == Group.UpdateIndices.Num()) return true;
 				const int32 Index = Group.UpdateIndices[Group.PreparedUpdates];
 				if (!Publication->PreparedMeshes[Index]) return true;
-				if (!Group.bNativeAdmitted)
+				if (!Group.bNativeAdmitted && HasNativeGroupWork(Publication.Get(), Group))
 				{
 					check(ActiveNativeGroups < MaximumNativeGroups);
 					Group.bNativeAdmitted = true;

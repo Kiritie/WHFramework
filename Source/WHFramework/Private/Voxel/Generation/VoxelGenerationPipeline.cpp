@@ -602,16 +602,24 @@ bool FVoxelGenerationPipeline::GenerateSection(
 	const TAtomic<bool>* InCancel,
 	const FVoxelTerrainResourceLease* InOutputLease) const
 {
+	return GenerateSectionWindow(InSectionCoordinate, FVoxelSectionWindow(), OutBaseBlocks, OutError, InCancel, InOutputLease);
+}
+
+bool FVoxelGenerationPipeline::GenerateSectionWindow(
+	const FIntVector& InSectionCoordinate,
+	const FVoxelSectionWindow& InWindow,
+	const TArrayView<FVoxelBlockState> OutBaseBlocks,
+	FString& OutError,
+	const TAtomic<bool>* InCancel,
+	const FVoxelTerrainResourceLease* InOutputLease) const
+{
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_GenerateSection);
 
 	constexpr int32 SectionSide = 16;
-	constexpr int32 SectionCellCount =
-		SectionSide *
-		SectionSide *
-		SectionSide;
-	if (OutBaseBlocks.Num() != SectionCellCount)
+	const int32 SectionCellCount = InWindow.Num();
+	if (!InWindow.IsValid() || OutBaseBlocks.Num() != SectionCellCount)
 	{
-		OutError = TEXT("InvalidResource: generation section requires a caller-owned 4096-cell output span");
+		OutError = TEXT("InvalidResource: generation window requires its exact caller-owned output span");
 		return false;
 	}
 
@@ -681,18 +689,18 @@ bool FVoxelGenerationPipeline::GenerateSection(
 
 	// 一列共享同一份自然采样，每格仍执行完整生成阶段，避免反复争用列缓存锁。
 	uint32 Symbols[SectionSide];
-	for (int32 Y = 0; Y < SectionSide; ++Y)
+	for (int32 Y = InWindow.Min.Y; Y < InWindow.Max.Y; ++Y)
 	{
-		for (int32 X = 0; X < SectionSide; ++X)
+		for (int32 X = InWindow.Min.X; X < InWindow.Max.X; ++X)
 		{
-			if (!Query.SampleColumnSymbols(FIntPoint(WorldMin.X + X, WorldMin.Y + Y), WorldMin.Z,
-				MakeArrayView(Symbols), OutError))
+			if (!Query.SampleColumnSymbols(FIntPoint(WorldMin.X + X, WorldMin.Y + Y), WorldMin.Z + InWindow.Min.Z,
+				MakeArrayView(Symbols, InWindow.Max.Z - InWindow.Min.Z), OutError))
 			{
 				return false;
 			}
-			for (int32 Z = 0; Z < SectionSide; ++Z)
+			for (int32 Z = InWindow.Min.Z; Z < InWindow.Max.Z; ++Z)
 			{
-				if (!Config->ToRuntime(Symbols[Z], Blocks[X + SectionSide * Y + SectionSide * SectionSide * Z]))
+				if (!Config->ToRuntime(Symbols[Z - InWindow.Min.Z], Blocks[InWindow.Index(FIntVector(X, Y, Z))]))
 				{
 					OutError = TEXT("Voxel generation returned an invalid recipe symbol");
 					return false;
@@ -701,7 +709,7 @@ bool FVoxelGenerationPipeline::GenerateSection(
 		}
 	}
 
-	if (Overlay && !Overlay->ApplySection(InSectionCoordinate, MakeArrayView(Blocks),
+	if (Overlay && !Overlay->ApplySectionWindow(InSectionCoordinate, InWindow, MakeArrayView(Blocks),
 		OutError, InCancel))
 	{
 		return false;

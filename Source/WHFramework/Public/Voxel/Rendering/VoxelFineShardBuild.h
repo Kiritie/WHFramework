@@ -58,7 +58,8 @@ public:
 
 private:
 	void VisitResourceSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
-	void CopySection(const FIntVector& InSection, TConstArrayView<FVoxelBlockState> InBlocks);
+	FVoxelSectionWindow RequiredWindow(const FIntVector& InSection) const;
+	void CopySection(const FIntVector& InSection, const FVoxelSectionWindow& InWindow, TConstArrayView<FVoxelBlockState> InBlocks);
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
 	TSharedRef<const FVoxelOverlaySnapshotSet, ESPMode::ThreadSafe> Overlay;
 	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;

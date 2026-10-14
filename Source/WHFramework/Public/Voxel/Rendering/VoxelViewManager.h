@@ -216,6 +216,8 @@ private:
 	TSharedPtr<FInterestInputRoot, ESPMode::ThreadSafe> AppliedInputRoot;
 	TSharedPtr<FInterestInputRoot, ESPMode::ThreadSafe> CoverageInputRoot;
 	bool bCoverageReadScope = false;
+	// 高位标记真实覆盖状态，低位标记临时覆盖读Scope；不会被无关资源事件更新。
+	uint64 CoverageCommitGateRevision = 0;
 	TSharedPtr<FInterestInputRoot, ESPMode::ThreadSafe> RetirementInputRoot;
 	bool bRetirementReadScope = false;
 	FInterestInputRoot& GetInputRoot();
@@ -449,6 +451,7 @@ private:
 	void MarkCoverageDirty();
 	void MarkCoverageDirty(const FVoxelCoverageRect& InBounds);
 	static void MergeCoverageRect(TArray<FVoxelCoverageRect>& InOutRects, const FVoxelCoverageRect& InBounds);
+	void InvalidateCoverageCommitGate();
 	void ExpandActiveCoverage(const FVoxelCoverageRect& InBounds);
 	void RetryActiveCoverage();
 	FVoxelCoverageRect PublishGroupCoverageRect(const FVoxelPublishGroupKey& InKey) const;

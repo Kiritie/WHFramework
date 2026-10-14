@@ -43,7 +43,7 @@ class WHFRAMEWORK_API FVoxelPublishGroupContinuation
 {
 public:
 	bool Add(const FVoxelPublishFootprint& InFootprint);
-	bool Advance(int32 InMaximumOperations);
+	bool Advance(int32 InMaximumOperations, double InDeadlineSeconds = MAX_dbl);
 	const TArray<int32>& GetGroupIndices() const;
 	uint64 GetComparedFootprints() const;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Voxel/Generation/VoxelSectionWindow.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
 #include "Voxel/Generation/VoxelGenerationConsumer.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
@@ -101,6 +102,16 @@ public:
 
 	virtual bool ApplySection(
 		const FIntVector& InSectionCoordinate,
+		TArrayView<FVoxelBlockState> InOutBlocks,
+		FString& OutError,
+		const TAtomic<bool>* InCancel) const
+	{
+		return ApplySectionWindow(InSectionCoordinate, FVoxelSectionWindow(), InOutBlocks, OutError, InCancel);
+	}
+
+	virtual bool ApplySectionWindow(
+		const FIntVector& InSectionCoordinate,
+		const FVoxelSectionWindow& InWindow,
 		TArrayView<FVoxelBlockState> InOutBlocks,
 		FString& OutError,
 		const TAtomic<bool>* InCancel) const = 0;

@@ -137,10 +137,11 @@ bool FVoxelPublishGroupContinuation::Add(const FVoxelPublishFootprint& InFootpri
 	return true;
 }
 
-bool FVoxelPublishGroupContinuation::Advance(const int32 InMaximumOperations)
+bool FVoxelPublishGroupContinuation::Advance(const int32 InMaximumOperations, const double InDeadlineSeconds)
 {
 	if (Phase == 0) { Phase = 1; Cursor = 0; }
-	for (int32 Operation = 0; Operation < FMath::Max(0, InMaximumOperations); ++Operation)
+	for (int32 Operation = 0; Operation < FMath::Max(0, InMaximumOperations) &&
+		FPlatformTime::Seconds() < InDeadlineSeconds; ++Operation)
 	{
 		if (Phase == 1)
 		{

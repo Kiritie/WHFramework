@@ -373,7 +373,7 @@ namespace VoxelFineRefactorTest
     class FAuthoredOverlay final : public IVoxelGenerationOverlay
     {
     public:
-        virtual bool ApplySection(const FIntVector& InSectionCoordinate, TArrayView<FVoxelBlockState> InOutBlocks,
+        virtual bool ApplySectionWindow(const FIntVector& InSectionCoordinate, const FVoxelSectionWindow& InWindow, TArrayView<FVoxelBlockState> InOutBlocks,
             FString& OutError, const TAtomic<bool>* InCancel) const override
         {
             if (InCancel && InCancel->Load())
@@ -383,8 +383,10 @@ namespace VoxelFineRefactorTest
             }
             if (InSectionCoordinate == FIntVector(0, 0, 2))
             {
-                InOutBlocks[256] = FVoxelBlockState(9, 0);
-                InOutBlocks[257] = FVoxelBlockState(9, 0);
+                for (const FIntVector& Cell : {FIntVector(0, 0, 1), FIntVector(1, 0, 1)})
+                {
+                    if (InWindow.Contains(Cell)) InOutBlocks[InWindow.Index(Cell)] = FVoxelBlockState(9, 0);
+                }
             }
             OutError.Reset();
             return true;

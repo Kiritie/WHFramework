@@ -762,6 +762,13 @@ namespace
 		TSharedPtr<FVoxelTerrainCoarseDrawPiece, ESPMode::ThreadSafe> LastPiece;
 		int32 Child = 0;
 	};
+	// 上传结束后有界扫描真实 Draw chunk；不为每个裁切叶子单独等待一帧。
+	struct FDrawReadinessWalk
+	{
+		TSharedPtr<const FVoxelTerrainCoarseDrawNode, ESPMode::ThreadSafe> Node;
+		TSharedPtr<const FVoxelTerrainCoarseDrawPiece, ESPMode::ThreadSafe> Piece;
+		int32 Child = -1;
+	};
 	struct FPreparedCoarse
 	{
 		FCoarsePtr Base;
@@ -858,6 +865,11 @@ namespace
 				DiagnosticPhase.Store(Phase);
 				DiagnosticFineReused.Store(FineReused);
 				DiagnosticFinePrepared.Store(FinePrepared);
+				DiagnosticFineCompleted.Store(FineCompleted);
+				const FIntVector Section = FineBuild && FineBuild->Base ? FineBuild->Base->Section : FIntVector::ZeroValue;
+				DiagnosticFineSectionX.Store(Section.X);
+				DiagnosticFineSectionY.Store(Section.Y);
+				DiagnosticFineSectionZ.Store(Section.Z);
 				DiagnosticFineProgress.Store(FineBuild ? uint32(FineBuild->Phase * 4096 + FineBuild->FaceCursor * 256 + FineBuild->TileCursor) : MAX_uint32);
 				bExecutionComplete.Store(!Result.bContinue);
 				bExecuting.Store(false);
@@ -960,6 +972,7 @@ namespace
 					if (Progress == EVoxelFineBuildProgress::Working) continue;
 					if (Progress != EVoxelFineBuildProgress::Complete)
 					{ Result.bCanceled = Progress == EVoxelFineBuildProgress::Canceled; return Result; }
+					++FineCompleted;
 					FineBuild->Upload = FineBuild->FirstPiece;
 					FineBuild = FineBuild->Next;
 					continue;
@@ -1096,6 +1109,7 @@ namespace
 		TArray<FFineWalk, TInlineAllocator<33>> FineWalk;
 		TArray<FFineWalk, TInlineAllocator<33>> InterfaceWalk;
 		TArray<FDrawWalk, TInlineAllocator<64>> DrawWalk;
+		TArray<FDrawReadinessWalk, TInlineAllocator<64>> ReadinessDrawWalk;
 		FCoarsePtr Current;
 		TSharedPtr<FVoxelTerrainCoarseExclusions, ESPMode::ThreadSafe> Exclusions;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BuilderLease;
@@ -1104,6 +1118,10 @@ namespace
 		TSharedPtr<FPreparedCoarse, ESPMode::ThreadSafe> LastPrepared;
 		TSharedPtr<FPreparedCoarse, ESPMode::ThreadSafe> Upload;
 		TSharedPtr<FPreparedFine, ESPMode::ThreadSafe> FirstFine, LastFine, FineBuild, FineUpload;
+		TSharedPtr<FPreparedFine, ESPMode::ThreadSafe> ReadinessFine;
+		TSharedPtr<FPreparedCoarse, ESPMode::ThreadSafe> ReadinessCoarse;
+		int32 ReadinessRoot = 0;
+		bool bUploadReadinessStarted = false;
 		TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry;
 		TSharedPtr<const FVoxelShapeRegistry, ESPMode::ThreadSafe> Shapes;
 		TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
@@ -1122,6 +1140,11 @@ namespace
 		TAtomic<int32> DiagnosticPhase{0};
 		TAtomic<int32> DiagnosticFineReused{0};
 		TAtomic<int32> DiagnosticFinePrepared{0};
+		TAtomic<int32> DiagnosticFineCompleted{0};
+		TAtomic<int32> DiagnosticFineSectionX{0};
+		TAtomic<int32> DiagnosticFineSectionY{0};
+		TAtomic<int32> DiagnosticFineSectionZ{0};
+		int32 FineCompleted = 0;
 		int32 FineReused = 0;
 		int32 FinePrepared = 0;
 		TAtomic<uint32> DiagnosticFineProgress{MAX_uint32};
@@ -1504,7 +1527,7 @@ struct FVoxelTerrainRendererState : TSharedFromThis<FVoxelTerrainRendererState, 
 	bool BeginRootPreparation(FReadyTransaction& InTransaction);
 	void AdvanceRootPreparations(double InDeadline);
 	void AdvanceRootUpload(FVoxelTerrainRenderer& InRenderer, double InDeadline);
-	void AdvanceRootUpload(FVoxelTerrainRenderer& InRenderer, FRootPreparation& InWork, int32 InMaximumSteps, double InDeadline);
+	bool AdvanceRootUpload(FVoxelTerrainRenderer& InRenderer, FRootPreparation& InWork, int32 InMaximumSteps, double InDeadline);
 	bool BeginRootMerge(FReadyTransaction& InTransaction, double InDeadline);
 	void ReleasePreparation(FReadyTransaction& InTransaction);
 	void TerminateTransaction(FReadyTransaction& InTransaction);
@@ -2435,6 +2458,7 @@ void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 {
 	const double Deadline = FMath::Min(InDeadline, Module.GetTerrainFrameContext().Deadline());
 	TArray<FReadyTransaction*, TInlineAllocator<VoxelNativeRootPreparationConcurrency>> Candidates;
+	TArray<FReadyTransaction*, TInlineAllocator<VoxelNativeRootPreparationConcurrency>> NextRound;
 	for (auto& Pending : Ready)
 	{
 		if (!Pending.Preparation) continue;
@@ -2470,23 +2494,30 @@ void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 		}
 		if (Charge.bOverdueOpportunity) Module.GetTerrainFrameContext().ConsumeOverdueOpportunity();
 		const double Started = FPlatformTime::Seconds();
-		// 每个活动事务获得一个时间片；等待渲染线程或容量时本轮不再重复轮询。
-		AdvanceRootUpload(Renderer, *Candidates[Index]->Preparation, MAX_int32, FMath::Min(Deadline, Started + 0.00025));
+		// 先给每个可运行事务一个时间片；仍能推进的事务再共享本帧剩余额度。
+		// 容量或 RT 等待立即退出该事务，不重轮询、不延长统一截止时间。
+		if (AdvanceRootUpload(Renderer, *Candidates[Index]->Preparation, MAX_int32, FMath::Min(Deadline, Started + 0.00025)))
+			NextRound.Add(Candidates[Index]);
 		Candidates.RemoveAtSwap(Index, 1, EAllowShrinking::No);
 		const double Actual = FMath::Max(1.0, (FPlatformTime::Seconds() - Started) * 1000000.0);
 		verify(UploadSelection.Settle(Charge.Serial, Actual));
 		UploadCostMicroseconds = FMath::Lerp(UploadCostMicroseconds, Actual, 0.15);
+		if (Candidates.IsEmpty())
+		{
+			Candidates = MoveTemp(NextRound);
+			NextRound.Reset();
+		}
 	}
 }
 
-void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Renderer, FRootPreparation& Work,
+bool FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Renderer, FRootPreparation& Work,
 	const int32 InMaximumSteps, const double InDeadline)
 {
 	const double Deadline = FMath::Min(InDeadline, Module.GetTerrainFrameContext().Deadline());
 	if (Work.UploadAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked &&
-		!RendererHasExternalRelease(Work.Resources, Work.Consumer, Work.UploadCapacityVersion)) return;
+		!RendererHasExternalRelease(Work.Resources, Work.Consumer, Work.UploadCapacityVersion)) return false;
 	if (Work.UploadAdmission != EVoxelTerrainResourceAdmission::Granted &&
-		Work.UploadAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) return;
+		Work.UploadAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked) return false;
 	Work.UploadAdmission = EVoxelTerrainResourceAdmission::Granted;
 	const auto ObserveAdmission = [&](const EVoxelTerrainResourceAdmission Admission, const uint64 Before)
 	{
@@ -2518,7 +2549,8 @@ void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 		if (Work.DrawWalk.IsEmpty()) Work.Upload->Item->DrawRoots[Work.UploadRoot++] = MoveTemp(Node);
 		else Work.DrawWalk.Last().Result->Children[Work.DrawWalk.Last().Child - 1] = MoveTemp(Node);
 	};
-	for (int32 Step = 0; Step < InMaximumSteps && FPlatformTime::Seconds() < Deadline; ++Step)
+	int32 Step = 0;
+	for (; Step < InMaximumSteps && FPlatformTime::Seconds() < Deadline; ++Step)
 	{
 		if (Work.FineUpload)
 		{
@@ -2542,34 +2574,98 @@ void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 					const uint64 RequiredInput = Work.InputLease && Work.InputLease->GetPool() == EVoxelTerrainResourcePool::Input
 						? Work.InputLease->Bytes() : 0;
 					if (!ObserveAdmission(Fine.Item->MetadataLease->TryResize(Fine.Item->GetAllocatedBytes() + NewBytes,
-						RequiredInput, Work.InputLease ? 1 : 0), Before)) return;
+						RequiredInput, Work.InputLease ? 1 : 0), Before)) return false;
 					Fine.Item->DrawRanges.Reserve(Capacity);
 					check(Fine.Item->DrawRanges.GetAllocatedSize() <= NewBytes);
 					verify(Fine.Item->MetadataLease->Resize(Fine.Item->GetAllocatedBytes()));
 				}
-				if (!Transfer(Mesh->ResourceLease)) return;
+				if (!Transfer(Mesh->ResourceLease)) return false;
 				const int32 Count = FMath::Min(4096, Triangles - Fine.UploadTriangle);
 				EVoxelTerrainResourceAdmission ChunkAdmission = EVoxelTerrainResourceAdmission::None;
 				const uint64 Before = Work.Resources->ReleaseVersionExcludingOwner(Work.Consumer);
 				auto Chunk = Renderer.PrepareChunk(Work.Consumer, Mesh, Fine.UploadBatch,
 					Fine.Upload->Origin * Work.CellSize, Fine.Upload->Scale * Work.CellSize, Fine.UploadTriangle, Count, &ChunkAdmission);
-				if (!Chunk) { ObserveAdmission(ChunkAdmission, Before); return; }
+				if (!Chunk) { ObserveAdmission(ChunkAdmission, Before); return false; }
 				Fine.Item->DrawRanges.Add({MoveTemp(Chunk), 0, Count});
 				Fine.UploadTriangle += Count;
 				continue;
 			}
-			if (!Fine.Item->IsResourceReady() || !Transfer(Fine.Item->MetadataLease)) return;
+			// 先建立尚未封存的局部根；全部真实 chunk 的就绪在末尾统一核对。
+			if (!Transfer(Fine.Item->MetadataLease)) return false;
 			Work.Root = SetAtom(Work.Root, Fine.Item, 31, Fine.PathLease, Work.CellSize);
 			Work.FineUpload = Fine.Next;
 			continue;
 		}
-		if (!Work.Upload) { Work.bUploadComplete = true; return; }
+		if (!Work.Upload)
+		{
+			if (!Work.bUploadReadinessStarted)
+			{
+				Work.ReadinessFine = Work.FirstFine;
+				Work.ReadinessCoarse = Work.FirstPrepared;
+				Work.bUploadReadinessStarted = true;
+				continue;
+			}
+			if (Work.ReadinessFine)
+			{
+				// 保留原 Fine 身份、边界和每个实际 chunk 的完整门禁。
+				const auto& Fine = *Work.ReadinessFine;
+				const FAtomPtr Atom = Fine.bReuseNativeInterfaces ? Fine.Base : FAtomPtr(Fine.Item);
+				if (!Atom || !Atom->IsResourceReady()) return false;
+				Work.ReadinessFine = Work.ReadinessFine->Next;
+				continue;
+			}
+			if (Work.ReadinessCoarse)
+			{
+				const auto& Item = *Work.ReadinessCoarse->Item;
+				if (!Work.ReadinessDrawWalk.IsEmpty())
+				{
+					auto& Walk = Work.ReadinessDrawWalk.Last();
+					if (Walk.Child == -1)
+					{
+						Walk.Piece = Walk.Node->FirstPiece;
+						Walk.Child = 0;
+						continue;
+					}
+					if (Walk.Piece)
+					{
+						if (!Walk.Piece->Chunk || !Walk.Piece->Chunk->bReady.Load()) return false;
+						Walk.Piece = Walk.Piece->Next;
+						continue;
+					}
+					if (Walk.Child < 2)
+					{
+						const auto Child = Walk.Node->Children[Walk.Child++];
+						if (Child)
+						{
+							check(Work.ReadinessDrawWalk.Num() < 64);
+							Work.ReadinessDrawWalk.Add({Child});
+						}
+						continue;
+					}
+					Work.ReadinessDrawWalk.Pop(EAllowShrinking::No);
+					continue;
+				}
+				// 原始 Source chunk 与裁切 Draw chunk 均必须实际初始化完毕。
+				if (Work.ReadinessRoot == 0 && !Item.IsResourceReady()) return false;
+				if (Item.DrawRoots.IsValidIndex(Work.ReadinessRoot))
+				{
+					const auto Root = Item.DrawRoots[Work.ReadinessRoot++];
+					if (Root) Work.ReadinessDrawWalk.Add({Root});
+					continue;
+				}
+				Work.ReadinessCoarse = Work.ReadinessCoarse->Next;
+				Work.ReadinessRoot = 0;
+				continue;
+			}
+			Work.bUploadComplete = true;
+			return false;
+		}
 		auto& Item = *Work.Upload->Item;
 		if (Work.DrawWalk.IsEmpty())
 		{
 			if (Work.UploadRoot == Item.DrawRoots.Num())
 			{
-				if (!Transfer(Item.MetadataLease) || !Transfer(Item.Patch->MetadataLease)) return;
+				if (!Transfer(Item.MetadataLease) || !Transfer(Item.Patch->MetadataLease)) return false;
 				Work.CoarseRoot = SetCoarse(Work.CoarseRoot, Item.Geometry->Stamp.GeometryIdentity.Key, Item.SourceId,
 					Work.Upload->Item, 77, Work.Upload->PathLease);
 				Work.Upload = Work.Upload->Next;
@@ -2589,7 +2685,7 @@ void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 			const uint64 Before = Work.Resources->ReleaseVersionExcludingOwner(Work.Consumer);
 			if (!ObserveAdmission(TryAcquirePublicationResident(Resources, Work.Consumer,
 				VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainCoarseDrawNode>(), Lease, 0, Work.bAllowResidentOverlap), Before) ||
-				!Transfer(Walk.Patch->MetadataLease)) return;
+				!Transfer(Walk.Patch->MetadataLease)) return false;
 			Walk.Result = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainCoarseDrawNode>(Lease);
 			Walk.Result->Lease = MoveTemp(Lease);
 			Walk.Result->Patch = Walk.Patch;
@@ -2608,11 +2704,11 @@ void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 			const uint64 Before = Work.Resources->ReleaseVersionExcludingOwner(Work.Consumer);
 			if (!ObserveAdmission(TryAcquirePublicationResident(Resources, Work.Consumer,
 				VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainCoarseDrawPiece>(), Lease, 0, Work.bAllowResidentOverlap), Before) ||
-				!Transfer(Walk.Piece->MetadataLease) || !Transfer(Walk.Piece->Mesh->ResourceLease)) return;
+				!Transfer(Walk.Piece->MetadataLease) || !Transfer(Walk.Piece->Mesh->ResourceLease)) return false;
 			EVoxelTerrainResourceAdmission ChunkAdmission = EVoxelTerrainResourceAdmission::None;
 			auto Chunk = Renderer.PrepareChunk(Work.Consumer, Walk.Piece->Mesh, 0,
 				Item.Geometry->WorldCellOrigin * Work.CellSize, Item.Geometry->CellScale * Work.CellSize, 0, INDEX_NONE, &ChunkAdmission);
-			if (!Chunk) { ObserveAdmission(ChunkAdmission, Before); return; }
+			if (!Chunk) { ObserveAdmission(ChunkAdmission, Before); return false; }
 			auto Piece = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainCoarseDrawPiece>(Lease);
 			Piece->Lease = MoveTemp(Lease);
 			Piece->Piece = Walk.Piece;
@@ -2623,9 +2719,10 @@ void FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 			Walk.Piece = Walk.Piece->Next;
 			continue;
 		}
-		if (Walk.LastPiece && !Walk.LastPiece->Chunk->bReady.Load()) return;
+		// 所有上传仍受原 Working/Resident 授额约束；最终扫描前不会封存或发布。
 		CompleteDraw(Walk.Result);
 	}
+	return Step > 0 && !Work.bUploadComplete;
 }
 
 void FVoxelTerrainRendererState::ReleasePreparation(FReadyTransaction& InTransaction)
@@ -2747,10 +2844,12 @@ void FVoxelTerrainRendererState::AdvanceRootPreparations(const double InDeadline
 		for (const FRootPreparation* Work : ActivePreparations)
 		{
 			const FIntVector Section = Work->Publication->Atoms.IsEmpty() ? FIntVector::ZeroValue : Work->Publication->Atoms[0]->Section;
-			UE_LOG(LogTemp, Display, TEXT("Native active: request=%llu section=%s band=%d enqueued=%d executing=%d completed=%d applied=%d phase=%d fineProgress=%u fineReused=%d finePrepared=%d capacityWait=%d uploadComplete=%d uploadAdmission=%d fineUpload=%d batch=%d triangle=%d coarseRoot=%d merge=%d ready=%d active=%d"),
+			UE_LOG(LogTemp, Display, TEXT("Native active: request=%llu section=%s band=%d enqueued=%d executing=%d completed=%d applied=%d phase=%d fineProgress=%u fineReused=%d finePrepared=%d fineCompleted=%d fineSection=(%d,%d,%d) capacityWait=%d uploadComplete=%d uploadAdmission=%d fineUpload=%d batch=%d triangle=%d coarseRoot=%d merge=%d ready=%d active=%d"),
 				Work->Consumer.RequestSerial, *Section.ToString(), int32(Work->SchedulingBand), Work->bEnqueued,
 				Work->bExecuting.Load(), Work->bExecutionComplete.Load(), Work->bDecodeComplete, Work->DiagnosticPhase.Load(),
 				Work->DiagnosticFineProgress.Load(), Work->DiagnosticFineReused.Load(), Work->DiagnosticFinePrepared.Load(),
+				Work->DiagnosticFineCompleted.Load(), Work->DiagnosticFineSectionX.Load(),
+				Work->DiagnosticFineSectionY.Load(), Work->DiagnosticFineSectionZ.Load(),
 				Work->bWaitingCapacity.Load(), Work->bUploadComplete, int32(Work->UploadAdmission),
 				bool(Work->FineUpload), Work->FineUpload ? Work->FineUpload->UploadBatch : -1,
 				Work->FineUpload ? Work->FineUpload->UploadTriangle : -1, Work->UploadRoot,
