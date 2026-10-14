@@ -7,7 +7,12 @@
 #include "JsonObjectConverter.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/Paths.h"
+#include "Misc/ScopeExit.h"
 #include "SaveGame/SaveGameModuleTypes.h"
+
+#if PLATFORM_WINDOWS
+#include "Windows/WindowsHWrapper.h"
+#endif
 
 namespace SaveBranchTests
 {
@@ -341,5 +346,38 @@ bool FSaveBranchStaleManifestTest::RunTest(const FString& InParameters)
         Current.LastCommitOperationId == Pending.OperationId && IFileManager::Get().FileExists(*StoreFixture(Storage, Pending)));
     return true;
 }
+
+#if PLATFORM_WINDOWS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSaveBranchNativeOpenFileRetirementTest,
+    "WHFramework.SaveGame.Branch.NativeOpenFileRetirement",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSaveBranchNativeOpenFileRetirementTest::RunTest(const FString& InParameters)
+{
+    SaveBranchTests::FDirectory Directory;
+    FSaveGameStorage Storage(0, Directory.Path);
+    const FGuid SaveId = FGuid::NewGuid();
+    if (!TestTrue(TEXT("建立实际存档槽"), SaveBranchTests::CreateSlot(Storage, SaveId, 1))) return false;
+    FString Path = Storage.GetWorldDir(SaveId) / TEXT("NativeSharing.bin");
+    const TArray<uint8> Original = {17, 31, 47};
+    if (!TestTrue(TEXT("写入受占用保护的数据"), FSaveGameStorage::WriteBinaryDurable(Path, Original))) return false;
+    FPaths::MakePlatformFilename(Path);
+    HANDLE Handle = ::CreateFileW(*Path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (!TestTrue(TEXT("建立不允许删除共享的真实原生读句柄"), Handle != INVALID_HANDLE_VALUE)) return false;
+    ON_SCOPE_EXIT
+    {
+        if (Handle != INVALID_HANDLE_VALUE) ::CloseHandle(Handle);
+    };
+    TestFalse(TEXT("持续原生占用不能被有限重试强制退役"), Storage.DeleteWorldDirectory(SaveId));
+    TestTrue(TEXT("未成功 rename 时原存档仍可发现"), IFileManager::Get().DirectoryExists(*Storage.GetWorldDir(SaveId)));
+    TArray<uint8> Readback;
+    TestTrue(TEXT("拒绝退役后数据完整"), Storage.ReadBinary(Path, Readback) && Readback == Original);
+    ::CloseHandle(Handle);
+    Handle = INVALID_HANDLE_VALUE;
+    TestTrue(TEXT("真实句柄释放后同一槽可原子退役"), Storage.DeleteWorldDirectory(SaveId));
+    TestFalse(TEXT("成功后才退出可加载目录"), IFileManager::Get().DirectoryExists(*Storage.GetWorldDir(SaveId)));
+    return true;
+}
+#endif
 
 #endif

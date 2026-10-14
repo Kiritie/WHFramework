@@ -234,6 +234,7 @@ public:
     void ResyncInventory(const FGuid& InInventoryId);
     const FInventorySnapshot* FindView(const FGuid& InInventoryId) const;
     FGuid GetOwnerInventoryId() const;
+    FGuid GetWorldId() const;
     FGuid GetWorldEpoch() const;
     FGuid GetStoreId() const;
     FGuid GetSessionId(const FGuid& InInventoryId) const;

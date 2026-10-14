@@ -325,23 +325,18 @@ void ACharacterBase::StopSound(bool bMulticast)
 
 void ACharacterBase::PlayMontage(UAnimMontage* InMontage, bool bMulticast)
 {
-	if (bMulticast)
-	{
-		if (HasAuthority())
-		{
-			MultiPlayMontage(InMontage);
-		}
-		else if (UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent =
-		             AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
-		{
-			CharacterModuleNetworkComponent->ServerPlayMontageMulticast(this, InMontage);
-		}
-		return;
-	}
-	if (Anim)
-	{
-		Anim->Montage_Play(InMontage);
-	}
+    if (bMulticast)
+    {
+        if (HasAuthority())
+        {
+            MultiPlayMontage(InMontage);
+        }
+        return;
+    }
+    if (Anim && InMontage)
+    {
+        Anim->Montage_Play(InMontage);
+    }
 }
 
 void ACharacterBase::MultiPlayMontage_Implementation(UAnimMontage* InMontage)
@@ -360,23 +355,18 @@ void ACharacterBase::PlayMontageByName(const FName InMontageName, bool bMulticas
 
 void ACharacterBase::StopMontage(UAnimMontage* InMontage, bool bMulticast)
 {
-	if (bMulticast)
-	{
-		if (HasAuthority())
-		{
-			MultiStopMontage(InMontage);
-		}
-		else if (UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent =
-		             AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
-		{
-			CharacterModuleNetworkComponent->ServerStopMontageMulticast(this, InMontage);
-		}
-		return;
-	}
-	if (Anim)
-	{
-		Anim->Montage_Stop(.2f, InMontage);
-	}
+    if (bMulticast)
+    {
+        if (HasAuthority())
+        {
+            MultiStopMontage(InMontage);
+        }
+        return;
+    }
+    if (Anim)
+    {
+        Anim->Montage_Stop(0.2f, InMontage);
+    }
 }
 
 void ACharacterBase::MultiStopMontage_Implementation(UAnimMontage* InMontage)
@@ -395,43 +385,42 @@ void ACharacterBase::StopMontageByName(const FName InMontageName, bool bMulticas
 
 void ACharacterBase::TransformTowards(FTransform InTransform, float InDuration, bool bMulticast)
 {
-	if (bMulticast)
-	{
-		if (HasAuthority())
-		{
-			MultiTransformTowards(InTransform);
-		}
-		else if (UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent =
-		             AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
-		{
-			CharacterModuleNetworkComponent->ServerTransformTowardsToMulticast(this, InTransform);
-		}
-		return;
-	}
-	SetActorTransform(InTransform);
+    if (InTransform.ContainsNaN() || !InTransform.GetRotation().IsNormalized() ||
+        !FMath::IsFinite(InDuration) || InDuration < 0.f)
+    {
+        return;
+    }
+    if (bMulticast)
+    {
+        if (HasAuthority())
+        {
+            MultiTransformTowards(InTransform, InDuration);
+        }
+        return;
+    }
+    SetActorTransform(InTransform);
 }
 
 void ACharacterBase::MultiTransformTowards_Implementation(FTransform InTransform, float InDuration)
 {
-	TransformTowards(InTransform, false);
+    TransformTowards(InTransform, InDuration, false);
 }
 
 void ACharacterBase::RotationTowards(FRotator InRotation, float InDuration, bool bMulticast)
 {
-	if (bMulticast)
-	{
-		if (HasAuthority())
-		{
-			MultiRotationTowards(InRotation, InDuration);
-		}
-		else if (UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent =
-		             AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
-		{
-			CharacterModuleNetworkComponent->ServerRotationTowardsMulticast(this, InRotation, InDuration);
-		}
-		return;
-	}
-	SetActorRotation(InRotation);
+    if (InRotation.ContainsNaN() || !FMath::IsFinite(InDuration) || InDuration < 0.f)
+    {
+        return;
+    }
+    if (bMulticast)
+    {
+        if (HasAuthority())
+        {
+            MultiRotationTowards(InRotation, InDuration);
+        }
+        return;
+    }
+    SetActorRotation(InRotation);
 }
 
 void ACharacterBase::MultiRotationTowards_Implementation(FRotator InRotation, float InDuration)
@@ -441,23 +430,15 @@ void ACharacterBase::MultiRotationTowards_Implementation(FRotator InRotation, fl
 
 void ACharacterBase::AIMoveTo(FVector InLocation, float InStopDistance, bool bMulticast)
 {
-	if (bMulticast)
-	{
-		if (HasAuthority())
-		{
-			MultiAIMoveTo(InLocation, InStopDistance);
-		}
-		else if (UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent =
-		             AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
-		{
-			CharacterModuleNetworkComponent->ServerAIMoveToMulticast(this, InLocation, InStopDistance);
-		}
-		return;
-	}
-	if (AAIController* AIController = GetController<AAIController>())
-	{
-		AIController->MoveToLocation(InLocation, InStopDistance);
-	}
+    if (!HasAuthority() || InLocation.ContainsNaN() || !FMath::IsFinite(InStopDistance) || InStopDistance < 0.f)
+    {
+        return;
+    }
+    // AI 寻路只在权威端推进；位置由角色现有 Movement 复制。
+    if (AAIController* AIController = GetController<AAIController>())
+    {
+        AIController->MoveToLocation(InLocation, InStopDistance);
+    }
 }
 
 void ACharacterBase::MultiAIMoveTo_Implementation(FVector InLocation, float InStopDistance)
@@ -467,23 +448,14 @@ void ACharacterBase::MultiAIMoveTo_Implementation(FVector InLocation, float InSt
 
 void ACharacterBase::StopAIMove(bool bMulticast)
 {
-	if (bMulticast)
-	{
-		if (HasAuthority())
-		{
-			MultiStopAIMove();
-		}
-		else if (UCharacterModuleNetworkComponent* CharacterModuleNetworkComponent =
-		             AMainModule::GetModuleNetworkComponentByClass<UCharacterModuleNetworkComponent>())
-		{
-			CharacterModuleNetworkComponent->ServerStopAIMoveMulticast(this);
-		}
-		return;
-	}
-	if (AAIController* AIController = GetController<AAIController>())
-	{
-		AIController->StopMovement();
-	}
+    if (!HasAuthority())
+    {
+        return;
+    }
+    if (AAIController* AIController = GetController<AAIController>())
+    {
+        AIController->StopMovement();
+    }
 }
 
 void ACharacterBase::MultiStopAIMove_Implementation()

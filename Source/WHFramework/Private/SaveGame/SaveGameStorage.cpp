@@ -3,6 +3,7 @@
 #include "HAL/FileManager.h"
 #include "Ability/Inventory/InventoryStoreLock.h"
 #include "HAL/PlatformFileManager.h"
+#include "HAL/PlatformProcess.h"
 #include "Dom/JsonObject.h"
 #include "JsonObjectConverter.h"
 #include "Misc/FileHelper.h"
@@ -227,7 +228,28 @@ bool MoveCompletedSavePath(const FString& InSource, const FString& InTarget, con
 	const FString Source = NativeSavePath(InSource);
 	const FString Target = NativeSavePath(InTarget);
 	// 同卷替换不先删除旧 manifest；文件 Flush 成功后才发布路径，失败保留旧代。
-	return ::MoveFileExW(*Source, *Target, MOVEFILE_WRITE_THROUGH | (bInReplace ? MOVEFILE_REPLACE_EXISTING : 0)) != 0;
+	const DWORD Flags = MOVEFILE_WRITE_THROUGH | (bInReplace ? MOVEFILE_REPLACE_EXISTING : 0);
+	if (::MoveFileExW(*Source, *Target, Flags)) return true;
+	DWORD MoveError = ::GetLastError();
+	const DWORD Attributes = ::GetFileAttributesW(*Source);
+	if (!bInReplace && Attributes != INVALID_FILE_ATTRIBUTES && (Attributes & FILE_ATTRIBUTE_DIRECTORY))
+	{
+		// 原生读句柄或文件系统过滤器可能短暂阻止目录 rename；调用者持续持有写入/退役租约。
+		// 只重试同一次原子操作，不移动目标、不绕过权限、不提前报告退役成功。
+		for (int32 Retry = 0; Retry < 7 &&
+			(MoveError == ERROR_ACCESS_DENIED || MoveError == ERROR_SHARING_VIOLATION || MoveError == ERROR_LOCK_VIOLATION); ++Retry)
+		{
+			FPlatformProcess::SleepNoStats(0.001f * float(1 << FMath::Min(Retry, 5)));
+			if (::MoveFileExW(*Source, *Target, Flags))
+			{
+				UE_LOG(LogTemp, Display, TEXT("Atomic save directory rename recovered after transient native rejection: retries=%d"), Retry + 1);
+				return true;
+			}
+			MoveError = ::GetLastError();
+		}
+	}
+	::SetLastError(MoveError);
+	return false;
 #elif PLATFORM_LINUX
 	if (!bInReplace && (Platform.FileExists(*InTarget) || Platform.DirectoryExists(*InTarget))) return false;
 	FTCHARToUTF8 Source(*FPaths::ConvertRelativePathToFull(InSource));
@@ -383,7 +405,12 @@ bool FSaveGameStorage::CreateWorldDirectory(const FGuid& SaveId)
 bool FSaveGameStorage::DeleteWorldDirectory(const FGuid& SaveId)
 {
 	TSharedPtr<const FSaveGameGenerationWriteLease, ESPMode::ThreadSafe> Writer;
-	if (AcquireWorldWrite(SaveId, Writer) != ESaveWorldWriteResult::Acquired) return false;
+	const ESaveWorldWriteResult WriteResult = AcquireWorldWrite(SaveId, Writer);
+	if (WriteResult != ESaveWorldWriteResult::Acquired)
+	{
+		UE_LOG(LogTemp, Display, TEXT("Save retirement denied before filesystem access: world=%s writerResult=%d"), *SaveId.ToString(), int32(WriteResult));
+		return false;
+	}
 	const FString IntentPath = GetPendingWorldPath(SaveId);
 	if (!CreateSaveDirectoryDurable(FPaths::GetPath(IntentPath))) return false;
 	FString LockError;
@@ -401,8 +428,13 @@ bool FSaveGameStorage::DeleteWorldDirectory(const FGuid& SaveId)
 	return FSaveGameGenerationReadLease::TryRetireDirectory(WorldDirectory, Writer.Get(), [&]()
 	{
 		bool bDurable = MoveCompletedSavePath(WorldDirectory, Retired, false);
+		const uint32 MoveError = bDurable ? 0 : FPlatformMisc::GetLastError();
 		const bool bRetired = !IFileManager::Get().DirectoryExists(*WorldDirectory) && IFileManager::Get().DirectoryExists(*Retired);
-		if (!bRetired) return false;
+		if (!bRetired)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Save retirement rename rejected: nativeError=%u source=%s target=%s"), MoveError, *WorldDirectory, *Retired);
+			return false;
+		}
 		// rename 可见不代表目录项已持久；再确认两侧目录后才能报告删除成功。
 		if (!bDurable) bDurable = SyncSaveDirectory(RetiredRoot) && SyncSaveDirectory(GetWorldsDir());
 		// 原始路径已经退出可加载命名空间，才释放 store.lock；Windows 可安全关闭待删除句柄。

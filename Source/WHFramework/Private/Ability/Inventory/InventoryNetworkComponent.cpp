@@ -570,6 +570,11 @@ FGuid UInventoryNetworkComponent::GetOwnerInventoryId() const
     return OwnerInventoryId;
 }
 
+FGuid UInventoryNetworkComponent::GetWorldId() const
+{
+    return ConnectionWorldId;
+}
+
 FGuid UInventoryNetworkComponent::GetWorldEpoch() const
 {
     return WorldEpoch;

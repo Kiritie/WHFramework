@@ -1,65 +1,78 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Character/CharacterModuleNetworkComponent.h"
 
+#include "Animation/AnimMontage.h"
 #include "Character/Base/CharacterInterface.h"
+#include "Engine/World.h"
 
 UCharacterModuleNetworkComponent::UCharacterModuleNetworkComponent()
 {
-	
 }
 
-bool UCharacterModuleNetworkComponent::ServerPlayMontageMulticast_Validate(AActor* InCharacter, UAnimMontage* InMontage) { return true; }
-void UCharacterModuleNetworkComponent::ServerPlayMontageMulticast_Implementation(AActor* InCharacter, UAnimMontage* InMontage)
+bool UCharacterModuleNetworkComponent::CanOperate(AActor* InCharacter) const
 {
-	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
-	{
-		Character->PlayMontage(InMontage, true);
-	}
+    return IsValid(GetOwner()) && GetOwner()->HasAuthority() && IsValid(InCharacter) &&
+        InCharacter->HasAuthority() && GetWorld() && !GetWorld()->bIsTearingDown &&
+        GetWorld()->GetNetMode() != NM_Client && InCharacter->GetWorld() == GetWorld() &&
+        Cast<ICharacterInterface>(InCharacter) != nullptr;
 }
 
-bool UCharacterModuleNetworkComponent::ServerStopMontageMulticast_Validate(AActor* InCharacter, UAnimMontage* InMontage) { return true; }
-void UCharacterModuleNetworkComponent::ServerStopMontageMulticast_Implementation(AActor* InCharacter, UAnimMontage* InMontage)
+bool UCharacterModuleNetworkComponent::PlayMontageAuthority(AActor* InCharacter, UAnimMontage* InMontage)
 {
-	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
-	{
-		Character->StopMontage(InMontage, true);
-	}
+    if (!CanOperate(InCharacter) || !IsValid(InMontage))
+    {
+        return false;
+    }
+    Cast<ICharacterInterface>(InCharacter)->PlayMontage(InMontage, true);
+    return true;
 }
 
-bool UCharacterModuleNetworkComponent::ServerTransformTowardsToMulticast_Validate(AActor* InCharacter, FTransform InTransform) { return true; }
-void UCharacterModuleNetworkComponent::ServerTransformTowardsToMulticast_Implementation(AActor* InCharacter, FTransform InTransform)
+bool UCharacterModuleNetworkComponent::StopMontageAuthority(AActor* InCharacter, UAnimMontage* InMontage)
 {
-	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
-	{
-		Character->TransformTowards(InTransform, true);
-	}
+    if (!CanOperate(InCharacter) || (InMontage && !IsValid(InMontage)))
+    {
+        return false;
+    }
+    Cast<ICharacterInterface>(InCharacter)->StopMontage(InMontage, true);
+    return true;
 }
 
-bool UCharacterModuleNetworkComponent::ServerRotationTowardsMulticast_Validate(AActor* InCharacter, FRotator InRotation, float InDuration) { return true; }
-void UCharacterModuleNetworkComponent::ServerRotationTowardsMulticast_Implementation(AActor* InCharacter, FRotator InRotation, float InDuration)
+bool UCharacterModuleNetworkComponent::TransformAuthority(AActor* InCharacter, FTransform InTransform, float InDuration)
 {
-	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
-	{
-		Character->RotationTowards(InRotation, InDuration, true);
-	}
+    if (!CanOperate(InCharacter) || InTransform.ContainsNaN() || !InTransform.GetRotation().IsNormalized() ||
+        !FMath::IsFinite(InDuration) || InDuration < 0.f)
+    {
+        return false;
+    }
+    Cast<ICharacterInterface>(InCharacter)->TransformTowards(InTransform, InDuration, true);
+    return true;
 }
 
-bool UCharacterModuleNetworkComponent::ServerAIMoveToMulticast_Validate(AActor* InCharacter, FVector InLocation, float InStopDistance) { return true; }
-void UCharacterModuleNetworkComponent::ServerAIMoveToMulticast_Implementation(AActor* InCharacter, FVector InLocation, float InStopDistance)
+bool UCharacterModuleNetworkComponent::RotateAuthority(AActor* InCharacter, FRotator InRotation, float InDuration)
 {
-	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
-	{
-		Character->AIMoveTo(InLocation, InStopDistance, true);
-	}
+    if (!CanOperate(InCharacter) || InRotation.ContainsNaN() || !FMath::IsFinite(InDuration) || InDuration < 0.f)
+    {
+        return false;
+    }
+    Cast<ICharacterInterface>(InCharacter)->RotationTowards(InRotation, InDuration, true);
+    return true;
 }
 
-bool UCharacterModuleNetworkComponent::ServerStopAIMoveMulticast_Validate(AActor* InCharacter) { return true; }
-void UCharacterModuleNetworkComponent::ServerStopAIMoveMulticast_Implementation(AActor* InCharacter)
+bool UCharacterModuleNetworkComponent::MoveAIAuthority(AActor* InCharacter, FVector InLocation, float InStopDistance)
 {
-	if(ICharacterInterface* Character = Cast<ICharacterInterface>(InCharacter))
-	{
-		Character->StopAIMove(true);
-	}
+    if (!CanOperate(InCharacter) || InLocation.ContainsNaN() || !FMath::IsFinite(InStopDistance) || InStopDistance < 0.f)
+    {
+        return false;
+    }
+    Cast<ICharacterInterface>(InCharacter)->AIMoveTo(InLocation, InStopDistance, true);
+    return true;
+}
+
+bool UCharacterModuleNetworkComponent::StopAIAuthority(AActor* InCharacter)
+{
+    if (!CanOperate(InCharacter))
+    {
+        return false;
+    }
+    Cast<ICharacterInterface>(InCharacter)->StopAIMove(true);
+    return true;
 }
