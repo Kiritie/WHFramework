@@ -13,6 +13,7 @@ bool UWidgetThemePreviewButton::Initialize()
 		UOverlay* Root = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("Root"));
 		Img_Icon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Img_Icon"));
 		Txt_Title = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass(), TEXT("Txt_Title"));
+		Txt_Title->SetJustification(ETextJustify::Center);
 		Img_Icon->SetVisibility(ESlateVisibility::Collapsed);
 		Root->AddChildToOverlay(Img_Icon);
 		UOverlaySlot* TitleSlot = Root->AddChildToOverlay(Txt_Title);
@@ -21,4 +22,9 @@ bool UWidgetThemePreviewButton::Initialize()
 		WidgetTree->RootWidget = Root;
 	}
 	return Super::Initialize();
+}
+
+void UWidgetThemePreviewButton::SetPreviewTextVisible(bool bVisible)
+{
+	Txt_Title->SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 }

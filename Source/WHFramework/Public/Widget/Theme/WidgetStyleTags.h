@@ -1,7 +1,7 @@
 #pragma once
 
 #include "NativeGameplayTags.h"
-#include "Widget/Theme/WidgetStyleCatalog.h"
+#include "Widget/Theme/WidgetStyleTypes.h"
 
 namespace WidgetStyleTags
 {

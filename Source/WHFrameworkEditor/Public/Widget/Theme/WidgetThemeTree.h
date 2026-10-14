@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
-#include "Widget/Theme/WidgetStyleCatalog.h"
+#include "Widget/Theme/WidgetStyleTypes.h"
 
 class UWidgetTheme;
 

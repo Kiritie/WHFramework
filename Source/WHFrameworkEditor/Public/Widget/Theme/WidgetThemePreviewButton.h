@@ -8,4 +8,5 @@ class UWidgetThemePreviewButton : public UCommonButton
 	GENERATED_BODY()
 public:
 	virtual bool Initialize() override;
+	void SetPreviewTextVisible(bool bVisible);
 };

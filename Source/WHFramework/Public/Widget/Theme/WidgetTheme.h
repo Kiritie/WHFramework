@@ -7,7 +7,7 @@
 #include "Setting/SettingModuleTypes.h"
 
 #include "Widget/Style/WidgetBrushStyle.h"
-#include "Widget/Theme/WidgetStyleCatalog.h"
+#include "Widget/Theme/WidgetStyleTypes.h"
 #include "WidgetTheme.generated.h"
 
 class UWidgetSettingEntryBase;

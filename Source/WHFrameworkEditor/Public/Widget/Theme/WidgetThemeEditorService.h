@@ -1,19 +1,17 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
-#include "Widget/Theme/WidgetStyleCatalog.h"
+#include "Widget/Theme/WidgetStyleTypes.h"
 #include "Widget/Theme/WidgetTheme.h"
 
 class UWidgetTheme;
-class UWidgetStyleCatalog;
 class UBlueprint;
 class WHFRAMEWORKEDITOR_API FWidgetThemeEditorService
 {
 public:
 	static void RegisterAssetLifecycle();
 	static void UnregisterAssetLifecycle();
-	static UWidgetStyleCatalog* Catalog();
-	static UClass* NativeRoot(EWidgetStyleKind Kind);
+	static UClass* CreationBase(EWidgetStyleKind Kind);
 	static TArray<FGameplayTag> Tags(const UWidgetTheme* Theme);
 	static bool Kind(FGameplayTag Tag, EWidgetStyleKind& Out);
 	static UBlueprint* Blueprint(UWidgetTheme* Theme, FGameplayTag Tag);

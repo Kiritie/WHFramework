@@ -24,7 +24,6 @@ void UWidgetThemeSubsystem::Deinitialize()
 	}
 	Pending.Reset();
 	ActiveTheme = nullptr;
-	Catalog = nullptr;
 	Super::Deinitialize();
 }
 void UWidgetThemeSubsystem::RequestTheme(TSoftObjectPtr<UWidgetTheme> Theme)
@@ -42,22 +41,21 @@ void UWidgetThemeSubsystem::RequestTheme(TSoftObjectPtr<UWidgetTheme> Theme)
 		OnSwitchFinished.Broadcast(false, TEXT("Theme is empty or not in the configured cook allowlist."));
 		return;
 	}
-	TArray<FSoftObjectPath> Paths{Theme.ToSoftObjectPath(), Settings->StyleCatalog.ToSoftObjectPath()};
-	Pending = UAssetManager::GetStreamableManager().RequestAsyncLoad(
-		Paths, FStreamableDelegate::CreateUObject(this, &ThisClass::CompleteRequest, Serial, Theme, Settings->StyleCatalog));
+	TArray<FSoftObjectPath> Paths{Theme.ToSoftObjectPath()};
+	Pending =
+		UAssetManager::GetStreamableManager().RequestAsyncLoad(Paths, FStreamableDelegate::CreateUObject(this, &ThisClass::CompleteRequest, Serial, Theme));
 	if (!Pending)
 	{
 		OnSwitchFinished.Broadcast(false, TEXT("Unable to create theme load request."));
 	}
 }
-void UWidgetThemeSubsystem::CompleteRequest(uint64 Serial, TSoftObjectPtr<UWidgetTheme> Requested, TSoftObjectPtr<UWidgetStyleCatalog> RequestedCatalog)
+void UWidgetThemeSubsystem::CompleteRequest(uint64 Serial, TSoftObjectPtr<UWidgetTheme> Requested)
 {
 	if (Serial != RequestSerial)
 	{
 		return;
 	}
 	UWidgetTheme* Candidate = Requested.Get();
-	UWidgetStyleCatalog* CandidateCatalog = RequestedCatalog.Get();
 	FString Error;
 	if (Candidate && !Candidate->bRuntimeTheme)
 	{
@@ -65,7 +63,7 @@ void UWidgetThemeSubsystem::CompleteRequest(uint64 Serial, TSoftObjectPtr<UWidge
 		OnSwitchFinished.Broadcast(false, TEXT("A library theme cannot be activated as a runtime theme."));
 		return;
 	}
-	if (!FWidgetThemeResolver::Validate(Candidate, CandidateCatalog, Error))
+	if (!FWidgetThemeResolver::Validate(Candidate, Error))
 	{
 		Pending.Reset();
 		UE_LOG(LogTemp, Error, TEXT("Theme switch rejected: %s"), *Error);
@@ -74,7 +72,6 @@ void UWidgetThemeSubsystem::CompleteRequest(uint64 Serial, TSoftObjectPtr<UWidge
 	}
 
 	ActiveTheme = Candidate;
-	Catalog = CandidateCatalog;
 	Pending.Reset();
 	FWidgetThemeResolver::NotifyThemeChanged();
 	OnSwitchFinished.Broadcast(true, FString());
@@ -97,20 +94,18 @@ bool UWidgetThemeSubsystem::ApplyLoadedTheme(UWidgetTheme* Theme, FString& Error
 		OnSwitchFinished.Broadcast(false, Error);
 		return false;
 	}
-	UWidgetStyleCatalog* CandidateCatalog = Settings->StyleCatalog.LoadSynchronous();
 	if (!Theme->bRuntimeTheme)
 	{
 		Error = TEXT("A library theme cannot be activated as a runtime theme.");
 		OnSwitchFinished.Broadcast(false, Error);
 		return false;
 	}
-	if (!FWidgetThemeResolver::Validate(Theme, CandidateCatalog, Error))
+	if (!FWidgetThemeResolver::Validate(Theme, Error))
 	{
 		OnSwitchFinished.Broadcast(false, Error);
 		return false;
 	}
 	ActiveTheme = Theme;
-	Catalog = CandidateCatalog;
 	FWidgetThemeResolver::NotifyThemeChanged();
 	OnSwitchFinished.Broadcast(true, FString());
 	return true;

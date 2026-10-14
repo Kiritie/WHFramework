@@ -22,21 +22,15 @@ public:
 	{
 		return ActiveTheme;
 	}
-	UWidgetStyleCatalog* GetCatalog() const
-	{
-		return Catalog;
-	}
 
 	bool ApplyLoadedTheme(UWidgetTheme* Theme, FString& Error);
 	UPROPERTY(BlueprintAssignable, Category = "Theme")
 	FWidgetThemeSwitchResult OnSwitchFinished;
 
 private:
-	void CompleteRequest(uint64 Serial, TSoftObjectPtr<UWidgetTheme> Requested, TSoftObjectPtr<UWidgetStyleCatalog> RequestedCatalog);
+	void CompleteRequest(uint64 Serial, TSoftObjectPtr<UWidgetTheme> Requested);
 	UPROPERTY(Transient)
 	TObjectPtr<UWidgetTheme> ActiveTheme;
-	UPROPERTY(Transient)
-	TObjectPtr<UWidgetStyleCatalog> Catalog;
 	TSharedPtr<FStreamableHandle> Pending;
 	uint64 RequestSerial = 0;
 };

@@ -10,23 +10,18 @@ void SWidgetThemePicker::Construct(const FArguments& InArgs)
 {
 	SelectedTheme = InArgs._SelectedTheme;
 	OnThemeSelected = InArgs._OnThemeSelected;
-	bAllowProjectDefault = InArgs._AllowProjectDefault;
 	ChildSlot[SNew(SComboButton)
 				  .OnGetMenuContent(this, &SWidgetThemePicker::BuildMenu)
 				  .ButtonContent()[SNew(STextBlock)
-									   .Text_Lambda(
-										   [this]
-										   { return FText::FromString(SelectedTheme.Get() ? SelectedTheme.Get()->GetPathName() : TEXT("Project default")); })]];
+									   .Text_Lambda([this]
+													{ return SelectedTheme.Get() ? FText::FromString(SelectedTheme.Get()->GetName()) : FText::GetEmpty(); })]];
 }
 
 TSharedRef<SWidget> SWidgetThemePicker::BuildMenu()
 {
 	FMenuBuilder Menu(true, nullptr);
-	if (bAllowProjectDefault)
-	{
-		Menu.AddMenuEntry(NSLOCTEXT("WidgetTheme", "ProjectDefault", "Project default"), FText(), FSlateIcon(),
-						  FUIAction(FExecuteAction::CreateSPLambda(this, [this] { OnThemeSelected.ExecuteIfBound(nullptr); })));
-	}
+	Menu.AddMenuEntry(FText::GetEmpty(), NSLOCTEXT("WidgetTheme", "ClearTheme", "Clear the theme selection"), FSlateIcon(),
+					  FUIAction(FExecuteAction::CreateSPLambda(this, [this] { OnThemeSelected.ExecuteIfBound(nullptr); })));
 	FARFilter Filter;
 	Filter.ClassPaths.Add(UWidgetTheme::StaticClass()->GetClassPathName());
 	Filter.bRecursiveClasses = true;

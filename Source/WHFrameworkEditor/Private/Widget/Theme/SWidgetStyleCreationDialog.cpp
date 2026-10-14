@@ -46,36 +46,40 @@ void SWidgetStyleCreationDialog::Construct(const FArguments& InArgs)
 	auto Row = [](const TCHAR* Label, TSharedRef<SWidget> Control) -> TSharedRef<SWidget>
 	{
 		return SNew(SHorizontalBox) +
-			   SHorizontalBox::Slot().AutoWidth().Padding(4)[SNew(SBox).WidthOverride(110)[SNew(STextBlock).Text(FText::FromString(Label))]] +
+			   SHorizontalBox::Slot().AutoWidth().Padding(
+				   4)[SNew(SBox).WidthOverride(110)[SNew(STextBlock).Text(FText::FromString(Label)).Justification(ETextJustify::Center)]] +
 			   SHorizontalBox::Slot().FillWidth(1).Padding(4)[Control];
 	};
 	TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
-	Body->AddSlot().AutoHeight()[Row(TEXT("Name"), SAssignNew(NameInput, SEditableTextBox)
-													   .OnTextChanged_Lambda(
-														   [this](const FText& Text)
-														   {
-															   FString Error;
-															   FWidgetThemeEditorService::ValidateName(Text.ToString(), Error);
-															   NameInput->SetError(FText::FromString(Error));
-														   }))];
+	Body->AddSlot().AutoHeight()[Row(TEXT("Tag"), SAssignNew(NameInput, SEditableTextBox)
+													  .OnTextChanged_Lambda(
+														  [this](const FText& Text)
+														  {
+															  FString Error;
+															  FWidgetThemeEditorService::ValidateName(Text.ToString(), Error);
+															  NameInput->SetError(FText::FromString(Error));
+														  }))];
 	TSharedRef<SHorizontalBox> Types = SNew(SHorizontalBox).IsEnabled(!bTypeLocked);
 	for (EWidgetStyleKind Type : {EWidgetStyleKind::Button, EWidgetStyleKind::Text, EWidgetStyleKind::Brush})
 	{
 		const FString Label = Type == EWidgetStyleKind::Button ? TEXT("Button") : Type == EWidgetStyleKind::Text ? TEXT("Text") : TEXT("Brush");
-		Types->AddSlot().FillWidth(1)[SNew(SCheckBox)
-										  .Style(FAppStyle::Get(), "ToggleButtonCheckbox")
-										  .IsChecked_Lambda([this, Type] { return Kind == Type ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
-										  .OnCheckStateChanged_Lambda(
-											  [this, Type](ECheckBoxState State)
-											  {
-												  if (State == ECheckBoxState::Checked)
-												  {
-													  Kind = Type;
-													  ParentTag = WidgetStyleTags::Root(Type);
-													  SourceTag = FGameplayTag();
-													  bInheritParent = false;
-												  }
-											  })[SNew(STextBlock).Text(FText::FromString(Label))]];
+		Types->AddSlot().FillWidth(1).Padding(
+			1, 0)[SNew(SCheckBox)
+					  .Style(FAppStyle::Get(), "SegmentedCombo.ButtonOnly")
+					  .HAlign(HAlign_Center)
+					  .Padding(FMargin(4, 3))
+					  .IsChecked_Lambda([this, Type] { return Kind == Type ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+					  .OnCheckStateChanged_Lambda(
+						  [this, Type](ECheckBoxState State)
+						  {
+							  if (State == ECheckBoxState::Checked)
+							  {
+								  Kind = Type;
+								  ParentTag = WidgetStyleTags::Root(Type);
+								  SourceTag = FGameplayTag();
+								  bInheritParent = false;
+							  }
+						  })[SNew(STextBlock).Text(FText::FromString(Label)).Justification(ETextJustify::Center)]];
 	}
 	Body->AddSlot().AutoHeight()[Row(TEXT("Type"), Types)];
 	Body->AddSlot()
@@ -98,26 +102,27 @@ void SWidgetStyleCreationDialog::Construct(const FArguments& InArgs)
 		TSharedRef<SHorizontalBox> Inheritance = SNew(SHorizontalBox);
 		for (bool Inherit : {false, true})
 		{
-			Inheritance->AddSlot().FillWidth(
-				1)[SNew(SCheckBox)
-					   .Style(FAppStyle::Get(), "ToggleButtonCheckbox")
-					   .IsEnabled_Lambda([this, Inherit] { return !Inherit || !WidgetStyleTags::IsRoot(ParentTag); })
-					   .IsChecked_Lambda([this, Inherit] { return bInheritParent == Inherit ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
-					   .OnCheckStateChanged_Lambda(
-						   [this, Inherit](ECheckBoxState State)
-						   {
-							   if (State == ECheckBoxState::Checked)
-							   {
-								   bInheritParent = Inherit;
-							   }
-						   })[SNew(STextBlock).Text(FText::FromString(Inherit ? TEXT("Parent Tag") : TEXT("None")))]];
+			Inheritance->AddSlot().FillWidth(1).Padding(
+				1, 0)[SNew(SCheckBox)
+						  .Style(FAppStyle::Get(), "SegmentedCombo.ButtonOnly")
+						  .HAlign(HAlign_Center)
+						  .Padding(FMargin(4, 3))
+						  .IsEnabled_Lambda([this, Inherit] { return !Inherit || !WidgetStyleTags::IsRoot(ParentTag); })
+						  .IsChecked_Lambda([this, Inherit] { return bInheritParent == Inherit ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+						  .OnCheckStateChanged_Lambda(
+							  [this, Inherit](ECheckBoxState State)
+							  {
+								  if (State == ECheckBoxState::Checked)
+								  {
+									  bInheritParent = Inherit;
+								  }
+							  })[SNew(STextBlock).Text(FText::FromString(Inherit ? TEXT("Parent Tag") : TEXT("None"))).Justification(ETextJustify::Center)]];
 		}
 		Body->AddSlot().AutoHeight()[Row(TEXT("Inheritance"), Inheritance)];
 	}
 	else
 	{
 		Body->AddSlot().AutoHeight()[Row(TEXT("Source theme"), SNew(SWidgetThemePicker)
-																   .AllowProjectDefault(false)
 																   .SelectedTheme_Lambda([this] { return SourceTheme.Get(); })
 																   .OnThemeSelected_Lambda(
 																	   [this](UWidgetTheme* Source)
@@ -133,6 +138,7 @@ void SWidgetStyleCreationDialog::Construct(const FArguments& InArgs)
 	}
 	Body->AddSlot().FillHeight(1).Padding(4)[SNew(STextBlock).AutoWrapText(true).Text_Lambda([this] { return FText::FromString(Report); })];
 	Body->AddSlot().AutoHeight().Padding(4)[SNew(SButton)
+												.HAlign(HAlign_Center)
 												.Text(NSLOCTEXT("WidgetTheme", "Confirm", "Confirm"))
 												.IsEnabled_Lambda(
 													[this]

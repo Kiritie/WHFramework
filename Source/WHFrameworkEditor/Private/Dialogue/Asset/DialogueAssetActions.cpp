@@ -12,7 +12,7 @@ FDialogueAssetActions::FDialogueAssetActions(uint32 InAssetCategory)
 
 FText FDialogueAssetActions::GetName() const
 {
-	return LOCTEXT("FDialogueAssetActionsName", "Dialogue");
+	return LOCTEXT("FDialogueAssetActionsName", "Dialogue Asset");
 }
 
 FColor FDialogueAssetActions::GetTypeColor() const

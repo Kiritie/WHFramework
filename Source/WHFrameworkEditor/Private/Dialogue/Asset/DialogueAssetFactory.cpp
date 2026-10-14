@@ -28,7 +28,7 @@ uint32 UDialogueAssetFactory::GetMenuCategories() const
 
 FText UDialogueAssetFactory::GetDisplayName() const
 {
-	return LOCTEXT("DialogueText", "Dialogue");
+	return LOCTEXT("DialogueText", "Dialogue Asset");
 }
 
 FString UDialogueAssetFactory::GetDefaultNewAssetName() const

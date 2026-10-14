@@ -7,7 +7,7 @@
 #include "UObject/GCObject.h"
 #include "GameplayTagContainer.h"
 #include "Widgets/Views/STreeView.h"
-#include "Widget/Theme/WidgetStyleCatalog.h"
+#include "Widget/Theme/WidgetStyleTypes.h"
 #include "Widget/Theme/WidgetThemeTree.h"
 
 class UWidgetTheme;
@@ -64,7 +64,10 @@ private:
 	TObjectPtr<UCommonImageN> PreviewImage = nullptr;
 	TSharedPtr<IDetailsView> Details;
 	TSharedPtr<STreeView<TSharedPtr<FThemeTreeItem>>> Tree;
-	TSharedPtr<SEditableTextBox> RenameInput;
+	FVector2D PreviewSize = FVector2D(200, 60);
+	bool bPreviewWidthEdited = false;
+	bool bPreviewHeightEdited = false;
+	bool bShowPreviewText = true;
 	TArray<TSharedPtr<FThemeTreeItem>> Roots;
 	FGameplayTag SelectedTag;
 	FString Search;
@@ -82,10 +85,12 @@ private:
 	TSharedRef<SDockTab> SpawnContext(const FSpawnTabArgs& Args);
 	void ExtendToolbar(FToolBarBuilder& Builder);
 	FReply OpenStyleDialog(EWidgetStyleOperation Operation);
+	FReply OpenRenameDialog();
 	void Refresh();
 	void Select(TSharedPtr<FThemeTreeItem> Item, ESelectInfo::Type Type);
 	void BindDetails();
 	void UpdatePreview();
+	void UpdatePreviewSize(UObject* Style, EWidgetStyleKind Kind);
 	void FinishDetailsEdit();
 	bool CanEditSelection() const;
 	FReply Run(const FString& OperationName, TFunction<bool(FString&)> Operation);

@@ -8,10 +8,22 @@ class WHFRAMEWORK_API UWidgetThemeSettings : public UDeveloperSettings
 {
 	GENERATED_BODY()
 public:
+	UWidgetThemeSettings();
+
 	UPROPERTY(Config, EditAnywhere, Category = "Themes")
 	TSoftObjectPtr<UWidgetTheme> DefaultTheme;
-	UPROPERTY(Config, EditAnywhere, Category = "Themes")
-	TSoftObjectPtr<UWidgetStyleCatalog> StyleCatalog;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
+	TSubclassOf<UCommonButtonStyle> ButtonStyleBase;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
+	TSubclassOf<UCommonTextStyle> TextStyleBase;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
+	TSubclassOf<UWidgetBrushStyle> BrushStyleBase;
+
+	UClass* GetStyleBase(EWidgetStyleKind Kind) const;
+
 	UPROPERTY(Config, EditAnywhere, Category = "Themes")
 	TArray<TSoftObjectPtr<UWidgetTheme>> AvailableThemes;
 

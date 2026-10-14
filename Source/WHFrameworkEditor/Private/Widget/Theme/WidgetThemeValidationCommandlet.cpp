@@ -53,8 +53,7 @@ int32 UWidgetThemeValidationCommandlet::Main(const FString& Params)
 			Good &= FWidgetThemeEditorService::Save(Theme, Result);
 		}
 		FString RuntimeResult;
-		const bool Valid = FWidgetThemeEditorService::Validate(Theme, Result) &&
-						   FWidgetThemeResolver::Validate(Theme, FWidgetThemeEditorService::Catalog(), RuntimeResult, Theme->bRuntimeTheme);
+		const bool Valid = FWidgetThemeEditorService::Validate(Theme, Result) && FWidgetThemeResolver::Validate(Theme, RuntimeResult);
 		Result += RuntimeResult;
 		Good &= Valid;
 		Report += Theme->GetPathName() + (Valid ? TEXT(": VALID\n") : TEXT(": INVALID\n")) + Result;
@@ -62,7 +61,6 @@ int32 UWidgetThemeValidationCommandlet::Main(const FString& Params)
 	if (FParse::Param(*Params, TEXT("Organize")))
 	{
 		Settings->DefaultTheme = Settings->DefaultTheme.LoadSynchronous();
-		Settings->StyleCatalog = Settings->StyleCatalog.LoadSynchronous();
 		for (auto& Path : Settings->AvailableThemes)
 		{
 			Path = Path.LoadSynchronous();

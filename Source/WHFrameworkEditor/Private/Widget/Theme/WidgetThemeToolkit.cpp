@@ -24,13 +24,14 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Input/SNumericEntryBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SSearchBox.h"
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SSplitter.h"
 #include "Widgets/Layout/SBox.h"
-#include "Widgets/Layout/SWrapBox.h"
+#include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "UObject/UObjectGlobals.h"
@@ -54,7 +55,7 @@ namespace
 	public:
 		virtual FText GetName() const override
 		{
-			return LOCTEXT("AssetName", "主题资产");
+			return LOCTEXT("AssetName", "Theme Asset");
 		}
 		virtual FColor GetTypeColor() const override
 		{
@@ -130,16 +131,16 @@ void UnregisterWidgetThemeAssetEditor()
 }
 TSharedRef<FTabManager::FLayout> FWidgetThemeToolkit::CreateDefaultLayout()
 {
-	return FTabManager::NewLayout("WidgetThemeEditor_DockedNative_v2")
+	return FTabManager::NewLayout("WidgetThemeEditor_DockedNative_v4")
 		->AddArea(FTabManager::NewPrimaryArea()
 					  ->SetOrientation(Orient_Vertical)
 					  ->Split(FTabManager::NewSplitter()
 								  ->SetOrientation(Orient_Horizontal)
-								  ->SetSizeCoefficient(0.82f)
-								  ->Split(FTabManager::NewStack()->SetSizeCoefficient(0.25f)->AddTab(TagsTab, ETabState::OpenedTab))
-								  ->Split(FTabManager::NewStack()->SetSizeCoefficient(0.45f)->AddTab(PreviewTab, ETabState::OpenedTab))
-								  ->Split(FTabManager::NewStack()->SetSizeCoefficient(0.30f)->AddTab(DetailsTab, ETabState::OpenedTab)))
-					  ->Split(FTabManager::NewStack()->SetSizeCoefficient(0.18f)->AddTab(ContextTab, ETabState::OpenedTab)));
+								  ->SetSizeCoefficient(0.91f)
+								  ->Split(FTabManager::NewStack()->SetSizeCoefficient(0.25f)->SetHideTabWell(true)->AddTab(TagsTab, ETabState::OpenedTab))
+								  ->Split(FTabManager::NewStack()->SetSizeCoefficient(0.45f)->SetHideTabWell(true)->AddTab(PreviewTab, ETabState::OpenedTab))
+								  ->Split(FTabManager::NewStack()->SetSizeCoefficient(0.30f)->SetHideTabWell(true)->AddTab(DetailsTab, ETabState::OpenedTab)))
+					  ->Split(FTabManager::NewStack()->SetSizeCoefficient(0.09f)->SetHideTabWell(true)->AddTab(ContextTab, ETabState::OpenedTab)));
 }
 
 void FWidgetThemeToolkit::Open(UWidgetTheme* InTheme, const TSharedPtr<IToolkitHost>& Host)
@@ -150,10 +151,11 @@ void FWidgetThemeToolkit::Open(UWidgetTheme* InTheme, const TSharedPtr<IToolkitH
 	PreviewButton = NewObject<UWidgetThemePreviewButton>(PreviewRoot);
 	PreviewButton->SetDesignerFlags(EWidgetDesignFlags::Designing);
 	PreviewButton->Initialize();
-	PreviewButton->SetTitle(LOCTEXT("ButtonPreview", "Button preview"));
+	PreviewButton->SetTitle(LOCTEXT("ButtonPreview", "Text Block"));
 	PreviewText = NewObject<UCommonTextBlockN>(PreviewRoot);
 	PreviewText->SetDesignerFlags(EWidgetDesignFlags::Designing);
 	PreviewText->SetText(LOCTEXT("TextPreview", "Aa 0123 中文"));
+	PreviewText->SetJustification(ETextJustify::Center);
 	PreviewImage = NewObject<UCommonImageN>(PreviewRoot);
 	PreviewImage->SetDesignerFlags(EWidgetDesignFlags::Designing);
 	FDetailsViewArgs Args;
@@ -323,11 +325,89 @@ FReply FWidgetThemeToolkit::OpenStyleDialog(EWidgetStyleOperation Operation)
 	return FReply::Handled();
 }
 
+FReply FWidgetThemeToolkit::OpenRenameDialog()
+{
+	if (!CanEditSelection() || WidgetStyleTags::IsRoot(SelectedTag))
+	{
+		return FReply::Handled();
+	}
+	const FGameplayTag Tag = SelectedTag;
+	FString OriginalName;
+	Tag.ToString().Split(TEXT("."), nullptr, &OriginalName, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
+	TSharedRef<SWindow> Window =
+		SNew(SWindow).Title(LOCTEXT("RenameStyle", "Rename style")).ClientSize(FVector2D(340, 120)).SupportsMinimize(false).SupportsMaximize(false);
+	TSharedRef<SEditableTextBox> Input = SNew(SEditableTextBox)
+											 .Text(FText::FromString(OriginalName))
+											 .SelectAllTextWhenFocused(true)
+											 .OnVerifyTextChanged_Lambda(
+												 [](const FText& Text, FText& Error)
+												 {
+													 FString Reason;
+													 const bool Valid = FWidgetThemeEditorService::ValidateName(Text.ToString(), Reason);
+													 Error = FText::FromString(Reason);
+													 return Valid;
+												 });
+	TWeakPtr<SWindow> WeakWindow = Window;
+	FSimpleDelegate Confirm = FSimpleDelegate::CreateSPLambda(this,
+															  [this, Tag, Input, WeakWindow, OriginalName]
+															  {
+																  FString Reason;
+																  const FString Name = Input->GetText().ToString();
+																  if (!FWidgetThemeEditorService::ValidateName(Name, Reason) || Name == OriginalName)
+																  {
+																	  return;
+																  }
+																  bool Renamed = false;
+																  Run(TEXT("Rename"),
+																	  [&](FString& Result)
+																	  {
+																		  Renamed = FWidgetThemeEditorService::RenameStyle(Theme, Tag, Name, Result);
+																		  if (!Renamed)
+																			  Input->SetError(FText::FromString(Result));
+																		  return Renamed;
+																	  });
+																  if (Renamed)
+																  {
+																	  if (TSharedPtr<SWindow> Dialog = WeakWindow.Pin())
+																		  Dialog->RequestDestroyWindow();
+																  }
+															  });
+	Window->SetContent(SNew(SVerticalBox) + SVerticalBox::Slot().AutoHeight().Padding(12, 8)[SNew(STextBlock).Text(LOCTEXT("NewName", "New name"))] +
+					   SVerticalBox::Slot().AutoHeight().Padding(12, 0)[Input] +
+					   SVerticalBox::Slot()
+						   .AutoHeight()
+						   .HAlign(HAlign_Right)
+						   .Padding(12, 8)[SNew(SButton)
+											   .HAlign(HAlign_Center)
+											   .Text(LOCTEXT("Confirm", "Confirm"))
+											   .IsEnabled_Lambda(
+												   [Input, OriginalName]
+												   {
+													   FString Reason;
+													   return Input->GetText().ToString() != OriginalName &&
+															  FWidgetThemeEditorService::ValidateName(Input->GetText().ToString(), Reason);
+												   })
+											   .OnClicked_Lambda(
+												   [Confirm]
+												   {
+													   Confirm.ExecuteIfBound();
+													   return FReply::Handled();
+												   })]);
+	Window->SetWidgetToFocusOnActivate(Input);
+	TSharedPtr<SWindow> Parent = FSlateApplication::Get().FindBestParentWindowForDialogs(nullptr);
+	if (Parent)
+		FSlateApplication::Get().AddWindowAsNativeChild(Window, Parent.ToSharedRef());
+	else
+		FSlateApplication::Get().AddWindow(Window);
+	return FReply::Handled();
+}
+
 TSharedRef<SDockTab> FWidgetThemeToolkit::SpawnTags(const FSpawnTabArgs& Args)
 {
 	auto Action = [this](const TCHAR* Label, TFunction<bool()> Enabled, TFunction<bool(FString&)> Operation) -> TSharedRef<SWidget>
 	{
 		return SNew(SButton)
+			.HAlign(HAlign_Center)
 			.Text(FText::FromString(Label))
 			.IsEnabled_Lambda(MoveTemp(Enabled))
 			.OnClicked_Lambda([this, Label, Operation] { return Run(Label, Operation); });
@@ -339,47 +419,47 @@ TSharedRef<SDockTab> FWidgetThemeToolkit::SpawnTags(const FSpawnTabArgs& Args)
 							  : Type == EWidgetStyleKind::Button ? TEXT("Button")
 							  : Type == EWidgetStyleKind::Text	 ? TEXT("Text")
 																 : TEXT("Brush");
-		Types->AddSlot().FillWidth(1)[SNew(SCheckBox)
-										  .Style(FAppStyle::Get(), "ToggleButtonCheckbox")
-										  .IsChecked_Lambda([this, Type] { return TypeFilter == Type ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
-										  .OnCheckStateChanged_Lambda(
-											  [this, Type](ECheckBoxState State)
-											  {
-												  if (State == ECheckBoxState::Checked)
-												  {
-													  TypeFilter = Type;
-													  Refresh();
-												  }
-											  })[SNew(STextBlock).Text(FText::FromString(Label))]];
+		Types->AddSlot().FillWidth(1).Padding(
+			1, 0)[SNew(SCheckBox)
+					  .Style(FAppStyle::Get(), "SegmentedCombo.ButtonOnly")
+					  .HAlign(HAlign_Center)
+					  .Padding(FMargin(2, 3))
+					  .IsChecked_Lambda([this, Type] { return TypeFilter == Type ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+					  .OnCheckStateChanged_Lambda(
+						  [this, Type](ECheckBoxState State)
+						  {
+							  if (State == ECheckBoxState::Checked)
+							  {
+								  TypeFilter = Type;
+								  Refresh();
+							  }
+						  })[SNew(STextBlock).Text(FText::FromString(Label)).Justification(ETextJustify::Center)]];
 	}
-	TSharedRef<SWrapBox> Actions = SNew(SWrapBox).UseAllottedSize(true).InnerSlotPadding(FVector2D(4, 4));
-	Actions->AddSlot()[SNew(SButton).Text(LOCTEXT("Create", "Create")).OnClicked_Lambda([this] { return OpenStyleDialog(EWidgetStyleOperation::Create); })];
-	Actions->AddSlot()
-		[SNew(SButton).Text(LOCTEXT("Associate", "Associate")).OnClicked_Lambda([this] { return OpenStyleDialog(EWidgetStyleOperation::Associate); })];
-	Actions->AddSlot()[Action(
+	TSharedRef<SHorizontalBox> Actions = SNew(SHorizontalBox);
+	Actions->AddSlot().FillWidth(1)[SNew(SButton)
+										.HAlign(HAlign_Center)
+										.Text(LOCTEXT("Create", "Create"))
+										.OnClicked_Lambda([this] { return OpenStyleDialog(EWidgetStyleOperation::Create); })];
+	Actions->AddSlot().FillWidth(1).Padding(4, 0)[SNew(SButton)
+													  .HAlign(HAlign_Center)
+													  .Text(LOCTEXT("Associate", "Associate"))
+													  .OnClicked_Lambda([this] { return OpenStyleDialog(EWidgetStyleOperation::Associate); })];
+	Actions->AddSlot().FillWidth(1)[Action(
 		TEXT("Remove"), [this] { return bCanRemoveSelection && !FWidgetThemeEditorService::IsBusy(); },
 		[this](FString& Result) { return FWidgetThemeEditorService::RemoveBinding(Theme, SelectedTag, Result); })];
-	Actions->AddSlot()[Action(
+	Actions->AddSlot().FillWidth(1).Padding(4, 0)[Action(
 		TEXT("Copy"), [this] { return FWidgetThemeEditorService::Blueprint(Theme, SelectedTag) != nullptr; },
 		[this](FString& Result) { return FWidgetThemeEditorService::CopyProperties(Theme, SelectedTag, Result); })];
-	Actions->AddSlot()[Action(
+	Actions->AddSlot().FillWidth(1)[Action(
 		TEXT("Paste"), [this] { return FWidgetThemeEditorService::CanPasteProperties(Theme, SelectedTag); },
 		[this](FString& Result) { return FWidgetThemeEditorService::PasteProperties(Theme, SelectedTag, Result); })];
+	Actions->AddSlot().FillWidth(1).Padding(4, 0, 0, 0)[SNew(SButton)
+															.HAlign(HAlign_Center)
+															.Text(LOCTEXT("Rename", "Rename"))
+															.IsEnabled_Lambda([this] { return CanEditSelection() && !WidgetStyleTags::IsRoot(SelectedTag); })
+															.OnClicked(this, &FWidgetThemeToolkit::OpenRenameDialog)];
 	TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
 	Body->AddSlot().AutoHeight().Padding(4)[Actions];
-	Body->AddSlot().AutoHeight().Padding(
-		4)[SNew(SHorizontalBox) +
-		   SHorizontalBox::Slot().FillWidth(1)[SAssignNew(RenameInput, SEditableTextBox).IsEnabled_Lambda([this] { return CanEditSelection(); })] +
-		   SHorizontalBox::Slot().AutoWidth().Padding(4, 0)[Action(
-			   TEXT("Rename"),
-			   [this]
-			   {
-				   FString Reason;
-				   const FString Name = RenameInput->GetText().ToString();
-				   return CanEditSelection() && FWidgetThemeEditorService::ValidateName(Name, Reason) &&
-						  Name != SelectedTag.ToString().RightChop(SelectedTag.RequestDirectParent().ToString().Len() + 1);
-			   },
-			   [this](FString& Result) { return FWidgetThemeEditorService::RenameStyle(Theme, SelectedTag, RenameInput->GetText().ToString(), Result); })]];
 	Body->AddSlot().AutoHeight().Padding(4)[Types];
 	Body->AddSlot().AutoHeight().Padding(4)[SNew(SSearchBox)
 												.OnTextChanged_Lambda(
@@ -414,32 +494,95 @@ TSharedRef<SDockTab> FWidgetThemeToolkit::SpawnPreview(const FSpawnTabArgs& Args
 	auto Visibility = [this](EWidgetStyleKind Type)
 	{
 		EWidgetStyleKind SelectedType;
-		return FWidgetThemeEditorService::Kind(SelectedTag, SelectedType) && SelectedType == Type && !WidgetStyleTags::IsRoot(SelectedTag)
+		return FWidgetThemeEditorService::Kind(SelectedTag, SelectedType) && (Type == EWidgetStyleKind::None || SelectedType == Type) &&
+					   !WidgetStyleTags::IsRoot(SelectedTag)
 				   ? EVisibility::Visible
 				   : EVisibility::Collapsed;
 	};
+	auto Dimension = [this](bool Width) -> TSharedRef<SWidget>
+	{
+		return SNew(SBox).WidthOverride(64)[SNew(SNumericEntryBox<float>)
+												.MinValue(1)
+												.MinSliderValue(1)
+												.MaxSliderValue(Width ? 500 : 350)
+												.AllowSpin(true)
+												.Value_Lambda([this, Width]() -> TOptional<float> { return Width ? PreviewSize.X : PreviewSize.Y; })
+												.OnValueChanged_Lambda(
+													[this, Width](float Value)
+													{
+														if (Width)
+														{
+															PreviewSize.X = Value;
+															bPreviewWidthEdited = true;
+														}
+														else
+														{
+															PreviewSize.Y = Value;
+															bPreviewHeightEdited = true;
+														}
+													})];
+	};
+	TSharedRef<SHorizontalBox> Header = SNew(SHorizontalBox);
+	Header->AddSlot()
+		.AutoWidth()
+		.Padding(0, 0, 8, 0)
+		.VAlign(VAlign_Center)[SNew(SCheckBox)
+								   .Visibility_Lambda([Visibility] { return Visibility(EWidgetStyleKind::Button); })
+								   .IsChecked_Lambda([this] { return PreviewButton->GetSelected() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+								   .OnCheckStateChanged_Lambda(
+									   [this](ECheckBoxState State)
+									   {
+										   PreviewButton->SetIsSelected(State == ECheckBoxState::Checked, false);
+									   })[SNew(STextBlock).Text(LOCTEXT("Selected", "Selected"))]];
+	Header->AddSlot()
+		.AutoWidth()
+		.Padding(0, 0, 8, 0)
+		.VAlign(VAlign_Center)[SNew(SCheckBox)
+								   .Visibility_Lambda([Visibility] { return Visibility(EWidgetStyleKind::None); })
+								   .IsChecked_Lambda([this] { return PreviewButton->GetIsEnabled() ? ECheckBoxState::Unchecked : ECheckBoxState::Checked; })
+								   .OnCheckStateChanged_Lambda(
+									   [this](ECheckBoxState State)
+									   {
+										   const bool Enabled = State != ECheckBoxState::Checked;
+										   PreviewButton->SetIsEnabled(Enabled);
+										   PreviewText->SetIsEnabled(Enabled);
+										   PreviewImage->SetIsEnabled(Enabled);
+									   })[SNew(STextBlock).Text(LOCTEXT("Disabled", "Disabled"))]];
+	Header->AddSlot()
+		.AutoWidth()
+		.Padding(0, 0, 8, 0)
+		.VAlign(VAlign_Center)[SNew(SCheckBox)
+								   .Visibility_Lambda([Visibility] { return Visibility(EWidgetStyleKind::Button); })
+								   .IsChecked_Lambda([this] { return bShowPreviewText ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+								   .OnCheckStateChanged_Lambda(
+									   [this](ECheckBoxState State)
+									   {
+										   bShowPreviewText = State == ECheckBoxState::Checked;
+										   PreviewButton->SetPreviewTextVisible(bShowPreviewText);
+									   })[SNew(STextBlock).Text(LOCTEXT("ShowText", "Show text"))]];
+	Header->AddSlot().FillWidth(1)[SNullWidget::NullWidget];
+	Header->AddSlot().AutoWidth().VAlign(VAlign_Center)[SNew(STextBlock).Text(LOCTEXT("Width", "W"))];
+	Header->AddSlot().AutoWidth().Padding(4, 0)[Dimension(true)];
+	Header->AddSlot().AutoWidth().VAlign(VAlign_Center)[SNew(STextBlock).Text(LOCTEXT("Height", "H"))];
+	Header->AddSlot().AutoWidth().Padding(4, 0)[Dimension(false)];
+	auto PreviewBox = [this, Visibility](EWidgetStyleKind Type, TSharedRef<SWidget> Widget) -> TSharedRef<SWidget>
+	{
+		return SNew(SBox)
+			.HAlign(Type == EWidgetStyleKind::Text ? HAlign_Center : HAlign_Fill)
+			.VAlign(Type == EWidgetStyleKind::Text ? VAlign_Center : VAlign_Fill)
+			.WidthOverride_Lambda([this] { return PreviewSize.X; })
+			.HeightOverride_Lambda([this] { return PreviewSize.Y; })
+			.Visibility_Lambda([Visibility, Type] { return Visibility(Type); })[Widget];
+	};
 	return SNew(SDockTab).ShouldAutosize(
-		false)[SNew(SVerticalBox) +
-			   SVerticalBox::Slot().AutoHeight().Padding(8)[SNew(STextBlock).Text_Lambda([this] { return FText::FromName(SelectedTag.GetTagName()); })] +
-			   SVerticalBox::Slot()
-				   .FillHeight(1)
+		false)[SNew(SOverlay) +
+			   SOverlay::Slot()
 				   .HAlign(HAlign_Center)
-				   .VAlign(
-					   VAlign_Center)[SNew(SVerticalBox) +
-									  SVerticalBox::Slot().AutoHeight()[SNew(SBox).WidthOverride(320).HeightOverride(64).Visibility_Lambda(
-										  [Visibility] { return Visibility(EWidgetStyleKind::Button); })[PreviewButton->TakeWidget()]] +
-									  SVerticalBox::Slot().AutoHeight()
-										  [SNew(SHorizontalBox).Visibility_Lambda([Visibility] { return Visibility(EWidgetStyleKind::Button); }) +
-										   SHorizontalBox::Slot().AutoWidth()[SNew(SCheckBox).OnCheckStateChanged_Lambda(
-											   [this](ECheckBoxState State) { PreviewButton->SetIsSelected(State == ECheckBoxState::Checked, false); })
-																				  [SNew(STextBlock).Text(LOCTEXT("Selected", "Selected"))]] +
-										   SHorizontalBox::Slot().AutoWidth().Padding(12, 0)[SNew(SCheckBox).OnCheckStateChanged_Lambda(
-											   [this](ECheckBoxState State) { PreviewButton->SetIsEnabled(State != ECheckBoxState::Checked); })
-																								 [SNew(STextBlock).Text(LOCTEXT("Disabled", "Disabled"))]]] +
-									  SVerticalBox::Slot().AutoHeight()[SNew(SBox).Visibility_Lambda(
-										  [Visibility] { return Visibility(EWidgetStyleKind::Text); })[PreviewText->TakeWidget()]] +
-									  SVerticalBox::Slot().AutoHeight()[SNew(SBox).WidthOverride(80).HeightOverride(80).Visibility_Lambda(
-										  [Visibility] { return Visibility(EWidgetStyleKind::Brush); })[PreviewImage->TakeWidget()]]]];
+				   .VAlign(VAlign_Center)[SNew(SVerticalBox) +
+										  SVerticalBox::Slot().AutoHeight()[PreviewBox(EWidgetStyleKind::Button, PreviewButton->TakeWidget())] +
+										  SVerticalBox::Slot().AutoHeight()[PreviewBox(EWidgetStyleKind::Text, PreviewText->TakeWidget())] +
+										  SVerticalBox::Slot().AutoHeight()[PreviewBox(EWidgetStyleKind::Brush, PreviewImage->TakeWidget())]] +
+			   SOverlay::Slot().VAlign(VAlign_Top).Padding(8)[Header]];
 }
 
 TSharedRef<SDockTab> FWidgetThemeToolkit::SpawnDetails(const FSpawnTabArgs& Args)
@@ -484,18 +627,15 @@ void FWidgetThemeToolkit::Refresh()
 void FWidgetThemeToolkit::Select(TSharedPtr<FThemeTreeItem> Item, ESelectInfo::Type Type)
 {
 	FinishDetailsEdit();
-	SelectedTag = Item ? Item->Tag : FGameplayTag();
+	const FGameplayTag NewSelection = Item ? Item->Tag : FGameplayTag();
+	if (SelectedTag != NewSelection)
+	{
+		bPreviewWidthEdited = false;
+		bPreviewHeightEdited = false;
+	}
+	SelectedTag = NewSelection;
 	FString RemoveReason;
 	bCanRemoveSelection = FWidgetThemeEditorService::CanRemove(Theme, SelectedTag, RemoveReason);
-	if (RenameInput)
-	{
-		FString Leaf;
-		if (Item && !Item->bRoot)
-		{
-			SelectedTag.ToString().Split(TEXT("."), nullptr, &Leaf, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
-		}
-		RenameInput->SetText(FText::FromString(Leaf));
-	}
 	BindDetails();
 	UpdatePreview();
 }
@@ -519,10 +659,12 @@ void FWidgetThemeToolkit::UpdatePreview()
 	{
 		return;
 	}
+	UpdatePreviewSize(StyleClass->GetDefaultObject(), Type);
 	if (Type == EWidgetStyleKind::Button)
 	{
 		PreviewButton->SetStyleTag(SelectedTag);
 		PreviewButton->SetStyle(Theme->GetStyleClass(SelectedTag, Type));
+		PreviewButton->SetPreviewTextVisible(bShowPreviewText);
 	}
 	else if (Type == EWidgetStyleKind::Text)
 	{
@@ -537,6 +679,22 @@ void FWidgetThemeToolkit::UpdatePreview()
 			PreviewImage->SetBrush(Style->Brush);
 		}
 	}
+}
+
+void FWidgetThemeToolkit::UpdatePreviewSize(UObject* Style, EWidgetStyleKind Kind)
+{
+	FVector2D Size = Kind == EWidgetStyleKind::Brush ? FVector2D(80, 80) : FVector2D(200, 60);
+	if (const UCommonButtonStyle* ButtonStyle = Cast<UCommonButtonStyle>(Style))
+	{
+		if (ButtonStyle->MinWidth > 0)
+			Size.X = ButtonStyle->MinWidth;
+		if (ButtonStyle->MinHeight > 0)
+			Size.Y = ButtonStyle->MinHeight;
+	}
+	if (!bPreviewWidthEdited)
+		PreviewSize.X = Size.X;
+	if (!bPreviewHeightEdited)
+		PreviewSize.Y = Size.Y;
 }
 
 void FWidgetThemeToolkit::NotifyPreChange(FProperty* Property)

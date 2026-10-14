@@ -1,4 +1,5 @@
 #include "Widget/Theme/WidgetTheme.h"
+#include "Widget/Theme/WidgetStyleTags.h"
 #include "Setting/Widget/Entry/WidgetSettingCategoryEntry.h"
 #include "Setting/Widget/Entry/WidgetSettingEntryBase.h"
 
@@ -115,6 +116,12 @@ UClass* UWidgetTheme::GetStyleClass(FGameplayTag Tag, EWidgetStyleKind Kind) con
 #if WITH_EDITOR
 bool UWidgetTheme::SetStyleClass(FGameplayTag Tag, EWidgetStyleKind Kind, UClass* StyleClass)
 {
+	EWidgetStyleKind TagKind;
+	if (!WidgetStyleTags::Kind(Tag, TagKind) || TagKind != Kind)
+	{
+		return false;
+	}
+
 	if (!Tag.IsValid() || !StyleClass || StyleClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
 	{
 		return false;

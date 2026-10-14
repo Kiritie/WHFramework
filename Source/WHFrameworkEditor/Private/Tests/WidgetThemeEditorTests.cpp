@@ -28,9 +28,13 @@
 #include "PackageTools.h"
 #include "Widget/Theme/WidgetThemeToolkit.h"
 #include "Widget/Theme/WidgetThemeTree.h"
+#include "Widget/Theme/WidgetThemePreviewButton.h"
+#include "Widget/Common/CommonTextBlockN.h"
+#include "Widget/Common/CommonImageN.h"
 #include "Widget/Theme/WidgetStylePropertyEditing.h"
 #include "Widget/Theme/WidgetStyleClipboard.h"
 #include "UObject/Linker.h"
+#include "UObject/ObjectRedirector.h"
 #include "GameplayTagsSettings.h"
 #include "GameplayTagsManager.h"
 #include "Misc/FileHelper.h"
@@ -40,18 +44,14 @@ namespace WidgetThemeEditorTests
 {
 	struct FFixture
 	{
-		TSoftObjectPtr<UWidgetStyleCatalog> SavedCatalog;
-		TStrongObjectPtr<UWidgetStyleCatalog> Catalog;
 		TArray<TWeakObjectPtr<UWidgetTheme>> Themes;
+		TArray<TWeakObjectPtr<UObjectRedirector>> Redirectors;
 		FString Directory;
 		FString Clipboard;
 		TArray<uint8> TagConfig;
 		TArray<FString> TextFiles;
 		FFixture()
 		{
-			SavedCatalog = GetDefault<UWidgetThemeSettings>()->StyleCatalog;
-			Catalog.Reset(NewObject<UWidgetStyleCatalog>());
-			GetMutableDefault<UWidgetThemeSettings>()->StyleCatalog = Catalog.Get();
 			Directory = TEXT("/Game/WidgetThemeTests/") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
 			WidgetStyleClipboard::Read(Clipboard);
 			FFileHelper::LoadFileToArray(TagConfig, *GetDefault<UGameplayTagsSettings>()->GetDefaultConfigFilename());
@@ -59,6 +59,11 @@ namespace WidgetThemeEditorTests
 		~FFixture()
 		{
 			TArray<UObject*> Objects;
+			for (const auto& Redirector : Redirectors)
+			{
+				if (Redirector.IsValid())
+					Objects.Add(Redirector.Get());
+			}
 			for (const auto& Theme : Themes)
 			{
 				if (!Theme.IsValid())
@@ -74,7 +79,6 @@ namespace WidgetThemeEditorTests
 				}
 				Objects.AddUnique(Theme.Get());
 			}
-			GetMutableDefault<UWidgetThemeSettings>()->StyleCatalog = SavedCatalog;
 			for (UObject* Object : Objects)
 			{
 				if (!IsValid(Object))
@@ -119,6 +123,14 @@ namespace WidgetThemeEditorTests
 			UWidgetTheme* Result =
 				Cast<UWidgetTheme>(FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get().DuplicateAsset(TEXT("DA_Copy"), Directory, Source));
 			Themes.Add(Result);
+			return Result;
+		}
+		UObjectRedirector* Redirect(const FString& Name, UObject* Destination)
+		{
+			UObjectRedirector* Result = NewObject<UObjectRedirector>(CreatePackage(*(Directory / Name)), FName(*Name), RF_Public | RF_Standalone);
+			Result->DestinationObject = Destination;
+			FAssetRegistryModule::AssetCreated(Result);
+			Redirectors.Add(Result);
 			return Result;
 		}
 		bool Parent(UWidgetTheme* Theme, FString& Error)
@@ -417,6 +429,79 @@ bool FThemeDeleteProtectionTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeOwnedRemoveTest, "WHFramework.WidgetTheme.Editor.OwnedRemovalInternalReferences",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FThemeOwnedRemoveTest::RunTest(const FString& Parameters)
+{
+	using namespace WidgetThemeEditorTests;
+	FFixture Fixture;
+	FString Error;
+	UWidgetTheme* Theme = Fixture.Theme(TEXT("DA_InternalReferences"));
+	if (!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Text, TEXT("ThemeEditorText"), EWidgetStyleKind::Text, TEXT("/Game/Themes"), false, Error) ||
+		!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Button, TEXT("ThemeEditorButton"), EWidgetStyleKind::Button, TEXT("/Game/Themes"), false,
+										   Error))
+	{
+		AddError(Error);
+		return false;
+	}
+	UBlueprint* TextStyle = FWidgetThemeEditorService::Blueprint(Theme, TAG_ThemeEditorText);
+	const FSoftObjectPath StylePath(TextStyle);
+	UBlueprint* ButtonStyle = FWidgetThemeEditorService::Blueprint(Theme, TAG_ThemeEditorButton);
+	FObjectPropertyBase* TextProperty = FindFProperty<FObjectPropertyBase>(ButtonStyle->GeneratedClass, TEXT("NormalTextStyle"));
+	if (!TestNotNull(TEXT("Button text style property"), TextProperty))
+		return false;
+	TextProperty->SetObjectPropertyValue_InContainer(ButtonStyle->GeneratedClass->GetDefaultObject(), TextStyle->GeneratedClass);
+	UObjectRedirector* Redirector = Fixture.Redirect(TEXT("OldTextStyle"), TextStyle);
+	const FSoftObjectPath RedirectorPath(Redirector);
+	TestTrue(TEXT("Owned style with internal button reference and redirector can be removed"),
+			 FWidgetThemeEditorService::CanRemove(Theme, TAG_ThemeEditorText, Error));
+	TestTrue(TEXT("Owned text removal succeeds"), FWidgetThemeEditorService::RemoveBinding(Theme, TAG_ThemeEditorText, Error));
+	auto& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
+	TestFalse(TEXT("Owned text Blueprint deleted"), Registry.GetAssetByObjectPath(StylePath, true).IsValid());
+	TestFalse(TEXT("Old text redirector deleted"), Registry.GetAssetByObjectPath(RedirectorPath, true).IsValid());
+	ButtonStyle = FWidgetThemeEditorService::Blueprint(Theme, TAG_ThemeEditorButton);
+	if (!TestNotNull(TEXT("Referencing button retained"), ButtonStyle))
+		return false;
+	TextProperty = FindFProperty<FObjectPropertyBase>(ButtonStyle->GeneratedClass, TEXT("NormalTextStyle"));
+	if (!TestNotNull(TEXT("Button text property retained"), TextProperty))
+		return false;
+	TestNull(TEXT("Deleted text class reference cleared"), TextProperty->GetObjectPropertyValue_InContainer(ButtonStyle->GeneratedClass->GetDefaultObject()));
+	if (!Fixture.Parent(Theme, Error) ||
+		!FWidgetThemeEditorService::Create(Theme, TAG_ThemeEditorParentA, TEXT("Child"), EWidgetStyleKind::Brush, TEXT("/Game/Themes"), true, Error))
+		return false;
+	UClass* OriginalParent = FWidgetThemeEditorService::Blueprint(Theme, TAG_ThemeEditorParentA)->ParentClass;
+	TestTrue(TEXT("Owned parent with child can be removed"), FWidgetThemeEditorService::CanRemove(Theme, TAG_ThemeEditorParentA, Error));
+	TestTrue(TEXT("Owned parent removal succeeds"), FWidgetThemeEditorService::RemoveBinding(Theme, TAG_ThemeEditorParentA, Error));
+	UBlueprint* Child = FWidgetThemeEditorService::Blueprint(Theme, TAG_ThemeEditorChild);
+	if (TestNotNull(TEXT("Child retained"), Child))
+		TestEqual(TEXT("Child inherits deleted parent's parent"), Child->ParentClass.Get(), OriginalParent);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeReferencedTagRemoveTest, "WHFramework.WidgetTheme.Editor.OwnedRemovalPreservesReferencedTag",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FThemeReferencedTagRemoveTest::RunTest(const FString& Parameters)
+{
+	using namespace WidgetThemeEditorTests;
+	FFixture Fixture;
+	FString Error;
+	UWidgetTheme* Owner = Fixture.Theme(TEXT("DA_TagOwner"));
+	UWidgetTheme* Consumer = Fixture.Theme(TEXT("DA_TagConsumer"));
+	const FString Name = TEXT("TestReferenced_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	if (!FWidgetThemeEditorService::Create(Owner, WidgetStyleTags::Brush, Name, EWidgetStyleKind::Brush, TEXT("/Game/Themes"), false, Error))
+		return false;
+	const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*(TEXT("Style.Brush.") + Name)));
+	const FSoftObjectPath StylePath(FWidgetThemeEditorService::Blueprint(Owner, Tag));
+	Consumer->SetStyleClass(Tag, EWidgetStyleKind::Brush, FWidgetThemeEditorService::CreationBase(EWidgetStyleKind::Brush));
+	TestTrue(TEXT("Another asset's tag usage does not disable removal"), FWidgetThemeEditorService::CanRemove(Owner, Tag, Error));
+	TestTrue(TEXT("Referenced-tag style removed"), FWidgetThemeEditorService::RemoveBinding(Owner, Tag, Error));
+	TestFalse(TEXT("Owned Blueprint deleted"),
+			  FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get().GetAssetByObjectPath(StylePath, true).IsValid());
+	TestTrue(TEXT("Referenced ordinary tag retained"), FGameplayTag::RequestGameplayTag(Tag.GetTagName(), false).IsValid());
+	TestNotNull(TEXT("Other asset's mapping retained"), Consumer->GetStyleClass(Tag, EWidgetStyleKind::Brush));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeNativeDeleteTest, "WHFramework.WidgetTheme.Editor.ContentBrowserDeletion",
 								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FThemeNativeDeleteTest::RunTest(const FString& Parameters)
@@ -431,8 +516,12 @@ bool FThemeNativeDeleteTest::RunTest(const FString& Parameters)
 	}
 	const FSoftObjectPath StylePath(FWidgetThemeEditorService::Blueprint(Theme, TAG_ThemeEditorParentA));
 	const FSoftObjectPath ThemePath(Theme);
+	UObjectRedirector* ThemeRedirector = Fixture.Redirect(TEXT("DA_OldTheme"), Theme);
+	UObjectRedirector* StyleRedirector = Fixture.Redirect(TEXT("OldStyle"), StylePath.ResolveObject());
+	const FSoftObjectPath ThemeRedirectorPath(ThemeRedirector);
+	const FSoftObjectPath StyleRedirectorPath(StyleRedirector);
 	TArray<FString> SavedFiles;
-	for (UObject* Asset : TArray<UObject*>{Theme, StylePath.ResolveObject()})
+	for (UObject* Asset : TArray<UObject*>{Theme, StylePath.ResolveObject(), ThemeRedirector, StyleRedirector})
 	{
 		UPackage* Package = Asset->GetOutermost();
 		const FString Filename = FPackageName::LongPackageNameToFilename(Package->GetName(), FPackageName::GetAssetPackageExtension());
@@ -475,6 +564,8 @@ bool FThemeNativeDeleteTest::RunTest(const FString& Parameters)
 	auto& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
 	TestFalse(TEXT("Theme removed"), Registry.GetAssetByObjectPath(ThemePath, true).IsValid());
 	TestFalse(TEXT("Owned Blueprint removed"), Registry.GetAssetByObjectPath(StylePath, true).IsValid());
+	TestFalse(TEXT("Old theme redirector removed"), Registry.GetAssetByObjectPath(ThemeRedirectorPath, true).IsValid());
+	TestFalse(TEXT("Old style redirector removed"), Registry.GetAssetByObjectPath(StyleRedirectorPath, true).IsValid());
 	for (const FString& Filename : SavedFiles)
 	{
 		TestFalse(TEXT("Deleted package absent from disk"), IFileManager::Get().FileExists(*Filename));
@@ -554,6 +645,74 @@ bool FThemeTreeAndLayoutTest::RunTest(const FString& Parameters)
 	}
 	TestEqual(TEXT("Type filter retains corresponding root"), FWidgetThemeTree::Build(Theme, EWidgetStyleKind::Text, TEXT("")).Num(), 1);
 	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeExistingUIPreviewTest, "WHFramework.WidgetTheme.Editor.ExistingAssetPreviewWidgets",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FThemeExistingUIPreviewTest::RunTest(const FString& Parameters)
+{
+	int32 Previewed = 0;
+	const TArray<UWidgetTheme*> Themes = FWidgetThemeEditorService::Themes();
+	TestTrue(TEXT("Existing project themes found"), !Themes.IsEmpty());
+	for (UWidgetTheme* Theme : Themes)
+	{
+		TStrongObjectPtr<UWidgetTheme> PreviewRoot(NewObject<UWidgetTheme>(GetTransientPackage(), NAME_None, RF_Transient));
+		FWidgetThemeResolver::SetPreviewOverride(PreviewRoot.Get(), Theme);
+		TStrongObjectPtr<UWidgetThemePreviewButton> Button(NewObject<UWidgetThemePreviewButton>(PreviewRoot.Get()));
+		Button->SetDesignerFlags(EWidgetDesignFlags::Designing);
+		if (!TestTrue(TEXT("Preview button initializes"), Button->Initialize()))
+		{
+			FWidgetThemeResolver::ClearPreviewOverride(PreviewRoot.Get());
+			return false;
+		}
+		Button->SetTitle(FText::FromString(TEXT("Text Block")));
+		Button->TakeWidget();
+		TStrongObjectPtr<UCommonTextBlockN> Text(NewObject<UCommonTextBlockN>(PreviewRoot.Get()));
+		Text->SetDesignerFlags(EWidgetDesignFlags::Designing);
+		Text->SetText(FText::FromString(TEXT("Aa 0123 中文")));
+		Text->TakeWidget();
+		TStrongObjectPtr<UCommonImageN> Image(NewObject<UCommonImageN>(PreviewRoot.Get()));
+		Image->SetDesignerFlags(EWidgetDesignFlags::Designing);
+		Image->TakeWidget();
+		for (FGameplayTag Tag : FWidgetThemeEditorService::Tags(Theme))
+		{
+			EWidgetStyleKind Kind;
+			if (!FWidgetThemeEditorService::Kind(Tag, Kind))
+				continue;
+			UClass* StyleClass = Theme->GetStyleClass(Tag, Kind);
+			if (!TestNotNull(*Tag.ToString(), StyleClass))
+				continue;
+			if (Kind == EWidgetStyleKind::Button)
+			{
+				Button->SetStyleTag(Tag);
+				TestEqual(TEXT("Existing button style applied"), Button->GetStyle()->GetClass(), StyleClass);
+				Button->SetIsEnabled(false);
+				TestFalse(TEXT("Button disabled state applies"), Button->GetIsEnabled());
+				Button->SetIsEnabled(true);
+				Button->SetPreviewTextVisible(false);
+				Button->SetPreviewTextVisible(true);
+				TestEqual(TEXT("Preview title preserved across style changes"), Button->GetTitle().ToString(), FString(TEXT("Text Block")));
+			}
+			else if (Kind == EWidgetStyleKind::Text)
+			{
+				Text->SetStyleTag(Tag);
+				FObjectPropertyBase* StyleProperty = FindFProperty<FObjectPropertyBase>(Text->GetClass(), TEXT("Style"));
+				if (TestNotNull(TEXT("Text style property"), StyleProperty))
+					TestEqual(TEXT("Existing text style applied"), StyleProperty->GetObjectPropertyValue_InContainer(Text.Get()),
+							  static_cast<UObject*>(StyleClass));
+			}
+			else
+			{
+				Image->SetStyleTag(Tag);
+				TestEqual(TEXT("Existing brush applied"), Image->GetBrush().GetResourceObject(),
+						  StyleClass->GetDefaultObject<UWidgetBrushStyle>()->Brush.GetResourceObject());
+			}
+			++Previewed;
+		}
+		FWidgetThemeResolver::ClearPreviewOverride(PreviewRoot.Get());
+	}
+	AddInfo(FString::Printf(TEXT("Constructed button/text/image widgets and applied %d existing theme mappings."), Previewed));
+	return Previewed > 0;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeMoveTest, "WHFramework.WidgetTheme.Editor.RenameAndMovePreserveStyles",
@@ -687,8 +846,6 @@ bool FThemeRenameReferenceTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Old theme key removed"), FWidgetThemeEditorService::Tags(Theme).Contains(OldTag));
 	TestEqual(TEXT("Blueprint identity retained"), FWidgetThemeEditorService::Blueprint(Theme, NewTag), Style);
 	TestEqual(TEXT("Shared source Tag updated"), Borrower->Bindings[TAG_ThemeEditorAlias].SourceTag, NewTag);
-	TestFalse(TEXT("Old catalog key removed"), Fixture.Catalog->Types.Contains(OldTag));
-	TestTrue(TEXT("New catalog key registered"), Fixture.Catalog->Types.Contains(NewTag));
 	for (const FString& File : Fixture.TextFiles)
 	{
 		FString Text;

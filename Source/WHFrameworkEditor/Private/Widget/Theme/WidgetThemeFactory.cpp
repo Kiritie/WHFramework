@@ -18,7 +18,7 @@ uint32 UWidgetThemeFactory::GetMenuCategories() const
 
 FText UWidgetThemeFactory::GetDisplayName() const
 {
-	return NSLOCTEXT("WidgetTheme", "ThemeAsset", "主题资产");
+	return NSLOCTEXT("WidgetTheme", "ThemeAsset", "Theme Asset");
 }
 
 UObject* UWidgetThemeFactory::FactoryCreateNew(UClass* Class, UObject* InParent, FName Name, EObjectFlags Flags, UObject* Context, FFeedbackContext* Warn)

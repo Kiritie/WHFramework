@@ -2,7 +2,7 @@
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/Theme/WidgetThemeSettings.h"
 #include "Widget/Theme/WidgetThemeSubsystem.h"
-#include "Widget/Theme/WidgetThemeFallbacks.h"
+#include "Widget/Theme/WidgetStyleTags.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "UObject/Package.h"
@@ -14,22 +14,18 @@ namespace WidgetThemeResolverPrivate
 #if WITH_EDITOR
 	TMap<TWeakObjectPtr<const UObject>, TStrongObjectPtr<UWidgetTheme>> Previews;
 	TStrongObjectPtr<UWidgetTheme> DefaultTheme;
-	TStrongObjectPtr<UWidgetStyleCatalog> DefaultCatalog;
 	FSoftObjectPath CachedThemePath;
-	FSoftObjectPath CachedCatalogPath;
 	bool bLoaded = false;
 	void LoadEditorDefault()
 	{
 		const auto* S = GetDefault<UWidgetThemeSettings>();
-		if (bLoaded && CachedThemePath == S->DefaultTheme.ToSoftObjectPath() && CachedCatalogPath == S->StyleCatalog.ToSoftObjectPath())
+		if (bLoaded && CachedThemePath == S->DefaultTheme.ToSoftObjectPath())
 		{
 			return;
 		}
 		bLoaded = true;
 		CachedThemePath = S->DefaultTheme.ToSoftObjectPath();
-		CachedCatalogPath = S->StyleCatalog.ToSoftObjectPath();
 		DefaultTheme.Reset(S->DefaultTheme.LoadSynchronous());
-		DefaultCatalog.Reset(S->StyleCatalog.LoadSynchronous());
 	}
 #endif
 	UWidgetThemeSubsystem* Subsystem(const UObject* Context)
@@ -61,88 +57,56 @@ UClass* FWidgetThemeResolver::NativeBase(EWidgetStyleKind Kind)
 	}
 	return nullptr;
 }
-UClass* FWidgetThemeResolver::Placeholder(EWidgetStyleKind Kind)
+UClass* FWidgetThemeResolver::DefaultStyle(EWidgetStyleKind Kind)
 {
-	switch (Kind)
-	{
-	case EWidgetStyleKind::Button:
-		return UWidgetFallbackButtonStyle::StaticClass();
-	case EWidgetStyleKind::Text:
-		return UWidgetFallbackTextStyle::StaticClass();
-	case EWidgetStyleKind::Brush:
-		return UWidgetFallbackBrushStyle::StaticClass();
-	}
-	return nullptr;
+	return GetDefault<UWidgetThemeSettings>()->GetStyleBase(Kind);
 }
-bool FWidgetThemeResolver::Validate(const UWidgetTheme* Theme, const UWidgetStyleCatalog* Catalog, FString& Error, bool bRequireComplete)
+
+bool FWidgetThemeResolver::Validate(const UWidgetTheme* Theme, FString& Error)
 {
 	Error.Reset();
-	if (!Theme || !Catalog)
+	if (!Theme)
 	{
-		Error = TEXT("Theme or global style catalog failed to load.");
+		Error = TEXT("Theme failed to load.");
 		return false;
 	}
-	for (const auto& Entry : Catalog->Types)
+	for (EWidgetStyleKind Kind : {EWidgetStyleKind::Button, EWidgetStyleKind::Text, EWidgetStyleKind::Brush})
 	{
-		if (!Entry.Key.IsValid() || !NativeBase(Entry.Value))
+		UClass* Base = DefaultStyle(Kind);
+		if (!Base || !Base->IsChildOf(NativeBase(Kind)) || Base->HasAnyClassFlags(CLASS_Deprecated | CLASS_NewerVersionExists))
 		{
-			Error = TEXT("Catalog contains an invalid Tag or control type.");
-			return false;
-		}
-	}
-	for (const auto& Entry : Catalog->NativeRoots)
-	{
-		UClass* Root = Entry.Value.Get();
-		UClass* Base = NativeBase(Entry.Key);
-		if (!Root || !Base || !Root->HasAnyClassFlags(CLASS_Native) || !Root->IsChildOf(Base))
-		{
-			Error = TEXT("Catalog has an invalid native creation root.");
+			Error = TEXT("Project settings contain an invalid style base class.");
 			return false;
 		}
 	}
 	TSet<FGameplayTag> Seen;
 	auto CheckEntry = [&](FGameplayTag Tag, EWidgetStyleKind Kind) -> bool
 	{
-		const EWidgetStyleKind* Declared = Catalog->Types.Find(Tag);
+		EWidgetStyleKind TagKind;
 		UClass* Class = Theme->GetStyleClass(Tag, Kind);
-		UClass* Base = NativeBase(Kind);
-		if (!Tag.IsValid() || Seen.Contains(Tag) || !Declared || *Declared != Kind || !Class || !Base || !Class->IsChildOf(Base) ||
+		if (!WidgetStyleTags::Kind(Tag, TagKind) || TagKind != Kind || Seen.Contains(Tag) || !Class || !Class->IsChildOf(NativeBase(Kind)) ||
 			Class->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
 		{
-			Error = FString::Printf(TEXT("Invalid, duplicate, undeclared or incompatible style: %s"), *Tag.ToString());
+			Error = FString::Printf(TEXT("Invalid, duplicate or incompatible style: %s"), *Tag.ToString());
 			return false;
 		}
 		Seen.Add(Tag);
 		return true;
 	};
-	for (const auto& E : Theme->GetButtonStyles())
+	for (const auto& Entry : Theme->GetButtonStyles())
 	{
-		if (!CheckEntry(E.Key, EWidgetStyleKind::Button))
-		{
+		if (!CheckEntry(Entry.Key, EWidgetStyleKind::Button))
 			return false;
-		}
 	}
-	for (const auto& E : Theme->GetTextStyles())
+	for (const auto& Entry : Theme->GetTextStyles())
 	{
-		if (!CheckEntry(E.Key, EWidgetStyleKind::Text))
-		{
+		if (!CheckEntry(Entry.Key, EWidgetStyleKind::Text))
 			return false;
-		}
 	}
-	for (const auto& E : Theme->GetBrushStyles())
+	for (const auto& Entry : Theme->GetBrushStyles())
 	{
-		if (!CheckEntry(E.Key, EWidgetStyleKind::Brush))
-		{
+		if (!CheckEntry(Entry.Key, EWidgetStyleKind::Brush))
 			return false;
-		}
-	}
-	for (const auto& E : Catalog->Types)
-	{
-		if (bRequireComplete && !Seen.Contains(E.Key))
-		{
-			Error = FString::Printf(TEXT("Theme is missing required catalog tag: %s"), *E.Key.ToString());
-			return false;
-		}
 	}
 	return true;
 }
@@ -180,29 +144,14 @@ const UWidgetTheme* FWidgetThemeResolver::ResolveTheme(const UObject* Context)
 UClass* FWidgetThemeResolver::ResolveClass(const UObject* Context, FGameplayTag Tag, EWidgetStyleKind Kind)
 {
 	const UWidgetTheme* Theme = ResolveTheme(Context);
-	const UWidgetStyleCatalog* Catalog = nullptr;
-	if (const auto* Sub = WidgetThemeResolverPrivate::Subsystem(Context))
-	{
-		Catalog = Sub->GetCatalog();
-	}
-#if WITH_EDITOR
-	if (!(Context && Context->GetWorld() && Context->GetWorld()->IsGameWorld()))
-	{
-		WidgetThemeResolverPrivate::LoadEditorDefault();
-		Catalog = WidgetThemeResolverPrivate::DefaultCatalog.Get();
-	}
-#endif
-	const EWidgetStyleKind* Declared = Catalog ? Catalog->Types.Find(Tag) : nullptr;
+	EWidgetStyleKind TagKind;
 	UClass* Class = Theme ? Theme->GetStyleClass(Tag, Kind) : nullptr;
-	UClass* Base = NativeBase(Kind);
-	if (Declared && *Declared == Kind && Class && Base && Class->IsChildOf(Base) &&
+	if (WidgetStyleTags::Kind(Tag, TagKind) && TagKind == Kind && Class && Class->IsChildOf(NativeBase(Kind)) &&
 		!Class->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
 	{
 		return Class;
 	}
-	UE_LOG(LogTemp, Warning, TEXT("Theme lookup failed (Theme=%s Tag=%s Kind=%d); native placeholder applied."), *GetNameSafe(Theme), *Tag.ToString(),
-		   static_cast<int32>(Kind));
-	return Placeholder(Kind);
+	return DefaultStyle(Kind);
 }
 #if WITH_EDITOR
 void FWidgetThemeResolver::SetPreviewOverride(const UObject* Root, UWidgetTheme* Theme)
@@ -224,7 +173,6 @@ void FWidgetThemeResolver::InvalidateEditorDefault()
 {
 	WidgetThemeResolverPrivate::bLoaded = false;
 	WidgetThemeResolverPrivate::DefaultTheme.Reset();
-	WidgetThemeResolverPrivate::DefaultCatalog.Reset();
 	NotifyThemeChanged();
 }
 #endif

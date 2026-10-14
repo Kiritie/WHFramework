@@ -459,7 +459,6 @@ namespace WidgetThemeEdit
 		}
 		auto* Settings = GetMutableDefault<UWidgetThemeSettings>();
 		const TSoftObjectPtr<UWidgetTheme> PreviousDefault = Settings->DefaultTheme;
-		const TSoftObjectPtr<UWidgetStyleCatalog> PreviousCatalog = Settings->StyleCatalog;
 		const TArray<TSoftObjectPtr<UWidgetTheme>> PreviousAvailable = Settings->AvailableThemes;
 		TMap<FSoftObjectPath, FSoftObjectPath> ConfigPaths;
 		for (const FAssetRenameData& Rename : Renames)
@@ -474,7 +473,6 @@ namespace WidgetThemeEdit
 			}
 		};
 		RewriteSetting(Settings->DefaultTheme);
-		RewriteSetting(Settings->StyleCatalog);
 		for (auto& Path : Settings->AvailableThemes)
 		{
 			RewriteSetting(Path);
@@ -483,7 +481,6 @@ namespace WidgetThemeEdit
 		if (!bSucceeded)
 		{
 			Settings->DefaultTheme = PreviousDefault;
-			Settings->StyleCatalog = PreviousCatalog;
 			Settings->AvailableThemes = PreviousAvailable;
 		}
 		else if (!Settings->TryUpdateDefaultConfigFile())
@@ -834,22 +831,9 @@ bool FWidgetThemeEditorService::IsBusy()
 {
 	return bBusy;
 }
-UWidgetStyleCatalog* FWidgetThemeEditorService::Catalog()
+UClass* FWidgetThemeEditorService::CreationBase(EWidgetStyleKind Kind)
 {
-	return GetDefault<UWidgetThemeSettings>()->StyleCatalog.LoadSynchronous();
-}
-UClass* FWidgetThemeEditorService::NativeRoot(EWidgetStyleKind K)
-{
-	UClass* Base = FWidgetThemeResolver::NativeBase(K);
-	if (auto* C = Catalog())
-	{
-		if (const auto* Configured = C->NativeRoots.Find(K))
-		{
-			UClass* Root = Configured->Get();
-			return Root && Root->HasAnyClassFlags(CLASS_Native) && Base && Root->IsChildOf(Base) ? Root : nullptr;
-		}
-	}
-	return Base;
+	return FWidgetThemeResolver::DefaultStyle(Kind);
 }
 TArray<FGameplayTag> FWidgetThemeEditorService::Tags(const UWidgetTheme* T)
 {
@@ -990,9 +974,9 @@ bool FWidgetThemeEditorService::ValidateName(const FString& Name, FString& Repor
 
 bool FWidgetThemeEditorService::Validate(UWidgetTheme* Theme, FString& Report)
 {
-	if (!Theme || Theme->bDuplicateFailed || !Catalog())
+	if (!Theme || Theme->bDuplicateFailed)
 	{
-		Report += TEXT("Missing theme/catalog or incomplete asset duplication.\n");
+		Report += TEXT("Missing theme or incomplete asset duplication.\n");
 		return false;
 	}
 	bool Good = DependencySafe(Theme, Report);
@@ -1030,7 +1014,7 @@ bool FWidgetThemeEditorService::Create(UWidgetTheme* Theme, FGameplayTag Parent,
 									   bool bInheritParent, FString& Report)
 {
 	EWidgetStyleKind ParentType;
-	if (!Theme || !Catalog() || !ValidateName(Name, Report) || !Kind(Parent, ParentType) || Type != ParentType ||
+	if (!Theme || !ValidateName(Name, Report) || !Kind(Parent, ParentType) || Type != ParentType ||
 		(!WidgetStyleTags::IsRoot(Parent) && !Tags(Theme).Contains(Parent)))
 	{
 		Report += TEXT("Select a matching type root or a style in this theme.\n");
@@ -1043,7 +1027,7 @@ bool FWidgetThemeEditorService::Create(UWidgetTheme* Theme, FGameplayTag Parent,
 		Report = TEXT("This theme already contains the name.");
 		return false;
 	}
-	UClass* ParentClass = bInheritParent ? Theme->GetStyleClass(Parent, Type) : NativeRoot(Type);
+	UClass* ParentClass = bInheritParent ? Theme->GetStyleClass(Parent, Type) : CreationBase(Type);
 	if (!ParentClass || ForbiddenFrameworkReference(ParentClass->GetPathName(), MountRoot(DestinationRoot)))
 	{
 		Report = TEXT("The selected parent has no style or cannot be referenced from this destination.");
@@ -1051,13 +1035,12 @@ bool FWidgetThemeEditorService::Create(UWidgetTheme* Theme, FGameplayTag Parent,
 	}
 	FString Package;
 	FGuid Identity;
-	if (!Writable(Theme->GetOutermost(), Report) || !Writable(Catalog()->GetOutermost(), Report) || !NewPackage(DestinationRoot, Package, Identity, Report))
+	if (!Writable(Theme->GetOutermost(), Report) || !NewPackage(DestinationRoot, Package, Identity, Report))
 	{
 		return false;
 	}
 	FScopedTransaction Transaction(NSLOCTEXT("WidgetTheme", "CreateStyle", "Create style"));
 	Theme->Modify();
-	Catalog()->Modify();
 	UBlueprint* Style =
 		FKismetEditorUtilities::CreateBlueprint(ParentClass, CreatePackage(*Package), FName(*FPackageName::GetShortName(Package)), BPTYPE_Normal,
 												UBlueprint::StaticClass(), UBlueprintGeneratedClass::StaticClass(), TEXT("WidgetThemeEditor"));
@@ -1072,7 +1055,6 @@ bool FWidgetThemeEditorService::Create(UWidgetTheme* Theme, FGameplayTag Parent,
 		return false;
 	}
 	const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*FullName));
-	Catalog()->Types.Add(Tag, Type);
 	Theme->SetStyleClass(Tag, Type, Style->GeneratedClass);
 	FWidgetStyleBinding Binding;
 	Binding.bManaged = true;
@@ -1081,7 +1063,6 @@ bool FWidgetThemeEditorService::Create(UWidgetTheme* Theme, FGameplayTag Parent,
 	FAssetRegistryModule::AssetCreated(Style);
 	Style->MarkPackageDirty();
 	Theme->MarkPackageDirty();
-	Catalog()->MarkPackageDirty();
 	FWidgetThemeResolver::NotifyThemeChanged();
 	Report += TEXT("Style created with native Blueprint inheritance. Save to persist.\n");
 	return true;
@@ -1092,8 +1073,8 @@ bool FWidgetThemeEditorService::Associate(UWidgetTheme* Theme, FGameplayTag Pare
 {
 	EWidgetStyleKind ParentType = EWidgetStyleKind::None;
 	EWidgetStyleKind SourceType = EWidgetStyleKind::None;
-	if (!Theme || !SourceTheme || !Catalog() || !ValidateName(Name, Report) || !Kind(Parent, ParentType) || !Kind(SourceTag, SourceType) ||
-		ParentType != SourceType || (!WidgetStyleTags::IsRoot(Parent) && !Tags(Theme).Contains(Parent)))
+	if (!Theme || !SourceTheme || !ValidateName(Name, Report) || !Kind(Parent, ParentType) || !Kind(SourceTag, SourceType) || ParentType != SourceType ||
+		(!WidgetStyleTags::IsRoot(Parent) && !Tags(Theme).Contains(Parent)))
 	{
 		Report += TEXT("Select a source theme and a style matching the parent type.\n");
 		return false;
@@ -1102,8 +1083,7 @@ bool FWidgetThemeEditorService::Associate(UWidgetTheme* Theme, FGameplayTag Pare
 	const FString FullName = Parent.ToString() + TEXT(".") + Name;
 	FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*FullName), false);
 	if (!SourceClass || ManagedOwnerCount(SourceClass) != 1 || (Tag.IsValid() && Tags(Theme).Contains(Tag)) ||
-		ForbiddenFrameworkReference(SourceClass->GetPathName(), MountRoot(Theme->GetOutermost()->GetName())) || !Writable(Theme->GetOutermost(), Report) ||
-		!Writable(Catalog()->GetOutermost(), Report))
+		ForbiddenFrameworkReference(SourceClass->GetPathName(), MountRoot(Theme->GetOutermost()->GetName())) || !Writable(Theme->GetOutermost(), Report))
 	{
 		Report += TEXT("Source ownership, destination name or dependency is invalid.\n");
 		return false;
@@ -1115,15 +1095,12 @@ bool FWidgetThemeEditorService::Associate(UWidgetTheme* Theme, FGameplayTag Pare
 	Tag = FGameplayTag::RequestGameplayTag(FName(*FullName));
 	FScopedTransaction Transaction(NSLOCTEXT("WidgetTheme", "AssociateStyle", "Associate style"));
 	Theme->Modify();
-	Catalog()->Modify();
-	Catalog()->Types.Add(Tag, SourceType);
 	Theme->SetStyleClass(Tag, SourceType, SourceClass);
 	FWidgetStyleBinding Binding;
 	Binding.SourceTheme = SourceTheme;
 	Binding.SourceTag = SourceTag;
 	Theme->Bindings.Add(Tag, Binding);
 	Theme->MarkPackageDirty();
-	Catalog()->MarkPackageDirty();
 	FWidgetThemeResolver::NotifyThemeChanged();
 	Report = TEXT("Shared style associated. Save to persist.");
 	return true;
@@ -1595,8 +1572,7 @@ namespace WidgetThemeEdit
 		{
 			UObject* Object = *It;
 			if (!ProjectContentMounts().Contains(MountRoot(Object->GetOutermost()->GetName())) ||
-				DeletedPackages.Contains(Object->GetOutermost()->GetFName()) || Object->HasAnyFlags(RF_Transient) || Object->IsA<UWidgetStyleCatalog>() ||
-				Object->IsA<UPackage>())
+				DeletedPackages.Contains(Object->GetOutermost()->GetFName()) || Object->HasAnyFlags(RF_Transient) || Object->IsA<UPackage>())
 			{
 				continue;
 			}
@@ -1669,23 +1645,6 @@ namespace WidgetThemeEdit
 			Report += TEXT("Unused Tag could not be removed from its definition: ") + Tag.ToString() + TEXT("\n");
 			return;
 		}
-		if (UWidgetStyleCatalog* Catalog = FWidgetThemeEditorService::Catalog())
-		{
-			Catalog->Modify();
-			Catalog->Types.Remove(Tag);
-			Catalog->MarkPackageDirty();
-			if (Catalog->GetOutermost() != GetTransientPackage())
-			{
-				FSavePackageArgs Args;
-				Args.TopLevelFlags = RF_Public | RF_Standalone;
-				Args.SaveFlags = SAVE_NoError;
-				const FString Filename = FPackageName::LongPackageNameToFilename(Catalog->GetOutermost()->GetName(), FPackageName::GetAssetPackageExtension());
-				if (!Writable(Catalog->GetOutermost(), Report) || !UPackage::SavePackage(Catalog->GetOutermost(), Catalog, *Filename, Args))
-				{
-					Report += TEXT("Catalog cleanup is pending; save the catalog after resolving write errors.\n");
-				}
-			}
-		}
 		Report += TEXT("Unused Tag removed: ") + Tag.ToString() + TEXT("\n");
 	}
 	static void AddOwnedStylesToDelete(const TArray<UObject*>& Assets, TSet<UObject*>& Extra)
@@ -1706,6 +1665,40 @@ namespace WidgetThemeEdit
 				}
 			}
 		}
+		TSet<UObject*> Destinations = Extra;
+		Destinations.Append(Assets);
+		for (UObject* Asset : Destinations.Array())
+		{
+			if (UBlueprint* Style = Cast<UBlueprint>(Asset))
+			{
+				Destinations.Add(Style->GeneratedClass);
+				Destinations.Add(Style->SkeletonGeneratedClass);
+			}
+		}
+		FARFilter Filter;
+		Filter.ClassPaths.Add(UObjectRedirector::StaticClass()->GetClassPathName());
+		Filter.bRecursivePaths = true;
+		for (const FString& Root : ProjectContentMounts())
+		{
+			Filter.PackagePaths.Add(FName(*Root));
+		}
+		TArray<FAssetData> Redirectors;
+		FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get().GetAssets(Filter, Redirectors);
+		bool Added;
+		do
+		{
+			Added = false;
+			for (const FAssetData& Asset : Redirectors)
+			{
+				UObjectRedirector* Redirector = Cast<UObjectRedirector>(Asset.GetAsset());
+				if (Redirector && !Destinations.Contains(Redirector) && Redirector->DestinationObject && Destinations.Contains(Redirector->DestinationObject))
+				{
+					Extra.Add(Redirector);
+					Destinations.Add(Redirector);
+					Added = true;
+				}
+			}
+		} while (Added);
 	}
 }
 
@@ -1717,6 +1710,16 @@ bool FWidgetThemeEditorService::CanDeleteAssets(const TArray<UObject*>& Assets, 
 	if (RemovalTheme)
 	{
 		Packages.Add(RemovalTheme->GetOutermost()->GetFName());
+		for (const auto& Entry : RemovalTheme->Bindings)
+		{
+			if (Entry.Value.bManaged)
+			{
+				if (UBlueprint* Style = Blueprint(RemovalTheme, Entry.Key))
+				{
+					Packages.Add(Style->GetOutermost()->GetFName());
+				}
+			}
+		}
 	}
 	TSet<UObject*> Objects;
 	bool HasThemeStyles = false;
@@ -1908,29 +1911,19 @@ bool FWidgetThemeEditorService::CanRemove(UWidgetTheme* Theme, FGameplayTag Tag,
 	const FWidgetStyleBinding* Binding = Theme ? Theme->Bindings.Find(Tag) : nullptr;
 	if (!Binding || WidgetStyleTags::IsRoot(Tag))
 	{
+		Report = TEXT("Select a configured non-root style to remove.");
 		return false;
 	}
 	if (!Binding->bManaged)
 	{
+		Report = TEXT("Remove this theme's association. The shared source blueprint is retained.");
 		return true;
 	}
 	UBlueprint* Style = Blueprint(Theme, Tag);
 	if (!Style)
 	{
+		Report = TEXT("The owned style blueprint could not be resolved.");
 		return false;
-	}
-	for (FGameplayTag Other : Tags(Theme))
-	{
-		if (Other == Tag)
-		{
-			continue;
-		}
-		UBlueprint* Child = Blueprint(Theme, Other);
-		if (Child && (Child == Style || Child->GeneratedClass->IsChildOf(Style->GeneratedClass)))
-		{
-			Report = TEXT("Remove dependent child or alias mappings first.");
-			return false;
-		}
 	}
 	TArray<UObject*> Assets{Style};
 	TGuardValue<UWidgetTheme*> IgnoreCurrentMapping(RemovalTheme, Theme);
@@ -1945,14 +1938,26 @@ bool FWidgetThemeEditorService::RemoveBinding(UWidgetTheme* Theme, FGameplayTag 
 	}
 	const FWidgetStyleBinding Saved = Theme->Bindings.FindChecked(Tag);
 	UBlueprint* Style = Blueprint(Theme, Tag);
-	UClass* StyleClass = Style->GeneratedClass;
+	UClass* StyleClass = Style ? Style->GeneratedClass.Get() : nullptr;
+	TArray<FGameplayTag> RemovedTags{Tag};
+	if (Saved.bManaged)
+	{
+		for (FGameplayTag Other : Tags(Theme))
+		{
+			if (Other != Tag && Blueprint(Theme, Other) == Style)
+			{
+				RemovedTags.Add(Other);
+			}
+		}
+	}
+	TGuardValue<bool> Busy(bBusy, true);
 	EWidgetStyleKind Type;
 	Kind(Tag, Type);
 	FScopedTransaction Transaction(NSLOCTEXT("WidgetTheme", "RemoveStyle", "Remove style"));
 	Theme->Modify();
 	Theme->RemoveStyle(Tag, Type);
 	TGuardValue<UWidgetTheme*> IgnoreCurrentMapping(RemovalTheme, Theme);
-	if (Saved.bManaged && ObjectTools::DeleteObjects({Style}, false) == 0)
+	if (Saved.bManaged && ObjectTools::ForceDeleteObjects({Style}, false) == 0)
 	{
 		Theme->SetStyleClass(Tag, Type, StyleClass);
 		Theme->Bindings.Add(Tag, Saved);
@@ -1960,7 +1965,12 @@ bool FWidgetThemeEditorService::RemoveBinding(UWidgetTheme* Theme, FGameplayTag 
 		return false;
 	}
 	Theme->MarkPackageDirty();
-	CleanUnusedTag(Tag, {}, Report);
+	for (FGameplayTag RemovedTag : RemovedTags)
+	{
+		Kind(RemovedTag, Type);
+		Theme->RemoveStyle(RemovedTag, Type);
+		CleanUnusedTag(RemovedTag, {}, Report);
+	}
 	FWidgetThemeResolver::NotifyThemeChanged();
 	Report += TEXT("Mapping and unreferenced owned style removed. Shared source retained.\n");
 	return true;
@@ -1968,10 +1978,11 @@ bool FWidgetThemeEditorService::RemoveBinding(UWidgetTheme* Theme, FGameplayTag 
 
 bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FString& Report)
 {
-	auto* C = Catalog();
-	if (!C || !Old.IsValid() || !New.IsValid() || Old == New || !C->Types.Contains(Old) || C->Types.Contains(New))
+	EWidgetStyleKind OldKind;
+	EWidgetStyleKind NewKind;
+	if (!Kind(Old, OldKind) || !Kind(New, NewKind) || OldKind != NewKind || Old == New)
 	{
-		Report = TEXT("New Tag must already be registered in Project Settings > Gameplay Tags and not yet declared in the style catalog.");
+		Report = TEXT("New Tag must be registered and retain the original style type root.");
 		return false;
 	}
 	auto& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
@@ -2064,15 +2075,6 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 		}
 	}
 	FScopedTransaction Transaction(NSLOCTEXT("WidgetTheme", "RenameTag", "Rename theme Tag with redirect"));
-	C->Modify();
-	const EWidgetStyleKind RenamedKind = C->Types.FindChecked(Old);
-	C->Types.Remove(Old);
-	C->Types.Add(New, RenamedKind);
-	C->MarkPackageDirty();
-	if (C->GetOutermost() != GetTransientPackage())
-	{
-		ReferenceChangedPackages.Add(C->GetOutermost());
-	}
 	for (UObject* O : Objects)
 	{
 		O->Modify();
@@ -2184,9 +2186,9 @@ bool FWidgetThemeEditorService::Save(UWidgetTheme* T, FString& Report)
 		return false;
 	}
 	FString RuntimeError;
-	if (!FWidgetThemeResolver::Validate(T, Catalog(), RuntimeError, T->bRuntimeTheme))
+	if (!FWidgetThemeResolver::Validate(T, RuntimeError))
 	{
-		Report += TEXT("Runtime completeness validation failed: ") + RuntimeError + TEXT("\n");
+		Report += TEXT("Runtime theme validation failed: ") + RuntimeError + TEXT("\n");
 		return false;
 	}
 	TArray<UPackage*> Packages;
@@ -2205,10 +2207,6 @@ bool FWidgetThemeEditorService::Save(UWidgetTheme* T, FString& Report)
 				return false;
 			}
 		}
-	}
-	if (auto* C = Catalog())
-	{
-		Packages.AddUnique(C->GetOutermost());
 	}
 	Packages.AddUnique(T->GetOutermost());
 	for (UPackage* P : Packages)
@@ -2459,10 +2457,6 @@ bool FWidgetThemeEditorService::OrganizeAssets(UWidgetTheme* Theme, FString& Rep
 	TArray<FAssetData> Assets;
 	Registry.GetAssets(Filter, Assets);
 	TArray<UObject*> ToMove{Theme};
-	if (UWidgetStyleCatalog* StyleCatalog = Catalog())
-	{
-		ToMove.Add(StyleCatalog);
-	}
 	for (const FAssetData& Asset : Assets)
 	{
 		FString GeneratedClass;
@@ -2499,11 +2493,7 @@ bool FWidgetThemeEditorService::OrganizeAssets(UWidgetTheme* Theme, FString& Rep
 			return false;
 		}
 		FString AssetName = Asset->GetName();
-		if (Asset->IsA<UWidgetStyleCatalog>())
-		{
-			AssetName = TEXT("DA_WidgetStyleCatalog");
-		}
-		else if (Asset->IsA<UWidgetTheme>())
+		if (Asset->IsA<UWidgetTheme>())
 		{
 			AssetName = SourcePackage.StartsWith(TEXT("/Game/")) ? TEXT("DA_WidgetTheme_Default") : TEXT("DA_WidgetTheme_") + MountRoot(SourcePackage).Mid(1);
 		}
