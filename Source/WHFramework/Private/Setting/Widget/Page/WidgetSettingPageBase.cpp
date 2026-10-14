@@ -11,7 +11,7 @@
 #include "Setting/Widget/Entry/WidgetSettingEntryBase.h"
 #include "Setting/Widget/Entry/WidgetSettingCategoryEntry.h"
 #include "Widget/Theme/WidgetTheme.h"
-#include "Widget/WidgetModule.h"
+#include "Widget/Theme/WidgetThemeResolver.h"
 
 UWidgetSettingPageBase::UWidgetSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
@@ -21,6 +21,10 @@ UWidgetSettingPageBase::UWidgetSettingPageBase(const FObjectInitializer& ObjectI
 
 void UWidgetSettingPageBase::OnCreate(const FParameter& InParam)
 {
+    if (!ThemeChangedHandle.IsValid())
+    {
+        ThemeChangedHandle = FWidgetThemeResolver::OnThemeChanged().AddUObject(this, &ThisClass::RefreshEntries);
+    }
 	Super::OnCreate(InParam);
 
 	if(!SettingList && WidgetTree)
@@ -93,6 +97,8 @@ void UWidgetSettingPageBase::OnReset(bool bForce)
 
 void UWidgetSettingPageBase::OnDestroy(EObjectDespawnMode InMode)
 {
+    FWidgetThemeResolver::OnThemeChanged().Remove(ThemeChangedHandle);
+    ThemeChangedHandle.Reset();
 	USettingModule::Get().OnSettingValueChanged.RemoveDynamic(this, &ThisClass::OnSettingValueChanged);
 	Super::OnDestroy(InMode);
 }
@@ -226,7 +232,7 @@ void UWidgetSettingPageBase::RefreshEntries()
 
 TSubclassOf<UUserWidget> UWidgetSettingPageBase::ResolveEntryClass(UObject* InItem) const
 {
-	const UWidgetTheme* Theme = UWidgetModule::Get().GetDefaultWidgetTheme();
+    const UWidgetTheme* Theme = FWidgetThemeResolver::ResolveTheme(this);
 	if(!Theme)
 	{
 		return nullptr;

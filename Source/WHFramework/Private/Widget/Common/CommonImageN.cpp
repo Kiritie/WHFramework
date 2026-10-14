@@ -1,27 +1,24 @@
 #include "Widget/Common/CommonImageN.h"
 
 #include "Widget/Theme/WidgetTheme.h"
-#include "Widget/WidgetModule.h"
+#include "Widget/Theme/WidgetThemeResolver.h"
 
-UCommonImageN::UCommonImageN(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
-{
-}
+UCommonImageN::UCommonImageN(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 
 void UCommonImageN::SynchronizeProperties()
 {
+	EnsureThemeSubscription();
 	ApplyStyleTag();
 	Super::SynchronizeProperties();
 }
 
 void UCommonImageN::OnSpawn_Implementation(const FParameter& InParam)
 {
+	EnsureThemeSubscription();
 	ApplyStyleTag();
 }
 
-void UCommonImageN::OnDespawn_Implementation(EObjectDespawnMode InMode)
-{
-}
+void UCommonImageN::OnDespawn_Implementation(EObjectDespawnMode InMode) {}
 
 void UCommonImageN::SetStyleTag(FGameplayTag InStyleTag)
 {
@@ -31,14 +28,26 @@ void UCommonImageN::SetStyleTag(FGameplayTag InStyleTag)
 
 void UCommonImageN::ApplyStyleTag()
 {
-	const bool bInEditor = IsDesignTime();
-	const UWidgetModule* WidgetModule = UWidgetModule::IsValid(bInEditor)
-		? UWidgetModule::GetPtr(bInEditor)
-		: nullptr;
-	const UWidgetTheme* Theme = WidgetModule ? WidgetModule->GetDefaultWidgetTheme() : nullptr;
-	const FWidgetBrushStyleData* StyleData = Theme ? Theme->FindBrushStyle(StyleTag) : nullptr;
-	if(StyleData)
+	if (!StyleTag.IsValid())
 	{
-		SetBrush(StyleData->Brush);
+		return;
 	}
+	EnsureThemeSubscription();
+	UClass* Class = FWidgetThemeResolver::ResolveClass(this, StyleTag, EWidgetStyleKind::Brush);
+	const UWidgetBrushStyle* Style = Class ? Class->GetDefaultObject<UWidgetBrushStyle>() : nullptr;
+	SetBrush(Style ? Style->Brush : FSlateBrush());
+}
+
+void UCommonImageN::EnsureThemeSubscription()
+{
+	if (!ThemeChangedHandle.IsValid() && !HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject))
+	{
+		ThemeChangedHandle = FWidgetThemeResolver::OnThemeChanged().AddUObject(this, &ThisClass::ApplyStyleTag);
+	}
+}
+void UCommonImageN::BeginDestroy()
+{
+	FWidgetThemeResolver::OnThemeChanged().Remove(ThemeChangedHandle);
+	ThemeChangedHandle.Reset();
+	Super::BeginDestroy();
 }

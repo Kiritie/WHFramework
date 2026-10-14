@@ -1,4 +1,4 @@
-﻿// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
 
@@ -15,6 +15,9 @@ public class WHFramework : ModuleRules
 			{
 				"Core",
 				"CoreUObject",
+				"DeveloperSettings",
+				"SlateCore",
+				"UMG",
 				"Engine",
 				"HTTP",
 				"Json",
@@ -35,26 +38,23 @@ public class WHFramework : ModuleRules
 			});
 
 
-        PrivateDependencyModuleNames.AddRange(
+		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
 				"RHI",
 				"RenderCore",
 				"Chaos",
-				"UMG",
 				"Slate",
 				"Paper2D",
 				"Sockets",
 				"Media",
 				"MediaUtils",
 				"MediaAssets",
-				"SlateCore",
 				"InputCore",
 				"AppFramework",
 				"ApplicationCore",
 				"ImageWrapper",
 				"ImageWriteQueue",
-				"DeveloperSettings",
 				"LevelSequence",
 				"MovieScene",
 				"CinematicCamera"

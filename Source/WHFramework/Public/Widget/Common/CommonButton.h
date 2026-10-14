@@ -20,15 +20,13 @@ class WHFRAMEWORK_API UCommonButton : public UCommonButtonBase, public IObjectPo
 
 public:
 	UCommonButton(const FObjectInitializer& ObjectInitializer);
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 public:
-
 	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-		
-	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
-		override;
+
+	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
 
 public:
 	virtual void SynchronizeProperties() override;
@@ -40,7 +38,7 @@ public:
 	virtual void NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
 	virtual void NativeOnDragLeave(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
-	
+
 	virtual void NativeOnCurrentTextStyleChanged() override;
 
 	virtual void NativeOnClicked() override;
@@ -48,6 +46,7 @@ public:
 	virtual void NativeOnSelected(bool bBroadcast) override;
 
 	virtual void NativeOnDeselected(bool bBroadcast) override;
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UImage* Img_Icon;
@@ -73,6 +72,9 @@ protected:
 
 private:
 	void ApplyStyleTag();
+	void EnsureThemeSubscription();
+	FDelegateHandle ThemeChangedHandle;
+	virtual void BeginDestroy() override;
 
 	void ApplyTitleStyle();
 
@@ -80,35 +82,57 @@ private:
 
 public:
 	UFUNCTION(BlueprintPure)
-	FText GetTitle() const { return Title; }
+	FText GetTitle() const
+	{
+		return Title;
+	}
 
 	UFUNCTION(BlueprintCallable)
+
 	void SetTitle(const FText InTitle);
 
 	UFUNCTION(BlueprintPure)
-	bool IsStandalone() const { return bStandalone; }
+
+	bool IsStandalone() const
+	{
+		return bStandalone;
+	}
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = InBrush))
+
 	void SetIconBrush(const FSlateBrush& InBrush);
 
 	UFUNCTION(BlueprintCallable)
+
 	void SetMinWidth(int32 InValue);
 
 	UFUNCTION(BlueprintCallable)
+
 	void SetMinHeight(int32 InValue);
 
 	UFUNCTION(BlueprintPure)
-	virtual FParameter GetWidgetParams() const { return WidgetParams; }
+
+	virtual FParameter GetWidgetParams() const
+	{
+		return WidgetParams;
+	}
 
 	UFUNCTION(BlueprintCallable)
+
 	void SetIsEnabledN(bool bEnable);
 
 	UFUNCTION(BlueprintCallable, Category = "Style")
+
 	void SetStyleTag(FGameplayTag InStyleTag);
 
 	UFUNCTION(BlueprintPure, Category = "Style")
-	FGameplayTag GetStyleTag() const { return StyleTag; }
+
+	FGameplayTag GetStyleTag() const
+	{
+		return StyleTag;
+	}
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
+
 	void SetTriggeringActionTag(FGameplayTag InActionTag);
 };

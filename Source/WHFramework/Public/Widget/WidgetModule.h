@@ -148,15 +148,15 @@ public:
 	////////////////////////////////////////////////////
 	// WidgetTheme
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "CommonWidget|Theme")
+	UPROPERTY(meta=(DeprecatedProperty, DeprecationMessage="Migrate explicitly to Project Settings / Widget Theme."))
 	TObjectPtr<UWidgetTheme> DefaultWidgetTheme;
 
 public:
 	UFUNCTION(BlueprintPure)
-	UWidgetTheme* GetDefaultWidgetTheme() const { return DefaultWidgetTheme; }
+	UWidgetTheme* GetDefaultWidgetTheme() const;
 
-	UFUNCTION(BlueprintCallable)
-	void SetDefaultWidgetTheme(UWidgetTheme* InTheme) { DefaultWidgetTheme = InTheme; }
+	UFUNCTION(BlueprintCallable, meta=(DeprecatedFunction, DeprecationMessage="Use WidgetThemeSubsystem.RequestTheme for async switching. Legacy setter validates and commits loaded themes synchronously."))
+	void SetDefaultWidgetTheme(UWidgetTheme* InTheme);
 
 	////////////////////////////////////////////////////
 	// ScreenWidget

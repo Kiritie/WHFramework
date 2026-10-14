@@ -9,6 +9,7 @@
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widget/Theme/WidgetTheme.h"
+#include "Widget/Theme/WidgetThemeToolkit.h"
 
 #define LOCTEXT_NAMESPACE "WidgetThemeCustomization"
 
@@ -21,45 +22,54 @@ void FWidgetThemeCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailLay
 {
 	FClassCustomizationBase::CustomizeDetails(DetailLayoutBuilder);
 	DetailBuilder = &DetailLayoutBuilder;
+	DetailLayoutBuilder.EditCategory(TEXT("Theme Editor"))
+		.AddCustomRow(LOCTEXT("OpenEditor", "Open Theme Editor"))
+		.WholeRowContent()[SNew(SButton)
+							   .Text(LOCTEXT("OpenThemeEditor", "Open Theme Editor"))
+							   .OnClicked_Lambda(
+								   [this]
+								   {
+									   for (const TWeakObjectPtr<UObject>& Object : SelectedObjectsList)
+									   {
+										   if (auto* Theme = Cast<UWidgetTheme>(Object.Get()))
+										   {
+											   MakeShared<FWidgetThemeToolkit>()->Open(Theme, nullptr);
+										   }
+									   }
+									   return FReply::Handled();
+								   })];
 
-	IDetailCategoryBuilder& StyleCategory = DetailLayoutBuilder.EditCategory(
-		TEXT("Style"),
-		LOCTEXT("StyleCategory", "Style"),
-		ECategoryPriority::Important);
+	IDetailCategoryBuilder& StyleCategory = DetailLayoutBuilder.EditCategory(TEXT("Style"), LOCTEXT("StyleCategory", "Style"), ECategoryPriority::Important);
 	StyleCategory.AddCustomRow(LOCTEXT("SortStylesFilter", "Sort Styles"))
-	.WholeRowContent()
-	[
-		SNew(SButton)
-		.Text(LOCTEXT("SortStyles", "Sort Styles by Tag"))
-		.ToolTipText(LOCTEXT("SortStylesTooltip", "Sort button, text, and brush styles by gameplay tag."))
-		.OnClicked(this, &FWidgetThemeCustomization::OnSortStyles)
-	];
+		.WholeRowContent()[SNew(SButton)
+							   .Text(LOCTEXT("SortStyles", "Sort Styles by Tag"))
+							   .ToolTipText(LOCTEXT("SortStylesTooltip", "Sort button, text, and brush styles by gameplay tag."))
+							   .OnClicked(this, &FWidgetThemeCustomization::OnSortStyles)];
 }
 
 FReply FWidgetThemeCustomization::OnSortStyles()
 {
 	TArray<UWidgetTheme*> Themes;
-	for(const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
+	for (const TWeakObjectPtr<UObject>& SelectedObject : SelectedObjectsList)
 	{
-		if(UWidgetTheme* Theme = Cast<UWidgetTheme>(SelectedObject.Get());
-			Theme && !Theme->AreStylesSorted())
+		if (UWidgetTheme* Theme = Cast<UWidgetTheme>(SelectedObject.Get()); Theme && !Theme->AreStylesSorted())
 		{
 			Themes.Add(Theme);
 		}
 	}
-	if(Themes.IsEmpty())
+	if (Themes.IsEmpty())
 	{
 		return FReply::Handled();
 	}
 
 	const FScopedTransaction Transaction(LOCTEXT("SortWidgetThemeStyles", "Sort Widget Theme Styles"));
-	for(UWidgetTheme* Theme : Themes)
+	for (UWidgetTheme* Theme : Themes)
 	{
 		Theme->Modify();
 		Theme->SortStyles();
 		Theme->MarkPackageDirty();
 	}
-	if(DetailBuilder)
+	if (DetailBuilder)
 	{
 		DetailBuilder->ForceRefreshDetails();
 	}

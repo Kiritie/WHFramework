@@ -7,7 +7,7 @@
 #include "Input/InputModule.h"
 #include "Widget/Common/CommonTextBlockN.h"
 #include "Widget/Theme/WidgetTheme.h"
-#include "Widget/WidgetModule.h"
+#include "Widget/Theme/WidgetThemeResolver.h"
 
 UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
@@ -16,11 +16,12 @@ UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Supe
 
 	bStandalone = false;
 	WidgetParams = FParameter();
-
 }
 
 void UCommonButton::OnSpawn_Implementation(const FParameter& InParam)
 {
+	EnsureThemeSubscription();
+	ApplyStyleTag();
 	WidgetParams = InParam;
 }
 
@@ -34,7 +35,7 @@ void UCommonButton::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	OnButtonBaseHovered.Clear();
 	OnButtonBaseUnhovered.Clear();
 
-	if(GetSelected())
+	if (GetSelected())
 	{
 		SetSelectedInternal(false, false, false);
 	}
@@ -45,6 +46,7 @@ void UCommonButton::OnDespawn_Implementation(EObjectDespawnMode InMode)
 
 void UCommonButton::SynchronizeProperties()
 {
+	EnsureThemeSubscription();
 	ApplyStyleTag();
 	Super::SynchronizeProperties();
 }
@@ -116,7 +118,7 @@ void UCommonButton::NativeOnDeselected(bool bBroadcast)
 void UCommonButton::SetTitle(const FText InTitle)
 {
 	Title = InTitle;
-	if(Txt_Title)
+	if (Txt_Title)
 	{
 		Txt_Title->SetText(Title);
 		Txt_Title->SetVisibility(Title.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
@@ -125,7 +127,7 @@ void UCommonButton::SetTitle(const FText InTitle)
 
 void UCommonButton::SetIconBrush(const FSlateBrush& InBrush)
 {
-	if(Img_Icon)
+	if (Img_Icon)
 	{
 		Img_Icon->SetBrush(InBrush);
 		Img_Icon->SetVisibility(!InBrush.HasUObject() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
@@ -162,22 +164,19 @@ void UCommonButton::SetTriggeringActionTag(FGameplayTag InActionTag)
 
 void UCommonButton::ApplyStyleTag()
 {
-	const bool bInEditor = IsDesignTime();
-	const UWidgetModule* WidgetModule = UWidgetModule::IsValid(bInEditor)
-		? UWidgetModule::GetPtr(bInEditor)
-		: nullptr;
-	const UWidgetTheme* Theme = WidgetModule ? WidgetModule->GetDefaultWidgetTheme() : nullptr;
-	const FWidgetButtonStyleData* StyleData = Theme ? Theme->FindButtonStyle(StyleTag) : nullptr;
-	if(StyleData && StyleData->Style)
+	if (!StyleTag.IsValid())
 	{
-		SetStyle(StyleData->Style);
+		ApplyTitleStyle();
+		return;
 	}
+	EnsureThemeSubscription();
+	SetStyle(FWidgetThemeResolver::ResolveClass(this, StyleTag, EWidgetStyleKind::Button));
 	ApplyTitleStyle();
 }
 
 void UCommonButton::ApplyTitleStyle()
 {
-	if(Txt_Title)
+	if (Txt_Title)
 	{
 		Txt_Title->SetStyleTag(FGameplayTag());
 		Txt_Title->SetStyle(GetCurrentTextStyleClass());
@@ -186,8 +185,20 @@ void UCommonButton::ApplyTitleStyle()
 
 void UCommonButton::ApplyTriggeringActionTag()
 {
-	const UInputActionBase* InputAction = TriggeringActionTag.IsValid()
-		? UInputModule::Get().GetInputActionByTag(TriggeringActionTag, false)
-		: nullptr;
+	const UInputActionBase* InputAction = TriggeringActionTag.IsValid() ? UInputModule::Get().GetInputActionByTag(TriggeringActionTag, false) : nullptr;
 	SetTriggeringEnhancedInputAction(const_cast<UInputActionBase*>(InputAction));
+}
+
+void UCommonButton::EnsureThemeSubscription()
+{
+	if (!ThemeChangedHandle.IsValid() && !HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject))
+	{
+		ThemeChangedHandle = FWidgetThemeResolver::OnThemeChanged().AddUObject(this, &ThisClass::ApplyStyleTag);
+	}
+}
+void UCommonButton::BeginDestroy()
+{
+	FWidgetThemeResolver::OnThemeChanged().Remove(ThemeChangedHandle);
+	ThemeChangedHandle.Reset();
+	Super::BeginDestroy();
 }

@@ -22,8 +22,7 @@ protected:
 public:
 	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
 
-	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
-		override;
+	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Brush"))
@@ -31,11 +30,18 @@ protected:
 
 private:
 	void ApplyStyleTag();
+	void EnsureThemeSubscription();
+	FDelegateHandle ThemeChangedHandle;
+	virtual void BeginDestroy() override;
 
 public:
 	UFUNCTION(BlueprintPure, Category = "Style")
-	FGameplayTag GetStyleTag() const { return StyleTag; }
+	FGameplayTag GetStyleTag() const
+	{
+		return StyleTag;
+	}
 
 	UFUNCTION(BlueprintCallable, Category = "Style")
+
 	void SetStyleTag(FGameplayTag InStyleTag);
 };

@@ -68,6 +68,9 @@ public:
 protected:
 	TSubclassOf<UUserWidget> ResolveEntryClass(UObject* InItem) const;
 
+private:
+    FDelegateHandle ThemeChangedHandle;
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = true), Category = "Components")
 	TObjectPtr<UCommonListView> SettingList;

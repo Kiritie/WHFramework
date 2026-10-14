@@ -9,7 +9,8 @@
 
 #include "CommonTextBlockN.generated.h"
 
-UCLASS(BlueprintType, Blueprintable, Config = CommonUI, DefaultConfig, ClassGroup = UI, meta = (Category = "Common UI", DisplayName = "Common Text N", PrioritizeCategories = "Content"))
+UCLASS(BlueprintType, Blueprintable, Config = CommonUI, DefaultConfig, ClassGroup = UI,
+	   meta = (Category = "Common UI", DisplayName = "Common Text N", PrioritizeCategories = "Content"))
 class WHFRAMEWORK_API UCommonTextBlockN : public UCommonTextBlock, public IObjectPoolInterface
 {
 	GENERATED_BODY()
@@ -21,15 +22,13 @@ protected:
 	virtual void SynchronizeProperties() override;
 
 	virtual void OnBindingChanged(const FName& Property) override;
-	
+
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 public:
-
 	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-		
-	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
-		override;
+
+	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Text"))
@@ -37,17 +36,23 @@ protected:
 
 private:
 	void ApplyStyleTag();
+	void EnsureThemeSubscription();
+	FDelegateHandle ThemeChangedHandle;
+	virtual void BeginDestroy() override;
 
 	bool bApplyingStyleTag = false;
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Getter, Setter, BlueprintGetter = "GetHighlightText", BlueprintSetter = "SetHighlightText", Category = "Content", meta = (MultiLine = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Getter, Setter, BlueprintGetter = "GetHighlightText", BlueprintSetter = "SetHighlightText",
+			  Category = "Content", meta = (MultiLine = "true"))
 	FText HighlightText;
-	
+
 	UPROPERTY()
 	FGetText HighlightTextDelegate;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Getter, Setter, BlueprintGetter = "GetHighlightColor", BlueprintSetter = "SetHighlightColor", Category = "Appearance")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Getter, Setter, BlueprintGetter = "GetHighlightColor", BlueprintSetter = "SetHighlightColor",
+			  Category = "Appearance")
+
 	FSlateColor HighlightColor;
 
 	UPROPERTY()
@@ -59,19 +64,27 @@ protected:
 public:
 	UFUNCTION(BlueprintPure, Category = "Widget")
 	virtual FText GetHighlightText() const;
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Widget")
+
 	virtual void SetHighlightText(const FText InText);
 
 	UFUNCTION(BlueprintPure, Category = "Widget")
+
 	virtual FSlateColor GetHighlightColor() const;
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Widget")
+
 	virtual void SetHighlightColor(const FSlateColor InColor);
 
 	UFUNCTION(BlueprintCallable, Category = "Style")
+
 	void SetStyleTag(FGameplayTag InStyleTag);
 
 	UFUNCTION(BlueprintPure, Category = "Style")
-	FGameplayTag GetStyleTag() const { return StyleTag; }
+
+	FGameplayTag GetStyleTag() const
+	{
+		return StyleTag;
+	}
 };

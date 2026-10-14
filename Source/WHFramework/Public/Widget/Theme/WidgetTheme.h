@@ -6,10 +6,17 @@
 #include "GameplayTagContainer.h"
 #include "Setting/SettingModuleTypes.h"
 
+#include "Widget/Style/WidgetBrushStyle.h"
+#include "Widget/Theme/WidgetStyleCatalog.h"
 #include "WidgetTheme.generated.h"
 
 class UWidgetSettingEntryBase;
 class UWidgetSettingCategoryEntry;
+class UWidgetTheme;
+
+#if WITH_EDITOR
+DECLARE_DELEGATE_RetVal_OneParam(bool, FWidgetThemeDuplicateDelegate, UWidgetTheme*);
+#endif
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSettingRendererClasses
@@ -67,6 +74,23 @@ struct WHFRAMEWORK_API FWidgetBrushStyleData
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
 	FSlateBrush Brush;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
+	TSubclassOf<UWidgetBrushStyle> Style;
+};
+
+USTRUCT()
+struct WHFRAMEWORK_API FWidgetStyleBinding
+{
+	GENERATED_BODY()
+	UPROPERTY()
+	TObjectPtr<UWidgetTheme> SourceTheme;
+	UPROPERTY()
+	FGameplayTag SourceTag;
+	UPROPERTY()
+	FGuid AssetId;
+	UPROPERTY()
+	bool bManaged = false;
 };
 
 UCLASS(BlueprintType)
@@ -76,6 +100,26 @@ class WHFRAMEWORK_API UWidgetTheme : public UPrimaryDataAsset
 
 public:
 	UWidgetTheme();
+
+#if WITH_EDITOR
+	virtual void PostDuplicate(EDuplicateMode::Type DuplicateMode) override;
+	static FWidgetThemeDuplicateDelegate DuplicateStyles;
+#endif
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Theme")
+	bool bRuntimeTheme = true;
+
+#if WITH_EDITORONLY_DATA
+	UPROPERTY()
+	bool bDuplicateFailed = false;
+	UPROPERTY()
+	TMap<FGameplayTag, FWidgetStyleBinding> Bindings;
+#endif
+	UClass* GetStyleClass(FGameplayTag Tag, EWidgetStyleKind Kind) const;
+#if WITH_EDITOR
+	bool SetStyleClass(FGameplayTag Tag, EWidgetStyleKind Kind, UClass* StyleClass);
+	void RemoveStyle(FGameplayTag Tag, EWidgetStyleKind Kind);
+#endif
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Button"))
@@ -94,15 +138,30 @@ protected:
 	TSubclassOf<UWidgetSettingCategoryEntry> SettingCategoryEntryClass;
 
 public:
-	const TMap<FGameplayTag, FWidgetButtonStyleData>& GetButtonStyles() const { return ButtonStyles; }
+	const TMap<FGameplayTag, FWidgetButtonStyleData>& GetButtonStyles() const
+	{
+		return ButtonStyles;
+	}
 
-	const TMap<FGameplayTag, FWidgetTextStyleData>& GetTextStyles() const { return TextStyles; }
+	const TMap<FGameplayTag, FWidgetTextStyleData>& GetTextStyles() const
+	{
+		return TextStyles;
+	}
 
-	const TMap<FGameplayTag, FWidgetBrushStyleData>& GetBrushStyles() const { return BrushStyles; }
+	const TMap<FGameplayTag, FWidgetBrushStyleData>& GetBrushStyles() const
+	{
+		return BrushStyles;
+	}
 
-	const FSettingRendererClasses& GetSettingRendererClasses() const { return SettingRendererClasses; }
+	const FSettingRendererClasses& GetSettingRendererClasses() const
+	{
+		return SettingRendererClasses;
+	}
 
-	TSubclassOf<UWidgetSettingCategoryEntry> GetSettingCategoryEntryClass() const { return SettingCategoryEntryClass; }
+	TSubclassOf<UWidgetSettingCategoryEntry> GetSettingCategoryEntryClass() const
+	{
+		return SettingCategoryEntryClass;
+	}
 
 	const FWidgetButtonStyleData* FindButtonStyle(FGameplayTag InStyleTag) const;
 
@@ -117,12 +176,24 @@ public:
 
 	void SortStyles();
 
-	void SetButtonStyles(const TMap<FGameplayTag, FWidgetButtonStyleData>& InStyles) { ButtonStyles = InStyles; }
+	void SetButtonStyles(const TMap<FGameplayTag, FWidgetButtonStyleData>& InStyles)
+	{
+		ButtonStyles = InStyles;
+	}
 
-	void SetTextStyles(const TMap<FGameplayTag, FWidgetTextStyleData>& InStyles) { TextStyles = InStyles; }
+	void SetTextStyles(const TMap<FGameplayTag, FWidgetTextStyleData>& InStyles)
+	{
+		TextStyles = InStyles;
+	}
 
-	void SetBrushStyles(const TMap<FGameplayTag, FWidgetBrushStyleData>& InStyles) { BrushStyles = InStyles; }
+	void SetBrushStyles(const TMap<FGameplayTag, FWidgetBrushStyleData>& InStyles)
+	{
+		BrushStyles = InStyles;
+	}
 
-	void SetSettingRendererClasses(const FSettingRendererClasses& InClasses) { SettingRendererClasses = InClasses; }
+	void SetSettingRendererClasses(const FSettingRendererClasses& InClasses)
+	{
+		SettingRendererClasses = InClasses;
+	}
 #endif
 };

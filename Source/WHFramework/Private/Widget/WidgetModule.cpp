@@ -25,6 +25,10 @@
 #include "Widget/Common/CommonTextBlockN.h"
 #include "Widget/Screen/WidgetMountSlot.h"
 #include "Widget/Theme/WidgetTheme.h"
+#include "Widget/Theme/WidgetThemeResolver.h"
+#include "Widget/Theme/WidgetThemeSubsystem.h"
+#include "Engine/GameInstance.h"
+#include "Engine/World.h"
 #include "Setting/Widget/Entry/WidgetSettingEntryBase.h"
 		
 IMPLEMENTATION_MODULE(UWidgetModule)
@@ -354,16 +358,17 @@ bool UWidgetModule::ValidateWorldWidgetConfigs(TArray<FText>& OutErrors, TArray<
 
 bool UWidgetModule::ValidateWidgetTheme(TArray<FText>& OutErrors, TArray<FText>& OutWarnings) const
 {
-	if(!DefaultWidgetTheme)
+	const UWidgetTheme* ResolvedTheme = GetDefaultWidgetTheme();
+	if(!ResolvedTheme)
 	{
 		OutErrors.Add(NSLOCTEXT(
 			"WH.WidgetModule",
-			"MissingDefaultWidgetTheme",
+			"MissingResolvedTheme",
 			"Widget module has no default widget theme."));
 		return false;
 	}
 
-	for(const auto& Iter : DefaultWidgetTheme->GetButtonStyles())
+	for(const auto& Iter : ResolvedTheme->GetButtonStyles())
 	{
 		if(!Iter.Key.IsValid() || !Iter.Value.Style)
 		{
@@ -372,7 +377,7 @@ bool UWidgetModule::ValidateWidgetTheme(TArray<FText>& OutErrors, TArray<FText>&
 				FText::FromString(Iter.Key.ToString())));
 		}
 	}
-	for(const auto& Iter : DefaultWidgetTheme->GetTextStyles())
+	for(const auto& Iter : ResolvedTheme->GetTextStyles())
 	{
 		if(!Iter.Key.IsValid() || !Iter.Value.Style)
 		{
@@ -381,7 +386,7 @@ bool UWidgetModule::ValidateWidgetTheme(TArray<FText>& OutErrors, TArray<FText>&
 				FText::FromString(Iter.Key.ToString())));
 		}
 	}
-	for(const auto& Iter : DefaultWidgetTheme->GetBrushStyles())
+	for(const auto& Iter : ResolvedTheme->GetBrushStyles())
 	{
 		if(!Iter.Key.IsValid())
 		{
@@ -390,15 +395,15 @@ bool UWidgetModule::ValidateWidgetTheme(TArray<FText>& OutErrors, TArray<FText>&
 				"InvalidBrushStyle",
 				"Widget theme contains a brush style with an invalid tag."));
 		}
-		else if(!Iter.Value.Brush.HasUObject() && Iter.Value.Brush.DrawAs != ESlateBrushDrawType::NoDrawType)
+		else if(!Iter.Value.Style)
 		{
 			OutWarnings.Add(FText::Format(
-				NSLOCTEXT("WH.WidgetModule", "BrushStyleWithoutResource", "Widget theme brush style {0} has no resource object."),
+				NSLOCTEXT("WH.WidgetModule", "BrushStyleWithoutResource", "Widget theme brush style {0} requires migration to a brush style class."),
 				FText::FromString(Iter.Key.ToString())));
 		}
 	}
 
-	const FSettingRendererClasses& RendererClasses = DefaultWidgetTheme->GetSettingRendererClasses();
+	const FSettingRendererClasses& RendererClasses = ResolvedTheme->GetSettingRendererClasses();
 	auto ValidateRendererClass = [&OutWarnings](const TCHAR* InName, TSubclassOf<UWidgetSettingEntryBase> InClass)
 	{
 		if(!InClass)
@@ -1406,4 +1411,26 @@ void UWidgetModule::ClearAllWorldWidget(EObjectDespawnMode InMode)
 			Widget->OnDestroy(InMode);
 		}
 	}
+}
+
+
+UWidgetTheme* UWidgetModule::GetDefaultWidgetTheme() const
+{
+    return const_cast<UWidgetTheme*>(FWidgetThemeResolver::ResolveTheme(this));
+}
+void UWidgetModule::SetDefaultWidgetTheme(UWidgetTheme* InTheme)
+{
+    UWorld* World = GetWorld();
+    UGameInstance* GI = World && World->IsGameWorld() ? World->GetGameInstance() : nullptr;
+    if (GI)
+    {
+        FString Error;
+        if(UWidgetThemeSubsystem* Themes=GI->GetSubsystem<UWidgetThemeSubsystem>())
+        {
+            if(!Themes->ApplyLoadedTheme(InTheme,Error))
+                UE_LOG(LogTemp, Error, TEXT("Legacy SetDefaultWidgetTheme rejected: %s"), *Error);
+        }
+        else UE_LOG(LogTemp, Warning, TEXT("Widget Theme UI subsystem is unavailable (e.g. dedicated server); no UI theme loaded."));
+    }
+    else UE_LOG(LogTemp, Warning, TEXT("SetDefaultWidgetTheme requires a game instance. Edit project settings explicitly in the editor."));
 }

@@ -14,6 +14,7 @@ public class WHFrameworkEditor : ModuleRules
 			new string[]
 			{
 				"Core",
+				"DeveloperSettings",
 				"WHFramework",
 				"WHFrameworkCore",
 				"WHFrameworkSlate"
@@ -23,9 +24,13 @@ public class WHFrameworkEditor : ModuleRules
 			new string[]
 			{
 				"Projects",
+				"DeveloperToolSettings",
+				"GameplayTagsEditor",
 				"InputCore",
 				"Settings",
 				"KismetCompiler",
+				"BlueprintEditorLibrary",
+				"UMGEditor",
 				"ToolMenus",
 				"ToolWidgets",
 				"CoreUObject",
