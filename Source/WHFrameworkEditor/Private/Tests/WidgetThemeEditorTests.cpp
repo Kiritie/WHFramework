@@ -28,6 +28,13 @@
 #include "PackageTools.h"
 #include "Widget/Theme/WidgetThemeToolkit.h"
 #include "Widget/Theme/WidgetThemeTree.h"
+#include "Widget/Theme/WidgetStylePropertyEditing.h"
+#include "Widget/Theme/WidgetStyleClipboard.h"
+#include "UObject/Linker.h"
+#include "GameplayTagsSettings.h"
+#include "GameplayTagsManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/ConfigCacheIni.h"
 
 namespace WidgetThemeEditorTests
 {
@@ -38,13 +45,16 @@ namespace WidgetThemeEditorTests
 		TArray<TWeakObjectPtr<UWidgetTheme>> Themes;
 		FString Directory;
 		FString Clipboard;
+		TArray<uint8> TagConfig;
+		TArray<FString> TextFiles;
 		FFixture()
 		{
 			SavedCatalog = GetDefault<UWidgetThemeSettings>()->StyleCatalog;
 			Catalog.Reset(NewObject<UWidgetStyleCatalog>());
 			GetMutableDefault<UWidgetThemeSettings>()->StyleCatalog = Catalog.Get();
 			Directory = TEXT("/Game/WidgetThemeTests/") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
-			FPlatformApplicationMisc::ClipboardPaste(Clipboard);
+			WidgetStyleClipboard::Read(Clipboard);
+			FFileHelper::LoadFileToArray(TagConfig, *GetDefault<UGameplayTagsSettings>()->GetDefaultConfigFilename());
 		}
 		~FFixture()
 		{
@@ -72,6 +82,7 @@ namespace WidgetThemeEditorTests
 					continue;
 				}
 				const FString Filename = FPackageName::LongPackageNameToFilename(Object->GetOutermost()->GetName(), FPackageName::GetAssetPackageExtension());
+				ResetLoaders(Object->GetOutermost());
 				FAssetRegistryModule::AssetDeleted(Object);
 				Object->ClearFlags(RF_Public | RF_Standalone);
 				Object->GetOutermost()->SetDirtyFlag(false);
@@ -82,12 +93,22 @@ namespace WidgetThemeEditorTests
 					IFileManager::Get().Delete(*Filename);
 				}
 			}
-			FPlatformApplicationMisc::ClipboardCopy(*Clipboard);
+			for (const FString& File : TextFiles)
+			{
+				IFileManager::Get().Delete(*File);
+			}
+			FFileHelper::SaveArrayToFile(TagConfig, *GetDefault<UGameplayTagsSettings>()->GetDefaultConfigFilename());
+			GConfig->UnloadFile(GetDefault<UGameplayTagsSettings>()->GetDefaultConfigFilename());
+			GConfig->LoadFile(GetDefault<UGameplayTagsSettings>()->GetDefaultConfigFilename());
+			GetMutableDefault<UGameplayTagsSettings>()->ReloadConfig();
+			UGameplayTagsManager::Get().EditorRefreshGameplayTagTree();
+			WidgetStyleClipboard::Write(Clipboard);
 			FWidgetThemeResolver::InvalidateEditorDefault();
 		}
 		UWidgetTheme* Theme(const FString& Name)
 		{
 			UWidgetTheme* Result = NewObject<UWidgetTheme>(CreatePackage(*(Directory / Name)), FName(*Name), RF_Public | RF_Standalone | RF_Transactional);
+			Result->GetOutermost()->MarkAsFullyLoaded();
 			Result->bRuntimeTheme = false;
 			FAssetRegistryModule::AssetCreated(Result);
 			Themes.Add(Result);
@@ -112,8 +133,21 @@ namespace WidgetThemeEditorTests
 		}
 		bool Tint(UWidgetTheme* Theme, FGameplayTag Tag, FLinearColor Color, FString& Error)
 		{
-			Brush(Theme, Tag)->Brush.TintColor = FSlateColor(Color);
-			return FWidgetThemeEditorService::CompileStyle(Theme, Tag, Error);
+			UWidgetBrushStyle* Defaults = Brush(Theme, Tag);
+			FWidgetStylePropertyEditing Properties(Defaults);
+			FProperty* Property = Defaults->GetClass()->FindPropertyByName(GET_MEMBER_NAME_CHECKED(UWidgetBrushStyle, Brush));
+			TSharedPtr<IPropertyHandle> Handle = Properties.Find(Property);
+			FSlateBrush Value = Defaults->Brush;
+			Value.TintColor = FSlateColor(Color);
+			FString Text;
+			Property->ExportText_Direct(Text, &Value, nullptr, Defaults, PPF_None);
+			if (!Handle || Handle->SetValueFromFormattedString(Text) != FPropertyAccess::Success)
+			{
+				Error = TEXT("Native property editor could not set Brush.");
+				return false;
+			}
+			FBlueprintEditorUtils::MarkBlueprintAsModified(FWidgetThemeEditorService::Blueprint(Theme, Tag));
+			return true;
 		}
 	};
 }
@@ -319,10 +353,8 @@ bool FThemePasteUndoTest::RunTest(const FString& Parameters)
 	}
 	TestEqual(TEXT("Pasted red"), Fixture.Brush(Target)->Brush.TintColor.GetSpecifiedColor(), FLinearColor::Red);
 	GEditor->UndoTransaction();
-	FWidgetThemeEditorService::CompileStyle(Target, TAG_ThemeEditorParentA, Error);
 	TestEqual(TEXT("Undo restored blue"), Fixture.Brush(Target)->Brush.TintColor.GetSpecifiedColor(), FLinearColor::Blue);
 	GEditor->RedoTransaction();
-	FWidgetThemeEditorService::CompileStyle(Target, TAG_ThemeEditorParentA, Error);
 	TestEqual(TEXT("Redo restored red"), Fixture.Brush(Target)->Brush.TintColor.GetSpecifiedColor(), FLinearColor::Red);
 	return true;
 }
@@ -399,11 +431,62 @@ bool FThemeNativeDeleteTest::RunTest(const FString& Parameters)
 	}
 	const FSoftObjectPath StylePath(FWidgetThemeEditorService::Blueprint(Theme, TAG_ThemeEditorParentA));
 	const FSoftObjectPath ThemePath(Theme);
+	TArray<FString> SavedFiles;
+	for (UObject* Asset : TArray<UObject*>{Theme, StylePath.ResolveObject()})
+	{
+		UPackage* Package = Asset->GetOutermost();
+		const FString Filename = FPackageName::LongPackageNameToFilename(Package->GetName(), FPackageName::GetAssetPackageExtension());
+		IFileManager::Get().MakeDirectory(*FPaths::GetPath(Filename), true);
+		FSavePackageArgs Args;
+		Args.TopLevelFlags = RF_Public | RF_Standalone;
+		if (!TestTrue(TEXT("Save deletion test package"), UPackage::SavePackage(Package, nullptr, *Filename, Args)))
+		{
+			return false;
+		}
+		SavedFiles.Add(Filename);
+	}
+	struct FRestoreSettings
+	{
+		TSoftObjectPtr<UWidgetTheme> Default = GetDefault<UWidgetThemeSettings>()->DefaultTheme;
+		TArray<TSoftObjectPtr<UWidgetTheme>> Available = GetDefault<UWidgetThemeSettings>()->AvailableThemes;
+		TArray<uint8> Config;
+		FRestoreSettings()
+		{
+			FFileHelper::LoadFileToArray(Config, *GetDefault<UWidgetThemeSettings>()->GetDefaultConfigFilename());
+		}
+		~FRestoreSettings()
+		{
+			UWidgetThemeSettings* Settings = GetMutableDefault<UWidgetThemeSettings>();
+			Settings->DefaultTheme = Default;
+			Settings->AvailableThemes = Available;
+			FFileHelper::SaveArrayToFile(Config, *Settings->GetDefaultConfigFilename());
+			GConfig->UnloadFile(Settings->GetDefaultConfigFilename());
+			GConfig->LoadFile(Settings->GetDefaultConfigFilename());
+			FWidgetThemeResolver::InvalidateEditorDefault();
+		}
+	} Restore;
+	GetMutableDefault<UWidgetThemeSettings>()->DefaultTheme = Theme;
+	GetMutableDefault<UWidgetThemeSettings>()->AvailableThemes.Add(Theme);
+	FEditorDelegates::OnAssetsPreDelete.Broadcast({Theme, StylePath.ResolveObject()});
+	TestTrue(TEXT("Pre-delete cancellation leaves theme intact"), Theme->IsAsset());
+	TestTrue(TEXT("Pre-delete cancellation leaves owned style intact"), StylePath.ResolveObject()->IsAsset());
 	TestTrue(TEXT("Deletion preflight passes"), FWidgetThemeEditorService::CanDeleteAssets({Theme}, Error));
 	TestTrue(TEXT("Native deletion including owned Blueprint"), ObjectTools::DeleteObjects({Theme}, false) > 0);
 	auto& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
-	TestFalse(TEXT("Theme removed"), Registry.GetAssetByObjectPath(ThemePath).IsValid());
-	TestFalse(TEXT("Owned Blueprint removed"), Registry.GetAssetByObjectPath(StylePath).IsValid());
+	TestFalse(TEXT("Theme removed"), Registry.GetAssetByObjectPath(ThemePath, true).IsValid());
+	TestFalse(TEXT("Owned Blueprint removed"), Registry.GetAssetByObjectPath(StylePath, true).IsValid());
+	for (const FString& Filename : SavedFiles)
+	{
+		TestFalse(TEXT("Deleted package absent from disk"), IFileManager::Get().FileExists(*Filename));
+	}
+	TestTrue(TEXT("Theme no longer an asset"), !ThemePath.ResolveObject() || !ThemePath.ResolveObject()->IsAsset());
+	TestTrue(TEXT("Style no longer an asset"), !StylePath.ResolveObject() || !StylePath.ResolveObject()->IsAsset());
+	TestTrue(TEXT("Deleted default theme cleared"), GetDefault<UWidgetThemeSettings>()->DefaultTheme.IsNull());
+	TestFalse(TEXT("Deleted theme removed from available list"),
+			  GetDefault<UWidgetThemeSettings>()->AvailableThemes.Contains(TSoftObjectPtr<UWidgetTheme>(ThemePath)));
+	FString SavedConfig;
+	FFileHelper::LoadFileToString(SavedConfig, *GetDefault<UWidgetThemeSettings>()->GetDefaultConfigFilename());
+	TestFalse(TEXT("Deleted theme config path persisted as removed"), SavedConfig.Contains(ThemePath.ToString()));
 	TestTrue(TEXT("Static roots retained"), WidgetStyleTags::Brush.GetTag().IsValid());
 	return true;
 }
@@ -566,6 +649,59 @@ bool FThemeUnusedTagTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Unused ordinary Tag deleted"), FGameplayTag::RequestGameplayTag(FName(*FullName), false).IsValid());
 	return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeRenameReferenceTest, "WHFramework.WidgetTheme.Editor.RenameReferencesAndRedirect",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FThemeRenameReferenceTest::RunTest(const FString& Parameters)
+{
+	using namespace WidgetThemeEditorTests;
+	FFixture Fixture;
+	FString Error;
+	UWidgetTheme* Theme = Fixture.Theme(TEXT("DA_RenameReferences"));
+	const FString Name = TEXT("TestRename_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	if (!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Brush, Name, EWidgetStyleKind::Brush, TEXT("/Game/Themes"), false, Error))
+	{
+		AddError(Error);
+		return false;
+	}
+	const FString OldName = TEXT("Style.Brush.") + Name;
+	const FString NewName = OldName + TEXT("Renamed");
+	const FGameplayTag OldTag = FGameplayTag::RequestGameplayTag(FName(*OldName));
+	UBlueprint* Style = FWidgetThemeEditorService::Blueprint(Theme, OldTag);
+	UWidgetTheme* Borrower = Fixture.Theme(TEXT("DA_RenameBorrower"));
+	if (!FWidgetThemeEditorService::Associate(Borrower, WidgetStyleTags::Brush, TEXT("ThemeEditorAlias"), Theme, OldTag, Error))
+	{
+		AddError(Error);
+		return false;
+	}
+	Fixture.TextFiles = {FPaths::ProjectDir() / TEXT("Source") / (Name + TEXT(".h")), FPaths::ProjectConfigDir() / (Name + TEXT(".ini"))};
+	for (const FString& File : Fixture.TextFiles)
+	{
+		FFileHelper::SaveStringToFile(TEXT("// ") + OldName + TEXT("\n"), *File);
+	}
+	if (!TestTrue(TEXT("Rename updates all reference forms"), FWidgetThemeEditorService::RenameStyle(Theme, OldTag, Name + TEXT("Renamed"), Error)))
+	{
+		AddError(Error);
+		return false;
+	}
+	const FGameplayTag NewTag = FGameplayTag::RequestGameplayTag(FName(*NewName));
+	TestFalse(TEXT("Old theme key removed"), FWidgetThemeEditorService::Tags(Theme).Contains(OldTag));
+	TestEqual(TEXT("Blueprint identity retained"), FWidgetThemeEditorService::Blueprint(Theme, NewTag), Style);
+	TestEqual(TEXT("Shared source Tag updated"), Borrower->Bindings[TAG_ThemeEditorAlias].SourceTag, NewTag);
+	TestFalse(TEXT("Old catalog key removed"), Fixture.Catalog->Types.Contains(OldTag));
+	TestTrue(TEXT("New catalog key registered"), Fixture.Catalog->Types.Contains(NewTag));
+	for (const FString& File : Fixture.TextFiles)
+	{
+		FString Text;
+		FFileHelper::LoadFileToString(Text, *File);
+		TestTrue(TEXT("Source and config reference rewritten"), Text.Contains(NewName));
+		TestFalse(TEXT("Old reference replaced exactly"), Text.Contains(OldName + TEXT("\n")));
+	}
+	TestTrue(TEXT("Old serialized name redirects"),
+			 GetDefault<UGameplayTagsSettings>()->GameplayTagRedirects.ContainsByPredicate(
+				 [&](const FGameplayTagRedirect& Redirect) { return Redirect.OldTagName == FName(*OldName) && Redirect.NewTagName == FName(*NewName); }));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeBlueprintFieldDuplicateTest, "WHFramework.WidgetTheme.Editor.BlueprintFieldsInDuplication",
 								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FThemeBlueprintFieldDuplicateTest::RunTest(const FString& Parameters)

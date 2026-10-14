@@ -10,6 +10,7 @@
 #include "AssetToolsModule.h"
 #include "Editor.h"
 #include "Engine/Blueprint.h"
+#include "Kismet2/BlueprintEditorUtils.h"
 #include "IDetailsView.h"
 #include "PropertyEditorModule.h"
 #include "SWidgetThemePicker.h"
@@ -565,10 +566,13 @@ void FWidgetThemeToolkit::FinishDetailsEdit()
 		return;
 	}
 	bEditingDetails = false;
-	FString Result;
-	const bool Good = FWidgetThemeEditorService::CompileStyle(Theme, SelectedTag, Result);
-	Report += FString::Printf(TEXT("[%s] Edit %s\n%s\n"), Good ? TEXT("OK") : TEXT("Error"), *SelectedTag.ToString(), *Result);
-	BindDetails();
+	if (UBlueprint* Style = FWidgetThemeEditorService::Blueprint(Theme, SelectedTag))
+	{
+		FBlueprintEditorUtils::MarkBlueprintAsModified(Style);
+		FBlueprintEditorUtils::PostEditChangeBlueprintActors(Style);
+		FWidgetThemeResolver::NotifyThemeChanged();
+		Report += TEXT("Edited ") + SelectedTag.ToString() + TEXT(". Save to persist.\n");
+	}
 	UpdatePreview();
 }
 
@@ -577,11 +581,7 @@ void FWidgetThemeToolkit::PostUndo(bool Success)
 	if (Success)
 	{
 		bEditingDetails = false;
-		if (CanEditSelection())
-		{
-			FString Result;
-			FWidgetThemeEditorService::CompileStyle(Theme, SelectedTag, Result);
-		}
+		FWidgetThemeResolver::NotifyThemeChanged();
 		Refresh();
 	}
 }

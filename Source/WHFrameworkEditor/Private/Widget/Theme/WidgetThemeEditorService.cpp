@@ -42,6 +42,8 @@
 
 #include "Widget/Theme/WidgetStyleTags.h"
 #include "Editor.h"
+#include "WidgetStylePropertyEditing.h"
+#include "WidgetStyleClipboard.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/ArchiveReplaceObjectRef.h"
@@ -1059,6 +1061,10 @@ bool FWidgetThemeEditorService::Create(UWidgetTheme* Theme, FGameplayTag Parent,
 	UBlueprint* Style =
 		FKismetEditorUtilities::CreateBlueprint(ParentClass, CreatePackage(*Package), FName(*FPackageName::GetShortName(Package)), BPTYPE_Normal,
 												UBlueprint::StaticClass(), UBlueprintGeneratedClass::StaticClass(), TEXT("WidgetThemeEditor"));
+	if (Style)
+	{
+		Style->GetOutermost()->MarkAsFullyLoaded();
+	}
 	if (!Style || !Compile(Style, Report) || !DependencySafe(Style->GeneratedClass->GetDefaultObject(), Report) || !RegisterTag(FullName, Report))
 	{
 		Abandon(Style);
@@ -1185,7 +1191,7 @@ namespace WidgetThemeEdit
 			return false;
 		}
 		FString Text;
-		FPlatformApplicationMisc::ClipboardPaste(Text);
+		WidgetStyleClipboard::Read(Text);
 		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Payload) || !Payload.IsValid())
 		{
 			return false;
@@ -1193,9 +1199,9 @@ namespace WidgetThemeEdit
 		FString Format;
 		double Version;
 		double SourceType;
-		const TSharedPtr<FJsonObject>* Fields;
+		const TSharedPtr<FJsonObject>* Fields = nullptr;
 		if (!Payload->TryGetStringField(TEXT("format"), Format) || Format != TEXT("WHFramework.WidgetStyleProperties") ||
-			!Payload->TryGetNumberField(TEXT("version"), Version) || Version != 1 || !Payload->TryGetNumberField(TEXT("kind"), SourceType) ||
+			!Payload->TryGetNumberField(TEXT("version"), Version) || Version != 2 || !Payload->TryGetNumberField(TEXT("kind"), SourceType) ||
 			SourceType != static_cast<int32>(Type) || !Payload->TryGetObjectField(TEXT("properties"), Fields) || (*Fields)->Values.IsEmpty())
 		{
 			return false;
@@ -1203,19 +1209,26 @@ namespace WidgetThemeEdit
 		const TArray<FProperty*> Editable = FWidgetThemeEditorService::EditableProperties(Style->GeneratedClass);
 		for (const auto& Entry : (*Fields)->Values)
 		{
-			const TSharedPtr<FJsonObject>* Field;
+			const TSharedPtr<FJsonObject>* Field = nullptr;
 			FString Signature;
-			FString Value;
+			const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
 			FProperty* Property = Style->GeneratedClass->FindPropertyByName(FName(*Entry.Key));
 			if (!Property || !Editable.Contains(Property) || !Entry.Value->TryGetObject(Field) || !(*Field)->TryGetStringField(TEXT("type"), Signature) ||
-				Signature != PropertyType(Property) || !(*Field)->TryGetStringField(TEXT("value"), Value))
+				Signature != PropertyType(Property) || !(*Field)->TryGetArrayField(TEXT("values"), Values) || Values->Num() != Property->ArrayDim)
 			{
 				Report = TEXT("Clipboard fields are incompatible with the selected style.");
 				return false;
 			}
 			void* Trial = FMemory::Malloc(Property->GetSize(), Property->GetMinAlignment());
 			Property->InitializeValue(Trial);
-			const bool Good = Property->ImportText_Direct(*Value, Trial, Style->GeneratedClass->GetDefaultObject(), PPF_None) != nullptr;
+			bool Good = true;
+			for (int32 Index = 0; Index < Values->Num(); ++Index)
+			{
+				FString Value;
+				Good &= (*Values)[Index]->TryGetString(Value) &&
+						Property->ImportText_Direct(*Value, static_cast<uint8*>(Trial) + Index * Property->GetElementSize(),
+													Style->GeneratedClass->GetDefaultObject(), PPF_None) != nullptr;
+			}
 			Property->DestroyValue(Trial);
 			FMemory::Free(Trial);
 			if (!Good)
@@ -1239,25 +1252,27 @@ bool FWidgetThemeEditorService::CopyProperties(UWidgetTheme* Theme, FGameplayTag
 	}
 	TSharedRef<FJsonObject> Payload = MakeShared<FJsonObject>();
 	Payload->SetStringField(TEXT("format"), TEXT("WHFramework.WidgetStyleProperties"));
-	Payload->SetNumberField(TEXT("version"), 1);
+	Payload->SetNumberField(TEXT("version"), 2);
 	Payload->SetNumberField(TEXT("kind"), static_cast<int32>(Type));
 	TSharedRef<FJsonObject> Fields = MakeShared<FJsonObject>();
 	for (FProperty* Property : EditableProperties(Style->GeneratedClass))
 	{
-		FString Value;
-		Property->ExportText_InContainer(0, Value, Style->GeneratedClass->GetDefaultObject(), nullptr, nullptr, PPF_None);
+		TArray<TSharedPtr<FJsonValue>> Values;
+		for (int32 Index = 0; Index < Property->ArrayDim; ++Index)
+		{
+			FString Value;
+			Property->ExportText_InContainer(Index, Value, Style->GeneratedClass->GetDefaultObject(), nullptr, nullptr, PPF_None);
+			Values.Add(MakeShared<FJsonValueString>(Value));
+		}
 		TSharedRef<FJsonObject> Field = MakeShared<FJsonObject>();
 		Field->SetStringField(TEXT("type"), PropertyType(Property));
-		Field->SetStringField(TEXT("value"), Value);
+		Field->SetArrayField(TEXT("values"), Values);
 		Fields->SetObjectField(Property->GetName(), Field);
 	}
 	Payload->SetObjectField(TEXT("properties"), Fields);
 	FString Text;
 	FJsonSerializer::Serialize(Payload, TJsonWriterFactory<>::Create(&Text));
-	FPlatformApplicationMisc::ClipboardCopy(*Text);
-	FString Readback;
-	FPlatformApplicationMisc::ClipboardPaste(Readback);
-	if (Readback != Text)
+	if (!WidgetStyleClipboard::Write(Text))
 	{
 		Report = TEXT("System clipboard is unavailable.");
 		return false;
@@ -1292,32 +1307,52 @@ bool FWidgetThemeEditorService::PasteProperties(UWidgetTheme* Theme, FGameplayTa
 	Style->Modify();
 	UObject* Defaults = Style->GeneratedClass->GetDefaultObject();
 	Defaults->Modify();
-	TMap<FName, FString> Original;
+	FWidgetStylePropertyEditing Properties(Defaults);
+	TMap<TSharedPtr<IPropertyHandle>, FString> Original;
+	bool Good = true;
 	for (const auto& Entry : Payload->GetObjectField(TEXT("properties"))->Values)
 	{
 		FProperty* Property = Defaults->GetClass()->FindPropertyByName(FName(*Entry.Key));
-		FString Value;
-		Property->ExportText_InContainer(0, Value, Defaults, nullptr, nullptr, PPF_None);
-		Original.Add(Property->GetFName(), Value);
-		Defaults->PreEditChange(Property);
-		Property->ImportText_Direct(*Entry.Value->AsObject()->GetStringField(TEXT("value")), Property->ContainerPtrToValuePtr<void>(Defaults), Defaults,
-									PPF_None);
-		FPropertyChangedEvent Event(Property, EPropertyChangeType::ValueSet);
-		Defaults->PostEditChangeProperty(Event);
+		TSharedPtr<IPropertyHandle> Handle = Properties.Find(Property);
+		if (!Handle)
+		{
+			Good = false;
+			break;
+		}
+		const TArray<TSharedPtr<FJsonValue>>& Values = Entry.Value->AsObject()->GetArrayField(TEXT("values"));
+		for (int32 Index = 0; Index < Values.Num(); ++Index)
+		{
+			TSharedPtr<IPropertyHandle> Element = Property->ArrayDim > 1 ? Handle->GetChildHandle(Index) : Handle;
+			FString Value;
+			if (!Element || Element->GetValueAsFormattedString(Value, PPF_None) != FPropertyAccess::Success)
+			{
+				Good = false;
+				break;
+			}
+			Original.Add(Element, Value);
+			if (Element->SetValueFromFormattedString(Values[Index]->AsString()) != FPropertyAccess::Success)
+			{
+				Good = false;
+				break;
+			}
+		}
+		if (!Good)
+		{
+			break;
+		}
 	}
-	FBlueprintEditorUtils::MarkBlueprintAsModified(Style);
-	if (!Compile(Style, Report) || !DependencySafe(Style->GeneratedClass->GetDefaultObject(), Report))
+	if (!Good || !DependencySafe(Defaults, Report))
 	{
-		Defaults = Style->GeneratedClass->GetDefaultObject();
 		for (const auto& Entry : Original)
 		{
-			FProperty* Property = Defaults->GetClass()->FindPropertyByName(Entry.Key);
-			Property->ImportText_Direct(*Entry.Value, Property->ContainerPtrToValuePtr<void>(Defaults), Defaults, PPF_None);
+			Entry.Key->SetValueFromFormattedString(Entry.Value);
 		}
-		Compile(Style, Report);
 		Transaction.Cancel();
+		Report += TEXT("Properties could not be applied safely.");
 		return false;
 	}
+	FBlueprintEditorUtils::MarkBlueprintAsModified(Style);
+	FBlueprintEditorUtils::PostEditChangeBlueprintActors(Style);
 	EWidgetStyleKind Type;
 	Kind(Tag, Type);
 	Theme->SetStyleClass(Tag, Type, Style->GeneratedClass);
@@ -1412,7 +1447,9 @@ bool FWidgetThemeEditorService::DuplicateThemeStyles(UWidgetTheme* Theme)
 			Good = false;
 			break;
 		}
-		UBlueprint* Copy = DuplicateObject<UBlueprint>(Original, CreatePackage(*Package), FName(*FPackageName::GetShortName(Package)));
+		UPackage* CopyPackage = CreatePackage(*Package);
+		CopyPackage->MarkAsFullyLoaded();
+		UBlueprint* Copy = DuplicateObject<UBlueprint>(Original, CopyPackage, FName(*FPackageName::GetShortName(Package)));
 		Copy->SetFlags(RF_Public | RF_Standalone | RF_Transactional);
 		Created.Add(Copy);
 		if (UClass** CopiedParent = Classes.Find(Original->ParentClass))
@@ -1497,6 +1534,45 @@ namespace WidgetThemeEdit
 	};
 	static TArray<FPendingThemeRemoval> PendingRemovals;
 	static UWidgetTheme* RemovalTheme = nullptr;
+	static TArray<TWeakObjectPtr<UObject>> DeleteBatch;
+	static uint64 DeleteBatchFrame = MAX_uint64;
+	static TArray<FString> ReferenceTextDirectories()
+	{
+		TArray<FString> Out{FPaths::ProjectDir() / TEXT("Source"), FPaths::ProjectConfigDir()};
+		for (const TSharedRef<IPlugin>& Plugin : IPluginManager::Get().GetEnabledPlugins())
+		{
+			if (Plugin->GetLoadedFrom() == EPluginLoadedFrom::Project)
+			{
+				Out.Add(Plugin->GetBaseDir() / TEXT("Source"));
+				Out.Add(Plugin->GetBaseDir() / TEXT("Config"));
+			}
+		}
+		return Out;
+	}
+	static bool PackageCouldContainTag(const FAssetData& Asset, const FString& Name)
+	{
+		if (Asset.IsAssetLoaded())
+		{
+			return true;
+		}
+		const FString Extension = Asset.AssetClassPath == UWorld::StaticClass()->GetClassPathName() ? FPackageName::GetMapPackageExtension()
+																									: FPackageName::GetAssetPackageExtension();
+		TArray<uint8> Bytes;
+		if (!FFileHelper::LoadFileToArray(Bytes, *FPackageName::LongPackageNameToFilename(Asset.PackageName.ToString(), Extension)))
+		{
+			return true;
+		}
+		const FTCHARToUTF8 Narrow(*Name);
+		for (int32 Index = 0; Index < Bytes.Num(); ++Index)
+		{
+			if ((Index + Narrow.Length() <= Bytes.Num() && FMemory::Memcmp(Bytes.GetData() + Index, Narrow.Get(), Narrow.Length()) == 0) ||
+				(Index + Name.Len() * sizeof(TCHAR) <= Bytes.Num() && FMemory::Memcmp(Bytes.GetData() + Index, *Name, Name.Len() * sizeof(TCHAR)) == 0))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
 	static bool ContainsTagText(const FString& Text, const FString& Tag)
 	{
 		FString Trial = Text;
@@ -1510,19 +1586,7 @@ namespace WidgetThemeEdit
 			{
 				continue;
 			}
-			const FString Extension = Asset.AssetClassPath == UWorld::StaticClass()->GetClassPathName() ? FPackageName::GetMapPackageExtension()
-																										: FPackageName::GetAssetPackageExtension();
-			TArray<uint8> Bytes;
-			bool CouldContain = !FFileHelper::LoadFileToArray(Bytes, *FPackageName::LongPackageNameToFilename(Asset.PackageName.ToString(), Extension));
-			const FString Name = Tag.ToString();
-			const FTCHARToUTF8 Narrow(*Name);
-			for (int32 Index = 0; !CouldContain && Index < Bytes.Num(); ++Index)
-			{
-				CouldContain =
-					(Index + Narrow.Length() <= Bytes.Num() && FMemory::Memcmp(Bytes.GetData() + Index, Narrow.Get(), Narrow.Length()) == 0) ||
-					(Index + Name.Len() * sizeof(TCHAR) <= Bytes.Num() && FMemory::Memcmp(Bytes.GetData() + Index, *Name, Name.Len() * sizeof(TCHAR)) == 0);
-			}
-			if (CouldContain && !Asset.GetAsset())
+			if (PackageCouldContainTag(Asset, Tag.ToString()) && !Asset.GetAsset())
 			{
 				return true;
 			}
@@ -1559,16 +1623,7 @@ namespace WidgetThemeEdit
 				}
 			}
 		}
-		TArray<FString> Directories{FPaths::ProjectDir() / TEXT("Source"), FPaths::ProjectConfigDir()};
-		for (const TSharedRef<IPlugin>& Plugin : IPluginManager::Get().GetEnabledPlugins())
-		{
-			if (Plugin->GetLoadedFrom() == EPluginLoadedFrom::Project)
-			{
-				Directories.Add(Plugin->GetBaseDir() / TEXT("Source"));
-				Directories.Add(Plugin->GetBaseDir() / TEXT("Config"));
-			}
-		}
-		for (const FString& Directory : Directories)
+		for (const FString& Directory : ReferenceTextDirectories())
 		{
 			TArray<FString> Files;
 			IFileManager::Get().FindFilesRecursive(Files, *Directory, TEXT("*"), true, false);
@@ -1619,6 +1674,17 @@ namespace WidgetThemeEdit
 			Catalog->Modify();
 			Catalog->Types.Remove(Tag);
 			Catalog->MarkPackageDirty();
+			if (Catalog->GetOutermost() != GetTransientPackage())
+			{
+				FSavePackageArgs Args;
+				Args.TopLevelFlags = RF_Public | RF_Standalone;
+				Args.SaveFlags = SAVE_NoError;
+				const FString Filename = FPackageName::LongPackageNameToFilename(Catalog->GetOutermost()->GetName(), FPackageName::GetAssetPackageExtension());
+				if (!Writable(Catalog->GetOutermost(), Report) || !UPackage::SavePackage(Catalog->GetOutermost(), Catalog, *Filename, Args))
+				{
+					Report += TEXT("Catalog cleanup is pending; save the catalog after resolving write errors.\n");
+				}
+			}
 		}
 		Report += TEXT("Unused Tag removed: ") + Tag.ToString() + TEXT("\n");
 	}
@@ -1733,12 +1799,37 @@ bool FWidgetThemeEditorService::CanDeleteAssets(const TArray<UObject*>& Assets, 
 void FWidgetThemeEditorService::RegisterAssetLifecycle()
 {
 	UWidgetTheme::DuplicateStyles.BindStatic(&DuplicateThemeStyles);
-	ExtraDeleteHandle = FEditorDelegates::OnAddExtraObjectsToDelete.AddStatic(&AddOwnedStylesToDelete);
+	ExtraDeleteHandle = FEditorDelegates::OnAddExtraObjectsToDelete.AddLambda(
+		[](const TArray<UObject*>& Assets, TSet<UObject*>& Extra)
+		{
+			AddOwnedStylesToDelete(Assets, Extra);
+			DeleteBatch.Reset();
+			DeleteBatchFrame = GFrameCounter;
+			for (UObject* Asset : Assets)
+			{
+				DeleteBatch.Add(Asset);
+			}
+			for (UObject* Asset : Extra)
+			{
+				DeleteBatch.AddUnique(Asset);
+			}
+		});
 	CanDeleteHandle = FEditorDelegates::OnAssetsCanDelete.AddLambda(
 		[](const TArray<UObject*>& Assets, FCanDeleteAssetResult& Result)
 		{
+			TArray<UObject*> CheckAssets = Assets;
+			if (Assets.Num() == 1 && DeleteBatchFrame == GFrameCounter && DeleteBatch.Contains(Assets[0]))
+			{
+				for (const TWeakObjectPtr<UObject>& Asset : DeleteBatch)
+				{
+					if (Asset.IsValid())
+					{
+						CheckAssets.AddUnique(Asset.Get());
+					}
+				}
+			}
 			FString Report;
-			if (!FWidgetThemeEditorService::CanDeleteAssets(Assets, Report))
+			if (!FWidgetThemeEditorService::CanDeleteAssets(CheckAssets, Report))
 			{
 				Result.Set(false);
 				UE_LOG(LogTemp, Warning, TEXT("%s"), *Report);
@@ -1773,7 +1864,21 @@ void FWidgetThemeEditorService::RegisterAssetLifecycle()
 					DeletedPackages.Add(Pending.Package);
 				}
 			}
+			UWidgetThemeSettings* Settings = GetMutableDefault<UWidgetThemeSettings>();
+			bool ConfigChanged = false;
+			if (DeletedPackages.Contains(Settings->DefaultTheme.ToSoftObjectPath().GetLongPackageFName()))
+			{
+				Settings->DefaultTheme.Reset();
+				ConfigChanged = true;
+			}
+			ConfigChanged |= Settings->AvailableThemes.RemoveAll([&](const TSoftObjectPtr<UWidgetTheme>& Theme)
+																 { return DeletedPackages.Contains(Theme.ToSoftObjectPath().GetLongPackageFName()); }) > 0;
+			if (ConfigChanged && !Settings->TryUpdateDefaultConfigFile())
+			{
+				UE_LOG(LogTemp, Error, TEXT("Deleted theme paths could not be removed from the theme settings config."));
+			}
 			PendingRemovals.Reset();
+			DeleteBatch.Reset();
 			FString Report;
 			for (FGameplayTag Tag : RemovedTags)
 			{
@@ -1795,6 +1900,7 @@ void FWidgetThemeEditorService::UnregisterAssetLifecycle()
 	FEditorDelegates::OnAssetsPreDelete.Remove(PreDeleteHandle);
 	FEditorDelegates::OnAssetsDeleted.Remove(DeletedHandle);
 	PendingRemovals.Reset();
+	DeleteBatch.Reset();
 }
 
 bool FWidgetThemeEditorService::CanRemove(UWidgetTheme* Theme, FGameplayTag Tag, FString& Report)
@@ -1873,7 +1979,7 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 	const TArray<FAssetData> Assets = ProjectAssets(false);
 	for (const FAssetData& A : Assets)
 	{
-		if (!A.GetAsset())
+		if (PackageCouldContainTag(A, Old.ToString()) && !A.GetAsset())
 		{
 			Report += TEXT("Cannot prove rename safe; unloadable asset: ") + A.GetObjectPathString() + TEXT("\n");
 			return false;
@@ -1917,7 +2023,56 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 			return false;
 		}
 	}
+	TMap<FString, FString> TextChanges;
+	for (const FString& Directory : ReferenceTextDirectories())
+	{
+		TArray<FString> Files;
+		IFileManager::Get().FindFilesRecursive(Files, *Directory, TEXT("*"), true, false);
+		for (const FString& File : Files)
+		{
+			const FString Extension = FPaths::GetExtension(File).ToLower();
+			if (Extension != TEXT("h") && Extension != TEXT("cpp") && Extension != TEXT("inl") && Extension != TEXT("ini") && Extension != TEXT("cs"))
+			{
+				continue;
+			}
+			FString Text;
+			if (!FFileHelper::LoadFileToString(Text, *File))
+			{
+				Report += TEXT("Could not scan reference file: ") + File + TEXT("\n");
+				return false;
+			}
+			TArray<FString> Lines;
+			Text.ParseIntoArrayLines(Lines, false);
+			bool Changed = false;
+			for (FString& Line : Lines)
+			{
+				if (Line.Contains(TEXT("GameplayTagList=")) || Line.Contains(TEXT("GameplayTagRedirects=")))
+				{
+					continue;
+				}
+				Changed |= RewriteTagText(Line, Old, New);
+			}
+			if (Changed)
+			{
+				if (IFileManager::Get().IsReadOnly(*File))
+				{
+					Report += TEXT("Reference file is read-only: ") + File + TEXT("\n");
+					return false;
+				}
+				TextChanges.Add(File, FString::Join(Lines, Text.Contains(TEXT("\r\n")) ? TEXT("\r\n") : TEXT("\n")) + TEXT("\n"));
+			}
+		}
+	}
 	FScopedTransaction Transaction(NSLOCTEXT("WidgetTheme", "RenameTag", "Rename theme Tag with redirect"));
+	C->Modify();
+	const EWidgetStyleKind RenamedKind = C->Types.FindChecked(Old);
+	C->Types.Remove(Old);
+	C->Types.Add(New, RenamedKind);
+	C->MarkPackageDirty();
+	if (C->GetOutermost() != GetTransientPackage())
+	{
+		ReferenceChangedPackages.Add(C->GetOutermost());
+	}
 	for (UObject* O : Objects)
 	{
 		O->Modify();
@@ -1953,7 +2108,7 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 	bool Good = true;
 	for (const FAssetData& A : Assets)
 	{
-		if (Packages.Contains(A.GetPackage()))
+		if (Packages.Contains(FindPackage(nullptr, *A.PackageName.ToString())))
 		{
 			if (auto* BP = Cast<UBlueprint>(A.GetAsset()))
 			{
@@ -1967,25 +2122,42 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 		Report += TEXT("Rename is pending in memory; fix compile errors or Undo. No redirect config was written.\n");
 		return false;
 	}
-	Settings->Modify();
-	FGameplayTagRedirect Redirect;
-	Redirect.OldTagName = Old.GetTagName();
-	Redirect.NewTagName = New.GetTagName();
-	if (!Settings->GameplayTagRedirects.ContainsByPredicate([&](const FGameplayTagRedirect& R)
-															{ return R.OldTagName == Redirect.OldTagName && R.NewTagName == Redirect.NewTagName; }))
+	for (const auto& Change : TextChanges)
 	{
-		Settings->GameplayTagRedirects.Add(Redirect);
+		if (!FFileHelper::SaveStringToFile(Change.Value, *Change.Key, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+		{
+			Report += TEXT("Could not save rewritten reference file: ") + Change.Key + TEXT(". Changes remain pending.\n");
+			return false;
+		}
+		Report += TEXT("Reference file updated: ") + Change.Key + TEXT("\n");
 	}
-	Settings->SaveConfig();
+	FString RedirectFilename = Settings->GetDefaultConfigFilename();
+	if (TSharedPtr<FGameplayTagNode> Node = UGameplayTagsManager::Get().FindTagNode(Old))
+	{
+		for (FName SourceName : Node->GetAllSourceNames())
+		{
+			const FGameplayTagSource* Source = UGameplayTagsManager::Get().FindTagSource(SourceName);
+			if (Source && Source->SourceTagList)
+			{
+				RedirectFilename = Source->SourceTagList->ConfigFileName;
+				break;
+			}
+		}
+	}
+	if (!IGameplayTagsEditorModule::Get().RenameTagInINI(Old.ToString(), New.ToString(), false))
+	{
+		Report += TEXT("Gameplay Tag definition and redirect could not be saved.\n");
+		return false;
+	}
 	FString WrittenConfig;
 	const FString ExpectedRedirect = TEXT("OldTagName=\"") + Old.ToString() + TEXT("\",NewTagName=\"") + New.ToString() + TEXT("\"");
-	if (!FFileHelper::LoadFileToString(WrittenConfig, *Settings->GetDefaultConfigFilename()) || !WrittenConfig.Contains(ExpectedRedirect))
+	if (!FFileHelper::LoadFileToString(WrittenConfig, *RedirectFilename) || !WrittenConfig.Contains(ExpectedRedirect))
 	{
 		Report += TEXT("Redirect config could not be written; asset changes remain pending in memory.\n");
 		return false;
 	}
 	UGameplayTagsManager::Get().EditorRefreshGameplayTagTree();
-	Report += FString::Printf(TEXT("Renamed loaded reflected references in %d packages. Save these assets with Save All. GUID names unchanged. Redirect config "
+	Report += FString::Printf(TEXT("Renamed reflected references in %d packages. GUID names unchanged. Redirect config "
 								   "is saved and must remain for old configs/saves; config writes are not undone by Ctrl+Z.\n"),
 							  Packages.Num());
 	FWidgetThemeResolver::NotifyThemeChanged();
@@ -1993,6 +2165,20 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 }
 bool FWidgetThemeEditorService::Save(UWidgetTheme* T, FString& Report)
 {
+	TSet<UBlueprint*> Compiled;
+	for (FGameplayTag Tag : Tags(T))
+	{
+		const FWidgetStyleBinding* Binding = T->Bindings.Find(Tag);
+		UBlueprint* Style = Blueprint(T, Tag);
+		if (Binding && Binding->bManaged && Style && Style->GetOutermost()->IsDirty() && !Compiled.Contains(Style))
+		{
+			if (!CompileStyle(T, Tag, Report))
+			{
+				return false;
+			}
+			Compiled.Add(Style);
+		}
+	}
 	if (!Validate(T, Report))
 	{
 		return false;
@@ -2015,7 +2201,7 @@ bool FWidgetThemeEditorService::Save(UWidgetTheme* T, FString& Report)
 			}
 			else if (BP->GetOutermost()->IsDirty())
 			{
-				Report += TEXT("Shared style has unsaved external changes; save it in its owning editor or fork first: ") + BP->GetPathName() + TEXT("\n");
+				Report += TEXT("Shared style has unsaved external changes; save it in its owning editor first: ") + BP->GetPathName() + TEXT("\n");
 				return false;
 			}
 		}
