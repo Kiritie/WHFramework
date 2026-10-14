@@ -749,6 +749,7 @@ bool UVoxelModule::CreateWorld(
 	}
 
 	FVoxelWorldManifest NewManifest;
+	NewManifest.GeneratorVersion = Config.Recipe->AlgorithmVersion;
 	NewManifest.WorldId =
 		FGuid::NewGuid();
 
@@ -837,7 +838,8 @@ bool UVoxelModule::StartWorld(
 		Config,
 		OutError) ||
 		!Config.Recipe ||
-		Config.Recipe->RecipeHash != Manifest.RecipeHash)
+		Config.Recipe->RecipeHash != Manifest.RecipeHash ||
+		Config.Recipe->AlgorithmVersion != Manifest.GeneratorVersion)
 	{
 		FailInitialization();
 		if (OutError.IsEmpty())
@@ -1862,6 +1864,16 @@ FVoxelGenerationDependencyStatus UVoxelModule::QueryEnvironment(const FIntPoint&
 {
 	return EmergeManager ? EmergeManager->QueryEnvironment(InCell, OutSample)
 		: FVoxelGenerationDependencyStatus{ false, true, TEXT("Voxel world is unavailable") };
+}
+
+FVoxelGenerationDependencyStatus UVoxelModule::EnsureEnvironmentGeometry(
+	const FVoxelGenerationConsumerKey& InConsumer, const FVoxelTerrainGeometry& InGeometry,
+	const EVoxelWorkClass InWorkClass, const int32 InSourcePriority,
+	const double InDistanceScore, const double InForwardScore)
+{
+	return EmergeManager ? EmergeManager->EnsureEnvironmentGeometry(InConsumer, InGeometry,
+		InWorkClass, InSourcePriority, InDistanceScore, InForwardScore)
+		: FVoxelGenerationDependencyStatus{false, true, TEXT("Voxel world is unavailable")};
 }
 
 FVoxelGenerationDependencyStatus UVoxelModule::EnsureEnvironmentBounds(
@@ -3268,10 +3280,6 @@ bool UVoxelModule::ValidateInteractionPlan(FVoxelInteractionPlan& InOutPlan, FSt
 	return FVoxelEditTransaction::ValidateBatch(*Runtime, *Registry.GetSnapshot(), *Shapes, InOutPlan.Cells, OutError);
 }
 
-
-
-
-
 bool UVoxelModule::ApplyPrefab(
 	const FVoxelPrefabSaveData& InPrefab,
 	const FIntVector& InOrigin,
@@ -3518,7 +3526,7 @@ bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError
 		OutError = TEXT("Voxel save manifest is invalid or uses an unsupported generation identity protocol");
 		return false;
 	}
-	if (SavedManifest.GeneratorVersion != FVoxelGenerationRecipe::CurrentAlgorithmVersion)
+	if (!FVoxelGenerationRecipe::IsSupportedAlgorithmVersion(SavedManifest.GeneratorVersion))
 	{
 		OutError = FString::Printf(TEXT("Saved voxel terrain algorithm %u differs from current algorithm %u"),
 			SavedManifest.GeneratorVersion, FVoxelGenerationRecipe::CurrentAlgorithmVersion);
@@ -3542,7 +3550,8 @@ bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError
 	{
 		return false;
 	}
-	if (!Config.Recipe || Config.Recipe->RecipeHash != SavedManifest.RecipeHash)
+	if (!Config.Recipe || Config.Recipe->RecipeHash != SavedManifest.RecipeHash ||
+		Config.Recipe->AlgorithmVersion != SavedManifest.GeneratorVersion)
 	{
 		OutError = TEXT("Saved voxel RecipeHash differs from the current generation profile");
 		return false;
@@ -4472,8 +4481,6 @@ void UVoxelModule::LogTerrainGeometryHistogram() const
 	if (const auto Statistics = GetTerrainStatistics())
 		UE_LOG(LogTemp, Display, TEXT("Voxel target readiness histogram (incremental owner samples):\n%s"), *Statistics->ToCsv());
 }
-
-
 
 void UVoxelModule::BindInventoryBridge(TSharedRef<FVoxelInventoryDomainBridge> InBridge, FInventoryVoxelContribution InContribution)
 {

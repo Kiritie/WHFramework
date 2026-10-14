@@ -2,6 +2,7 @@
 
 #include "EngineGlobals.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "Voxel/Generation/VoxelGenerationQuery.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 #include "Voxel/Save/VoxelDeltaCodec.h"
@@ -1319,6 +1320,86 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::QueryEnvironment(const FIn
 	return {};
 }
 
+FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentGeometry(
+	const FVoxelGenerationConsumerKey& InConsumer, const FVoxelTerrainGeometry& InGeometry,
+	const EVoxelWorkClass InWorkClass, const int32 InSourcePriority,
+	const double InDistanceScore, const double InForwardScore)
+{
+	check(IsInGameThread());
+	FString Error;
+	if (bResetting || !InConsumer.IsValid() || InConsumer.WorldEpoch != Runtime.Epoch() ||
+		!InGeometry.Validate(Error))
+		return {false, true, TEXT("InvalidRequest: environment geometry or consumer")};
+	const bool bProxy = InGeometry.Key.Representation == EVoxelTerrainRepresentation::VoxelProxy;
+	if (!bProxy && InGeometry.Key.Representation != EVoxelTerrainRepresentation::Surface &&
+		InGeometry.Key.Representation != EVoxelTerrainRepresentation::Macro)
+		return {false, true, TEXT("InvalidRequest: environment geometry representation")};
+	FIntVector Min, Max;
+	if (!InGeometry.Key.TryBounds(InGeometry.WorldMinZ, InGeometry.WorldMaxZ, Min, Max))
+		return {false, true, TEXT("InvalidRequest: environment geometry bounds")};
+	const int32 Step = InGeometry.SampleStepCells;
+	const int64 Cells = InGeometry.Key.SideCells() / Step;
+	if (Cells <= 0 || Cells > 256)
+		return {false, true, TEXT("InvalidRequest: environment geometry sample count")};
+	const auto& Settings = Generator->GetRuntimeConfig()->Recipe->Settings;
+	const auto& Trees = Settings.Ecology.Tree;
+	const int64 TreePadding = bProxy ?
+		(FMath::Max<int64>(1, (int64(Trees.CrownRadius) - 1) / Step) + 1) * Step :
+		FMath::Max<int64>(Step, Trees.bEnabled ? Trees.CrownRadius : 0);
+	const int64 Padding = bProxy && !Trees.bEnabled ? Step : TreePadding;
+	if (Padding > MAX_int32 || !VoxelStreamingGeometry::TrySamplingBounds(InGeometry,
+		FIntVector(int32(Padding), int32(Padding), 0), FIntVector(int32(Padding), int32(Padding), 0),
+		Min, Max, Error))
+		return {false, true, TEXT("InvalidRequest: environment geometry sampling bounds")};
+	FVoxelGenerationBounds Bounds{FIntVector(Min.X, Min.Y, Settings.MinZ),
+		FIntVector(Max.X, Max.Y, Settings.MaxZ)};
+	FIntVector PageMin, PageMax;
+	if (!InGeometry.Key.TryBounds(InGeometry.WorldMinZ, InGeometry.WorldMaxZ, PageMin, PageMax))
+		return {false, true, TEXT("InvalidRequest: environment page bounds")};
+	const FIntPoint Origin = bProxy ? FIntPoint(PageMin.X - Step + Step / 2, PageMin.Y - Step + Step / 2) :
+		FIntPoint(PageMin.X, PageMin.Y);
+	const int32 Width = int32(Cells) + (bProxy ? 2 : 1);
+	const bool bTrees = Trees.bEnabled && (bProxy || FMath::Max<int64>(Trees.MaxHeight,
+		int64(Trees.CrownRadius) * 2 + 1) >= Step);
+	FExternalFactConsumer* Consumer = ExternalFactConsumers.Find(InConsumer);
+	if (Consumer && (!Consumer->SamplingGeometry.IsSet() || Consumer->SamplingGeometry.GetValue() != InGeometry))
+		return {false, true, TEXT("InvalidRequest: same consumer changed its sampling geometry")};
+	if (!Consumer)
+	{
+		if (ExternalFactConsumers.Num() == MAX_int32)
+			return {false, true, TEXT("Oversized: environment geometry consumer directory")};
+		if (!ReserveFactStorage(WaitingPlanSections.Num(), ExternalFactConsumers.Num() + 1, Error))
+			return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
+		FExternalFactConsumer Candidate;
+		Candidate.Bounds = Bounds;
+		Candidate.SamplingGeometry = InGeometry;
+		Consumer = &ExternalFactConsumers.Add(InConsumer, MoveTemp(Candidate));
+		FactStorageLease->MarkPublished();
+	}
+	const auto Resources = Scheduler.GetRuntimeResources();
+	const uint64 Version = Resources->ReleaseVersionExcludingOwner(InConsumer);
+	if (Consumer->bWaitingCapacity && Version <= Consumer->CapacityVersion)
+		return {false, false, TEXT("CapacityBlocked: environment geometry capture")};
+	Consumer->bWaitingCapacity = false;
+	if (!Consumer->Dependencies.Lease && !PlanCoordinator->GatherEnvironmentGeometry(
+		Bounds, Origin, Width, Width, Step, bTrees, InConsumer, Consumer->Dependencies, Error))
+	{
+		Consumer->bWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
+		Consumer->CapacityVersion = Version;
+		return {false, !Consumer->bWaitingCapacity, MoveTemp(Error)};
+	}
+
+
+	const auto Status = PlanCoordinator->Ensure(Consumer->Dependencies.Values, InWorkClass,
+		InSourcePriority, InDistanceScore, InForwardScore, InConsumer);
+	if (Status.bReady || Status.bFailed)
+	{
+		PlanCoordinator->ReleaseConsumer(InConsumer);
+		ExternalFactConsumers.Remove(InConsumer);
+	}
+	return Status;
+}
+
 FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentBounds(
 	const FVoxelGenerationBounds& InBounds, const EVoxelWorkClass InWorkClass,
 	const int32 InSourcePriority, const double InDistanceScore, const double InForwardScore)
@@ -1404,7 +1485,10 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentSamples(
 		return {false, !Consumer->bWaitingCapacity, MoveTemp(Error)};
 	}
 	const int32 DependencyCount = Consumer->Dependencies.Values.Num();
-	if (DependencyCount > 64)
+
+
+	if (Generator->GetRuntimeConfig()->Recipe->AlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion &&
+		DependencyCount > 64)
 	{
 		return {false, true, TEXT("InvalidRequest: map sample batch exceeds active dependency limit")};
 	}
@@ -1446,12 +1530,16 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentSamples(
 		});
 	const int32 RetentionEnd = FMath::Min(DependencyCount, Consumer->SampleRetentions.Num() + 8);
 	const auto& Settings = Generator->GetRuntimeConfig()->Recipe->Settings;
-	const int64 HydrologySide = int64(FMath::Max(8, Settings.HydrologyRegionSide)) * FMath::Max(1, Settings.HydrologyCellSize);
+	const int64 HydrologySide = FVoxelGenerationQuery::HydrologyKeySide(Settings,
+		Generator->GetRuntimeConfig()->Recipe->AlgorithmVersion);
 	while (Consumer->SampleRetentions.Num() < RetentionEnd)
 	{
 		const auto& Dependency = Consumer->Dependencies.Values[Consumer->SampleRetentions.Num()];
-		const int64 CenterX = int64(Dependency.HydrologyKey.Coordinate.X) * HydrologySide + HydrologySide / 2;
-		const int64 CenterY = int64(Dependency.HydrologyKey.Coordinate.Y) * HydrologySide + HydrologySide / 2;
+		const bool bFineWater = Dependency.Kind == EVoxelGenerationPlanKind::FineWater;
+		const int64 CenterX = bFineWater ? int64(Dependency.TileKey.Coordinate.X) :
+			int64(Dependency.HydrologyKey.Coordinate.X) * HydrologySide + HydrologySide / 2;
+		const int64 CenterY = bFineWater ? int64(Dependency.TileKey.Coordinate.Y) :
+			int64(Dependency.HydrologyKey.Coordinate.Y) * HydrologySide + HydrologySide / 2;
 		FVoxelGenerationCacheRetentionPoint Point;
 		Point.Center = FIntPoint(int32(FMath::Clamp<int64>(CenterX, MIN_int32, MAX_int32)),
 			int32(FMath::Clamp<int64>(CenterY, MIN_int32, MAX_int32)));

@@ -7,6 +7,7 @@
 #include "Voxel/Generation/VoxelWorldManifest.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Streaming/VoxelInterest.h"
+#include "Voxel/Rendering/VoxelStreamingGeometry.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 
 class FVoxelRegionStore;
@@ -58,6 +59,10 @@ public:
 	void Reset();
 
 	FVoxelGenerationDependencyStatus QueryEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample);
+
+	FVoxelGenerationDependencyStatus EnsureEnvironmentGeometry(const FVoxelGenerationConsumerKey& InConsumer,
+		const FVoxelTerrainGeometry& InGeometry, EVoxelWorkClass InWorkClass,
+		int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	FVoxelGenerationDependencyStatus EnsureEnvironmentBounds(const FVoxelGenerationBounds& InBounds,
 		EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	FVoxelGenerationDependencyStatus EnsureEnvironmentSamples(const FVoxelGenerationConsumerKey& InConsumer,
@@ -224,6 +229,7 @@ private:
 		FVoxelGenerationPlanDependencyCapture Dependencies;
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
 		int32 SampleStep = 0;
+		TOptional<FVoxelTerrainGeometry> SamplingGeometry;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SampleRetentionStorageLease;
 		TArray<TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>> SampleRetentions;
 		int32 SampleDependencyCursor = 0;

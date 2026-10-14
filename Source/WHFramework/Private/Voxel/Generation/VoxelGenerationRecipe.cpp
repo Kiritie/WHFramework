@@ -411,9 +411,9 @@ bool FVoxelStructureRuntimeDefinition::Validate(int32 InBlockCount, FString& Out
 
 bool FVoxelGenerationRecipe::Validate(FString& OutError) const
 {
-	if (AlgorithmVersion == 0)
+	if (AlgorithmVersion == 0 || AlgorithmVersion > CurrentAlgorithmVersion)
 	{
-		OutError = TEXT("Voxel recipe algorithm version must be non-zero");
+		OutError = TEXT("Voxel recipe algorithm version is unsupported");
 		return false;
 	}
 	if (CellCentimeters <= 0 || CellCentimeters > 1000)

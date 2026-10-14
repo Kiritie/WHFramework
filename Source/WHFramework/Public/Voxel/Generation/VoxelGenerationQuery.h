@@ -75,7 +75,11 @@ public:
 	static FVoxelHydrologyRegionKey HydrologyKeyForVoxel(
 		int32 InX,
 		int32 InY,
-		const FVoxelGenerationSettings& InSettings);
+		const FVoxelGenerationSettings& InSettings, uint32 InAlgorithmVersion);
+
+	static int64 HydrologyKeySide(const FVoxelGenerationSettings& InSettings, uint32 InAlgorithmVersion);
+	static FVoxelHydrologyRegionKey HydrologyTopologyKeyForVoxel(
+		int32 InX, int32 InY, const FVoxelGenerationSettings& InSettings);
 	// 上下文由调用者事先授予，Query 只延长原强引用，不创建回调 heap 或控制器。
 	void SetMissingHydrologyObserver(
 		TSharedPtr<void, ESPMode::ThreadSafe> InContext,
@@ -84,6 +88,9 @@ public:
 		MissingHydrologyContext = MoveTemp(InContext);
 		MissingHydrologyObserver = InObserver;
 	}
+
+	bool EnsureFineWater(const FIntPoint& InCell, FVoxelHydrologyFinePlanPtr& OutPlan,
+		FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
 
 	bool EnsureHydrologyPlan(
 		const FVoxelHydrologyRegionKey& InKey,
@@ -286,6 +293,7 @@ private:
 private:
 	TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
 	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
+	uint64 CacheGeneration = 0;
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	FVoxelGenerationConsumerKey Consumer;
 	uint64 GeneratorInputBytes = 0;

@@ -257,7 +257,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelMapSparseDependenciesTest,
 bool FVoxelMapSparseDependenciesTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
-	FVoxelGenerationRuntimeConfig MutableConfig = *VoxelTest::MakeGenerationConfig();
+	FVoxelGenerationRuntimeConfig MutableConfig = *VoxelTest::MakeGenerationConfig(173, FVoxelGenerationRecipe::CurrentAlgorithmVersion);
 	FVoxelGenerationRecipe Recipe = *MutableConfig.Recipe;
 	Recipe.Settings.HydrologyRegionSide = 16;
 	MutableConfig.Recipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(Recipe));
@@ -287,15 +287,19 @@ bool FVoxelMapSparseDependenciesTest::RunTest(const FString& InParameters)
 			for (int32 Column = 0; Column < 64; ++Column)
 			{
 				const auto Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(
-					Origin.X + Column * Step, Origin.Y + Row * Step, Config->Recipe->Settings);
-				Expected.Add(FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
+					Origin.X + Column * Step, Origin.Y + Row * Step, Config->Recipe->Settings, Config->Recipe->AlgorithmVersion);
+				Expected.Add(Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion
+					? FIntVector(Origin.X + Column * Step, Origin.Y + Row * Step, 0)
+					: FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
 			}
 		}
 		TestEqual(TEXT("依赖数等于真实采样点去重数"), Capture.Values.Num(), Expected.Num());
 		TSet<FIntVector> Actual;
 		for (const auto& Dependency : Capture.Values)
 		{
-			TestTrue(TEXT("地图不附加洞穴、生态或结构事实"), Dependency.Kind == EVoxelGenerationPlanKind::Hydrology);
+			TestTrue(TEXT("地图只准备所用版本的真实水文事实"), Dependency.Kind ==
+				(Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion
+					? EVoxelGenerationPlanKind::FineWater : EVoxelGenerationPlanKind::Hydrology));
 			TestTrue(TEXT("每个依赖都来自真实采样点"), Expected.Contains(Dependency.Coordinate()));
 			Actual.Add(Dependency.Coordinate());
 		}
@@ -303,8 +307,8 @@ bool FVoxelMapSparseDependenciesTest::RunTest(const FString& InParameters)
 		if (Step == 512)
 		{
 			TestEqual(TEXT("稀疏大步长保留4096个实采依赖"), Capture.Values.Num(), 4096);
-			const auto First = FVoxelGenerationQuery::HydrologyKeyForVoxel(Origin.X, Origin.Y, Config->Recipe->Settings);
-			const auto Last = FVoxelGenerationQuery::HydrologyKeyForVoxel(Max.X - 1, Max.Y - 1, Config->Recipe->Settings);
+			const auto First = FVoxelGenerationQuery::HydrologyKeyForVoxel(Origin.X, Origin.Y, Config->Recipe->Settings, Config->Recipe->AlgorithmVersion);
+			const auto Last = FVoxelGenerationQuery::HydrologyKeyForVoxel(Max.X - 1, Max.Y - 1, Config->Recipe->Settings, Config->Recipe->AlgorithmVersion);
 			const int64 DenseCount = int64(Last.Coordinate.X - First.Coordinate.X + 1) *
 				(Last.Coordinate.Y - First.Coordinate.Y + 1);
 			TestTrue(TEXT("同包围矩形密集依赖超过4096也不影响稀疏请求"), DenseCount > 4096);

@@ -6,11 +6,50 @@
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
 #include "Voxel/Generation/Hydrology/VoxelHydrology.h"
+#include "Voxel/Generation/Hydrology/VoxelHydrologyFineWaterQuery.h"
 #include "Voxel/Generation/VoxelFeaturePlan.h"
 #include "Voxel/Generation/VoxelNaturalGenerationCache.h"
 #include "Voxel/Generation/VoxelStructurePlan.h"
 #include "Voxel/Generation/VoxelPlanDiagnostics.h"
 #include "Voxel/Generation/VoxelGenerationConsumer.h"
+
+struct FVoxelGenerationRuntimeConfig;
+struct FVoxelHydrologyRiverComponent;
+class FVoxelClimateGenerator;
+class FVoxelTerrainGenerator;
+
+struct FVoxelHydrologyFinePlan;
+
+
+struct FVoxelHydrologyFineIndexLink
+{
+    FIntVector Bucket = FIntVector::ZeroValue;
+    FVoxelHydrologyFineIndexLink* Previous = nullptr;
+    FVoxelHydrologyFineIndexLink* Next = nullptr;
+    const FVoxelHydrologyFinePlan* Plan = nullptr;
+};
+
+struct WHFRAMEWORK_API FVoxelHydrologyFinePlan
+{
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+	FIntPoint Key = FIntPoint::ZeroValue;
+	FIntPoint Minimum = FIntPoint::ZeroValue;
+	FIntPoint Maximum = FIntPoint::ZeroValue;
+	FVoxelHydrologyFineWaterResult Water;
+	TArray<FIntPoint> Members;
+	TArray<FVoxelHydrologySharedCell> FixedContacts;
+
+    TSet<FIntPoint> CertifiedDry;
+    FIntPoint IndexMinimum = FIntPoint::ZeroValue, IndexMaximum = FIntPoint::ZeroValue;
+    mutable FVoxelHydrologyFineIndexLink IndexLinks[4];
+    mutable int32 IndexLinkCount = 0;
+    FVoxelHydrologyFineWaterResult SampleWater(const FIntPoint& InCell) const;
+	uint64 GetAllocatedBytes() const;
+	bool Contains(const FIntPoint& InCell) const;
+
+	bool HasEquivalentOutput(const FVoxelHydrologyFinePlan& InOther) const;
+};
+using FVoxelHydrologyFinePlanPtr = TSharedPtr<const FVoxelHydrologyFinePlan, ESPMode::ThreadSafe>;
 
 using FVoxelHydrologyPlanPtr =
 	TSharedPtr<
@@ -111,6 +150,7 @@ struct WHFRAMEWORK_API FVoxelGenerationCacheStats
 	int32 BaseColumns = 0;
 	int32 NaturalColumns = 0;
 	int32 Hydrology = 0;
+	int32 FineWater = 0;
 	int32 Caves = 0;
 	int32 Ecology = 0;
 	int32 Features = 0;
@@ -194,6 +234,33 @@ public:
 		FVoxelHydrologyPlanPtr& OutPlan,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr);
+
+	bool BindHydrologyRecipe(uint64 InRecipeHash, uint32 InAlgorithmVersion, FString& OutError, uint64 InExpectedGeneration = 0);
+	uint64 GetHydrologyGeneration() const { return HydrologyGeneration.Load(); }
+
+	// 单次只推进一个有界批次；未 Ready 保持原 owner 和容量，不发布 Region。
+	bool AdvanceHydrologyPlan(const FVoxelHydrologyRegionKey& InKey,
+		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+		TSharedRef<const FVoxelClimateGenerator, ESPMode::ThreadSafe> InClimate,
+		TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> InTerrain,
+		FVoxelHydrologyPlanPtr& OutPlan, FString& OutError, const TAtomic<bool>* InCancel = nullptr);
+
+	bool FindFineWater(const FIntPoint& InCell, FVoxelHydrologyFinePlanPtr& OutPlan) const;
+	bool AdvanceFineWater(const FIntPoint& InCell,
+		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+		TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> InTerrain,
+		FVoxelHydrologyFinePlanPtr& OutPlan, FString& OutError, const TAtomic<bool>* InCancel = nullptr);
+	void CancelFineWaterBuild(const FIntPoint& InCell, uint64 InWorldEpoch,
+		const FGuid& InOwnerId, uint64 InOwnerIncarnation, uint64 InAttemptId);
+
+	void CancelHydrologyBuild(const FVoxelHydrologyRegionKey& InKey, uint64 InWorldEpoch,
+		const FGuid& InOwnerId, uint64 InOwnerIncarnation, uint64 InAttemptId);
+
+	// 拓扑输入与正式 Region 计划分开存储；构建回调只能调用旧拓扑入口。
+	bool FindHydrologyTopology(const FVoxelHydrologyRegionKey& InKey, FVoxelHydrologyPlanPtr& OutPlan) const;
+	bool GetOrBuildHydrologyTopology(const FVoxelHydrologyRegionKey& InKey,
+		TFunctionRef<bool(FVoxelHydrologyPlan&, FString&)> InBuild,
+		FVoxelHydrologyPlanPtr& OutPlan, FString& OutError, const TAtomic<bool>* InCancel = nullptr);
 
 	bool FindCave(
 		const FVoxelGenerationTileKey& InKey,
@@ -311,6 +378,9 @@ private:
 	void ReleaseTaskRetention(FVoxelGenerationCacheRetentionLease& InLease);
 
 	struct FBuildGate;
+	struct FHydrologyRegionOwner;
+	struct FFineWaterOwner;
+	struct FHydrologyComponentOwner;
 
 	struct FBackingReservation
 	{
@@ -346,30 +416,48 @@ private:
 	{
 		mutable FRWLock Lock;
 		FBackingReservation HydrologyBacking;
+		FBackingReservation FineWaterBacking;
+		FBackingReservation HydrologyTopologyBacking;
+		FBackingReservation RiverComponentBacking;
 		FBackingReservation CaveBacking;
 		FBackingReservation EcologyBacking;
 		FBackingReservation FeatureBacking;
 		FBackingReservation StructureBacking;
 
 		TMap<FVoxelHydrologyRegionKey, FVoxelHydrologyPlanPtr> Hydrology;
+		TMap<FIntPoint, FVoxelHydrologyFinePlanPtr> FineWater;
+        TMap<FIntVector, FVoxelHydrologyFineIndexLink*> FineWaterIndex;
+        TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FineWaterIndexLease;
+        int32 FineWaterIndexCapacity = 0;
+        uint32 FineWaterIndexLevels = 0;
+		TMap<FVoxelHydrologyRegionKey, FVoxelHydrologyPlanPtr> HydrologyTopology;
+		TMap<FIntPoint, TSharedPtr<const FVoxelHydrologyRiverComponent, ESPMode::ThreadSafe>> RiverComponents;
 		TMap<FVoxelGenerationTileKey, FVoxelCavePlanPtr> Caves;
 		TMap<FVoxelEcologyTileKey, FVoxelEcologyPlanPtr> Ecology;
 		TMap<FVoxelGenerationTileKey, FVoxelFeaturePlanPtr> Features;
 		TMap<FVoxelGenerationTileKey, FVoxelStructurePlanPtr> Structures;
 
 		TMap<FVoxelHydrologyRegionKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> HydrologyBuilds;
+		TMap<FIntPoint, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> FineWaterBuilds;
+		TMap<FVoxelHydrologyRegionKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> HydrologyTopologyBuilds;
 		TMap<FVoxelGenerationTileKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> CaveBuilds;
 		TMap<FVoxelEcologyTileKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> EcologyBuilds;
 		TMap<FVoxelGenerationTileKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> FeatureBuilds;
 		TMap<FVoxelGenerationTileKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> StructureBuilds;
 
 		TArray<FVoxelHydrologyRegionKey> HydrologyKeys;
+		TArray<FIntPoint> FineWaterKeys;
+		TArray<FVoxelHydrologyRegionKey> HydrologyTopologyKeys;
+		TArray<FIntPoint> RiverComponentKeys;
 		TArray<FVoxelGenerationTileKey> CaveKeys;
 		TArray<FVoxelEcologyTileKey> EcologyKeys;
 		TArray<FVoxelGenerationTileKey> FeatureKeys;
 		TArray<FVoxelGenerationTileKey> StructureKeys;
 
 		int32 HydrologyCursor = 0;
+		int32 FineWaterCursor = 0;
+		int32 HydrologyTopologyCursor = 0;
+		int32 RiverComponentCursor = 0;
 		int32 CaveCursor = 0;
 		int32 EcologyCursor = 0;
 		int32 FeatureCursor = 0;
@@ -417,11 +505,16 @@ private:
 
 	TAtomic<uint64> GateWaitCount { 0 };
 	TAtomic<uint64> GateWaitMicroseconds { 0 };
-	mutable TAtomic<uint64> PlanHits[5];
-	mutable TAtomic<uint64> PlanMisses[5];
-	TAtomic<uint64> PlanDonations[5];
+	mutable TAtomic<uint64> PlanHits[6];
+	mutable TAtomic<uint64> PlanMisses[6];
+	TAtomic<uint64> PlanDonations[6];
 	mutable FRWLock PlanDiagnosticsLock;
-	FVoxelPlanDiagnostics PlanBuildDiagnostics[5];
+	FVoxelPlanDiagnostics PlanBuildDiagnostics[6];
+
+	TAtomic<uint64> HydrologyGeneration{1};
+	TAtomic<bool> bHydrologyResetting{false};
+	uint64 HydrologyRecipeHash = 0;
+	uint32 HydrologyAlgorithmVersion = 0;
 
 	bool bAllowGameThreadBuilds = true;
 	bool bAllowWorkerWait = true;

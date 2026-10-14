@@ -30,7 +30,7 @@ bool FVoxelHydrologyWorldBoundsTest::RunTest(const FString& InParameters)
 	FString Error;
 	for (const int32 Coordinate : {MIN_int32, MAX_int32 - 1})
 	{
-		const auto Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(Coordinate, Coordinate, Recipe->Settings);
+		const auto Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(Coordinate, Coordinate, Recipe->Settings, FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion);
 		FVoxelHydrologyPlan Plan;
 		if (!TestTrue(TEXT("Native hydrology builds at both world edges"), Generator.BuildPlan(Key, Plan, Error))) return false;
 		const int64 CoreOrigin = int64(Key.Coordinate.X) * Recipe->Settings.HydrologyRegionSide * Plan.Grid.CellSize;

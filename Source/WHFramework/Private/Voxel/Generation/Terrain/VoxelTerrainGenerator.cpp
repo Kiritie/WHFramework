@@ -17,6 +17,13 @@ FVoxelLandformSample FVoxelTerrainGenerator::SampleLandform(int32 InX, int32 InY
     return Landform.Sample(InX, InY, Climate->Sample(InX, InY));
 }
 
+int32 FVoxelTerrainGenerator::SampleSurfaceHeight(int32 InX, int32 InY) const
+{
+    const FVoxelClimateSample ClimateSample = Climate->Sample(InX, InY);
+    const FVoxelLandformSample LandformSample = Landform.Sample(InX, InY, ClimateSample);
+    return SampleRawHeight(InX, InY, ClimateSample, LandformSample);
+}
+
 FVoxelMacroTerrainSample FVoxelTerrainGenerator::SampleMacro(int32 InX, int32 InY) const
 {
     const FVoxelClimateSample ClimateSample = Climate->Sample(InX, InY);

@@ -84,7 +84,9 @@ public:
 		const FVoxelGenerationConsumerKey& InConsumer,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InWorkingLease,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InResidentReservation,
-		uint64 InRootBytes);
+		uint64 InRootBytes,
+		// 恢复只接受原所有者实际保留的正文容量，不接受估算值。
+		uint64 InRetainedBytes = 0);
 	~FVoxelGenerationAllocationScope();
 	FVoxelGenerationAllocationScope(const FVoxelGenerationAllocationScope&) = delete;
 	FVoxelGenerationAllocationScope& operator=(const FVoxelGenerationAllocationScope&) = delete;

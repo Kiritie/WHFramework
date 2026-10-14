@@ -280,6 +280,7 @@ FVoxelGenerationQuery& FVoxelGenerationQuery::operator=(FVoxelGenerationQuery&& 
 		Prepared = MoveTemp(InOther.Prepared);
 		Config = MoveTemp(InOther.Config);
 		Cache = MoveTemp(InOther.Cache);
+		CacheGeneration = InOther.CacheGeneration;
 		Resources = MoveTemp(InOther.Resources);
 		Consumer = InOther.Consumer;
 		GeneratorInputBytes = InOther.GeneratorInputBytes;
@@ -360,15 +361,15 @@ bool FVoxelGenerationQuery::RetainHydrologyReads(
 	if (!Resources || bRequireReadyHydrology || bRequireReadyPlans) return true;
 	const auto& Settings = Config->Recipe->Settings;
 	const int64 Margin = FMath::Max<int64>(0, InMargin);
-	const auto At = [&Settings](const int64 X, const int64 Y)
+	const auto At = [this, &Settings](const int64 X, const int64 Y)
 	{
 		return HydrologyKeyForVoxel(
 			int32(FMath::Clamp<int64>(X, VoxelGeneration::WorldCellMin, VoxelGeneration::WorldCellMaxExclusive - 1)),
-			int32(FMath::Clamp<int64>(Y, VoxelGeneration::WorldCellMin, VoxelGeneration::WorldCellMaxExclusive - 1)), Settings).Coordinate;
+			int32(FMath::Clamp<int64>(Y, VoxelGeneration::WorldCellMin, VoxelGeneration::WorldCellMaxExclusive - 1)), Settings, Config->Recipe->AlgorithmVersion).Coordinate;
 	};
 	const FIntPoint First = At(int64(InBounds.Min.X) - Margin, int64(InBounds.Min.Y) - Margin);
 	const FIntPoint Last = At(int64(InBounds.Max.X) - 1 + Margin, int64(InBounds.Max.Y) - 1 + Margin);
-	const int64 Side = int64(Settings.HydrologyRegionSide) * Settings.HydrologyCellSize;
+	const int64 Side = HydrologyKeySide(Settings, Config->Recipe->AlgorithmVersion);
 	const FInt64Vector2 FirstCenter(int64(First.X) * Side + Side / 2, int64(First.Y) * Side + Side / 2);
 	const FInt64Vector2 LastCenter(int64(Last.X) * Side + Side / 2, int64(Last.Y) * Side + Side / 2);
 	FVoxelGenerationCacheRetentionPoint Point;
@@ -513,16 +514,32 @@ void FVoxelGenerationQuery::GatherStructureTiles(
 }
 #endif
 
-FVoxelHydrologyRegionKey FVoxelGenerationQuery::HydrologyKeyForVoxel(
-	const int32 InX,
-	const int32 InY,
-	const FVoxelGenerationSettings& InSettings)
+int64 FVoxelGenerationQuery::HydrologyKeySide(
+	const FVoxelGenerationSettings& InSettings, const uint32 InAlgorithmVersion)
+{
+	return InAlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion
+		? VoxelHydrology::CoverageSide
+		: int64(FMath::Max(1, InSettings.HydrologyCellSize)) * FMath::Max(1, InSettings.HydrologyRegionSide);
+}
+
+FVoxelHydrologyRegionKey FVoxelGenerationQuery::HydrologyTopologyKeyForVoxel(
+	const int32 InX, const int32 InY, const FVoxelGenerationSettings& InSettings)
 {
 	const int32 CellSize = FMath::Max(1, InSettings.HydrologyCellSize);
 	const int32 RegionSide = FMath::Max(1, InSettings.HydrologyRegionSide);
 	return { FIntPoint(
 		VoxelGeneration::FloorDivide(VoxelGeneration::FloorDivide(InX, CellSize), RegionSide),
 		VoxelGeneration::FloorDivide(VoxelGeneration::FloorDivide(InY, CellSize), RegionSide)) };
+}
+
+FVoxelHydrologyRegionKey FVoxelGenerationQuery::HydrologyKeyForVoxel(
+	const int32 InX, const int32 InY, const FVoxelGenerationSettings& InSettings,
+	const uint32 InAlgorithmVersion)
+{
+	if (InAlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion)
+		return HydrologyTopologyKeyForVoxel(InX, InY, InSettings);
+	return {FIntPoint(VoxelGeneration::FloorDivide(InX, VoxelHydrology::CoverageSide),
+		VoxelGeneration::FloorDivide(InY, VoxelHydrology::CoverageSide))};
 }
 
 bool FVoxelGenerationQuery::SamplePlanColumn(
@@ -551,6 +568,28 @@ bool FVoxelGenerationQuery::SamplePlanSymbol(
 	return true;
 }
 
+bool FVoxelGenerationQuery::EnsureFineWater(const FIntPoint& InCell,
+	FVoxelHydrologyFinePlanPtr& OutPlan, FString& OutError, const TAtomic<bool>* InCancel) const
+{
+	if (!ValidateConsumer(OutError)) return false;
+	if (InCancel && InCancel->Load()) { OutError = TEXT("Canceled"); return false; }
+	if (!Cache->BindHydrologyRecipe(Config->Recipe->RecipeHash, Config->Recipe->AlgorithmVersion, OutError, CacheGeneration)) return false;
+	if ((bRequireReadyHydrology || bRequireReadyPlans) && Cache->FindFineWater(InCell, OutPlan))
+	{
+		if (CacheGeneration != Cache->GetHydrologyGeneration())
+		{ OutPlan.Reset(); OutError = TEXT("Canceled"); return false; }
+		OutError.Reset(); return true;
+	}
+	if (bRequireReadyPlans)
+	{
+		FVoxelGenerationPlanningReadScope::Missing(EVoxelGenerationPlanKind::FineWater, FIntVector(InCell.X, InCell.Y, 0));
+		OutError = TEXT("DependencyNotReady: FineWater"); return false;
+	}
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
+	FVoxelGenerationPlanningReadScope ConsumerScope(nullptr, nullptr, InCancel, Resources ? &Consumer : nullptr);
+	return Cache->AdvanceFineWater(InCell, Config.ToSharedRef(), Terrain.ToSharedRef(), OutPlan, OutError, InCancel);
+}
+
 bool FVoxelGenerationQuery::EnsureHydrologyPlan(
 	const FVoxelHydrologyRegionKey& InKey,
 	FVoxelHydrologyPlanPtr& OutPlan,
@@ -559,21 +598,27 @@ bool FVoxelGenerationQuery::EnsureHydrologyPlan(
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_QueryHydrologyPlan);
 	if (!ValidateConsumer(OutError)) return false;
+	if (InCancel && InCancel->Load())
+	{
+		OutError = TEXT("Canceled");
+		return false;
+	}
+	if (!Cache->BindHydrologyRecipe(Config->Recipe->RecipeHash, Config->Recipe->AlgorithmVersion, OutError, CacheGeneration)) return false;
 	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
 	FVoxelGenerationPlanningReadScope ConsumerScope(nullptr, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	const auto& Settings = Config->Recipe->Settings;
-	const int64 MinCell = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMin, Settings.HydrologyCellSize);
-	const int64 MaxCell = VoxelGeneration::FloorDivideWide(VoxelGeneration::WorldCellMaxExclusive - 1, Settings.HydrologyCellSize) + 1;
-	const FInt64Vector2 Core(int64(InKey.Coordinate.X) * Settings.HydrologyRegionSide,
-		int64(InKey.Coordinate.Y) * Settings.HydrologyRegionSide);
-	if (Core.X >= MaxCell || Core.Y >= MaxCell || Core.X + Settings.HydrologyRegionSide <= MinCell ||
-		Core.Y + Settings.HydrologyRegionSide <= MinCell)
+	const int64 Side = HydrologyKeySide(Settings, Config->Recipe->AlgorithmVersion);
+	const FInt64Vector2 Core(int64(InKey.Coordinate.X) * Side, int64(InKey.Coordinate.Y) * Side);
+	if (Core.X >= VoxelGeneration::WorldCellMaxExclusive || Core.Y >= VoxelGeneration::WorldCellMaxExclusive ||
+		Core.X + Side <= VoxelGeneration::WorldCellMin || Core.Y + Side <= VoxelGeneration::WorldCellMin)
 	{
 		OutError = TEXT("Invalid hydrology region outside world cell domain");
 		return false;
 	}
 	if (bRequireReadyPlans && Cache->FindHydrology(InKey, OutPlan))
 	{
+		if (CacheGeneration != Cache->GetHydrologyGeneration())
+			{ OutPlan.Reset(); OutError = TEXT("Canceled"); return false; }
 		OutError.Reset();
 		return true;
 	}
@@ -583,6 +628,11 @@ bool FVoxelGenerationQuery::EnsureHydrologyPlan(
 			FIntVector(InKey.Coordinate.X, InKey.Coordinate.Y, 0));
 		OutError = TEXT("DependencyNotReady: Hydrology");
 		return false;
+	}
+	if (Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion)
+	{
+		return Cache->AdvanceHydrologyPlan(InKey, Config.ToSharedRef(), Climate.ToSharedRef(), Terrain.ToSharedRef(),
+			OutPlan, OutError, InCancel);
 	}
 	return Cache->GetOrBuildHydrology(InKey,
 		[this, InKey, InCancel](FVoxelHydrologyPlan& Plan, FString& Error)
@@ -890,6 +940,7 @@ bool FVoxelGenerationQuery::Create(
 			}
 			QueryConsumer = *OriginalConsumer;
 		}
+		if (!InCache->BindHydrologyRecipe(InConfig->Recipe->RecipeHash, InConfig->Recipe->AlgorithmVersion, OutError)) return false;
 		const uint64 GeneratorBytes[] = {
 			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelClimateGenerator>(),
 			VoxelBoundedAllocation::WorkerSharedBytes<const FVoxelTerrainGenerator>(),
@@ -943,6 +994,8 @@ bool FVoxelGenerationQuery::Create(
 
 	Query.Config = InConfig;
 	Query.Cache = InCache;
+	Query.CacheGeneration = InCache->GetHydrologyGeneration();
+	if (!InCache->BindHydrologyRecipe(InConfig->Recipe->RecipeHash, InConfig->Recipe->AlgorithmVersion, OutError, Query.CacheGeneration)) return false;
 	Query.Resources = QueryResources;
 	Query.Consumer = QueryConsumer;
 	Query.GeneratorInputBytes = NewGeneratorInputBytes;
@@ -1041,8 +1094,8 @@ bool FVoxelGenerationQuery::PrepareEnvironmentColumnRead(
 		return false;
 	}
 	const auto& Settings = Config->Recipe->Settings;
-	const auto Key = HydrologyKeyForVoxel(InX, InY, Settings);
-	const int64 Side = int64(Settings.HydrologyRegionSide) * Settings.HydrologyCellSize;
+	const auto Key = HydrologyKeyForVoxel(InX, InY, Settings, Config->Recipe->AlgorithmVersion);
+	const int64 Side = HydrologyKeySide(Settings, Config->Recipe->AlgorithmVersion);
 	const int64 X = int64(Key.Coordinate.X) * Side;
 	const int64 Y = int64(Key.Coordinate.Y) * Side;
 	FVoxelGenerationBounds Bounds{
@@ -1409,7 +1462,7 @@ bool FVoxelGenerationQuery::ApplyHydrology(
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_NaturalHydrology);
 	const FVoxelHydrologyRegionKey Key = HydrologyKeyForVoxel(
-		InX, InY, Config->Recipe->Settings);
+		InX, InY, Config->Recipe->Settings, Config->Recipe->AlgorithmVersion);
 	FVoxelHydrologyPlanPtr Plan;
 	if (bRequireReadyHydrology && !Cache->FindHydrology(Key, Plan))
 	{
@@ -1424,30 +1477,39 @@ bool FVoxelGenerationQuery::ApplyHydrology(
 		return false;
 	}
 
+	FVoxelHydrologyFinePlanPtr Fine;
+	FVoxelHydrologyInfluence FineBase;
+	const bool bFineVersion = Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion;
+	if (bFineVersion)
+	{
+		const FIntPoint Cell(InX, InY);
+		if ((bRequireReadyHydrology || bRequireReadyPlans) && !Cache->FindFineWater(Cell, Fine))
+		{
+			FVoxelGenerationPlanningReadScope::Missing(EVoxelGenerationPlanKind::FineWater, FIntVector(InX, InY, 0));
+			OutError = TEXT("DependencyNotReady: FineWater"); return false;
+		}
+		if (!EnsureFineWater(Cell, Fine, OutError, InCancel) || !Fine) return false;
+		FineBase.bCoast = InOutColumn.bCoast;
+		const auto FineWater = Fine->SampleWater(FIntPoint(InX, InY));
+		FineBase.SurfaceWaterZ = FineWater.IsWet() ? FineWater.WaterZ : MIN_int32;
+		const auto OceanId = VoxelGeneration::MakeStableId(Config->Recipe->Settings.Seed,
+			FIntVector(0, 0, Config->Recipe->Settings.SeaLevel), 0x4F4345414E524543ull, 0);
+		FineBase.bOcean = FineWater.bFixedWater && FineWater.FixedId == OceanId;
+		FineBase.bLake = FineWater.IsWet() && !FineBase.bOcean;
+	}
+	FVoxelGenerationRequiredSourceScope FineSource(Resources.Get(), Fine ? Fine->ResourceLease.Get() : nullptr);
+
 	FVoxelHydrologyInfluence Influence;
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_HydrologyPlanSample);
-		if (!Plan->Sample(InX, InY, InOutColumn.SurfaceZ, Influence))
+		if (!Plan->Sample(InX, InY, InOutColumn.SurfaceZ, Influence, bFineVersion ? &FineBase : nullptr))
 		{
 			OutError.Reset();
 			return true;
 		}
 	}
 
-	if (Influence.GroundOverrideZ != MIN_int32)
-	{
-		InOutColumn.SurfaceZ = Influence.GroundOverrideZ;
-	}
-	InOutColumn.SurfaceWaterZ = Influence.SurfaceWaterZ;
-	InOutColumn.RiverDistanceCells = Influence.RiverDistanceCells;
-	InOutColumn.BankDistanceCells = Influence.BankDistanceCells;
-	InOutColumn.FloodplainStrengthQ15 = Influence.FloodplainStrengthQ15;
-	InOutColumn.RiverId = Influence.RiverId;
-	InOutColumn.RiverZone = Influence.RiverZone;
-	InOutColumn.bRiver = Influence.bRiver;
-	InOutColumn.bLake = Influence.bLake;
-	InOutColumn.bOcean = Influence.bOcean;
-	InOutColumn.bCoast = Influence.bCoast;
+	VoxelHydrology::ApplyInfluenceToColumn(Influence, InOutColumn);
 	OutError.Reset();
 	return true;
 }

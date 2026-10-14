@@ -5,10 +5,12 @@
 
 namespace VoxelTest
 {
+	// 保留既有同步夹具的 v13 基线；v14 测试显式选择版本并推进合作式构建。
 	inline TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> MakeGenerationConfig(
-		const int32 InSeed = 173)
+		const int32 InSeed = 173, const uint32 InAlgorithmVersion = FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion)
 	{
 		FVoxelGenerationRecipe Recipe;
+		Recipe.AlgorithmVersion = InAlgorithmVersion;
 		Recipe.RecipeHash = 0x8a42d3c871f0195bull;
 		Recipe.Settings.Seed = InSeed;
 		Recipe.Settings.MinZ = -64;
@@ -85,10 +87,11 @@ namespace VoxelTest
 		return MakeShared<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>(MoveTemp(Config));
 	}
 
-	inline TSharedRef<FVoxelGenerationPipeline, ESPMode::ThreadSafe> MakeGenerator(const int32 InSeed = 173)
+	inline TSharedRef<FVoxelGenerationPipeline, ESPMode::ThreadSafe> MakeGenerator(const int32 InSeed = 173,
+		const uint32 InAlgorithmVersion = FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion)
 	{
 		return MakeShared<FVoxelGenerationPipeline, ESPMode::ThreadSafe>(
-			MakeGenerationConfig(InSeed),
+			MakeGenerationConfig(InSeed, InAlgorithmVersion),
 			MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>());
 	}
 

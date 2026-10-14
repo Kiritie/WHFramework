@@ -567,6 +567,8 @@ bool FVoxelRiverSurfaceKeepsSubsoilTest::RunTest(const FString& InParameters)
 {
 	(void)InParameters;
 	FVoxelGenerationRecipe Recipe;
+
+	Recipe.AlgorithmVersion = FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion;
 	Recipe.Palette.Grass = 3;
 	Recipe.Palette.Dirt = 2;
 	Recipe.Palette.Stone = 1;

@@ -538,6 +538,8 @@ struct WHFRAMEWORK_API FVoxelColumnSample
 	int32 GroundWaterZ = MIN_int32;
 	int32 RiverDistanceCells = MAX_int32;
 	int32 BankDistanceCells = MAX_int32;
+    int32 SignedWetEdgeDistanceCells = MAX_int32;
+    int32 RiverWaterPlane = MIN_int32;
 	int32 FloodplainStrengthQ15 = 0;
 	FVoxelStableId RiverId;
 	EVoxelRiverSurfaceZone RiverZone = EVoxelRiverSurfaceZone::None;

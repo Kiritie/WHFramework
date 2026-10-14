@@ -193,6 +193,10 @@ public:
 	UVoxelWorldGenerationProfile* GetWorldGenerationProfile() const;
 	TSharedPtr<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> GetGenerator() const;
 	FVoxelGenerationDependencyStatus QueryEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample);
+
+	FVoxelGenerationDependencyStatus EnsureEnvironmentGeometry(const FVoxelGenerationConsumerKey& InConsumer,
+		const FVoxelTerrainGeometry& InGeometry, EVoxelWorkClass InWorkClass,
+		int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	FVoxelGenerationDependencyStatus EnsureEnvironmentBounds(const FVoxelGenerationBounds& InBounds,
 		EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	bool ResolveMapSurface(

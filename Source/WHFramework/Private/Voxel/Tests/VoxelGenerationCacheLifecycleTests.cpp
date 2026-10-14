@@ -379,7 +379,7 @@ namespace
 		FVoxelGenerationSettings Settings;
 		Settings.HydrologyRegionSide = 8;
 		Settings.HydrologyCellSize = 3;
-		InCache.StoreHydrology(FVoxelGenerationQuery::HydrologyKeyForVoxel(InCell, InCell, Settings),
+		InCache.StoreHydrology(FVoxelGenerationQuery::HydrologyTopologyKeyForVoxel(InCell, InCell, Settings),
 			MakeShared<FVoxelHydrologyPlan, ESPMode::ThreadSafe>());
 		const FVoxelGenerationTileKey Tile{FIntVector(VoxelGeneration::FloorDivide(InCell, 256),
 			VoxelGeneration::FloorDivide(InCell, 256), 0)};
@@ -475,15 +475,15 @@ bool FVoxelCacheLifecycleWideRetentionTest::RunTest(const FString& InParameters)
 	Settings.HydrologyCellSize = 3;
 	FVoxelHydrologyPlanPtr Hydrology;
 	TestTrue(TEXT("负边界水文center不Clamp为错误身份"), Cache->FindHydrology(
-		FVoxelGenerationQuery::HydrologyKeyForVoxel(MIN_int32, MIN_int32, Settings), Hydrology));
+		FVoxelGenerationQuery::HydrologyTopologyKeyForVoxel(MIN_int32, MIN_int32, Settings), Hydrology));
 	TestFalse(TEXT("远处正边界水文不能伪装成距离4"), Cache->FindHydrology(
-		FVoxelGenerationQuery::HydrologyKeyForVoxel(MAX_int32 - 1, MAX_int32 - 1, Settings), Hydrology));
+		FVoxelGenerationQuery::HydrologyTopologyKeyForVoxel(MAX_int32 - 1, MAX_int32 - 1, Settings), Hydrology));
 	Retention.Points[0].HydrologyRadiusCells = 3;
 	++Retention.Revision;
 	Cache->UpdateRetention(Retention);
 	MaintainCache(*Cache);
 	TestFalse(TEXT("半径3不能把MIN-4中心Clamp到MIN后误保留"), Cache->FindHydrology(
-		FVoxelGenerationQuery::HydrologyKeyForVoxel(MIN_int32, MIN_int32, Settings), Hydrology));
+		FVoxelGenerationQuery::HydrologyTopologyKeyForVoxel(MIN_int32, MIN_int32, Settings), Hydrology));
 
 	Retention.Points.Reset();
 	++Retention.Revision;
@@ -503,9 +503,9 @@ bool FVoxelCacheLifecycleWideRetentionTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("任务保留采用完整256tile原点距离"), Positive.Caves + Positive.Features + Positive.Structures, 3);
 	TestEqual(TEXT("任务保留采用完整64ecology中心距离"), Positive.Ecology, 1);
 	TestTrue(TEXT("合法partial region的完整域外中心元数据按宽整数距离保留"), Cache->FindHydrology(
-		FVoxelGenerationQuery::HydrologyKeyForVoxel(MAX_int32 - 1, MAX_int32 - 1, Settings), Hydrology));
+		FVoxelGenerationQuery::HydrologyTopologyKeyForVoxel(MAX_int32 - 1, MAX_int32 - 1, Settings), Hydrology));
 	TestFalse(TEXT("负边界region不被正边界任务误保留"), Cache->FindHydrology(
-		FVoxelGenerationQuery::HydrologyKeyForVoxel(MIN_int32, MIN_int32, Settings), Hydrology));
+		FVoxelGenerationQuery::HydrologyTopologyKeyForVoxel(MIN_int32, MIN_int32, Settings), Hydrology));
 	Point.HydrologyRadiusCells = 5;
 	if (!Cache->RetainForTask(Point, Resources, Consumer, TaskRetention, Error))
 	{
@@ -514,7 +514,7 @@ bool FVoxelCacheLifecycleWideRetentionTest::RunTest(const FString& InParameters)
 	}
 	MaintainCache(*Cache);
 	TestFalse(TEXT("半径5不能把MAX+5中心Clamp到MAX后误保留"), Cache->FindHydrology(
-		FVoxelGenerationQuery::HydrologyKeyForVoxel(MAX_int32 - 1, MAX_int32 - 1, Settings), Hydrology));
+		FVoxelGenerationQuery::HydrologyTopologyKeyForVoxel(MAX_int32 - 1, MAX_int32 - 1, Settings), Hydrology));
 	TaskRetention.Reset();
 	MaintainCache(*Cache);
 	const auto Released = Cache->GetStats();

@@ -14,6 +14,7 @@ public:
         TSharedRef<const FVoxelClimateGenerator, ESPMode::ThreadSafe> InClimate);
 
 public:
+    int32 SampleSurfaceHeight(int32 InX, int32 InY) const;
     FVoxelMacroTerrainSample SampleMacro(int32 InX, int32 InY) const;
     FVoxelLandformSample SampleLandform(int32 InX, int32 InY) const;
     int32 SampleDensityQ16(const FIntVector& InCell, const FVoxelMacroTerrainSample& InMacro) const;

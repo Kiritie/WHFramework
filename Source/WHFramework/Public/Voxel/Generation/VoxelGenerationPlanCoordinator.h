@@ -80,6 +80,11 @@ public:
 		const FVoxelGenerationConsumerKey& InConsumer,
 		FVoxelGenerationPlanDependencyCapture& OutDependencies,
 		FString& OutError) const;
+	bool GatherEnvironmentGeometry(const FVoxelGenerationBounds& InBounds, const FIntPoint& InOrigin,
+		int32 InWidth, int32 InHeight, int32 InStep, bool bIncludeTreeCandidates,
+		const FVoxelGenerationConsumerKey& InConsumer, FVoxelGenerationPlanDependencyCapture& OutDependencies,
+		FString& OutError) const;
+
 	bool GatherEnvironmentSamples(const FIntPoint& InOrigin, int32 InWidth, int32 InHeight, int32 InStep,
 		const FVoxelGenerationConsumerKey& InConsumer, FVoxelGenerationPlanDependencyCapture& OutDependencies,
 		FString& OutError) const;

@@ -1,4 +1,7 @@
 #include "Voxel/Generation/Hydrology/VoxelHydrologyPlan.h"
+#include "Voxel/Generation/Hydrology/VoxelHydrologyComponent.h"
+#include "Voxel/Generation/Hydrology/VoxelRiverCorridor.h"
+#include "Voxel/Generation/Hydrology/VoxelHydrologyRiverDecoration.h"
 
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
@@ -740,18 +743,16 @@ namespace
 
 bool FVoxelHydrologyPlan::Finalize(FString& OutError, const TAtomic<bool>* InCancel)
 {
+    return BuildGeometry(OutError, InCancel) && BuildSpatialIndex(OutError, InCancel);
+}
+
+bool FVoxelHydrologyPlan::BuildGeometry(FString& OutError, const TAtomic<bool>* InCancel)
+{
 	const auto* Allocation = FVoxelGenerationAllocationScope::Get();
 	if (!(Allocation ? Allocation->Check(OutError) : FVoxelGenerationAllocationScope::AllowPassive(OutError)))
 	{
 		return false;
 	}
-	LakeWaterByCellOrigin.Reset();
-	for (auto& Pair : RiverSegmentsByHydrologyCell)
-	{
-		VoxelGenerationAllocation::FreeRetainedArray(Pair.Value);
-	}
-	RiverSegmentsByHydrologyCell.Reset();
-	Waterfalls.Reset();
 	for (FVoxelRiverRoute& River : Rivers)
 	{
 		if (InCancel && InCancel->Load())
@@ -770,6 +771,40 @@ bool FVoxelHydrologyPlan::Finalize(FString& OutError, const TAtomic<bool>* InCan
 		{
 			return false;
 		}
+		if (!River.MeanderPoints.IsEmpty())
+		{
+			River.Min = River.MeanderPoints[0].Position;
+			River.Max = River.Min;
+			for (const FVoxelRiverMeanderPoint& Point : River.MeanderPoints)
+			{
+				River.Min.X = FMath::Min(River.Min.X, Point.Position.X);
+				River.Min.Y = FMath::Min(River.Min.Y, Point.Position.Y);
+				River.Max.X = FMath::Max(River.Max.X, Point.Position.X);
+				River.Max.Y = FMath::Max(River.Max.Y, Point.Position.Y);
+			}
+		}
+	}
+
+	OutError.Reset();
+	return true;
+}
+
+bool FVoxelHydrologyPlan::BuildSpatialIndex(FString& OutError, const TAtomic<bool>* InCancel)
+{
+	const auto* Allocation = FVoxelGenerationAllocationScope::Get();
+	if (!(Allocation ? Allocation->Check(OutError) : FVoxelGenerationAllocationScope::AllowPassive(OutError)))
+	{
+		return false;
+	}
+	LakeWaterByCellOrigin.Reset();
+	for (auto& Pair : RiverSegmentsByHydrologyCell)
+	{
+		VoxelGenerationAllocation::FreeRetainedArray(Pair.Value);
+	}
+	RiverSegmentsByHydrologyCell.Reset();
+	Waterfalls.Reset();
+	for (FVoxelRiverRoute& River : Rivers)
+	{
 		// Author steep drops once in the immutable hydrology plan; clients only present these records.
 		for (int32 Start=0; Start+1<River.MeanderPoints.Num(); ++Start)
 		{
@@ -797,18 +832,6 @@ bool FVoxelHydrologyPlan::Finalize(FString& OutError, const TAtomic<bool>* InCan
 				Waterfalls.Add(Fall);
 				Start=End;
 				break;
-			}
-		}
-		if (!River.MeanderPoints.IsEmpty())
-		{
-			River.Min = River.MeanderPoints[0].Position;
-			River.Max = River.Min;
-			for (const FVoxelRiverMeanderPoint& Point : River.MeanderPoints)
-			{
-				River.Min.X = FMath::Min(River.Min.X, Point.Position.X);
-				River.Min.Y = FMath::Min(River.Min.Y, Point.Position.Y);
-				River.Max.X = FMath::Max(River.Max.X, Point.Position.X);
-				River.Max.Y = FMath::Max(River.Max.Y, Point.Position.Y);
 			}
 		}
 	}
@@ -889,10 +912,10 @@ bool FVoxelHydrologyPlan::Finalize(FString& OutError, const TAtomic<bool>* InCan
 				const int64 MaxY = FMath::Min(int64(FMath::Max(A.Position.Y, B.Position.Y)) + Radius,
 					VoxelGeneration::WorldCellMaxExclusive - 1);
 				// 索引只覆盖本 plan 的物理 Grid；Sample 不消费 Grid 外的水文 cell。
-				const int64 MinCellX = FMath::Max(VoxelGeneration::FloorDivideWide(MinX, Grid.CellSize), int64(Grid.WorldMinCell.X));
-				const int64 MinCellY = FMath::Max(VoxelGeneration::FloorDivideWide(MinY, Grid.CellSize), int64(Grid.WorldMinCell.Y));
-				const int64 MaxCellX = FMath::Min(VoxelGeneration::FloorDivideWide(MaxX, Grid.CellSize), int64(Grid.WorldMinCell.X) + Grid.Width - 1);
-				const int64 MaxCellY = FMath::Min(VoxelGeneration::FloorDivideWide(MaxY, Grid.CellSize), int64(Grid.WorldMinCell.Y) + Grid.Height - 1);
+				const int64 MinCellX = (bCompleteRiverIndex ? VoxelGeneration::FloorDivideWide(MinX, Grid.CellSize) : FMath::Max(VoxelGeneration::FloorDivideWide(MinX, Grid.CellSize), int64(Grid.WorldMinCell.X)));
+				const int64 MinCellY = (bCompleteRiverIndex ? VoxelGeneration::FloorDivideWide(MinY, Grid.CellSize) : FMath::Max(VoxelGeneration::FloorDivideWide(MinY, Grid.CellSize), int64(Grid.WorldMinCell.Y)));
+				const int64 MaxCellX = (bCompleteRiverIndex ? VoxelGeneration::FloorDivideWide(MaxX, Grid.CellSize) : FMath::Min(VoxelGeneration::FloorDivideWide(MaxX, Grid.CellSize), int64(Grid.WorldMinCell.X) + Grid.Width - 1));
+				const int64 MaxCellY = (bCompleteRiverIndex ? VoxelGeneration::FloorDivideWide(MaxY, Grid.CellSize) : FMath::Min(VoxelGeneration::FloorDivideWide(MaxY, Grid.CellSize), int64(Grid.WorldMinCell.Y) + Grid.Height - 1));
 
 				for (int64 CellY = MinCellY;
 					CellY <= MaxCellY;
@@ -982,60 +1005,127 @@ void FVoxelHydrologyPlan::Finalize()
 }
 #endif
 
-bool FVoxelHydrologyPlan::ValidateRiverRoutes(FString& OutError) const
+bool FVoxelHydrologyPlan::ValidateRiverRoutePoint(int32 RiverIndex, int32 PointIndex, FString& OutError) const
 {
-	const int32 TangentQ10 = MeanderTangentQ10(RiverMaxMeanderAngle);
-	for (const FVoxelRiverRoute& River : Rivers)
-	{
-		if (River.ShapePoints.Num() < 2 || River.MeanderPoints.Num() < 2)
-		{
-			OutError = TEXT("River has no valid shape route");
-			return false;
-		}
-		for (int32 Index = 0; Index < River.MeanderPoints.Num(); ++Index)
-		{
-			const FVoxelRiverMeanderPoint& Point = River.MeanderPoints[Index];
-			if (!VoxelGeneration::IsWorldCell(Point.Position.X) || !VoxelGeneration::IsWorldCell(Point.Position.Y))
-			{
-				OutError = TEXT("River shape contains a point outside world cell domain");
-				return false;
-			}
-			if (Point.BedHalfWidth < 1 || Point.WaterHalfWidth < Point.BedHalfWidth ||
-				Point.BankWidth < 1 || Point.ShoreWidth < 1 || Point.Depth < 1)
-			{
-				OutError = TEXT("River shape contains an invalid width or depth");
-				return false;
-			}
-			if (Index == 0) continue;
-			const FVoxelRiverMeanderPoint& Previous = River.MeanderPoints[Index - 1];
-			if (Point.Position == Previous.Position || int64(Point.WaterZ) > int64(Previous.WaterZ) + 1)
-			{
-				OutError = TEXT("River shape has a zero segment or uphill discontinuity");
-				return false;
-			}
-			if (Index > 1 && !IsMeanderAngleWithinLimit(
-				River.MeanderPoints[Index - 2].Position, Previous.Position,
-				Point.Position, TangentQ10))
-			{
-				const FIntPoint Before = River.MeanderPoints[Index - 2].Position;
-				OutError = FString::Printf(TEXT("River meander exceeds %d degrees: (%d,%d) -> (%d,%d) -> (%d,%d), anchor=%d"),
-					RiverMaxMeanderAngle, Before.X, Before.Y,
-					Previous.Position.X, Previous.Position.Y,
-					Point.Position.X, Point.Position.Y,
-					Previous.bAnchor ? 1 : 0);
-				return false;
-			}
-		}
-	}
-	OutError.Reset();
-	return true;
+    if (!Rivers.IsValidIndex(RiverIndex)) { OutError = TEXT("Invalid river index"); return false; }
+    const auto& River = Rivers[RiverIndex];
+    if (River.ShapePoints.Num()<2 || River.MeanderPoints.Num()<2 || !River.MeanderPoints.IsValidIndex(PointIndex))
+    { OutError = TEXT("River has no valid shape route"); return false; }
+    const auto& Point = River.MeanderPoints[PointIndex];
+    if (!VoxelGeneration::IsWorldCell(Point.Position.X) || !VoxelGeneration::IsWorldCell(Point.Position.Y))
+    { OutError = TEXT("River shape contains a point outside world cell domain"); return false; }
+    if (Point.BedHalfWidth<1 || Point.WaterHalfWidth<Point.BedHalfWidth || Point.BankWidth<1 || Point.ShoreWidth<1 || Point.Depth<1)
+    { OutError = TEXT("River shape contains an invalid width or depth"); return false; }
+    if (PointIndex>0)
+    {
+        const auto& Previous = River.MeanderPoints[PointIndex-1];
+        if (Point.Position==Previous.Position || int64(Point.WaterZ)>int64(Previous.WaterZ)+1)
+        { OutError = TEXT("River shape has a zero segment or uphill discontinuity"); return false; }
+        if (PointIndex>1 && !IsMeanderAngleWithinLimit(River.MeanderPoints[PointIndex-2].Position,
+            Previous.Position,Point.Position,MeanderTangentQ10(RiverMaxMeanderAngle)))
+        {
+            const auto& Before = River.MeanderPoints[PointIndex-2].Position;
+            OutError = FString::Printf(TEXT("River meander exceeds %d degrees: (%d,%d) -> (%d,%d) -> (%d,%d), anchor=%d"),
+                RiverMaxMeanderAngle,Before.X,Before.Y,Previous.Position.X,Previous.Position.Y,Point.Position.X,Point.Position.Y,Previous.bAnchor?1:0);
+            return false;
+        }
+    }
+    OutError.Reset(); return true;
 }
 
-bool FVoxelHydrologyPlan::Sample(
-	const int32 InWorldX,
-	const int32 InWorldY,
-	const int32 InOriginalGround,
-	FVoxelHydrologyInfluence& OutInfluence) const
+bool FVoxelHydrologyPlan::ValidateRiverRoutes(FString& OutError) const
+{
+    for (int32 River=0;River<Rivers.Num();++River)
+    {
+        if (Rivers[River].MeanderPoints.IsEmpty()) { OutError=TEXT("River has no valid shape route"); return false; }
+        for (int32 Point=0;Point<Rivers[River].MeanderPoints.Num();++Point)
+            if (!ValidateRiverRoutePoint(River,Point,OutError)) return false;
+    }
+    OutError.Reset(); return true;
+}
+
+bool FVoxelHydrologyPlan::Sample(int32 InWorldX, int32 InWorldY, int32 InOriginalGround, FVoxelHydrologyInfluence& OutInfluence,
+    const FVoxelHydrologyInfluence* InBaseWaterOverride) const
+{
+    if (!VoxelGeneration::IsWorldCell(InWorldX) || !VoxelGeneration::IsWorldCell(InWorldY))
+    {
+        return false;
+    }
+    FVoxelHydrologyInfluence Result;
+    const FVoxelHydrologyPlan* Base = TopologyPlan ? TopologyPlan.Get() : this;
+    if (!InBaseWaterOverride && !TopologyPlans.IsEmpty())
+    {
+        Base = nullptr;
+        for (const auto& Candidate : TopologyPlans)
+        {
+            if (Candidate && InWorldX >= Candidate->CoreMin.X && InWorldY >= Candidate->CoreMin.Y &&
+                InWorldX < Candidate->CoreMax.X && InWorldY < Candidate->CoreMax.Y)
+            { Base = Candidate.Get(); break; }
+        }
+
+
+        if (!Base) return false;
+    }
+    if (InBaseWaterOverride) Result = *InBaseWaterOverride;
+    else Base->SampleBaseWater(InWorldX, InWorldY, InOriginalGround, Result);
+    FVoxelHydrologyInfluence River;
+    bool bHasRiver = false;
+    if (TopologyPlan || !TopologyPlans.IsEmpty())
+    {
+        for (const TSharedPtr<const FVoxelHydrologyRiverComponent, ESPMode::ThreadSafe>& Component : RiverComponents)
+        {
+            if (!Component)
+            {
+                continue;
+            }
+            FVoxelHydrologyInfluence Candidate;
+            if (!Component->Sample(InWorldX, InWorldY, InOriginalGround, Candidate))
+            {
+                continue;
+            }
+            const bool bCandidateReceiver = Candidate.bLake || Candidate.bOcean;
+            const bool bCurrentReceiver = River.bLake || River.bOcean;
+            if (!bHasRiver || (bCandidateReceiver && !bCurrentReceiver) ||
+                (bCandidateReceiver && bCurrentReceiver && Candidate.SurfaceWaterZ > River.SurfaceWaterZ) ||
+                (!bCandidateReceiver && !bCurrentReceiver && (Candidate.RiverDistanceCells < River.RiverDistanceCells ||
+                    (Candidate.RiverDistanceCells == River.RiverDistanceCells && Candidate.RiverId < River.RiverId))))
+            {
+                River = Candidate;
+                bHasRiver = true;
+            }
+        }
+    }
+    else
+    {
+        bHasRiver = SampleRiverInfluence(InWorldX, InWorldY, InOriginalGround, River);
+    }
+    if (bHasRiver)
+    {
+        if (!Result.bOcean && !Result.bLake)
+        {
+            const bool bCoast = Result.bCoast;
+            Result = River;
+            Result.bCoast = bCoast;
+        }
+        else
+        {
+            Result.RiverId = River.RiverId;
+            Result.RiverDistanceCells = River.RiverDistanceCells;
+            Result.BankDistanceCells = River.BankDistanceCells;
+            Result.SignedWetEdgeDistanceCells = River.SignedWetEdgeDistanceCells;
+            Result.RiverWaterPlane = River.RiverWaterPlane;
+            Result.FloodplainStrengthQ15 = River.FloodplainStrengthQ15;
+        }
+    }
+    if (!Result.bOcean && !Result.bLake && !Result.bRiver && !Result.bCoast && Result.GroundOverrideZ == MIN_int32)
+    {
+        return false;
+    }
+    OutInfluence = Result;
+    return true;
+}
+
+bool FVoxelHydrologyPlan::SampleBaseWater(int32 InWorldX, int32 InWorldY, int32 InOriginalGround, FVoxelHydrologyInfluence& OutInfluence) const
 {
 	if (!VoxelGeneration::IsWorldCell(InWorldX) || !VoxelGeneration::IsWorldCell(InWorldY) ||
 		Grid.CellSize <= 0 ||
@@ -1137,9 +1227,24 @@ bool FVoxelHydrologyPlan::Sample(
 		Result.bOcean = false;
 	}
 
+	OutInfluence = Result;
+	return Result.bOcean || Result.bLake || Result.bCoast;
+}
+
+bool FVoxelHydrologyPlan::SampleRiverInfluence(int32 InWorldX, int32 InWorldY, int32 InOriginalGround, FVoxelHydrologyInfluence& OutInfluence) const
+{
+    if (!VoxelGeneration::IsWorldCell(InWorldX) || !VoxelGeneration::IsWorldCell(InWorldY) || Grid.CellSize <= 0)
+    {
+        return false;
+    }
+    const FIntPoint WorldHydrologyCell(
+        VoxelGeneration::FloorDivide(InWorldX, Grid.CellSize),
+        VoxelGeneration::FloorDivide(InWorldY, Grid.CellSize));
+    FVoxelHydrologyInfluence Result;
 	int32 BestDistance =
 		MAX_int32;
 	int32 BestBankExtent = 0;
+    int32 BestWetExtent = 0;
 	int32 BestShoreExtent = 0;
 	FVoxelStableId BestRiverId;
 
@@ -1186,87 +1291,22 @@ bool FVoxelHydrologyPlan::Sample(
 				River.MeanderPoints[
 					Ref.ShapePointIndex];
 
-			const int64 ABX =
-				static_cast<int64>(
-					B.Position.X) -
-				A.Position.X;
-
-			const int64 ABY =
-				static_cast<int64>(
-					B.Position.Y) -
-				A.Position.Y;
-
-			const int64 APX =
-				static_cast<int64>(
-					Sample.X) -
-				A.Position.X;
-
-			const int64 APY =
-				static_cast<int64>(
-					Sample.Y) -
-				A.Position.Y;
-
-			const double LengthSquared = double(ABX) * ABX + double(ABY) * ABY;
-
-			const double Alpha = LengthSquared > 0.0 ? FMath::Clamp(
-				(double(APX) * ABX + double(APY) * ABY) / LengthSquared, 0.0, 1.0) : 0.0;
-			const int32 AlphaQ16 = int32(Alpha * 65536.0);
-			// Q16 只插值内容属性；超长段不能用量化 Alpha 求几何最近点。
-			const double DX = FMath::Abs(double(APX) - double(ABX) * Alpha);
-			const double DY = FMath::Abs(double(APY) - double(ABY) * Alpha);
-			const int32 Distance = int32(FMath::Min(double(MAX_int32),
-				FMath::Max(DX, DY) + FMath::Min(DX, DY) * 3.0 / 8.0));
-
-			if (Distance >=
-				BestDistance)
-			{
-				continue;
-			}
-
-			auto Blend = [AlphaQ16](const int32 First, const int32 Second)
-			{
-				return int32(int64(First) + (int64(Second) - First) * AlphaQ16 / 65536);
-			};
-			const int32 WaterZ = Blend(A.WaterZ, B.WaterZ);
-
-			FVoxelRiverShape Shape;
-
-			Shape.BedHalfWidth = Blend(A.BedHalfWidth, B.BedHalfWidth);
-			Shape.WaterHalfWidth = Blend(A.WaterHalfWidth, B.WaterHalfWidth);
-			Shape.Depth = Blend(A.Depth, B.Depth);
-			Shape.BankWidth = Blend(A.BankWidth, B.BankWidth);
-			Shape.ShoreWidth = Blend(A.ShoreWidth, B.ShoreWidth);
-			const int32 Curvature = AlphaQ16 < 32768 ? A.Curvature : B.Curvature;
-			const double Side = double(ABX) * APY - double(ABY) * APX;
-			if (Curvature != 0 && Side != 0)
-			{
-				if ((Curvature > 0 && Side < 0) ||
-					(Curvature < 0 && Side > 0))
-				{
-					const int32 Shift = FMath::Min(Shape.ShoreWidth - 1,
-						FMath::Max(1, Shape.BankWidth / 5));
-					Shape.BankWidth += Shift;
-					Shape.ShoreWidth -= Shift;
-				}
-				else
-				{
-					const int32 Shift = FMath::Min(Shape.BankWidth - 1,
-						FMath::Max(1, Shape.BankWidth / 10));
-					Shape.BankWidth -= Shift;
-					Shape.ShoreWidth += Shift;
-				}
-			}
-
-			Shape.MaxCutFill =
-				FMath::Max(
-					64,
-					Shape.Depth * 4);
+            FVoxelRiverProjection Projection;
+            if (!VoxelHydrology::ProjectRiverSegment(A, B, Sample, Projection) ||
+                Projection.DistanceCells >= BestDistance ||
+                (bCompleteRiverIndex && Projection.DistanceCells > Projection.Shape.WaterHalfWidth+Projection.Shape.BankWidth+Projection.Shape.ShoreWidth))
+            {
+                continue;
+            }
+            const int32 Distance = Projection.DistanceCells;
+            const int32 WaterZ = Projection.WaterPlane;
+            const FVoxelRiverShape& Shape = Projection.Shape;
 
 			FVoxelRiverSection Section;
 			FString Error;
 
 			if (VoxelHydrology::
-				EvaluateRiverSection(
+				EvaluateCertifiedRiverSection(
 					InOriginalGround,
 					WaterZ,
 					Distance,
@@ -1274,9 +1314,11 @@ bool FVoxelHydrologyPlan::Sample(
 					Section,
 					Error))
 			{
+                if (bCompleteRiverIndex) Section.GroundPlane = FMath::Min(InOriginalGround,Section.GroundPlane);
 				BestDistance =
 					Distance;
 				BestBankExtent = Shape.WaterHalfWidth + Shape.BankWidth;
+                BestWetExtent = Shape.WaterHalfWidth;
 				BestShoreExtent = BestBankExtent + Shape.ShoreWidth;
 				BestRiverId = River.Id;
 
@@ -1292,6 +1334,8 @@ bool FVoxelHydrologyPlan::Sample(
 		Result.RiverId = BestRiverId;
 		Result.RiverDistanceCells = BestDistance;
 		Result.BankDistanceCells = FMath::Max(0, BestDistance - BestBankExtent);
+        Result.SignedWetEdgeDistanceCells = BestDistance - BestWetExtent;
+        Result.RiverWaterPlane = BestSection.WaterPlane;
 		Result.FloodplainStrengthQ15 = BestDistance <= BestBankExtent ?
 			32767 : static_cast<int32>(
 				static_cast<int64>(FMath::Max(0, BestShoreExtent - BestDistance)) *
@@ -1339,6 +1383,9 @@ uint64 FVoxelHydrologyPlan::GetAllocatedBytes() const
 		VoxelGenerationAllocation::AllocatedBytes(Drainage.Parent) +
 		VoxelGenerationAllocation::AllocatedBytes(Drainage.SettledOrder) +
 		VoxelGenerationAllocation::AllocatedBytes(Drainage.Accumulation) +
+		VoxelGenerationAllocation::AllocatedBytes(SelectedRiverCells) +
+		VoxelGenerationAllocation::AllocatedBytes(RiverComponents) +
+        VoxelGenerationAllocation::AllocatedBytes(TopologyPlans) +
 		VoxelGenerationAllocation::AllocatedBytes(Rivers) +
 		VoxelGenerationAllocation::AllocatedBytes(Lakes) +
 		VoxelGenerationAllocation::AllocatedBytes(Waterfalls) +
@@ -1368,4 +1415,98 @@ uint64 FVoxelHydrologyPlan::GetAllocatedBytes() const
 	}
 
 	return Bytes;
+}
+
+void FVoxelHydrologyPlan::VisitHydrologyLeases(TFunctionRef<void(const FVoxelTerrainResourceLease*)> InVisit) const
+{
+    if (ResourceLease)
+    {
+        InVisit(ResourceLease.Get());
+    }
+    if (TopologyPlan) TopologyPlan->VisitHydrologyLeases(InVisit);
+    for (const auto& Topology : TopologyPlans)
+        if (Topology && Topology != TopologyPlan) Topology->VisitHydrologyLeases(InVisit);
+    for (const TSharedPtr<const FVoxelHydrologyRiverComponent, ESPMode::ThreadSafe>& Component : RiverComponents)
+    {
+        if (Component)
+        {
+            if (Component->ResourceLease)
+            {
+                InVisit(Component->ResourceLease.Get());
+            }
+            Component->Plan.VisitHydrologyLeases(InVisit);
+        }
+    }
+}
+
+bool FVoxelHydrologyPlan::IndexSelectedRiverCells(FString& OutError)
+{
+    const int64 Count = int64(Grid.Width) * Grid.Height;
+    if (Grid.CellSize <= 0 || Count <= 0 || Count > MAX_int32)
+    {
+        OutError = TEXT("Invalid canonical topology grid");
+        return false;
+    }
+    if (!VoxelGenerationAllocation::RetainArray(SelectedRiverCells, int32(Count), OutError))
+    {
+        return false;
+    }
+    SelectedRiverCells.Init(0, int32(Count));
+    for (const FVoxelRiverRoute& River : Rivers)
+    {
+        for (const FVoxelRiverRoutePoint& Point : River.Points)
+        {
+            const FIntPoint Cell(VoxelGeneration::FloorDivide(Point.Position.X, Grid.CellSize),
+                VoxelGeneration::FloorDivide(Point.Position.Y, Grid.CellSize));
+            const FIntPoint Local = Cell - Grid.WorldMinCell;
+            if (Local.X >= 0 && Local.Y >= 0 && Local.X < Grid.Width && Local.Y < Grid.Height)
+            {
+                SelectedRiverCells[Grid.ToIndex(Local.X, Local.Y)] = 1;
+            }
+        }
+    }
+    OutError.Reset();
+    return true;
+}
+
+bool FVoxelHydrologyPlan::HasSelectedRiverCell(const FIntPoint& InCell) const
+{
+    const FIntPoint Local = InCell - Grid.WorldMinCell;
+    if (Grid.CellSize <= 0 || Local.X < 0 || Local.Y < 0 || Local.X >= Grid.Width || Local.Y >= Grid.Height)
+    {
+        return false;
+    }
+    if (SelectedRiverCells.Num() == int64(Grid.Width) * Grid.Height)
+    {
+        return SelectedRiverCells[Grid.ToIndex(Local.X, Local.Y)] != 0;
+    }
+    for (const FVoxelRiverRoute& River : Rivers)
+    {
+        for (const FVoxelRiverRoutePoint& Point : River.Points)
+        {
+            if (VoxelGeneration::FloorDivide(Point.Position.X, Grid.CellSize) == InCell.X &&
+                VoxelGeneration::FloorDivide(Point.Position.Y, Grid.CellSize) == InCell.Y)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void VoxelHydrology::ApplyInfluenceToColumn(const FVoxelHydrologyInfluence& Influence, FVoxelColumnSample& Column)
+{
+    if (Influence.GroundOverrideZ != MIN_int32) Column.SurfaceZ = Influence.GroundOverrideZ;
+    Column.SurfaceWaterZ = Influence.SurfaceWaterZ;
+    Column.RiverDistanceCells = Influence.RiverDistanceCells;
+    Column.BankDistanceCells = Influence.BankDistanceCells;
+    Column.SignedWetEdgeDistanceCells = Influence.SignedWetEdgeDistanceCells;
+    Column.RiverWaterPlane = Influence.RiverWaterPlane;
+    Column.FloodplainStrengthQ15 = Influence.FloodplainStrengthQ15;
+    Column.RiverId = Influence.RiverId;
+    Column.RiverZone = Influence.RiverZone;
+    Column.bRiver = Influence.bRiver;
+    Column.bLake = Influence.bLake;
+    Column.bOcean = Influence.bOcean;
+    Column.bCoast = Influence.bCoast;
 }

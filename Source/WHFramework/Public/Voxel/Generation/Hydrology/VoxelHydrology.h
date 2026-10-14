@@ -1,6 +1,7 @@
 #pragma once
 
 class FVoxelTerrainResourceLease;
+struct FVoxelHydrologyRiverComponent;
 
 #include "CoreMinimal.h"
 #include "Containers/Array.h"
@@ -99,6 +100,7 @@ struct WHFRAMEWORK_API FVoxelRiverShape
     int32 ShoreWidth = 8;
     int32 Depth = 8;
     int32 MaxCutFill = 64;
+    bool bWalkableMargins = false;
 };
 
 struct WHFRAMEWORK_API FVoxelRiverSection
@@ -113,6 +115,7 @@ struct WHFRAMEWORK_API FVoxelRiverSection
 
 namespace VoxelHydrology
 {
+    constexpr int32 CoverageSide = 64;
     WHFRAMEWORK_API bool BuildDrainage(
         const FVoxelDrainageInput& InInput,
         FVoxelDrainageResult& OutResult,
@@ -212,6 +215,7 @@ struct WHFRAMEWORK_API FVoxelRiverMeanderPoint
     uint64 Accumulation = 0;
     int32 MeanderOffset = 0;
     int32 Curvature = 0;
+    bool bWalkableMargins = false;
 };
 
 struct WHFRAMEWORK_API FVoxelRiverRoute
@@ -260,6 +264,8 @@ struct WHFRAMEWORK_API FVoxelHydrologyInfluence
     int32 GroundOverrideZ = MIN_int32;
 	int32 RiverDistanceCells = MAX_int32;
 	int32 BankDistanceCells = MAX_int32;
+    int32 SignedWetEdgeDistanceCells = MAX_int32;
+    int32 RiverWaterPlane = MIN_int32;
 	int32 FloodplainStrengthQ15 = 0;
 	FVoxelStableId RiverId;
 	EVoxelRiverSurfaceZone RiverZone = EVoxelRiverSurfaceZone::None;
@@ -270,10 +276,20 @@ struct WHFRAMEWORK_API FVoxelHydrologyInfluence
     bool bCoast = false;
 };
 
+namespace VoxelHydrology
+{
+    WHFRAMEWORK_API void ApplyInfluenceToColumn(const FVoxelHydrologyInfluence& InInfluence,
+        FVoxelColumnSample& InOutColumn);
+}
+
 struct WHFRAMEWORK_API FVoxelHydrologyPlan
 {
 	// 原正文 grant 的共享来源；深层 backing 先析构，controller deleter 仍保活到最后 weak。
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+    TSharedPtr<const FVoxelHydrologyPlan, ESPMode::ThreadSafe> TopologyPlan;
+    TArray<TSharedPtr<const FVoxelHydrologyPlan, ESPMode::ThreadSafe>> TopologyPlans;
+    TArray<TSharedPtr<const FVoxelHydrologyRiverComponent, ESPMode::ThreadSafe>> RiverComponents;
+    bool bCompleteRiverIndex = false;
     FVoxelHydrologyRegionKey Key;
     int32 RiverShapeSmoothingPasses = 1;
     int32 RiverSeed = 0;
@@ -297,21 +313,32 @@ struct WHFRAMEWORK_API FVoxelHydrologyPlan
 	TArray<FVoxelWaterfallSemantic> Waterfalls;
 
 	bool Finalize(FString& OutError, const TAtomic<bool>* InCancel = nullptr);
+	bool IndexSelectedRiverCells(FString& OutError);
+	bool HasSelectedRiverCell(const FIntPoint& InCell) const;
+	void VisitHydrologyLeases(TFunctionRef<void(const FVoxelTerrainResourceLease*)> InVisit) const;
+	bool BuildGeometry(FString& OutError, const TAtomic<bool>* InCancel = nullptr);
+	bool BuildSpatialIndex(FString& OutError, const TAtomic<bool>* InCancel = nullptr);
+	bool SampleBaseWater(int32 InWorldX, int32 InWorldY, int32 InOriginalGround, FVoxelHydrologyInfluence& OutInfluence) const;
+	bool SampleRiverInfluence(int32 InWorldX, int32 InWorldY, int32 InOriginalGround, FVoxelHydrologyInfluence& OutInfluence) const;
 #if WITH_DEV_AUTOMATION_TESTS
 	void Finalize();
 #endif
 	bool ValidateRiverRoutes(FString& OutError) const;
+    bool ValidateRiverRoutePoint(int32 RiverIndex, int32 PointIndex, FString& OutError) const;
 
     bool Sample(
         int32 InWorldX,
         int32 InWorldY,
         int32 InOriginalGround,
-        FVoxelHydrologyInfluence& OutInfluence) const;
+        FVoxelHydrologyInfluence& OutInfluence,
+        const FVoxelHydrologyInfluence* InBaseWaterOverride = nullptr) const;
 
 	/** 仅持有的 native heap backing；root、共享控制器与退休任务由 Cache 构建路径授予。 */
 	uint64 GetAllocatedBytes() const;
 
 private:
+    friend class FVoxelHydrologyComponentBuild;
+	TArray<uint8> SelectedRiverCells;
 	TMap<
 		FIntPoint,
 		int32>

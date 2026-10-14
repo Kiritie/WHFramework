@@ -469,8 +469,8 @@ bool FVoxelGenerationPipeline::QueryReadyWaterfalls(
 	FVoxelGenerationWorkspace Workspace(Resources, Consumer,
 		RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes);
 	TArray<FVoxelWaterfallSemantic> Waterfalls;
-	const auto First = FVoxelGenerationQuery::HydrologyKeyForVoxel(InMin.X, InMin.Y, Config->Recipe->Settings);
-	const auto Last = FVoxelGenerationQuery::HydrologyKeyForVoxel(InMax.X, InMax.Y, Config->Recipe->Settings);
+	const auto First = FVoxelGenerationQuery::HydrologyKeyForVoxel(InMin.X, InMin.Y, Config->Recipe->Settings, Config->Recipe->AlgorithmVersion);
+	const auto Last = FVoxelGenerationQuery::HydrologyKeyForVoxel(InMax.X, InMax.Y, Config->Recipe->Settings, Config->Recipe->AlgorithmVersion);
 	for (int64 Y = First.Coordinate.Y; Y <= Last.Coordinate.Y; ++Y)
 	{
 		for (int64 X = First.Coordinate.X; X <= Last.Coordinate.X; ++X)

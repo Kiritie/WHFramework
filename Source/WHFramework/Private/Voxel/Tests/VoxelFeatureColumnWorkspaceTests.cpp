@@ -38,7 +38,7 @@ namespace
 			if (!Context.SampleColumn(Context.CandidateAnchor, Column)) return false;
 			if (MaintenanceCache && Mode == 0)
 			{
-				const auto Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(Context.CandidateAnchor.X, Context.CandidateAnchor.Y, Context.Recipe->Settings);
+				const auto Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(Context.CandidateAnchor.X, Context.CandidateAnchor.Y, Context.Recipe->Settings, Context.Recipe->AlgorithmVersion);
 				FVoxelHydrologyPlanPtr Before, After;
 				Test.TestTrue(TEXT("Actual natural sampling publishes its original hydrology dependency"), MaintenanceCache->FindHydrology(Key, Before));
 				for (int32 Shard = 0; Shard < FVoxelGenerationPlanCache::ShardCount; ++Shard) MaintenanceCache->TickMaintenance(4096);

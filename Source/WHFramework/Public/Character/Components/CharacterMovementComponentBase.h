@@ -89,6 +89,15 @@ private:
 	void PhysClimbing(float InDeltaSeconds, int32 InIterations);
 	void PhysWater(float InDeltaSeconds, int32 InIterations, bool bInFloat);
 	void MoveWithCollision(float InDeltaSeconds);
+	enum class EWaterExitStepResult : uint8
+	{
+		None,
+		Rejected,
+		Waiting,
+		Stepped
+	};
+	EWaterExitStepResult TryWaterExitStep(const FVector& InRemainingDelta, const FHitResult& InHit);
+	void MoveWaterWithCollision(float InDeltaSeconds);
 	FBox MakeMovementBounds(const FVector& InLocation) const;
 
 	TWeakObjectPtr<UObject> EnvironmentProvider;

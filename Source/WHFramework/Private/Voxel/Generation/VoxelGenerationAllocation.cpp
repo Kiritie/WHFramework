@@ -226,7 +226,8 @@ FVoxelGenerationAllocationScope::FVoxelGenerationAllocationScope(
 	const FVoxelGenerationConsumerKey& InConsumer,
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InWorkingLease,
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InResidentReservation,
-	const uint64 InRootBytes)
+	const uint64 InRootBytes,
+	const uint64 InRetainedBytes)
 	: Previous(ActiveScopeSlot())
 	, Resources(MoveTemp(InResources))
 	, Consumer(InConsumer)
@@ -241,7 +242,9 @@ FVoxelGenerationAllocationScope::FVoxelGenerationAllocationScope(
 		!WorkingLease->IsOwnedBy(*Resources) || !ResidentReservation->IsOwnedBy(*Resources) ||
 		WorkingLease->GetPool() != EVoxelTerrainResourcePool::Working ||
 		ResidentReservation->GetPool() != EVoxelTerrainResourcePool::Resident ||
-		WorkingLease->Bytes() != RootBytes || ResidentReservation->Bytes() != RootBytes))
+		InRetainedBytes > MAX_uint64 - RootBytes ||
+		WorkingLease->Bytes() != RootBytes + InRetainedBytes ||
+		ResidentReservation->Bytes() != RootBytes + InRetainedBytes))
 	{
 		FCString::Strncpy(Error, TEXT("InvalidAllocationScope: native body requires original complete reservations"), UE_ARRAY_COUNT(Error));
 	}

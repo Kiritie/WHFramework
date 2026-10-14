@@ -2,6 +2,7 @@
 
 #include "Character/Components/CharacterMovementEnvironmentInterface.h"
 #include "Components/CapsuleComponent.h"
+#include "Engine/ScopedMovementUpdate.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PhysicsVolume.h"
 #include "GameFramework/RootMotionSource.h"
@@ -639,6 +640,213 @@ void UCharacterMovementComponentBase::MoveWithCollision(float InDeltaSeconds)
 	}
 }
 
+UCharacterMovementComponentBase::EWaterExitStepResult UCharacterMovementComponentBase::TryWaterExitStep(
+	const FVector& InRemainingDelta, const FHitResult& InHit)
+{
+	ICharacterMovementEnvironmentInterface* Provider = GetEnvironmentProvider();
+	const UCapsuleComponent* Capsule = CharacterOwner ? CharacterOwner->GetCapsuleComponent() : nullptr;
+	const FCharacterMovementConstraint Constraint = GetSimulationConstraint();
+	const FVector HorizontalDelta(InRemainingDelta.X, InRemainingDelta.Y, 0.0);
+	const FVector HorizontalInput(Acceleration.X, Acceleration.Y, 0.0);
+	if (!HasValidData() || !Provider || !Capsule || UpdatedPrimitive != Capsule ||
+		!UpdatedPrimitive->IsQueryCollisionEnabled() || !CharacterOwner->GetActorEnableCollision() ||
+		CharacterOwner->GetLocalRole() == ROLE_SimulatedProxy || bWaitingForTerrain ||
+		(MovementMode != MOVE_Swimming && !IsFloating()) || Constraint.bBlockMovement ||
+		Constraint.Traversal != ECharacterTraversalMode::None || Environment.Result != ECharacterWorldQueryResult::Ready ||
+		!Environment.bBodyInWater || Environment.bHeadUnderWater ||
+		HasAnimRootMotion() || CurrentRootMotion.HasOverrideVelocity() ||
+		!GetGravityDirection().Equals(FVector(0.0, 0.0, -1.0), KINDA_SMALL_NUMBER) ||
+		!FMath::IsFinite(MaxStepHeight) || MaxStepHeight <= 0.f ||
+		!FMath::IsFinite(PerchAdditionalHeight) ||
+		!FMath::IsFinite(Capsule->GetScaledCapsuleHalfHeight()) || Capsule->GetScaledCapsuleHalfHeight() <= 0.f ||
+		InRemainingDelta.ContainsNaN() || HorizontalInput.ContainsNaN() ||
+		HorizontalDelta.IsNearlyZero() || HorizontalInput.IsNearlyZero() ||
+		!InHit.IsValidBlockingHit() || InHit.bStartPenetrating || InHit.Time >= 1.f ||
+		!InHit.GetComponent() || InHit.ImpactNormal.ContainsNaN() || FMath::Abs(InHit.ImpactNormal.Z) >= 0.35f ||
+		FVector::DotProduct(HorizontalInput.GetSafeNormal(), HorizontalDelta.GetSafeNormal()) <= 0.f ||
+		FVector::DotProduct(HorizontalInput.GetSafeNormal(), InHit.ImpactNormal) >= -KINDA_SMALL_NUMBER ||
+		FVector::DotProduct(HorizontalDelta.GetSafeNormal(), InHit.ImpactNormal) >= -KINDA_SMALL_NUMBER ||
+		!CanStepUp(InHit))
+	{
+		return EWaterExitStepResult::Rejected;
+	}
+
+	const FVector Start = UpdatedComponent->GetComponentLocation();
+	const FVector SavedVelocity = Velocity;
+	const FFindFloorResult SavedFloor = CurrentFloor;
+	const bool bSavedJustTeleported = bJustTeleported;
+	const float StepBudget = MaxStepHeight;
+	const FVector Up(0.0, 0.0, StepBudget);
+
+
+	FBox PathBounds = MakeMovementBounds(Start);
+	PathBounds += MakeMovementBounds(Start + Up);
+	PathBounds += MakeMovementBounds(Start + Up + HorizontalDelta);
+	PathBounds += MakeMovementBounds(Start + HorizontalDelta);
+	if (Provider->QueryMovementCoverage(PathBounds) != ECharacterWorldQueryResult::Ready)
+	{
+		bWaitingForTerrain = true;
+		return EWaterExitStepResult::Waiting;
+	}
+
+	FScopedMovementUpdate ScopedMove(UpdatedComponent, EScopedUpdate::DeferredUpdates);
+	auto Reject = [&]()
+	{
+		const bool bWait = bWaitingForTerrain;
+		ScopedMove.RevertMove();
+		Velocity = SavedVelocity;
+		CurrentFloor = SavedFloor;
+		bJustTeleported = bSavedJustTeleported;
+
+		bWaitingForTerrain = bWait;
+		return bWait ? EWaterExitStepResult::Waiting : EWaterExitStepResult::Rejected;
+	};
+	const FQuat Rotation = UpdatedComponent->GetComponentQuat();
+	FHitResult UpHit;
+
+
+	MoveUpdatedComponent(Up, Rotation, true, &UpHit);
+	if (bWaitingForTerrain || UpHit.bBlockingHit || UpHit.bStartPenetrating ||
+		!UpdatedComponent->GetComponentLocation().Equals(Start + Up, KINDA_SMALL_NUMBER))
+	{
+		return Reject();
+	}
+	FHitResult ForwardHit;
+	MoveUpdatedComponent(HorizontalDelta, Rotation, true, &ForwardHit);
+	if (bWaitingForTerrain || ForwardHit.bBlockingHit || ForwardHit.bStartPenetrating ||
+		!UpdatedComponent->GetComponentLocation().Equals(Start + Up + HorizontalDelta, KINDA_SMALL_NUMBER))
+	{
+		return Reject();
+	}
+	FHitResult DownHit;
+	MoveUpdatedComponent(-Up, Rotation, true, &DownHit);
+	if (bWaitingForTerrain || !DownHit.IsValidBlockingHit() || DownHit.bStartPenetrating ||
+		!DownHit.GetComponent() || !IsWalkable(DownHit) || !CanStepUp(DownHit))
+	{
+		return Reject();
+	}
+	const FVector CandidateLocation = UpdatedComponent->GetComponentLocation();
+	const double Rise = CandidateLocation.Z - Start.Z;
+	if (CandidateLocation.ContainsNaN() || Rise < 0.0 || Rise > StepBudget)
+	{
+		return Reject();
+	}
+
+	const double FloorReach = 2.0 * Capsule->GetScaledCapsuleHalfHeight() +
+		2.0 * StepBudget + 2.0 * MAX_FLOOR_DIST + FMath::Max(0.f, PerchAdditionalHeight);
+	if (!FMath::IsFinite(FloorReach))
+	{
+		return Reject();
+	}
+	FBox FloorBounds = MakeMovementBounds(CandidateLocation);
+	FloorBounds += MakeMovementBounds(CandidateLocation - FVector(0.0, 0.0, FloorReach));
+	if (Provider->QueryMovementCoverage(FloorBounds) != ECharacterWorldQueryResult::Ready)
+	{
+		bWaitingForTerrain = true;
+		return Reject();
+	}
+	FFindFloorResult CandidateFloor;
+	FindFloor(CandidateLocation, CandidateFloor, false, &DownHit);
+	if (!CandidateFloor.IsWalkableFloor() || !CandidateFloor.HitResult.IsValidBlockingHit() ||
+		CandidateFloor.HitResult.bStartPenetrating || !CanStepUp(CandidateFloor.HitResult) ||
+		!FMath::IsFinite(CandidateFloor.GetDistanceToFloor()) ||
+		CandidateFloor.GetDistanceToFloor() < 0.f || CandidateFloor.GetDistanceToFloor() > MAX_FLOOR_DIST)
+	{
+		return Reject();
+	}
+	const FCharacterMovementEnvironment CandidateEnvironment = Provider->SampleMovementEnvironment(CandidateLocation);
+	if (CandidateEnvironment.Result != ECharacterWorldQueryResult::Ready ||
+		CandidateEnvironment.WorldEpoch != Environment.WorldEpoch)
+	{
+		bWaitingForTerrain = true;
+		return Reject();
+	}
+	if (CandidateEnvironment.bHeadUnderWater)
+	{
+		return Reject();
+	}
+
+
+	Environment = CandidateEnvironment;
+	return EWaterExitStepResult::Stepped;
+}
+
+void UCharacterMovementComponentBase::MoveWaterWithCollision(float InDeltaSeconds)
+{
+	const FVector PreviousLocation = UpdatedComponent->GetComponentLocation();
+	const FVector PreviousVelocity = Velocity;
+	FVector Delta = Velocity * InDeltaSeconds;
+	float ImpactTime = InDeltaSeconds;
+	FHitResult Hit;
+	SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, Hit);
+
+	const FCharacterMovementConstraint Constraint = GetSimulationConstraint();
+	const FVector HorizontalInput(Acceleration.X, Acceleration.Y, 0.0);
+	if (Hit.IsValidBlockingHit() && Hit.GetComponent() && !bWaitingForTerrain && Delta.Z < 0.0 &&
+		GetGravityDirection().Equals(FVector(0.0, 0.0, -1.0), KINDA_SMALL_NUMBER) &&
+		Environment.bBodyInWater && !Environment.bHeadUnderWater &&
+		!Constraint.bBlockMovement && Constraint.Traversal == ECharacterTraversalMode::None &&
+		!HorizontalInput.IsNearlyZero() &&
+		FVector::DotProduct(HorizontalInput, FVector(Delta.X, Delta.Y, 0.0)) > 0.0 &&
+		Hit.ImpactNormal.Z > 1.f - KINDA_SMALL_NUMBER && IsWalkable(Hit) &&
+		!HasAnimRootMotion() && !CurrentRootMotion.HasOverrideVelocity())
+	{
+		const float RemainingFraction = 1.f - Hit.Time;
+		HandleImpact(Hit, InDeltaSeconds, Delta);
+		if (!HasValidData() || bWaitingForTerrain ||
+			(MovementMode != MOVE_Swimming && !IsFloating()))
+		{
+			return;
+		}
+		Delta = FVector(Delta.X, Delta.Y, 0.0) * RemainingFraction;
+		ImpactTime *= RemainingFraction;
+		Hit = FHitResult();
+		SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, Hit);
+	}
+	bool bStepped = false;
+	if (Hit.IsValidBlockingHit() && !bWaitingForTerrain)
+	{
+
+
+		const EWaterExitStepResult Result = TryWaterExitStep(Delta * (1.f - Hit.Time), Hit);
+
+		if (!HasValidData() || (MovementMode != MOVE_Swimming && !IsFloating()))
+		{
+			return;
+		}
+		if (Result == EWaterExitStepResult::Waiting)
+		{
+			Velocity = PreviousVelocity;
+			return;
+		}
+		bStepped = Result == EWaterExitStepResult::Stepped;
+		if (!bStepped)
+		{
+			HandleImpact(Hit, ImpactTime, Delta);
+			SlideAlongSurface(Delta, 1.f - Hit.Time, Hit.Normal, Hit, true);
+		}
+	}
+	if (bWaitingForTerrain)
+	{
+		Velocity = PreviousVelocity;
+		return;
+	}
+	if (!bJustTeleported && InDeltaSeconds >= MIN_TICK_TIME && !HasAnimRootMotion() && !CurrentRootMotion.HasOverrideVelocity())
+	{
+		Velocity = (UpdatedComponent->GetComponentLocation() - PreviousLocation) / InDeltaSeconds;
+	}
+	if (bStepped)
+	{
+
+
+		Velocity.Z = 0.0;
+		if (!Environment.bBodyInWater && !Environment.bHeadUnderWater)
+		{
+			SetMovementMode(MOVE_Falling);
+		}
+	}
+}
+
 void UCharacterMovementComponentBase::PhysClimbing(float InDeltaSeconds, int32 InIterations)
 {
 	if (InDeltaSeconds < MIN_TICK_TIME || !HasValidData())
@@ -700,7 +908,7 @@ void UCharacterMovementComponentBase::PhysWater(float InDeltaSeconds, int32 InIt
 		}
 	}
 	ApplyRootMotionToVelocity(InDeltaSeconds);
-	MoveWithCollision(InDeltaSeconds);
+	MoveWaterWithCollision(InDeltaSeconds);
 }
 
 FBox UCharacterMovementComponentBase::MakeMovementBounds(const FVector& InLocation) const

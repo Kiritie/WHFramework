@@ -432,13 +432,17 @@ bool FVoxelMapTileCache::ReservePendingStorage(const int32 InRequired, FString& 
 int32 FVoxelMapTileCache::SelectBatchRows(const FVoxelMapTileKey& InKey, const FIntPoint& InOrigin,
 	const int32 InStartRow) const
 {
+	if (Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion)
+	{
+		return 1;
+	}
 	const auto& Settings = Config->Recipe->Settings;
 	int32 UniqueColumns = 0;
 	int32 PreviousX = 0;
 	for (int32 Column = 0; Column < TileSide; ++Column)
 	{
 		const int32 CellX = int32(int64(InOrigin.X) + int64(Column) * InKey.Step);
-		const int32 RegionX = FVoxelGenerationQuery::HydrologyKeyForVoxel(CellX, InOrigin.Y, Settings).Coordinate.X;
+		const int32 RegionX = FVoxelGenerationQuery::HydrologyKeyForVoxel(CellX, InOrigin.Y, Settings, Config->Recipe->AlgorithmVersion).Coordinate.X;
 		if (Column == 0 || RegionX != PreviousX)
 		{
 			++UniqueColumns;
@@ -451,7 +455,7 @@ int32 FVoxelMapTileCache::SelectBatchRows(const FVoxelMapTileKey& InKey, const F
 	for (int32 Row = InStartRow; Row < TileSide; ++Row)
 	{
 		const int32 CellY = int32(int64(InOrigin.Y) + int64(Row) * InKey.Step);
-		const int32 RegionY = FVoxelGenerationQuery::HydrologyKeyForVoxel(InOrigin.X, CellY, Settings).Coordinate.Y;
+		const int32 RegionY = FVoxelGenerationQuery::HydrologyKeyForVoxel(InOrigin.X, CellY, Settings, Config->Recipe->AlgorithmVersion).Coordinate.Y;
 		if (Row == InStartRow || RegionY != PreviousY)
 		{
 			if ((UniqueRows + 1) * UniqueColumns > 64)

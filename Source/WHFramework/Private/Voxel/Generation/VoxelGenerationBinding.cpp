@@ -261,7 +261,7 @@ bool FVoxelGenerationBinding::Build(const UVoxelWorldGenerationProfile& InProfil
 		OutError = TEXT("Voxel generation profile RecipeHash does not match RecipeBytes");
 		return false;
 	}
-	if (RuntimeRecipe.AlgorithmVersion != FVoxelGenerationRecipe::CurrentAlgorithmVersion)
+	if (!FVoxelGenerationRecipe::IsSupportedAlgorithmVersion(RuntimeRecipe.AlgorithmVersion))
 	{
 		OutError = TEXT("Voxel generation profile requires rebaking for the current terrain algorithm");
 		return false;

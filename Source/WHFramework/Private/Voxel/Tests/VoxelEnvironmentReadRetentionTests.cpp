@@ -76,7 +76,7 @@ bool FVoxelEnvironmentReadRetentionTest::RunTest(const FString& InParameters)
 				AddError(Error);
 				return false;
 			}
-			const auto Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(Point.X, Point.Y, Config->Recipe->Settings);
+			const auto Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(Point.X, Point.Y, Config->Recipe->Settings, Config->Recipe->AlgorithmVersion);
 			if (!Keys.Contains(Key))
 			{
 				FVoxelHydrologyPlanPtr Body;

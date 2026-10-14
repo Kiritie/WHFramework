@@ -1298,7 +1298,11 @@ bool FVoxelViewManager::IsPreparedDataCurrent(const FVoxelTaskKey& InKey) const
 void FVoxelViewManager::PrunePreparedData()
 {
 	for (auto It = PreparedEnvironmentRetentions.CreateIterator(); It; ++It)
-		if (!IsPreparedDataCurrent(It.Key())) It.RemoveCurrent();
+		if (!IsPreparedDataCurrent(It.Key()))
+		{
+			Module.ReleaseGenerationFacts(MakeCoarseGenerationConsumer(It.Key().Stamp.GeometryIdentity, It.Key().Stamp));
+			It.RemoveCurrent();
+		}
 	for (auto It = PreparedData.CreateIterator(); It; ++It)
 	{
 		if (!IsPreparedDataCurrent(It.Key()))
@@ -1848,8 +1852,6 @@ void FVoxelViewManager::RefreshTerrainBuildStage()
 		Scheduler.SetObservedTerrainStage(Stage);
 	}
 }
-
-
 
 bool FVoxelViewManager::IsAdmissionTerminalFailure(const FVoxelViewAdmission& A) const
 {
@@ -3443,6 +3445,8 @@ void FVoxelViewManager::Reset()
 			Publisher->Forget(Pair.Value);
 	}
 	PreparedData.Reset();
+	for (const auto& Entry : PreparedEnvironmentRetentions)
+		Module.ReleaseGenerationFacts(MakeCoarseGenerationConsumer(Entry.Key.Stamp.GeometryIdentity, Entry.Key.Stamp));
 	PreparedEnvironmentRetentions.Reset();
 	PreparedDataBytes = 0;
 	PendingDataBytes = 0;
@@ -4037,7 +4041,9 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewProxyEnvironment);
 		RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
-		if (!Module.EnsureEnvironmentBounds(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
+		if (!(Config->Recipe->AlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion
+			? Module.EnsureEnvironmentBounds(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)
+			: Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)).bReady)
 			return false;
 	}
 	if (bDataOnly)
@@ -4346,7 +4352,9 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	const auto EnvironmentRetention = bDataOnly ? RetainPreparedEnvironment(DataKey, *Generator, OverlayBounds) : nullptr;
 	if (bDataOnly && !EnvironmentRetention) return false;
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
-	if (bDataOnly && !Module.EnsureEnvironmentBounds(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
+	if (bDataOnly && !(Config->Recipe->AlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion
+			? Module.EnsureEnvironmentBounds(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)
+			: Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)).bReady)
 		return false;
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("ProjectOverlayPreflight"));
 	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
@@ -4658,7 +4666,9 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 	const auto EnvironmentRetention = bDataOnly ? RetainPreparedEnvironment(DataKey, *Generator, Bounds) : nullptr;
 	if (bDataOnly && !EnvironmentRetention) return false;
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
-	if (bDataOnly && !Module.EnsureEnvironmentBounds(Bounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
+	if (bDataOnly && !(Config->Recipe->AlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion
+			? Module.EnsureEnvironmentBounds(Bounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)
+			: Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)).bReady)
 		return false;
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("ProjectOverlayPreflight"));
 	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(Bounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
