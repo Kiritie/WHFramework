@@ -11,6 +11,9 @@
 #include "Voxel/Generation/Hydrology/VoxelHydrologyBucketOutlet.h"
 
 struct FVoxelGenerationRecipe;
+struct FVoxelGenerationRuntimeConfig;
+struct FVoxelHydrologyFinePlan;
+class FVoxelGenerationPlanCache;
 class FVoxelTerrainGenerator;
 
 enum class EVoxelHydrologyComponentStep : uint8
@@ -86,12 +89,16 @@ public:
     ~FVoxelHydrologyComponentBuild();
 
     EVoxelHydrologyComponentStep Advance(FTileLookup InLookup, int32 InWorkBudget,
-        FString& OutError, const TAtomic<bool>* InCancel = nullptr);
+        FString& OutError, const TAtomic<bool>* InCancel = nullptr,
+        FVoxelGenerationPlanCache* InFineCache = nullptr,
+        const TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>& InConfig = {});
+    void VisitFineSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
 
 
     void BeginFineInputStep(const TAtomic<bool>* InCancel = nullptr);
     EVoxelHydrologyClosureRead ReadCertifiedFineCell(const FIntPoint& InCell, FTileLookup InLookup,
-        FVoxelHydrologySharedCell& OutCell, FString& OutError);
+        FVoxelHydrologySharedCell& OutCell, FString& OutError,
+        FVoxelGenerationPlanCache* InCertificateCache = nullptr);
     EVoxelHydrologyClosureRead ReadFineWater(const FIntPoint& InCell, FTileLookup InLookup,
         FVoxelHydrologyReceivingVoxel& OutWater, FString& OutError);
     const TArray<FVoxelHydrologyRegionKey>& GetMissingTiles() const;
@@ -133,6 +140,10 @@ private:
 private:
     TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Recipe;
     TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> Terrain;
+    TSharedPtr<const FVoxelHydrologyFinePlan, ESPMode::ThreadSafe> PinnedFinePlan;
+    // 仅 Advance 调用栈借用；退出时清空，不跨回合持有 Cache/Config 或形成强引用环。
+    FVoxelGenerationPlanCache* ActiveFineCache = nullptr;
+    const TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>* ActiveConfig = nullptr;
     FIntPoint SeedCell = FIntPoint::ZeroValue;
     FVoxelHydrologyRoutingGrid RoutingGrid;
     FVoxelHydrologyWidthRoutingQuery WidthRouting;

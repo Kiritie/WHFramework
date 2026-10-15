@@ -15,7 +15,8 @@ namespace
 }
 
 bool FVoxelHydrologySharedSearch::Initialize(const FIntPoint& InSeed,
-    const FIntPoint& InMinimum, const FIntPoint& InMaximumInclusive, FString& OutError)
+    const FIntPoint& InMinimum, const FIntPoint& InMaximumInclusive, FString& OutError,
+    EVoxelHydrologySharedSearchPurpose InPurpose)
 {
     if (bInitialized || InMinimum.X > InMaximumInclusive.X || InMinimum.Y > InMaximumInclusive.Y ||
         InSeed.X < InMinimum.X || InSeed.Y < InMinimum.Y ||
@@ -27,6 +28,8 @@ bool FVoxelHydrologySharedSearch::Initialize(const FIntPoint& InSeed,
     Seed = InSeed;
     Minimum = InMinimum;
     Maximum = InMaximumInclusive;
+    bFineWaterOnly = InPurpose == EVoxelHydrologySharedSearchPurpose::FineWaterBody;
+    bPreferDescendingWitness = bFineWaterOnly;
     bInitialized = true;
     OutError.Reset();
     return true;
@@ -44,8 +47,78 @@ bool FVoxelHydrologySharedSearch::Neighbor(const FIntPoint& Cell, int32 InFace, 
 
 bool FVoxelHydrologySharedSearch::EventLess(const FEvent& A, const FEvent& B) const
 {
-    return A.Plane != B.Plane ? A.Plane < B.Plane :
-        SharedSearchCellLess(Cells[A.Index].Cell, Cells[B.Index].Cell);
+    if (A.Plane != B.Plane)
+    {
+        return A.Plane < B.Plane;
+    }
+    if (bPreferDescendingWitness && Cells[A.Index].GroundZ != Cells[B.Index].GroundZ)
+    {
+        return Cells[A.Index].GroundZ < Cells[B.Index].GroundZ;
+    }
+    return SharedSearchCellLess(Cells[A.Index].Cell, Cells[B.Index].Cell);
+}
+
+bool FVoxelHydrologySharedSearch::TryGetSeedDryCertificate(FVoxelHydrologySharedCell& OutCell) const
+{
+    if (Cells.IsEmpty() || Cells[0].IsReceiver() || Threshold > Cells[0].GroundZ)
+    {
+        return false;
+    }
+    // 已有通向真实湿接收体的路径，最高障碍不超过种子地面；只证明这一列为干地。
+    OutCell = ReadCell(0);
+    OutCell.SpillZ = OutCell.GroundZ;
+    OutCell.bIncluded = true;
+    OutCell.Parent = INDEX_NONE;
+    OutCell.bParentIsLocalOutlet = false;
+    return true;
+}
+
+int32 FVoxelHydrologySharedSearch::FindCellIndex(const FIntPoint& InCell) const
+{
+    check(bReady);
+    const int32* Index = ByCell.Find(InCell);
+    return Index ? *Index : INDEX_NONE;
+}
+
+int32 FVoxelHydrologySharedSearch::FCellView::Num() const
+{
+    return Search->Cells.Num();
+}
+
+FVoxelHydrologySharedCell FVoxelHydrologySharedSearch::FCellView::operator[](int32 InIndex) const
+{
+    return Search->ReadCell(InIndex);
+}
+
+const FVoxelHydrologySharedCell& FVoxelHydrologySharedSearch::GetDetails(const FSearchCell& InCell) const
+{
+    check(InCell.DetailIndex != INDEX_NONE);
+    return Details[InCell.DetailIndex];
+}
+
+FVoxelHydrologySharedCell FVoxelHydrologySharedSearch::ReadCell(int32 InIndex) const
+{
+    const FSearchCell& Cell = Cells[InIndex];
+    FVoxelHydrologySharedCell Result = Cell.DetailIndex != INDEX_NONE
+        ? GetDetails(Cell) : FVoxelHydrologySharedCell();
+    Result.Cell = Cell.Cell;
+    Result.GroundZ = Cell.GroundZ;
+    Result.RainWeight = Cell.RainWeight;
+    Result.SpillZ = Cell.SpillZ;
+    Result.PlateauDistance = Cell.PlateauDistance;
+    Result.Parent = Cell.Parent;
+    Result.bIncluded = Cell.bIncluded;
+    Result.bHasLocalOutlet = Cell.bHasLocalOutlet;
+    Result.bParentIsLocalOutlet = Cell.bParentIsLocalOutlet;
+    Result.bHasCertifiedDryOutlet = Cell.bHasCertifiedDryOutlet;
+    if (bFineWaterOnly && bReady && Cell.bIncluded)
+    {
+        // 首湿根确定种子最小溢流水位。仅种子、已到达干列与真实湿根带水位证明；
+        // 其它低列必须由 FineWaterQuery 的严格低水位连通闭合确认，不能冒充整图证书。
+        if (Cell.IsReceiver()) Result.SpillZ = Result.ReceiverWaterZ;
+        else if (InIndex == 0 || Cell.GroundZ >= Threshold) Result.SpillZ = FMath::Max(Cell.GroundZ, Threshold);
+    }
+    return Result;
 }
 
 bool FVoxelHydrologySharedSearch::Push(const FEvent& Event, FString& OutError)
@@ -88,8 +161,9 @@ bool FVoxelHydrologySharedSearch::Append(const FVoxelHydrologySharedCell& InCell
 {
     if (Cells.Num() == MAX_int32)
     { OutError = TEXT("Oversized: shared drainage certificate"); return false; }
-    if (Cells.Num() == Cells.Max() && !VoxelGenerationAllocation::RetainArray(Cells,
-        SharedSearchCapacity(Cells.Num() + 1, Cells.Max()), OutError)) return false;
+    if (!Cells.ReserveOne(OutError)) return false;
+    const bool bNeedsDetails = InCell.IsReceiver() || InCell.bHasLocalOutlet;
+    if (bNeedsDetails && !Details.ReserveOne(OutError)) return false;
     if (ByCell.Num() == MapCapacity)
     {
         const int32 Capacity = SharedSearchCapacity(MapCapacity + 1, MapCapacity);
@@ -100,7 +174,20 @@ bool FVoxelHydrologySharedSearch::Append(const FVoxelHydrologySharedCell& InCell
 
     if (Frontier.Num() == Frontier.Max() && !VoxelGenerationAllocation::RetainArray(Frontier,
         SharedSearchCapacity(Frontier.Num() + 1, Frontier.Max()), OutError)) return false;
-    OutIndex = Cells.Add(InCell);
+    FSearchCell Cell;
+    Cell.Cell = InCell.Cell;
+    Cell.GroundZ = InCell.GroundZ;
+    Cell.RainWeight = InCell.RainWeight;
+    Cell.SpillZ = InCell.SpillZ;
+    Cell.PlateauDistance = InCell.PlateauDistance;
+    Cell.Parent = InCell.Parent;
+    Cell.bIncluded = InCell.bIncluded;
+    Cell.bHasLocalOutlet = InCell.bHasLocalOutlet;
+    Cell.bParentIsLocalOutlet = InCell.bParentIsLocalOutlet;
+    Cell.bReceiver = InCell.IsReceiver();
+    Cell.bHasCertifiedDryOutlet = InCell.bHasCertifiedDryOutlet;
+    if (bNeedsDetails) Cell.DetailIndex = Details.Add(InCell);
+    OutIndex = Cells.Add(Cell);
     ByCell.Add(InCell.Cell, OutIndex);
     return Push(FEvent{OutIndex, InEntryPlane}, OutError);
 }
@@ -121,6 +208,16 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologySharedSearch::Advance(FReadCell I
     if (InFaceBudget <= 0) return EVoxelHydrologySharedSearchStep::Yielded;
     auto ValidateInput = [&](FVoxelHydrologySharedCell& Cell)
     {
+        if (Cell.bHasCertifiedDryOutlet && (!bFineWaterOnly || Cell.IsReceiver() || Cell.bHasLocalOutlet))
+        {
+            OutError = TEXT("Certified fine dry outlet cannot replace a wet receiver or runoff parent certificate");
+            return false;
+        }
+        if (bFineWaterOnly && Cell.bHasLocalOutlet)
+        {
+            OutError = TEXT("Fine water requires physical wet receivers, not local runoff outlets");
+            return false;
+        }
         if (Cell.GroundZ < -32768 || Cell.GroundZ > 32768 || Cell.RainWeight > 10000 ||
             (Cell.IsReceiver() && (Cell.ReceiverWaterZ < -32768 || Cell.ReceiverWaterZ > 32768 ||
              Cell.GroundZ >= Cell.ReceiverWaterZ || (Cell.ReceiverId.High == 0 && Cell.ReceiverId.Low == 0))))
@@ -170,12 +267,19 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologySharedSearch::Advance(FReadCell I
             Face = 0;
             Cells[Current].bIncluded = true;
             if (Cells[Current].bHasLocalOutlet)
-                Threshold=FMath::Min(Threshold,FMath::Max(CurrentPlane,Cells[Current].LocalOutletBarrier));
-            if (Cells[Current].IsReceiver())
+                Threshold=FMath::Min(Threshold,FMath::Max(CurrentPlane,GetDetails(Cells[Current]).LocalOutletBarrier));
+            if (Cells[Current].IsReceiver() || (bFineWaterOnly && Cells[Current].bHasCertifiedDryOutlet))
             {
                 Threshold = FMath::Min(Threshold, CurrentPlane);
                 Current = INDEX_NONE;
                 --InFaceBudget;
+                if (bFineWaterOnly)
+                {
+                    // 首真实湿根或已发布干列的真实排水路径给出精确种子水位。
+                    // 所有低于该水位的种子连通成员及其邻接边界已读完；不扩展无关同高平台。
+                    bSearchComplete = bReady = true;
+                    return EVoxelHydrologySharedSearchStep::Ready;
+                }
                 continue;
             }
         }
@@ -233,14 +337,14 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologySharedSearch::SolveCertificate(in
             Cell.bParentIsLocalOutlet=false;
             if (Cell.bIncluded && Cell.IsReceiver())
             {
-                if (!Push(FEvent{SolveCursor, Cell.ReceiverWaterZ}, OutError)) return Failure();
-                Cell.SpillZ = Cell.ReceiverWaterZ;
+                if (!Push(FEvent{SolveCursor, GetDetails(Cell).ReceiverWaterZ}, OutError)) return Failure();
+                Cell.SpillZ = GetDetails(Cell).ReceiverWaterZ;
                 Cell.PlateauDistance = 0;
             }
-            else if (Cell.bIncluded && Cell.bHasLocalOutlet && Cell.LocalOutletBarrier<=Threshold)
+            else if (Cell.bIncluded && Cell.bHasLocalOutlet && GetDetails(Cell).LocalOutletBarrier<=Threshold)
             {
-                if (!Push(FEvent{SolveCursor,Cell.LocalOutletBarrier},OutError)) return Failure();
-                Cell.SpillZ=Cell.LocalOutletBarrier;
+                if (!Push(FEvent{SolveCursor,GetDetails(Cell).LocalOutletBarrier},OutError)) return Failure();
+                Cell.SpillZ=GetDetails(Cell).LocalOutletBarrier;
             }
             ++SolveCursor;
         }
@@ -281,7 +385,7 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologySharedSearch::SolveCertificate(in
                 if (Cell.SpillZ == MAX_int32)
                 { OutError = TEXT("Shared drainage certificate has an unreachable included cell"); return Failure(); }
                 if (Cell.IsReceiver()) PlateauQueue.Add(SolveCursor);
-                else if (Cell.bHasLocalOutlet && Cell.LocalOutletBarrier==Cell.SpillZ)
+                else if (Cell.bHasLocalOutlet && GetDetails(Cell).LocalOutletBarrier==Cell.SpillZ)
                 {
                     Cell.bParentIsLocalOutlet=true; Cell.PlateauDistance=0; PlateauQueue.Add(SolveCursor);
                 }
@@ -350,7 +454,7 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologySharedSearch::SolveCertificate(in
 
 uint64 FVoxelHydrologySharedSearch::GetAllocatedBytes() const
 {
-    return VoxelGenerationAllocation::AllocatedBytes(Cells) +
+    return Cells.GetAllocatedBytes() + Details.GetAllocatedBytes() +
         VoxelGenerationAllocation::AllocatedBytes(ByCell) +
         VoxelGenerationAllocation::AllocatedBytes(Frontier) +
         VoxelGenerationAllocation::AllocatedBytes(PlateauQueue);
@@ -358,7 +462,8 @@ uint64 FVoxelHydrologySharedSearch::GetAllocatedBytes() const
 
 void FVoxelHydrologySharedSearch::FreeBacking()
 {
-    VoxelGenerationAllocation::FreeRetainedArray(Cells);
+    Cells.FreeBacking();
+    Details.FreeBacking();
     VoxelGenerationAllocation::FreeRetainedMap(ByCell);
     VoxelGenerationAllocation::FreeRetainedArray(Frontier);
     VoxelGenerationAllocation::FreeRetainedArray(PlateauQueue);
@@ -373,4 +478,6 @@ void FVoxelHydrologySharedSearch::FreeBacking()
     bInitialized = false;
     bSearchComplete = false;
     bReady = false;
+    bPreferDescendingWitness = false;
+    bFineWaterOnly = false;
 }

@@ -332,7 +332,12 @@ bool FVoxelGenerationAllocationScope::PrepareBytes(
 	if (OtherWorking > Limits.WorkingBytes || Peak > Limits.WorkingBytes - OtherWorking ||
 		OtherResident > GenerationResidentLimit(Limits) || Final > GenerationResidentLimit(Limits) - OtherResident)
 	{
-		return Fail(TEXT("Oversized: retained body or allocation peak exceeds original pool limit"), OutError);
+		TCHAR CapacityError[512];
+		FCString::Snprintf(CapacityError, UE_ARRAY_COUNT(CapacityError),
+			TEXT("Oversized: retained body or allocation peak exceeds original pool limit: current=%llu old=%llu new=%llu peak=%llu final=%llu otherWorking=%llu workingLimit=%llu otherResident=%llu residentLimit=%llu"),
+			Current, InOldBytes, InNewBytes, Peak, Final, OtherWorking, Limits.WorkingBytes,
+			OtherResident, GenerationResidentLimit(Limits));
+		return Fail(CapacityError, OutError);
 	}
 	const auto ResidentAdmission = ResidentReservation->TryResize(Final,
 		ResidentSources.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], ResidentSources.LeaseCount);

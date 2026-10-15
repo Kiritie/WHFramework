@@ -1,9 +1,13 @@
 #include "Voxel/Generation/Hydrology/VoxelHydrologyComponent.h"
 
+#include "HAL/PlatformTime.h"
+#include "Misc/ScopeExit.h"
 #include "Voxel/Generation/Terrain/VoxelTerrainGenerator.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationRecipe.h"
+#include "Voxel/Generation/VoxelGenerationPlanCache.h"
+#include "Voxel/Generation/VoxelGenerationBinding.h"
 
 namespace
 {
@@ -50,6 +54,14 @@ FVoxelHydrologyComponentBuild::FVoxelHydrologyComponentBuild(
 
 FVoxelHydrologyComponentBuild::~FVoxelHydrologyComponentBuild()
 {
+}
+
+void FVoxelHydrologyComponentBuild::VisitFineSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+{
+    if (PinnedFinePlan)
+    {
+        FVoxelGenerationRequiredSourceScope::VisitLease(PinnedFinePlan->ResourceLease.Get(), InVisit);
+    }
 }
 
 bool FVoxelHydrologyComponentBuild::AddMissingTile(const FVoxelHydrologyRegionKey& InKey, FString& OutError)
@@ -373,20 +385,34 @@ EVoxelHydrologyClosureRead FVoxelHydrologyComponentBuild::ReadRawFineCell(const 
 }
 
 EVoxelHydrologyClosureRead FVoxelHydrologyComponentBuild::ReadCertifiedFineCell(const FIntPoint& InCell,
-    FTileLookup InLookup, FVoxelHydrologySharedCell& OutCell, FString& OutError)
+    FTileLookup InLookup, FVoxelHydrologySharedCell& OutCell, FString& OutError,
+    FVoxelGenerationPlanCache* InCertificateCache)
 {
     if (ActiveCancel && ActiveCancel->Load()) { OutError = TEXT("Canceled"); return EVoxelHydrologyClosureRead::Failed; }
+    const auto PublishCell = [&](const FVoxelHydrologySharedCell& InValue)
+    {
+        OutCell = InValue;
+        if (!OutCell.IsReceiver() && InCertificateCache)
+        {
+            if (!PinnedFinePlan || !PinnedFinePlan->Contains(InCell))
+                InCertificateCache->FindFineWater(InCell, PinnedFinePlan);
+            if (PinnedFinePlan && !PinnedFinePlan->SampleWater(InCell).IsWet())
+                OutCell.bHasCertifiedDryOutlet = true;
+        }
+        OutError.Reset();
+        return EVoxelHydrologyClosureRead::Ready;
+    };
     if (const auto* Existing = CertifiedFineRoots.Find(InCell))
-    { OutCell=*Existing; OutError.Reset(); return EVoxelHydrologyClosureRead::Ready; }
+        return PublishCell(*Existing);
     FVoxelHydrologySharedCell Raw;
     const auto Read = ReadRawFineCell(InCell, InLookup, Raw, OutError);
     if (Read != EVoxelHydrologyClosureRead::Ready) return Read;
     const auto OceanId = VoxelGeneration::MakeStableId(Recipe->Settings.Seed,
         FIntVector(0, 0, Recipe->Settings.SeaLevel), 0x4F4345414E524543ull, 0);
     if (!Raw.IsReceiver() || Raw.ReceiverId == OceanId)
-    { OutCell = Raw; return EVoxelHydrologyClosureRead::Ready; }
+        return PublishCell(Raw);
     if (const auto* Existing = CertifiedFineRoots.Find(InCell))
-    { OutCell = *Existing; return EVoxelHydrologyClosureRead::Ready; }
+        return PublishCell(*Existing);
     if (!bLakeCertificateActive)
     {
         const int32 Minimum = int32(VoxelGeneration::WorldCellMin);
@@ -440,7 +466,7 @@ EVoxelHydrologyClosureRead FVoxelHydrologyComponentBuild::ReadCertifiedFineCell(
     LakeCertificate.FreeBacking();
     bLakeCertificateActive = false;
     if (const auto* Existing = CertifiedFineRoots.Find(InCell))
-    { OutCell = *Existing; OutError.Reset(); return EVoxelHydrologyClosureRead::Ready; }
+        return PublishCell(*Existing);
     OutError = TEXT("Yielded: another existing lake needs fine-shore certification");
     return EVoxelHydrologyClosureRead::Pending;
 }
@@ -449,6 +475,38 @@ EVoxelHydrologyClosureRead FVoxelHydrologyComponentBuild::ReadFineWater(const FI
     FTileLookup InLookup, FVoxelHydrologyReceivingVoxel& OutWater, FString& OutError)
 {
     if (ActiveCancel && ActiveCancel->Load()) { OutError = TEXT("Canceled"); return EVoxelHydrologyClosureRead::Failed; }
+    if (ActiveFineCache)
+    {
+        check(ActiveConfig && ActiveConfig->IsValid());
+        if (!PinnedFinePlan || !PinnedFinePlan->Contains(InCell))
+        {
+            PinnedFinePlan.Reset();
+            if (!ActiveFineCache->AdvanceFineWater(InCell, ActiveConfig->ToSharedRef(), Terrain,
+                PinnedFinePlan, OutError, ActiveCancel))
+            {
+                if (OutError.StartsWith(TEXT("Yielded")) && !OutError.StartsWith(TEXT("YieldedImmediate:")))
+                {
+                    OutError = TEXT("DependencyNotReady: shared fine water: ") + OutError;
+                }
+                return OutError.StartsWith(TEXT("Yielded")) || OutError.StartsWith(TEXT("DependencyNotReady"))
+                    ? EVoxelHydrologyClosureRead::Pending : EVoxelHydrologyClosureRead::Failed;
+            }
+        }
+        const auto Fine = PinnedFinePlan->SampleWater(InCell);
+        OutWater = FVoxelHydrologyReceivingVoxel();
+        OutWater.OriginalGroundZ = Terrain->SampleSurfaceHeight(InCell.X, InCell.Y);
+        OutWater.WaterZ = Fine.WaterZ;
+        if (Fine.bFixedWater) OutWater.BodyId = Fine.FixedId;
+        else if (Fine.bNaturalWater)
+            OutWater.BodyId = VoxelGeneration::MakeStableId(Recipe->Settings.Seed,
+                FIntVector(Fine.NaturalKey.MinimumMember.X, Fine.NaturalKey.MinimumMember.Y, Fine.NaturalKey.WaterZ),
+                0x46494E454C414B45ull, 0);
+        const auto OceanId = VoxelGeneration::MakeStableId(Recipe->Settings.Seed,
+            FIntVector(0, 0, Recipe->Settings.SeaLevel), 0x4F4345414E524543ull, 0);
+        OutWater.bOcean = Fine.bFixedWater && Fine.FixedId == OceanId;
+        OutError.Reset();
+        return EVoxelHydrologyClosureRead::Ready;
+    }
     if (const auto* Existing = FineWaterCache.Find(InCell))
     { OutWater = *Existing; OutError.Reset(); return EVoxelHydrologyClosureRead::Ready; }
     if (!bFineWaterActive)
@@ -464,7 +522,12 @@ EVoxelHydrologyClosureRead FVoxelHydrologyComponentBuild::ReadFineWater(const FI
     }
     auto Reader = [&](const FIntPoint& Cell, FVoxelHydrologySharedCell& Value, FString& Error)
     { return ReadCertifiedFineCell(Cell, InLookup, Value, Error); };
-    const auto Step = FineWaterQuery.Advance(Reader, 256, OutError, ActiveCancel);
+    auto IsOcean = [&](const FIntPoint& Cell)
+    {
+        return Terrain->SampleSurfaceHeight(Cell.X, Cell.Y) < Recipe->Settings.SeaLevel;
+    };
+    const FVoxelHydrologyFineWaterQuery::FWetHint WetHint(IsOcean);
+    const auto Step = FineWaterQuery.Advance(Reader, 256, OutError, ActiveCancel, &WetHint);
     if (Step != EVoxelHydrologyFineWaterStep::Ready)
     {
         if (Step == EVoxelHydrologyFineWaterStep::Yielded)
@@ -780,16 +843,54 @@ bool FVoxelHydrologyComponentBuild::AddNode(const FVoxelHydrologyComponentNode& 
 }
 
 EVoxelHydrologyComponentStep FVoxelHydrologyComponentBuild::Advance(FTileLookup InLookup,
-    int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel)
+    int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel,
+    FVoxelGenerationPlanCache* InFineCache,
+    const TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>& InConfig)
 {
+    if ((InFineCache != nullptr) != InConfig.IsValid())
+    {
+        OutError = TEXT("Invalid fine water cache/config context");
+        return EVoxelHydrologyComponentStep::Failed;
+    }
+    check(!ActiveFineCache && !ActiveConfig);
+    ActiveFineCache = InFineCache;
+    ActiveConfig = &InConfig;
+    ON_SCOPE_EXIT
+    {
+        ActiveFineCache = nullptr;
+        ActiveConfig = nullptr;
+    };
     ActiveCancel = InCancel;
+    ON_SCOPE_EXIT
+    {
+        static TAtomic<uint64> NextDiagnosticMilliseconds(0);
+        const uint64 Now = uint64(FPlatformTime::Seconds() * 1000.0);
+        uint64 Expected = NextDiagnosticMilliseconds.Load();
+        if (Now >= Expected && NextDiagnosticMilliseconds.CompareExchange(Expected, Now + 5000))
+        {
+            UE_LOG(LogTemp, Display,
+                TEXT("Voxel hydrology component progress: seed=(%d,%d) mapped=%d initialized=%d nodes=%d expanded=%d filtered=%d geometry=%d profiles=%d ready=%d fineActive=%d fineBytes=%llu fineCached=%d lakeActive=%d lakeBytes=%llu lakeRoots=%d widthBytes=%llu sharedActive=%d sharedBytes=%llu totalBytes=%llu error=%s"),
+                SeedCell.X, SeedCell.Y, bSeedMapped, bSeedInitialized, Nodes.Num(), ExpandIndex,
+                bNodesFiltered, bGeometryBuilt, bProfilesSolved, bReady, bFineWaterActive,
+                FineWaterQuery.GetAllocatedBytes(), FineWaterCache.Num(), bLakeCertificateActive,
+                LakeCertificate.GetAllocatedBytes(), CertifiedFineRoots.Num(), WidthRouting.GetAllocatedBytes(),
+                bSharedSearchActive, SharedSearch.GetAllocatedBytes(), GetAllocatedBytes(), *OutError);
+            if (bFineWaterActive)
+            {
+                UE_LOG(LogTemp, Display,
+                    TEXT("Voxel fine search progress: cells=%d threshold=%d stage=%d"),
+                    FineWaterQuery.GetSearchCellCount(), FineWaterQuery.GetSearchThreshold(),
+                    FineWaterQuery.GetProgressStage());
+            }
+        }
+    };
     auto Failure = [&OutError]()
     {
         if (OutError == TEXT("Canceled"))
         {
             return EVoxelHydrologyComponentStep::Canceled;
         }
-        if (OutError.StartsWith(TEXT("Yielded")))
+        if (OutError.StartsWith(TEXT("Yielded")) || OutError.StartsWith(TEXT("DependencyNotReady")))
         {
             return EVoxelHydrologyComponentStep::Yielded;
         }

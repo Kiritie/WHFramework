@@ -1821,8 +1821,8 @@ FVoxelTerrainReadinessSnapshot UVoxelModule::CaptureTerrainReadiness() const
 TMap<FName, FVoxelPlanDiagnostics> UVoxelModule::GetPlanDiagnostics() const
 {
 	TMap<FName, FVoxelPlanDiagnostics> Result;
-	const FName Names[]{TEXT("Hydrology"), TEXT("Cave"), TEXT("Structure"), TEXT("Feature"), TEXT("Ecology")};
-	for (uint8 Index = 0; Index < 5; ++Index)
+	const FName Names[]{TEXT("Hydrology"), TEXT("Cave"), TEXT("Structure"), TEXT("Feature"), TEXT("Ecology"), TEXT("FineWater")};
+	for (uint8 Index = 0; Index < UE_ARRAY_COUNT(Names); ++Index)
 	{
 		const auto Kind = static_cast<EVoxelGenerationPlanKind>(Index);
 		FVoxelPlanDiagnostics Stats = GenerationCache ? GenerationCache->GetPlanDiagnostics(Kind) : FVoxelPlanDiagnostics{};

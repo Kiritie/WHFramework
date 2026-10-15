@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Voxel/Generation/Hydrology/VoxelHydrologySharedSearch.h"
+#include "Voxel/Generation/Hydrology/VoxelHydrologyDryWitness.h"
 
 
 struct WHFRAMEWORK_API FVoxelHydrologyNaturalWaterKey
@@ -21,6 +22,19 @@ struct WHFRAMEWORK_API FVoxelHydrologyFineWaterResult
     bool IsWet() const { return bNaturalWater || bFixedWater; }
 };
 
+// 仅保留已认证干列与真实湿根的消费事实，不携带搜索图的父索引。
+struct WHFRAMEWORK_API FVoxelHydrologyFineWaterCertificate
+{
+    FIntPoint Cell = FIntPoint::ZeroValue;
+    int32 GroundZ = 0;
+    int32 SpillZ = MAX_int32;
+    int32 ReceiverWaterZ = MIN_int32;
+    FVoxelStableId ReceiverId;
+    bool bIncluded = false;
+
+    bool IsReceiver() const { return ReceiverWaterZ != MIN_int32; }
+};
+
 enum class EVoxelHydrologyFineWaterStep : uint8
 {
     None,
@@ -37,20 +51,24 @@ class WHFRAMEWORK_API FVoxelHydrologyFineWaterQuery
 {
 public:
     using FReadCell = FVoxelHydrologySharedSearch::FReadCell;
+    using FWetHint = FVoxelHydrologyDryWitness::FWetHint;
     FVoxelHydrologyFineWaterQuery() = default;
     FVoxelHydrologyFineWaterQuery(const FVoxelHydrologyFineWaterQuery&) = delete;
     FVoxelHydrologyFineWaterQuery& operator=(const FVoxelHydrologyFineWaterQuery&) = delete;
     bool Initialize(const FIntPoint& Seed, const FIntPoint& Minimum,
         const FIntPoint& MaximumInclusive, FString& OutError);
     EVoxelHydrologyFineWaterStep Advance(FReadCell ReadCertifiedFineCell, int32 WorkBudget,
-        FString& OutError, const TAtomic<bool>* Cancel = nullptr);
+        FString& OutError, const TAtomic<bool>* Cancel = nullptr, const FWetHint* WetHint = nullptr);
     bool IsReady() const { return bReady; }
+    int32 GetSearchCellCount() const { return Search.GetCellCount(); }
+    int32 GetSearchThreshold() const { return Search.GetThreshold(); }
+    int32 GetProgressStage() const { return int32(Stage) * 10 + Search.GetSolveStage(); }
     const FVoxelHydrologyFineWaterResult& GetResult() const { check(bReady); return Result; }
 
     const TArray<FIntPoint>& GetCells() const { check(bReady); return Members; }
     int32 GetMemberGround(int32 MemberIndex) const;
-    int32 GetSeedGround() const { check(bReady); return Search.GetSeedResult().GroundZ; }
-    const TArray<FVoxelHydrologySharedCell>& GetDrainageCertificate() const { check(bReady); return Search.GetCells(); }
+    int32 GetSeedGround() const { check(bReady); return SeedGround; }
+    const TArray<FVoxelHydrologyFineWaterCertificate>& GetDrainageCertificate() const { check(bReady); return Certificates; }
 
 
     TArray<FIntPoint> TakeCells() { check(bReady); return MoveTemp(Members); }
@@ -61,15 +79,19 @@ public:
     void FreeBacking();
 private:
     bool AddMember(const FIntPoint& Position, int32 CertificateIndex, FString& OutError);
+    bool AddCertificate(const FVoxelHydrologySharedCell& InCell, FString& OutError);
     FVoxelHydrologySharedSearch Search;
-    TMap<FIntPoint, int32> CertificateByCell;
+    FVoxelHydrologyDryWitness DryWitness;
+    TArray<FVoxelHydrologyFineWaterCertificate> Certificates;
     TArray<uint8> Visited;
     TArray<FIntPoint> Members;
+    TArray<int32> MemberGrounds;
     TArray<FIntPoint> SortBuffer;
+    TArray<int32> GroundSortBuffer;
     TArray<FVoxelHydrologySharedCell> FixedContacts;
     FIntPoint WorldMinimum, WorldMaximum;
     FVoxelHydrologyFineWaterResult Result;
-    int32 MapCapacity = 0;
+    int32 SeedGround = 0;
     int32 Cursor = 0;
     int32 Face = 0;
     int64 SortWidth = 1;
@@ -82,6 +104,7 @@ private:
     uint8 Stage = 0;
     bool bInitialized = false;
     bool bReady = false;
+    bool bWitnessFinished = false;
 };
 
 class WHFRAMEWORK_API FVoxelHydrologyFineWaterCoverage
