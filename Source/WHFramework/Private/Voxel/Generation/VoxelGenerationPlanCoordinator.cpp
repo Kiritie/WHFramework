@@ -1,6 +1,7 @@
 #include "Voxel/Generation/VoxelGenerationPlanCoordinator.h"
 
 #include "Misc/ScopeExit.h"
+#include "HAL/PlatformTime.h"
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
@@ -1520,12 +1521,17 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			if (!Scratch.ReserveSet(DependencyNodes, Desired.Count, Error) ||
 				!Scratch.ReserveArray(Growth, GrowthCount, Error))
 				return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
-			FVoxelGenerationRequiredSourceScope GrowthSources(&Resources.Get(), &Growth,
+			// 新租约在本段只由Growth强持，提交前未向任何其它来源暴露，也不会调整池/字节。
+			// 因此可精确累加实际Input字节和原租约数，避免第N次授额重放前N-1个来源。
+			FVoxelGenerationRequiredCapacity GrowthCapacity;
+			FVoxelGenerationRequiredSourceScope GrowthSources(&Resources.Get(), &GrowthCapacity,
 				[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
 				{
-					for (const auto& Plan : *static_cast<const TArray<FDonationGrowth>*>(Context))
-						if (Plan.Lease) FVoxelGenerationRequiredSourceScope::VisitLease(Plan.Lease.Get(), Visit);
+					const auto& Capacity = *static_cast<const FVoxelGenerationRequiredCapacity*>(Context);
+					if (Capacity.LeaseCount) Visit({Context, 0, EVoxelTerrainResourcePool::Input,
+						Capacity.Bytes[int32(EVoxelTerrainResourcePool::Input)], Capacity.LeaseCount});
 				});
+			const double DonationStarted = FPlatformTime::Seconds();
 			for (FGuid Node = Desired.Head; Node.IsValid();)
 			{
 				const auto& State = Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Node));
@@ -1549,20 +1555,41 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 							Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: generation donations and retained inputs") :
 							TEXT("InvalidRequest: generation donations")};
 					}
+					EVoxelTerrainResourcePool GrantedPool;
+					uint64 GrantedBytes = 0;
+					uint64& PrefixBytes = GrowthCapacity.Bytes[int32(EVoxelTerrainResourcePool::Input)];
+					if (!Plan.Lease->ReadCapacity(GrantedPool, GrantedBytes) || GrantedPool != EVoxelTerrainResourcePool::Input ||
+						GrantedBytes > MAX_uint64 - PrefixBytes || GrowthCapacity.LeaseCount == MAX_int32)
+						return {false, true, TEXT("CapacityUnachievable: invalid owned donation prefix")};
+					PrefixBytes += GrantedBytes;
+					++GrowthCapacity.LeaseCount;
 					Growth.Add(MoveTemp(Plan));
 				}
 				Node = State.NextDesired;
 			}
+			if (Growth.Num() >= 1024)
+				UE_LOG(LogTemp, Display, TEXT("Voxel donation preparation: dependencies=%d growth=%d inputBytes=%llu leases=%d ms=%.3f"),
+					Desired.Count, Growth.Num(), GrowthCapacity.Bytes[int32(EVoxelTerrainResourcePool::Input)],
+					GrowthCapacity.LeaseCount, (FPlatformTime::Seconds() - DonationStarted) * 1000.0);
 			if (!PrepareMap<FVoxelGenerationPlanDependency, FSubscription>(Consumer->Dependencies, Desired.Count,
 				Consumer->Capacity, Consumer->DependenciesLease, Error)) return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
 			for (auto& Plan : Growth)
 			{
+				EVoxelTerrainResourcePool GrantedPool;
+				uint64 GrantedBytes = 0;
+				uint64& PrefixBytes = GrowthCapacity.Bytes[int32(EVoxelTerrainResourcePool::Input)];
+				if (!Plan.Lease->ReadCapacity(GrantedPool, GrantedBytes) || GrantedPool != EVoxelTerrainResourcePool::Input ||
+					GrantedBytes > PrefixBytes || GrowthCapacity.LeaseCount <= 0)
+					return {false, true, TEXT("CapacityUnachievable: invalid donation ownership transfer")};
 				auto& State = Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Plan.Node));
 				State.Donations.Reserve(Plan.Capacity);
 				check(VoxelGenerationAllocation::AllocatedBytes(State.Donations) <= Plan.Lease->Bytes());
+				PrefixBytes -= GrantedBytes;
+				--GrowthCapacity.LeaseCount;
 				State.DonationsLease = MoveTemp(Plan.Lease);
 				State.DonationsCapacity = Plan.Capacity;
 			}
+			check(GrowthCapacity.LeaseCount == 0 && GrowthCapacity.Bytes[int32(EVoxelTerrainResourcePool::Input)] == 0);
 			if (!PriorityGraph.SetDependencies(Consumer->PriorityNode, DependencyNodes, Error))
 				return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
 		}

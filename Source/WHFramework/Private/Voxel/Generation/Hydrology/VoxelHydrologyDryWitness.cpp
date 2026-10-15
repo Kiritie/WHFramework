@@ -156,6 +156,15 @@ EVoxelHydrologyDryWitnessStep FVoxelHydrologyDryWitness::Advance(FReadCell InRea
     }
     if (Phase == EPhase::Proven) return EVoxelHydrologyDryWitnessStep::Proven;
     if (Phase == EPhase::Unproven) return EVoxelHydrologyDryWitnessStep::Unproven;
+    const auto ProveSeed = [this]()
+    {
+        Seed.SpillZ = Seed.GroundZ;
+        Seed.bIncluded = true;
+        Seed.Parent = INDEX_NONE;
+        Seed.bParentIsLocalOutlet = false;
+        Phase = EPhase::Proven;
+        return EVoxelHydrologyDryWitnessStep::Proven;
+    };
     while (InWorkBudget-- > 0)
     {
         if (InCancel && InCancel->Load())
@@ -180,6 +189,26 @@ EVoxelHydrologyDryWitnessStep FVoxelHydrologyDryWitness::Advance(FReadCell InRea
         }
         else if (Phase == EPhase::FindTarget)
         {
+            // 四邻接续沿用搜索的障碍界与认证终点，不依赖远处候选提示。
+            if (Face < 4)
+            {
+                const FIntPoint Direction = HydrologyWitnessDirections[Face];
+                const int64 X = int64(Seed.Cell.X) + Direction.X;
+                const int64 Y = int64(Seed.Cell.Y) + Direction.Y;
+                if (X >= Minimum.X && X <= Maximum.X && Y >= Minimum.Y && Y <= Maximum.Y)
+                {
+                    FVoxelHydrologySharedCell Value;
+                    const auto Read = InReadCell(FIntPoint(int32(X), int32(Y)), Value, OutError);
+                    if (Read == EVoxelHydrologyClosureRead::Pending) return EVoxelHydrologyDryWitnessStep::NeedInput;
+                    if (Read != EVoxelHydrologyClosureRead::Ready || !ValidateSample(Value, OutError))
+                        return HydrologyWitnessFailure(OutError);
+                    const int32 Barrier = Value.IsReceiver() ? Value.ReceiverWaterZ : Value.GroundZ;
+                    if (Barrier <= Seed.GroundZ && (Value.IsReceiver() || Value.bHasCertifiedDryOutlet))
+                        return ProveSeed();
+                }
+                ++Face;
+                continue;
+            }
             if (ProbeIndex == HydrologyWitnessProbeRings * UE_ARRAY_COUNT(HydrologyWitnessDirections))
             {
                 Phase = EPhase::Unproven;
@@ -213,12 +242,7 @@ EVoxelHydrologyDryWitnessStep FVoxelHydrologyDryWitness::Advance(FReadCell InRea
                 // 本路径每格障碍均不高于种子；已认证干列接续的真实排水路径同样满足该界。
                 if (Nodes[Current].Sample.IsReceiver() || Nodes[Current].Sample.bHasCertifiedDryOutlet)
                 {
-                    Seed.SpillZ = Seed.GroundZ;
-                    Seed.bIncluded = true;
-                    Seed.Parent = INDEX_NONE;
-                    Seed.bParentIsLocalOutlet = false;
-                    Phase = EPhase::Proven;
-                    return EVoxelHydrologyDryWitnessStep::Proven;
+                    return ProveSeed();
                 }
                 continue;
             }

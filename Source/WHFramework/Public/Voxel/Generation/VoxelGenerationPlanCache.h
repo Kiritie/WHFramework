@@ -426,6 +426,10 @@ private:
 
 		TMap<FVoxelHydrologyRegionKey, FVoxelHydrologyPlanPtr> Hydrology;
 		TMap<FIntPoint, FVoxelHydrologyFinePlanPtr> FineWater;
+        TMap<FIntPoint, FIntPoint> FineWaterDryTiles;
+        TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FineWaterDryTilesLease;
+        int32 FineWaterDryTilesCapacity = 0;
+        uint64 FineWaterDryPublications = 0;
         TMap<FIntVector, FVoxelHydrologyFineIndexLink*> FineWaterIndex;
         TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FineWaterIndexLease;
         int32 FineWaterIndexCapacity = 0;

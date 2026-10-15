@@ -18,6 +18,13 @@ namespace
 {
 	constexpr int32 GenerationPlanTileSide = 256;
 	constexpr int32 LakeAnchorSide = 64;
+    constexpr int32 FineWaterDryTileSide = FVoxelHydrologyFineWaterQuery::DryTileSide;
+
+    FIntPoint FineWaterDryTile(const FIntPoint& InCell)
+    {
+        return FIntPoint(int32(VoxelGeneration::FloorDivideWide(InCell.X, FineWaterDryTileSide)),
+            int32(VoxelGeneration::FloorDivideWide(InCell.Y, FineWaterDryTileSide)));
+    }
 	constexpr int32 MaximumControlEntries = 1 << 20;
 	constexpr int32 MaximumRetiredEntriesPerGroup = 64;
 
@@ -985,13 +992,27 @@ struct FVoxelGenerationPlanCache::FFineWaterOwner
 	FIntPoint Cell;
 	FVoxelGenerationConsumerKey Consumer;
 	uint64 Generation;
+    double CallMilliseconds = 0.0;
+    double DryClosureMilliseconds = 0.0;
+    uint64 DryClosureReads = 0;
+    int32 DryProofsBuilt = 0;
     double BuildMilliseconds = 0.0;
+    double QueryMilliseconds = 0.0;
+    double CertifiedReadMilliseconds = 0.0;
+    double HintMilliseconds = 0.0;
+    double TopologyMilliseconds = 0.0;
+    uint64 TopologyBuilds = 0;
+    uint64 AdvanceCalls = 0;
+    uint64 CertifiedReads = 0;
+    uint64 LakeWaits = 0;
+    uint64 HintSamples = 0;
 	FVoxelHydrologyFinePlan Plan;
 	int32 MissingIndex = 0;
 	int32 TileCapacity = 0;
 	int32 CopyIndex = 0;
 	int32 DryCopyIndex = 0, DryCapacity = 0;
 	bool bQueryComplete = false;
+    bool bCompactDryOutput = false;
     bool bSeekPublishedDryOutlets = false;
 	TArray<FVoxelHydrologySharedCell> ContactSortScratch;
 	int64 SortWidth = 1, SortRun = 0, SortLeft = 0, SortRight = 0, SortWrite = 0;
@@ -1996,7 +2017,7 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyPlan(const FVoxelHydrologyRegion
 			Owner->MissingTiles.Reset();
 			Owner->MissingTiles.Append(Missing);
 			Owner->MissingIndex = 0;
-			return Stop(TEXT("Yielded: hydrology component needs topology inputs"));
+			return Stop(TEXT("YieldedImmediate: hydrology component needs topology inputs"));
 		}
         if (Step == EVoxelHydrologyComponentStep::Yielded)
         {
@@ -2122,6 +2143,21 @@ bool FVoxelGenerationPlanCache::FindFineWater(const FIntPoint& InCell, FVoxelHyd
         if (const auto* Found = Shard.FineWater.Find(InCell))
         { OutPlan = *Found; RecordPlanLookup(EVoxelGenerationPlanKind::FineWater, true); return true; }
 	}
+    {
+        const FIntPoint Tile = FineWaterDryTile(InCell);
+        const auto& Shard = *PlanShards[NaturalShardIndex(Tile)];
+        FReadScopeLock Lock(Shard.Lock);
+        if (const auto* Anchor = Shard.FineWaterDryTiles.Find(Tile))
+        {
+            const auto& Plan = Shard.FineWater.FindChecked(*Anchor);
+            if (Plan->Contains(InCell))
+            {
+                OutPlan = Plan;
+                RecordPlanLookup(EVoxelGenerationPlanKind::FineWater, true);
+                return true;
+            }
+        }
+    }
 
     for (const auto& Shard : PlanShards)
     {
@@ -2152,6 +2188,16 @@ bool FVoxelGenerationPlanCache::AdvanceFineWater(const FIntPoint& InKey,
 	TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> InTerrain,
 	FVoxelHydrologyFinePlanPtr& OutPlan, FString& OutError, const TAtomic<bool>* InCancel)
 {
+    const double CallStarted = FPlatformTime::Seconds();
+    TSharedPtr<FFineWaterOwner, ESPMode::ThreadSafe> MeasuredOwner;
+    ON_SCOPE_EXIT
+    {
+        if (MeasuredOwner)
+        {
+            FWriteScopeLock Lock(PlanShards[NaturalShardIndex(InKey)]->Lock);
+            MeasuredOwner->CallMilliseconds += (FPlatformTime::Seconds() - CallStarted) * 1000.0;
+        }
+    };
 	if (InConfig->Recipe->AlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion)
 	{ OutError = TEXT("InvalidRecipe: fine water certificates require v14"); return false; }
 	if (InCancel && InCancel->Load())
@@ -2307,6 +2353,7 @@ bool FVoxelGenerationPlanCache::AdvanceFineWater(const FIntPoint& InKey,
 	}
 
 	const auto Owner = Gate->FineWaterOwner;
+    MeasuredOwner = Owner;
 	const FVoxelGenerationRequiredSource GateRoot{Gate.Get(), 0, EVoxelTerrainResourcePool::Input,
 		VoxelBoundedAllocation::WorkerSharedBytes<FBuildGate>()};
 	FVoxelGenerationRequiredSourceScope GateSource(Resources.Get(), &GateRoot,
@@ -2324,6 +2371,7 @@ bool FVoxelGenerationPlanCache::AdvanceFineWater(const FIntPoint& InKey,
 	bool bTerminal = false;
     bool bPublished = false;
     const double AdvanceStarted = FPlatformTime::Seconds();
+    ++Owner->AdvanceCalls;
 	ON_SCOPE_EXIT
 	{
         Owner->BuildMilliseconds += (FPlatformTime::Seconds() - AdvanceStarted) * 1000.0;
@@ -2351,32 +2399,53 @@ bool FVoxelGenerationPlanCache::AdvanceFineWater(const FIntPoint& InKey,
 	if (!FineAllocation.Check(OutError)) return Stop(OutError);
 	if (Owner->bCanceled.Load() || Owner->Generation != HydrologyGeneration.Load()) return Stop(TEXT("Canceled"));
 
-	if (!Owner->bReady && Owner->MissingIndex < Owner->MissingTiles.Num())
-	{
-		const auto Missing = Owner->MissingTiles[Owner->MissingIndex];
-		if (!Owner->Tiles.Contains(Missing))
-		{
-			if (Owner->Tiles.Num() == MAX_int32) return Stop(TEXT("Oversized: fine water input tiles"));
-			if (Owner->Tiles.Num() + 1 > Owner->TileCapacity)
-			{
-				const int32 Capacity = int32(FMath::Min<int64>(MAX_int32,
-					FMath::Max<int64>(Owner->Tiles.Num() + 1, FMath::Max<int64>(4, int64(Owner->TileCapacity) * 2))));
-				if (!VoxelGenerationAllocation::RetainMap(Owner->Tiles, Capacity, OutError)) return Stop(OutError);
-				Owner->TileCapacity = Capacity;
-			}
-			FVoxelHydrologyPlanPtr Tile;
-			FVoxelHydrologyGenerator Legacy(Owner->Config->Recipe.ToSharedRef(), Owner->Terrain.ToSharedRef());
-			if (!GetOrBuildHydrologyTopology(Missing, [&](FVoxelHydrologyPlan& Plan, FString& Error)
-				{ return Legacy.BuildPlan(Missing, Plan, Error, InCancel) && Plan.IndexSelectedRiverCells(Error); }, Tile, OutError, InCancel))
-			{
-				if (OutError.StartsWith(TEXT("DependencyNotReady"))) OutError = TEXT("Yielded: fine water topology input building");
-				return Stop(OutError);
-			}
-			Owner->Tiles.Add(Missing, MoveTemp(Tile));
-		}
-		++Owner->MissingIndex;
-		return Stop(TEXT("YieldedImmediate: fine water topology input advanced"));
-	}
+    if (!Owner->bReady && Owner->MissingIndex < Owner->MissingTiles.Num())
+    {
+        int32 ReadyInputs = 0;
+        while (Owner->MissingIndex < Owner->MissingTiles.Num() && ReadyInputs < 16)
+        {
+            if (Owner->bCanceled.Load() || Owner->Generation != HydrologyGeneration.Load() ||
+                bHydrologyResetting.Load() || (InCancel && InCancel->Load())) return Stop(TEXT("Canceled"));
+            const auto Missing = Owner->MissingTiles[Owner->MissingIndex];
+            bool bInputFromCache = true;
+            if (!Owner->Tiles.Contains(Missing))
+            {
+                if (Owner->Tiles.Num() == MAX_int32) return Stop(TEXT("Oversized: fine water input tiles"));
+                if (Owner->Tiles.Num() + 1 > Owner->TileCapacity)
+                {
+                    const int32 Capacity = int32(FMath::Min<int64>(MAX_int32,
+                        FMath::Max<int64>(Owner->Tiles.Num() + 1, FMath::Max<int64>(4, int64(Owner->TileCapacity) * 2))));
+                    if (!VoxelGenerationAllocation::RetainMap(Owner->Tiles, Capacity, OutError)) return Stop(OutError);
+                    Owner->TileCapacity = Capacity;
+                }
+                FVoxelHydrologyPlanPtr Tile;
+                const double TopologyStarted = FPlatformTime::Seconds();
+                bInputFromCache = FindHydrologyTopology(Missing, Tile);
+                if (!bInputFromCache)
+                {
+                    FVoxelHydrologyGenerator Legacy(Owner->Config->Recipe.ToSharedRef(), Owner->Terrain.ToSharedRef());
+                    const bool bInputReady = GetOrBuildHydrologyTopology(Missing, [&](FVoxelHydrologyPlan& Plan, FString& Error)
+                    {
+                        ++Owner->TopologyBuilds;
+                        return Legacy.BuildPlan(Missing, Plan, Error, InCancel) && Plan.IndexSelectedRiverCells(Error);
+                    }, Tile, OutError, InCancel);
+                    Owner->TopologyMilliseconds += (FPlatformTime::Seconds() - TopologyStarted) * 1000.0;
+                    if (!bInputReady)
+                    {
+                        if (OutError.StartsWith(TEXT("DependencyNotReady"))) OutError = TEXT("Yielded: fine water topology input building");
+                        return Stop(OutError);
+                    }
+                }
+                else Owner->TopologyMilliseconds += (FPlatformTime::Seconds() - TopologyStarted) * 1000.0;
+                Owner->Tiles.Add(Missing, MoveTemp(Tile));
+            }
+            ++Owner->MissingIndex;
+            ++ReadyInputs;
+            // 只合并已发布输入的钉住；实际缺失构建仍单次让出，沿用原工作片。
+            if (!bInputFromCache) break;
+        }
+        return Stop(TEXT("YieldedImmediate: fine water topology input advanced"));
+    }
 	if (!Owner->bReady && !Owner->bCopying)
 	{
 		if (!Owner->Reader)
@@ -2410,14 +2479,45 @@ bool FVoxelGenerationPlanCache::AdvanceFineWater(const FIntPoint& InKey,
 		Owner->Reader->BeginFineInputStep(InCancel);
 		const auto Lookup = [&](const FVoxelHydrologyRegionKey& Key) -> const FVoxelHydrologyPlan*
 		{ const auto* Tile = Owner->Tiles.Find(Key); return Tile ? Tile->Get() : nullptr; };
-		auto IsOcean = [&](const FIntPoint& Cell)
-		{
-			return Owner->Terrain->SampleSurfaceHeight(Cell.X, Cell.Y) < Owner->Config->Recipe->Settings.SeaLevel;
-		};
-		const FVoxelHydrologyFineWaterQuery::FWetHint WetHint(IsOcean);
-		const auto Step = Owner->bQueryComplete ? EVoxelHydrologyFineWaterStep::Ready : Owner->Query->Advance([&](const FIntPoint& Cell, FVoxelHydrologySharedCell& Raw, FString& Error)
-            { return Owner->Reader->ReadCertifiedFineCell(Cell, Lookup, Raw, Error,
-                Owner->bSeekPublishedDryOutlets ? this : nullptr); }, 256, OutError, InCancel, &WetHint);
+        auto IsOcean = [&](const FIntPoint& Cell)
+        {
+            const double Started = Owner->bSeekPublishedDryOutlets ? FPlatformTime::Seconds() : 0.0;
+            const bool bOcean = Owner->Terrain->SampleSurfaceHeight(Cell.X, Cell.Y) < Owner->Config->Recipe->Settings.SeaLevel;
+            if (Owner->bSeekPublishedDryOutlets)
+            {
+                Owner->HintMilliseconds += (FPlatformTime::Seconds() - Started) * 1000.0;
+                ++Owner->HintSamples;
+            }
+            return bOcean;
+        };
+        const FVoxelHydrologyFineWaterQuery::FWetHint WetHint(IsOcean);
+        auto ReadCertified = [&](const FIntPoint& Cell, FVoxelHydrologySharedCell& Raw, FString& Error)
+        {
+            const double Started = Owner->bSeekPublishedDryOutlets ? FPlatformTime::Seconds() : 0.0;
+            const auto Status = Owner->Reader->ReadCertifiedFineCell(Cell, Lookup, Raw, Error,
+                Owner->bSeekPublishedDryOutlets ? this : nullptr);
+            if (Owner->bSeekPublishedDryOutlets)
+            {
+                Owner->CertifiedReadMilliseconds += (FPlatformTime::Seconds() - Started) * 1000.0;
+                ++Owner->CertifiedReads;
+                if (Error.Contains(TEXT("lake"))) ++Owner->LakeWaits;
+            }
+            return Status;
+        };
+        auto ReadOriginal = [&](const FIntPoint& Cell, FVoxelHydrologySharedCell& Raw, FString& Error)
+        {
+            const double Started = FPlatformTime::Seconds();
+            const auto Status = Owner->Reader->ReadRawFineCell(Cell, Lookup, Raw, Error);
+            Owner->DryClosureMilliseconds += (FPlatformTime::Seconds() - Started) * 1000.0;
+            ++Owner->DryClosureReads;
+            return Status;
+        };
+        const double QueryStarted = FPlatformTime::Seconds();
+        auto Step = Owner->bQueryComplete ? EVoxelHydrologyFineWaterStep::Ready :
+            Owner->Query->Advance(ReadCertified, 256, OutError, InCancel, &WetHint);
+        if (Step == EVoxelHydrologyFineWaterStep::Ready)
+            Step = Owner->Query->ExpandCertifiedDryTile(ReadOriginal, 256, OutError, InCancel);
+        Owner->QueryMilliseconds += (FPlatformTime::Seconds() - QueryStarted) * 1000.0;
         {
             static TAtomic<uint64> NextFineDiagnosticMilliseconds(0);
             const uint64 Now = uint64(FPlatformTime::Seconds() * 1000.0);
@@ -2436,7 +2536,7 @@ bool FVoxelGenerationPlanCache::AdvanceFineWater(const FIntPoint& InKey,
 			if (Missing.IsEmpty()) return Stop(TEXT("FineWaterConflict: pending fine certificate has no topology request"));
 			if (!VoxelGenerationAllocation::RetainArray(Owner->MissingTiles, Missing.Num(), OutError)) return Stop(OutError);
 			Owner->MissingTiles.Reset(); Owner->MissingTiles.Append(Missing); Owner->MissingIndex = 0;
-			return Stop(TEXT("Yielded: fine water certificate needs topology"));
+			return Stop(TEXT("YieldedImmediate: fine water certificate needs topology"));
 		}
 		if (Step == EVoxelHydrologyFineWaterStep::Yielded) return Stop(TEXT("YieldedImmediate: fine water certificate advanced"));
 		if (Step == EVoxelHydrologyFineWaterStep::CapacityBlocked) return Stop(OutError.IsEmpty() ? TEXT("CapacityBlocked: fine water certificate") : OutError);
@@ -2473,6 +2573,7 @@ bool FVoxelGenerationPlanCache::AdvanceFineWater(const FIntPoint& InKey,
             ++Owner->DryCopyIndex;
         }
         if (Owner->DryCopyIndex < Drainage.Num()) return Stop(TEXT("YieldedImmediate: certified dry transfer"));
+        Owner->DryProofsBuilt = Owner->Plan.CertifiedDry.Num();
 		Owner->Plan.Water = Owner->Query->GetResult();
 		Owner->Plan.Key = Owner->Plan.Water.bNaturalWater ? Owner->Plan.Water.NaturalKey.MinimumMember : InKey;
 		Owner->Plan.Minimum = Owner->Plan.Maximum = Owner->Plan.Key;
@@ -2483,6 +2584,16 @@ bool FVoxelGenerationPlanCache::AdvanceFineWater(const FIntPoint& InKey,
 		const uint64 Before = Owner->GetAllocatedBytes();
 		Owner->Plan.Members = Owner->Query->TakeCells();
 		Owner->Plan.FixedContacts = Owner->Query->TakeFixedContacts();
+        Owner->bCompactDryOutput = !Owner->Plan.Water.IsWet() && Owner->Plan.Members.IsEmpty() &&
+            Owner->Plan.FixedContacts.IsEmpty() && Owner->Plan.CertifiedDry.Num() > 0 &&
+            Owner->Plan.CertifiedDry.Num() <= FineWaterDryTileSide * FineWaterDryTileSide &&
+            Owner->Plan.CertifiedDry.Contains(InKey);
+        if (Owner->bCompactDryOutput)
+        {
+            const FIntPoint Tile = FineWaterDryTile(InKey);
+            for (const FIntPoint& Cell : Owner->Plan.CertifiedDry)
+                if (FineWaterDryTile(Cell) != Tile) { Owner->bCompactDryOutput = false; break; }
+        }
 		Owner->Reader.Reset(); Owner->Query.Reset();
 		FineAllocation.ReleaseRetainedBytes(Before - Owner->GetAllocatedBytes());
 		VoxelGenerationAllocation::FreeRetainedMap(Owner->Tiles);
@@ -2551,18 +2662,56 @@ bool FVoxelGenerationPlanCache::AdvanceFineWater(const FIntPoint& InKey,
 		VoxelGenerationAllocation::FreeRetainedArray(Owner->ContactSortScratch);
 		Owner->bReady = true;
 	}
-	if (!FineAllocation.ValidateRetainedBytes(Owner->GetAllocatedBytes(), OutError)) return Stop(OutError);
-	FVoxelHydrologyFinePlanPtr ExistingOutput;
-	const int32 InputShardIndex = NaturalShardIndex(InKey);
-	const int32 OutputShardIndex = NaturalShardIndex(Owner->Plan.Key);
-	FPlanShard& OutputShard = *PlanShards[OutputShardIndex];
-	{
-		FReadScopeLock Lock(OutputShard.Lock);
-		if (const auto* Existing = OutputShard.FineWater.Find(Owner->Plan.Key)) ExistingOutput = *Existing;
-	}
-
-	if (ExistingOutput && !ExistingOutput->HasEquivalentOutput(Owner->Plan))
-		return Stop(TEXT("FineWaterConflict: independent fine certificates differ"));
+    const FIntPoint DryTile = FineWaterDryTile(InKey);
+    FVoxelHydrologyFinePlanPtr ExistingOutput;
+    const int32 InputShardIndex = NaturalShardIndex(InKey);
+    const int32 OutputShardIndex = NaturalShardIndex(Owner->bCompactDryOutput ? DryTile : Owner->Plan.Key);
+    FPlanShard& OutputShard = *PlanShards[OutputShardIndex];
+    {
+        FReadScopeLock Lock(OutputShard.Lock);
+        if (Owner->bCompactDryOutput)
+        {
+            const auto* Anchor = OutputShard.FineWaterDryTiles.Find(DryTile);
+            if (Anchor) ExistingOutput = OutputShard.FineWater.FindChecked(*Anchor);
+        }
+        else if (const auto* Existing = OutputShard.FineWater.Find(Owner->Plan.Key)) ExistingOutput = *Existing;
+    }
+    const FHydrologyOutputSources MergeSources{ExistingOutput, Resources.Get()};
+    FVoxelGenerationRequiredSourceScope MergeSourceScope(Resources.Get(), &MergeSources,
+        [](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+        {
+            const auto& Source = *static_cast<const FHydrologyOutputSources*>(InContext);
+            if (Source.Plan) FVoxelGenerationRequiredSourceScope::VisitLease(Source.Plan->ResourceLease.Get(), InVisit);
+        });
+    if (Owner->bCompactDryOutput)
+    {
+        Owner->Plan.Key = ExistingOutput ? ExistingOutput->Key : InKey;
+        Owner->Plan.Minimum = Owner->Plan.Maximum = Owner->Plan.Key;
+        if (ExistingOutput)
+        {
+            check(!ExistingOutput->Water.IsWet() && ExistingOutput->Members.IsEmpty() && ExistingOutput->FixedContacts.IsEmpty());
+            const int32 Required = FMath::Min(FineWaterDryTileSide * FineWaterDryTileSide,
+                ExistingOutput->CertifiedDry.Num() + Owner->Plan.CertifiedDry.Num());
+            if (Required > Owner->DryCapacity)
+            {
+                if (!VoxelGenerationAllocation::RetainSet(Owner->Plan.CertifiedDry, Required, OutError)) return Stop(OutError);
+                Owner->DryCapacity = Required;
+            }
+            for (const FIntPoint& Cell : ExistingOutput->CertifiedDry)
+            {
+                check(FineWaterDryTile(Cell) == DryTile);
+                Owner->Plan.CertifiedDry.Add(Cell);
+            }
+            Owner->Plan.IndexMinimum.X = FMath::Min(Owner->Plan.IndexMinimum.X, ExistingOutput->IndexMinimum.X);
+            Owner->Plan.IndexMinimum.Y = FMath::Min(Owner->Plan.IndexMinimum.Y, ExistingOutput->IndexMinimum.Y);
+            Owner->Plan.IndexMaximum.X = FMath::Max(Owner->Plan.IndexMaximum.X, ExistingOutput->IndexMaximum.X);
+            Owner->Plan.IndexMaximum.Y = FMath::Max(Owner->Plan.IndexMaximum.Y, ExistingOutput->IndexMaximum.Y);
+        }
+        check(Owner->Plan.CertifiedDry.Num() <= FineWaterDryTileSide * FineWaterDryTileSide);
+    }
+    else if (ExistingOutput && !ExistingOutput->HasEquivalentOutput(Owner->Plan))
+        return Stop(TEXT("FineWaterConflict: independent fine certificates differ"));
+    if (!FineAllocation.ValidateRetainedBytes(Owner->GetAllocatedBytes(), OutError)) return Stop(OutError);
 	{
 
 
@@ -2574,17 +2723,38 @@ bool FVoxelGenerationPlanCache::AdvanceFineWater(const FIntPoint& InKey,
 		if (!Current || *Current != Gate || Gate->bCompleted || Owner->bCanceled.Load() ||
 			Owner->Generation != HydrologyGeneration.Load() || bHydrologyResetting.Load() ||
 			(InCancel && InCancel->Load())) return Stop(TEXT("Canceled"));
-		FVoxelHydrologyFinePlanPtr Published;
-		if (const auto* Existing = OutputShard.FineWater.Find(Owner->Plan.Key))
+        if (Owner->bCompactDryOutput)
+        {
+            const auto* Anchor = OutputShard.FineWaterDryTiles.Find(DryTile);
+            const FVoxelHydrologyFinePlanPtr CurrentOutput = Anchor ? OutputShard.FineWater.FindChecked(*Anchor) : nullptr;
+            if (CurrentOutput != ExistingOutput) return Stop(TEXT("YieldedImmediate: certified dry aggregate changed"));
+            if (!Anchor && OutputShard.FineWater.Contains(Owner->Plan.Key))
+                return Stop(TEXT("FineWaterConflict: dry aggregate anchor occupied"));
+        }
+		else
 		{
-			if (*Existing != ExistingOutput) return Stop(TEXT("Yielded: fine water canonical competitor changed"));
-			Published = *Existing;
+			const auto* Existing = OutputShard.FineWater.Find(Owner->Plan.Key);
+			if ((Existing ? *Existing : nullptr) != ExistingOutput)
+				return Stop(TEXT("Yielded: fine water canonical competitor changed"));
+		}
+		FVoxelHydrologyFinePlanPtr Published;
+		if (!Owner->bCompactDryOutput && ExistingOutput)
+		{
+            const auto* Existing = OutputShard.FineWater.Find(Owner->Plan.Key);
+            if (!Existing || *Existing != ExistingOutput) return Stop(TEXT("Yielded: fine water canonical competitor changed"));
+            Published = *Existing;
 		}
 		else
 		{
 			if (!PrepareControlStorage(OutputShard.FineWater, OutputShard.FineWaterBuilds, OutputShard.FineWaterKeys,
-				OutputShard.FineWaterBacking, ControlBackingCapacity, 1, 0, Resources, ControlConsumer, OutError)) return Stop(OutError);
-            if (Owner->Plan.IndexMinimum != Owner->Plan.Key || Owner->Plan.IndexMaximum != Owner->Plan.Key)
+				OutputShard.FineWaterBacking, ControlBackingCapacity, ExistingOutput ? 0 : 1, 0, Resources, ControlConsumer, OutError)) return Stop(OutError);
+			if (Owner->bCompactDryOutput && !ExistingOutput && OutputShard.FineWaterDryTiles.Num() >= MaximumControlEntries)
+				return Stop(TEXT("Oversized: fine water dry tile index"));
+			if (Owner->bCompactDryOutput && !ExistingOutput &&
+                !PrepareControlMap(OutputShard.FineWaterDryTiles, OutputShard.FineWaterDryTiles.Num() + 1,
+                    OutputShard.FineWaterDryTilesCapacity, OutputShard.FineWaterDryTilesLease, ControlBackingCapacity,
+                    Resources, ControlConsumer, OutError)) return Stop(OutError);
+            if (!Owner->bCompactDryOutput && (Owner->Plan.IndexMinimum != Owner->Plan.Key || Owner->Plan.IndexMaximum != Owner->Plan.Key))
             {
                 if (OutputShard.FineWaterIndex.Num() > MaximumControlEntries - 4)
                     return Stop(TEXT("Oversized: fine water spatial buckets"));
@@ -2596,17 +2766,33 @@ bool FVoxelGenerationPlanCache::AdvanceFineWater(const FIntPoint& InKey,
 			if (Owner->BodyLease && !Owner->BodyLease->CommitReservation(Owner->ResidentReservation.ToSharedRef(),
 				CacheBodyOwner(ControlConsumer, Owner->Plan.Key))) return Stop(TEXT("CapacityBlocked: fine water publication"));
 			Published = FVoxelHydrologyFinePlanPtr(Owner, &Owner->Plan);
-			OutputShard.FineWater.Add(Owner->Plan.Key, Published); OutputShard.FineWaterKeys.Add(Owner->Plan.Key);
-            LinkFineWaterIndex(OutputShard, Owner->Plan);
+            OutputShard.FineWater.Add(Owner->Plan.Key, Published);
+            if (!ExistingOutput) OutputShard.FineWaterKeys.Add(Owner->Plan.Key);
+            if (Owner->bCompactDryOutput)
+            {
+                OutputShard.FineWaterDryTiles.Add(DryTile, Owner->Plan.Key);
+                ++OutputShard.FineWaterDryPublications;
+            }
+            else LinkFineWaterIndex(OutputShard, Owner->Plan);
 			if (Owner->BodyLease) Owner->BodyLease->MarkPublished();
+            if (!Owner->bCompactDryOutput || OutputShard.FineWaterDryPublications <= 8 ||
+                OutputShard.FineWaterDryPublications % 256 == 0)
+            {
             UE_LOG(LogTemp, Display,
-                TEXT("Voxel fine plan published: input=(%d,%d) key=(%d,%d) water=%d natural=%d fixed=%d members=%d dry=%d contacts=%d min=(%d,%d) max=(%d,%d) indexMin=(%d,%d) indexMax=(%d,%d) bytes=%llu dryReuse=%d"),
+                TEXT("Voxel fine plan published: input=(%d,%d) key=(%d,%d) water=%d natural=%d fixed=%d members=%d dry=%d contacts=%d min=(%d,%d) max=(%d,%d) indexMin=(%d,%d) indexMax=(%d,%d) bytes=%llu dryReuse=%d ownerMs=%.3f queryMs=%.3f certifiedReadMs=%.3f certifiedReads=%llu lakeWaits=%llu hintMs=%.3f hints=%llu advances=%llu topologyMs=%.3f topologyBuilds=%llu compactDry=%d dryPublications=%llu callMs=%.3f dryBuilt=%d dryClosureReads=%llu dryClosureMs=%.3f"),
                 InKey.X, InKey.Y, Owner->Plan.Key.X, Owner->Plan.Key.Y, Owner->Plan.Water.WaterZ,
                 Owner->Plan.Water.bNaturalWater, Owner->Plan.Water.bFixedWater, Owner->Plan.Members.Num(),
                 Owner->Plan.CertifiedDry.Num(), Owner->Plan.FixedContacts.Num(),
                 Owner->Plan.Minimum.X, Owner->Plan.Minimum.Y, Owner->Plan.Maximum.X, Owner->Plan.Maximum.Y,
                 Owner->Plan.IndexMinimum.X, Owner->Plan.IndexMinimum.Y, Owner->Plan.IndexMaximum.X, Owner->Plan.IndexMaximum.Y,
-                Owner->Plan.GetAllocatedBytes(), Owner->bSeekPublishedDryOutlets);
+                Owner->Plan.GetAllocatedBytes(), Owner->bSeekPublishedDryOutlets,
+                Owner->BuildMilliseconds + (FPlatformTime::Seconds() - AdvanceStarted) * 1000.0,
+                Owner->QueryMilliseconds, Owner->CertifiedReadMilliseconds, Owner->CertifiedReads,
+                Owner->LakeWaits, Owner->HintMilliseconds, Owner->HintSamples, Owner->AdvanceCalls,
+                Owner->TopologyMilliseconds, Owner->TopologyBuilds, Owner->bCompactDryOutput, OutputShard.FineWaterDryPublications,
+                Owner->CallMilliseconds + (FPlatformTime::Seconds() - CallStarted) * 1000.0,
+                Owner->DryProofsBuilt, Owner->DryClosureReads, Owner->DryClosureMilliseconds);
+            }
 		}
 		CompleteBuildGate(*Gate, Published, FString()); Shard.FineWaterBuilds.Remove(InKey);
 		OutPlan = Published;
@@ -3428,14 +3614,47 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 				};
 				for (const auto& Point : Retention.Points) if (Intersects(Point)) return true;
 				for (auto* Lease = TaskRetentionHead; Lease; Lease = Lease->Next) if (Intersects(Lease->Point)) return true;
+                const FIntPoint Tile = FineWaterDryTile(Key);
+                if (const auto* Anchor = Shard.FineWaterDryTiles.Find(Tile); Anchor && *Anchor == Key)
+                    Shard.FineWaterDryTiles.Remove(Tile);
                 UnlinkFineWaterIndex(Shard, Plan);
 				return false;
 			});
 
-		bRetirementLimited |= !TrimMapBudgeted(
-			Shard.HydrologyTopology, Shard.HydrologyTopologyKeys, Shard.HydrologyTopologyCursor,
-			TopologyBudget, RetiredTopology,
-			[](const FVoxelHydrologyRegionKey&) { return true; }, true);
+        bRetirementLimited |= !TrimMapBudgeted(
+            Shard.HydrologyTopology, Shard.HydrologyTopologyKeys, Shard.HydrologyTopologyCursor,
+            TopologyBudget, RetiredTopology,
+            [this, &Shard, bNaturalCapacityPressure](const FVoxelHydrologyRegionKey& Key)
+            {
+                const auto* Cached = Shard.HydrologyTopology.Find(Key);
+                if (!Cached) return false;
+                if (!Cached->IsUnique()) return true;
+                if (bNaturalCapacityPressure) return false;
+                const auto& Grid = (*Cached)->Grid;
+                if (Grid.CellSize <= 0 || Grid.Width <= 0 || Grid.Height <= 0) return false;
+                const int64 MinimumX = FMath::Max<int64>(VoxelGeneration::WorldCellMin,
+                    int64(Grid.WorldMinCell.X) * Grid.CellSize);
+                const int64 MinimumY = FMath::Max<int64>(VoxelGeneration::WorldCellMin,
+                    int64(Grid.WorldMinCell.Y) * Grid.CellSize);
+                const int64 MaximumX = FMath::Min<int64>(VoxelGeneration::WorldCellMaxExclusive - 1,
+                    (int64(Grid.WorldMinCell.X) + Grid.Width) * Grid.CellSize - 1);
+                const int64 MaximumY = FMath::Min<int64>(VoxelGeneration::WorldCellMaxExclusive - 1,
+                    (int64(Grid.WorldMinCell.Y) + Grid.Height) * Grid.CellSize - 1);
+                if (MinimumX > MaximumX || MinimumY > MaximumY) return false;
+                // 沿已发布拓扑的真实格域保留，不能把外部引用短暂清空当作任务已结束。
+                const auto Intersects = [&](const FVoxelGenerationCacheRetentionPoint& Point)
+                {
+                    const int64 Radius = Point.HydrologyRadiusCells;
+                    return Radius >= 0 && MinimumX <= int64(Point.Center.X) + Radius &&
+                        MaximumX >= int64(Point.Center.X) - Radius &&
+                        MinimumY <= int64(Point.Center.Y) + Radius &&
+                        MaximumY >= int64(Point.Center.Y) - Radius;
+                };
+                for (const auto& Point : Retention.Points) if (Intersects(Point)) return true;
+                for (auto* Lease = TaskRetentionHead; Lease; Lease = Lease->Next)
+                    if (Intersects(Lease->Point)) return true;
+                return false;
+            });
 
 		bRetirementLimited |= !TrimMapBudgeted(
 			Shard.RiverComponents, Shard.RiverComponentKeys, Shard.RiverComponentCursor,
@@ -3591,6 +3810,8 @@ void FVoxelGenerationPlanCache::Reset()
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RetiredFineWaterLease;
             TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RetiredFineIndexLease;
             TMap<FIntVector, FVoxelHydrologyFineIndexLink*> RetiredFineIndex;
+            TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RetiredFineDryLease;
+            TMap<FIntPoint, FIntPoint> RetiredFineDryTiles;
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RetiredFineWaterBuildsLease;
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RetiredHydrologyBuildsLease;
 			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RetiredTopologyLease;
@@ -3645,6 +3866,11 @@ void FVoxelGenerationPlanCache::Reset()
                 ControlBackingCapacity.Replace(Shard.FineWaterIndexLease.Get(), nullptr);
                 RetiredFineIndexLease = MoveTemp(Shard.FineWaterIndexLease);
                 Shard.FineWaterIndexCapacity = 0; Shard.FineWaterIndexLevels = 0;
+                RetiredFineDryTiles = MoveTemp(Shard.FineWaterDryTiles);
+                ControlBackingCapacity.Replace(Shard.FineWaterDryTilesLease.Get(), nullptr);
+                RetiredFineDryLease = MoveTemp(Shard.FineWaterDryTilesLease);
+                Shard.FineWaterDryTilesCapacity = 0;
+                Shard.FineWaterDryPublications = 0;
 				RetiredTopology = MoveTemp(Shard.HydrologyTopology);
 				RetiredComponents = MoveTemp(Shard.RiverComponents);
 				RetiredCaves = MoveTemp(Shard.Caves);
@@ -3815,6 +4041,7 @@ uint64 FVoxelGenerationPlanCache::GetAllocatedBytes() const
 			Bytes +=
 				Shard.Hydrology.GetAllocatedSize() +
 				Shard.FineWater.GetAllocatedSize() + Shard.FineWaterKeys.GetAllocatedSize() + Shard.FineWaterIndex.GetAllocatedSize() +
+                Shard.FineWaterDryTiles.GetAllocatedSize() +
 				Shard.HydrologyTopology.GetAllocatedSize() +
 				Shard.HydrologyTopologyKeys.GetAllocatedSize() +
 				Shard.RiverComponents.GetAllocatedSize() +

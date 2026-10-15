@@ -1,6 +1,7 @@
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "HAL/PlatformTime.h"
 
 FVoxelGenerationAllocationScope*& FVoxelGenerationAllocationScope::ActiveScopeSlot()
 {
@@ -22,6 +23,16 @@ FVoxelGenerationRequiredSourceScope*& FVoxelGenerationRequiredSourceScope::Activ
 
 namespace
 {
+	// 64位双射只用于本次计量的索引分布；相等判断仍使用原serial/object完整身份。
+	uint64 GenerationSourceHash(uint64 Value)
+	{
+		Value ^= Value >> 33;
+		Value *= 0xff51afd7ed558ccdull;
+		Value ^= Value >> 33;
+		Value *= 0xc4ceb9fe1a85ec53ull;
+		return Value ^ (Value >> 33);
+	}
+
 	uint64 GenerationResidentLimit(const FVoxelTerrainResourceLimits& InLimits)
 	{
 		return InLimits.ResidentBytes - InLimits.OverlapBytes;
@@ -134,8 +145,13 @@ bool FVoxelGenerationRequiredSourceScope::MeasureSources(TFunctionRef<void(FVisi
 	int32 PendingCount = 1;
 	FVoxelGenerationRequiredCapacity Capacity;
 	bool bValid = true;
+	uint64 References = 0, Probes = 0;
+	uint32 Passes = 0;
+	const double Started = FPlatformTime::Seconds();
+	double NextDiagnostic = Started + 5.0;
 	while (PendingCount > 0 && bValid)
 	{
+		++Passes;
 		const FPartition Partition = Pending[--PendingCount];
 		FMemory::Memzero(Identities.GetData(), Identities.Num() * sizeof(FVoxelGenerationSourceIdentity));
 		uint32 Tracked = 0;
@@ -144,6 +160,16 @@ bool FVoxelGenerationRequiredSourceScope::MeasureSources(TFunctionRef<void(FVisi
 		const uint64 Mask = Partition.Bits == 64 ? MAX_uint64 : (uint64(1) << Partition.Bits) - 1;
 		InEnumerate([&](const FVoxelGenerationRequiredSource& InSource)
 		{
+			if ((++References & 65535) == 0)
+			{
+				const double Now = FPlatformTime::Seconds();
+				if (Now >= NextDiagnostic)
+				{
+					NextDiagnostic = Now + 5.0;
+					UE_LOG(LogTemp, Warning, TEXT("Voxel source measurement slow: seconds=%.3f references=%llu probes=%llu passes=%u bits=%u kind=%u tracked=%u slots=%u pending=%d"),
+						Now - Started, References, Probes, Passes, uint32(Partition.Bits), uint32(Partition.Kind), Tracked, SlotCount, PendingCount);
+				}
+			}
 			if (!bValid || (InSource.Serial && InSource.Serial == InExcludedSerial)) return;
 			if ((!InSource.Serial && !InSource.Object) || InSource.Pool >= EVoxelTerrainResourcePool::Count || InSource.LeaseCount < 0)
 			{
@@ -152,10 +178,13 @@ bool FVoxelGenerationRequiredSourceScope::MeasureSources(TFunctionRef<void(FVisi
 			}
 			if (Partition.Kind && bool(InSource.Serial) != (Partition.Kind == 1)) return;
 			const uint64 Key = InSource.Serial ? InSource.Serial : uint64(reinterpret_cast<UPTRINT>(InSource.Object));
-			if ((Key & Mask) != Partition.Prefix) return;
-			uint32 Slot = (InSource.Serial ? GetTypeHash(InSource.Serial) : PointerHash(InSource.Object)) & (SlotCount - 1);
+			const uint64 Hash = GenerationSourceHash(Key ^ (InSource.Serial ? 0x53455249414cull : 0x4f424a454354ull));
+			if ((Hash & Mask) != Partition.Prefix) return;
+			// 再混合后取槽位，避免分区固定的低位把连续serial挤到相同探测链。
+			uint32 Slot = uint32(GenerationSourceHash(Hash ^ 0x9e3779b97f4a7c15ull)) & (SlotCount - 1);
 			for (uint32 Probe = 0; Probe < SlotCount; ++Probe, Slot = (Slot + 1) & (SlotCount - 1))
 			{
+				++Probes;
 				auto& Identity = Identities[Slot];
 				if (!Identity.Serial && !Identity.Object)
 				{

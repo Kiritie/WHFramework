@@ -1,10 +1,21 @@
 #include "Voxel/Generation/Hydrology/VoxelHydrologyLakeCertificate.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
+#include "HAL/PlatformTime.h"
+#include "Voxel/Generation/VoxelGenerationMath.h"
 
 namespace
 {
     int32 LakeCertificateCapacity(int32 Required, int32 Existing)
     { return int32(FMath::Min<int64>(MAX_int32, FMath::Max<int64>(Required, FMath::Max<int64>(16, int64(Existing) * 2)))); }
+
+    void LakeSeenLocation(const FIntPoint& Cell, FIntPoint& OutTile, int32& OutBit)
+    {
+        OutTile = FIntPoint(VoxelGeneration::FloorDivide(Cell.X, 32), VoxelGeneration::FloorDivide(Cell.Y, 32));
+        const int32 X = int32(int64(Cell.X) - int64(OutTile.X) * 32);
+        const int32 Y = int32(int64(Cell.Y) - int64(OutTile.Y) * 32);
+        check(X >= 0 && X < 32 && Y >= 0 && Y < 32);
+        OutBit = X + Y * 32;
+    }
 }
 
 bool FVoxelHydrologyLakeCertificate::Initialize(const FVoxelHydrologySharedCell& InSeed,
@@ -31,18 +42,67 @@ bool FVoxelHydrologyLakeCertificate::Initialize(const FVoxelHydrologySharedCell&
 bool FVoxelHydrologyLakeCertificate::Append(const FVoxelHydrologySharedCell& Cell,
     bool bWet, FString& OutError)
 {
-    if (Seen.Num() == MAX_int32 || (bWet && Cells.Num() == MAX_int32))
+    if (SeenCount == MAX_int32 || (bWet && Cells.Num() == MAX_int32))
     { OutError = TEXT("Oversized: fine lake certificate"); return false; }
-    if (bWet && Cells.Num() == Cells.Max() && !VoxelGenerationAllocation::RetainArray(Cells,
-        LakeCertificateCapacity(Cells.Num() + 1, Cells.Max()), OutError)) return false;
-    if (Seen.Num() == SeenCapacity)
+    if (bWet && !Cells.ReserveOne(OutError)) return false;
+    int32 ReceiverIndex = INDEX_NONE;
+    if (bWet && Cell.IsReceiver())
     {
-        const int32 Capacity = LakeCertificateCapacity(SeenCapacity + 1, SeenCapacity);
-        if (!VoxelGenerationAllocation::RetainSet(Seen, Capacity, OutError)) return false;
-        SeenCapacity = Capacity;
+        const FReceiver Receiver{Cell.ReceiverWaterZ, Cell.ReceiverId};
+        if (const int32* Existing = ReceiverIndices.Find(Receiver)) ReceiverIndex = *Existing;
+        else
+        {
+            if (Receivers.Num() == MAX_int32)
+            { OutError = TEXT("Oversized: fine lake receiver identities"); return false; }
+            if (Receivers.Num() == ReceiverCapacity)
+            {
+                const int32 Capacity = LakeCertificateCapacity(ReceiverCapacity + 1, ReceiverCapacity);
+                if (!VoxelGenerationAllocation::RetainArray(Receivers, Capacity, OutError) ||
+                    !VoxelGenerationAllocation::RetainMap(ReceiverIndices, Capacity, OutError)) return false;
+                ReceiverCapacity = Capacity;
+            }
+            ReceiverIndex = Receivers.Add(Receiver);
+            ReceiverIndices.Add(Receiver, ReceiverIndex);
+        }
     }
-    Seen.Add(Cell.Cell);
-    if (bWet) Cells.Add(Cell);
+    if (!MarkSeen(Cell.Cell, OutError)) return false;
+    if (bWet) Cells.Add({Cell.Cell, Cell.GroundZ, ReceiverIndex});
+    return true;
+}
+
+bool FVoxelHydrologyLakeCertificate::HasSeen(const FIntPoint& InCell) const
+{
+    FIntPoint Tile;
+    int32 Bit;
+    LakeSeenLocation(InCell, Tile, Bit);
+    const int32* Page = SeenTiles.Find(Tile);
+    return Page && (SeenPages[*Page].Bits[Bit / 64] & (uint64(1) << (Bit % 64))) != 0;
+}
+
+bool FVoxelHydrologyLakeCertificate::MarkSeen(const FIntPoint& InCell, FString& OutError)
+{
+    FIntPoint Tile;
+    int32 Bit;
+    LakeSeenLocation(InCell, Tile, Bit);
+    int32 PageIndex;
+    if (const int32* Page = SeenTiles.Find(Tile)) PageIndex = *Page;
+    else
+    {
+        if (SeenTiles.Num() == SeenTileCapacity)
+        {
+            if (SeenTileCapacity == MAX_int32)
+            { OutError = TEXT("Oversized: fine lake visited tiles"); return false; }
+            const int32 Capacity = LakeCertificateCapacity(SeenTileCapacity + 1, SeenTileCapacity);
+            if (!VoxelGenerationAllocation::RetainMap(SeenTiles, Capacity, OutError)) return false;
+            SeenTileCapacity = Capacity;
+        }
+        if (!SeenPages.ReserveOne(OutError)) return false;
+        PageIndex = SeenPages.Add(FSeenTile());
+        SeenTiles.Add(Tile, PageIndex);
+    }
+    uint64& Word = SeenPages[PageIndex].Bits[Bit / 64];
+    const uint64 Mask = uint64(1) << (Bit % 64);
+    if ((Word & Mask) == 0) { Word |= Mask; ++SeenCount; }
     return true;
 }
 
@@ -69,7 +129,7 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologyLakeCertificate::Advance(FReadCel
         if (X >= Minimum.X && Y >= Minimum.Y && X <= Maximum.X && Y <= Maximum.Y)
         {
             const FIntPoint Position{int32(X), int32(Y)};
-            if (!Seen.Contains(Position))
+            if (!HasSeen(Position))
             {
                 FVoxelHydrologySharedCell Value;
                 const auto Read = InRead(Position, Value, OutError);
@@ -85,8 +145,16 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologyLakeCertificate::Advance(FReadCel
 
                 const bool bTerminal = Value.IsReceiver() &&
                     (Value.ReceiverId == OceanId || Value.ReceiverWaterZ < WaterZ);
+                // 所有已加入成员均通过严格低于水位的真实路径连通；更低受水体已足以否定这些根。
+                // 不再遍历其余湖岸，也不认证尚未访问的坐标。接受闭合湖仍必须完成全部边界。
+                if (bBelow && Value.IsReceiver() && Value.ReceiverWaterZ < WaterZ)
+                {
+                    bLowerContact = true;
+                    bReady = true;
+                    TraceState(true);
+                    return EVoxelHydrologySharedSearchStep::Ready;
+                }
                 if (!Append(Value, bBelow && !bTerminal, OutError)) return Failure();
-                if (bBelow && Value.IsReceiver() && Value.ReceiverWaterZ < WaterZ) bLowerContact = true;
                 if (bBelow && bSameBodyLevel && Value.ReceiverId < GroupId) GroupId = Value.ReceiverId;
             }
         }
@@ -95,22 +163,64 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologyLakeCertificate::Advance(FReadCel
 
 
             bOpenBoundary = true;
+            bReady = true;
+            TraceState(true);
+            return EVoxelHydrologySharedSearchStep::Ready;
         }
         if (++Face == 4) { Face = 0; ++Cursor; }
     }
-    if (Cursor < Cells.Num()) return EVoxelHydrologySharedSearchStep::Yielded;
+    if (Cursor < Cells.Num())
+    {
+        TraceState(false);
+        return EVoxelHydrologySharedSearchStep::Yielded;
+    }
     bReady = true;
+    TraceState(true);
     return EVoxelHydrologySharedSearchStep::Ready;
 }
 
+void FVoxelHydrologyLakeCertificate::TraceState(bool bComplete)
+{
+    if (Cells.Num() < 32768) return;
+    const double Now = FPlatformTime::Seconds();
+    if (!bComplete && Now - LastDiagnosticSeconds < 5.0) return;
+    LastDiagnosticSeconds = Now;
+    UE_LOG(LogTemp, Display, TEXT("Voxel lake certificate: seed=(%d,%d) water=%d cells=%d seen=%d cursor=%d face=%d lower=%d open=%d ready=%d bytes=%llu"),
+        Seed.Cell.X, Seed.Cell.Y, WaterZ, Cells.Num(), SeenCount, Cursor, Face,
+        bLowerContact, bOpenBoundary, bReady, GetAllocatedBytes());
+}
+
 uint64 FVoxelHydrologyLakeCertificate::GetAllocatedBytes() const
-{ return VoxelGenerationAllocation::AllocatedBytes(Cells) + VoxelGenerationAllocation::AllocatedBytes(Seen); }
+{
+    return Cells.GetAllocatedBytes() + SeenPages.GetAllocatedBytes() +
+        VoxelGenerationAllocation::AllocatedBytes(SeenTiles) + VoxelGenerationAllocation::AllocatedBytes(Receivers) +
+        VoxelGenerationAllocation::AllocatedBytes(ReceiverIndices);
+}
+
+FVoxelHydrologySharedCell FVoxelHydrologyLakeCertificate::FCellView::operator[](int32 InIndex) const
+{
+    const auto& Stored = Owner->Cells[InIndex];
+    FVoxelHydrologySharedCell Result;
+    Result.Cell = Stored.Cell;
+    Result.GroundZ = Stored.GroundZ;
+    if (Stored.ReceiverIndex != INDEX_NONE)
+    {
+        const auto& Receiver = Owner->Receivers[Stored.ReceiverIndex];
+        Result.ReceiverWaterZ = Receiver.WaterZ;
+        Result.ReceiverId = Receiver.Id;
+    }
+    return Result;
+}
 
 void FVoxelHydrologyLakeCertificate::FreeBacking()
 {
-    VoxelGenerationAllocation::FreeRetainedArray(Cells);
-    VoxelGenerationAllocation::FreeRetainedSet(Seen);
-    SeenCapacity = Cursor = Face = 0;
+    Cells.FreeBacking();
+    SeenPages.FreeBacking();
+    VoxelGenerationAllocation::FreeRetainedMap(SeenTiles);
+    VoxelGenerationAllocation::FreeRetainedArray(Receivers);
+    VoxelGenerationAllocation::FreeRetainedMap(ReceiverIndices);
+    SeenCount = SeenTileCapacity = ReceiverCapacity = Cursor = Face = 0;
     WaterZ = MIN_int32;
     bInitialized = bReady = bLowerContact = bOpenBoundary = false;
+    LastDiagnosticSeconds = 0.0;
 }

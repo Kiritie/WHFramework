@@ -117,6 +117,7 @@ public:
         FString& OutError);
 
 private:
+    friend class FVoxelGenerationPlanCache;
     bool InitializeRouting(FString& OutError);
     bool ReadRoutingFacts(const FIntPoint& InWorld, FTileLookup InLookup, FVoxelHydrologyComponentNode& OutNode, FString& OutError);
     EVoxelHydrologyClosureRead ReadRawFineCell(const FIntPoint& InCell, FTileLookup InLookup,
@@ -197,7 +198,14 @@ private:
     FIntPoint FineWaterSeed = FIntPoint::ZeroValue;
     bool bFineWaterActive = false;
     FVoxelHydrologyLakeCertificate LakeCertificate;
-    TMap<FIntPoint, FVoxelHydrologySharedCell> CertifiedFineRoots;
+    struct FCertifiedFineRoot
+    {
+        int32 GroundZ = 0;
+        int32 WaterZ = MIN_int32;
+        FVoxelStableId ReceiverId;
+    };
+    static_assert(sizeof(FCertifiedFineRoot) <= 24);
+    TMap<FIntPoint, FCertifiedFineRoot> CertifiedFineRoots;
     int32 FineRootCapacity = 0;
     int32 LakeCertificateCopyIndex = 0;
     bool bLakeCertificateActive = false;

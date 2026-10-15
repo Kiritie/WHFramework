@@ -403,7 +403,8 @@ bool FVoxelGenerationQuery::GetPlanKeyRanges(const FVoxelGenerationBounds& InBou
 	};
 	const int64 Margin = FMath::Max(InSettings.CaveSpacing, GenerationPlanTileSide);
 	const int64 EcologyMargin = int64(FMath::Max(0, FMath::Max(
-		InSettings.Ecology.Tree.CrownRadius, InSettings.Ecology.Grass.PatchRadius))) + 2;
+		FMath::Max(InSettings.Ecology.Tree.CrownRadius, InSettings.Ecology.Grass.PatchRadius),
+		InSettings.Ecology.Flower.PatchRadius))) + 2;
 	FVoxelGenerationPlanKeyRanges Candidate;
 	Candidate.TileMin = FIntPoint(At(int64(InBounds.Min.X) - Margin, GenerationPlanTileSide),
 		At(int64(InBounds.Min.Y) - Margin, GenerationPlanTileSide));

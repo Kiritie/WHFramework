@@ -33,6 +33,29 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologySectionCertificate::Advance(FRead
     if (Cancel && Cancel->Load()) { OutError = TEXT("Canceled"); return EVoxelHydrologySharedSearchStep::Canceled; }
     if (!bInitialized) { OutError = TEXT("Section certificate is not initialized"); return EVoxelHydrologySharedSearchStep::Failed; }
     if (bReady) return EVoxelHydrologySharedSearchStep::Ready;
+    if (WorkBudget <= 0) return EVoxelHydrologySharedSearchStep::Yielded;
+    // 固定栈缓冲仅在本次调用复用已认证采样，不跨代保存或申请额外账本容量。
+    struct FRecentSample
+    {
+        FIntPoint Cell = FIntPoint::ZeroValue;
+        FVoxelHydrologySectionSample Sample;
+        bool bValid = false;
+    };
+    FRecentSample Recent[64];
+    static_assert(sizeof(Recent) <= 4096, "Section sampling scratch must remain a bounded stack buffer");
+    auto ReadRecent = [&](const FIntPoint& Cell, FVoxelHydrologySectionSample& Out, FString& Error)
+    {
+        if (Cancel && Cancel->Load())
+        { Error = TEXT("Canceled"); return EVoxelHydrologyClosureRead::Failed; }
+        const uint32 Slot = ((uint32(Cell.X) * 73856093u) ^ (uint32(Cell.Y) * 19349663u)) & 63u;
+        auto& Entry = Recent[Slot];
+        if (Entry.bValid && Entry.Cell == Cell)
+        { Out = Entry.Sample; Error.Reset(); return EVoxelHydrologyClosureRead::Ready; }
+        const auto Status = Read(Cell, Out, Error);
+        if (Status == EVoxelHydrologyClosureRead::Ready && Out.IsValid())
+        { Entry.Cell = Cell; Entry.Sample = Out; Entry.bValid = true; }
+        return Status;
+    };
     while (Y <= Radius && WorkBudget > 0)
     {
         --WorkBudget;
@@ -51,16 +74,21 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologySectionCertificate::Advance(FRead
             else
             {
                 const FIntPoint Cell{int32(WX), int32(WY)};
-                FVoxelHydrologySectionSample Sample;
-                const auto Status = Read(Cell, Sample, OutError);
-                if (Status == EVoxelHydrologyClosureRead::Pending) return OutError == TEXT("Canceled") ? EVoxelHydrologySharedSearchStep::Canceled : OutError.StartsWith(TEXT("Yielded")) ? EVoxelHydrologySharedSearchStep::Yielded : OutError.StartsWith(TEXT("CapacityBlocked")) ? EVoxelHydrologySharedSearchStep::CapacityBlocked : EVoxelHydrologySharedSearchStep::NeedInput;
-                if (Status != EVoxelHydrologyClosureRead::Ready)
-                    return OutError == TEXT("Canceled") ? EVoxelHydrologySharedSearchStep::Canceled : OutError.StartsWith(TEXT("Yielded")) ? EVoxelHydrologySharedSearchStep::Yielded : OutError.StartsWith(TEXT("CapacityBlocked")) ? EVoxelHydrologySharedSearchStep::CapacityBlocked : EVoxelHydrologySharedSearchStep::Failed;
-                if (Sample.OriginalGround < -32768 || Sample.OriginalGround > 32768 ||
-                    (Sample.ExistingWaterZ != MIN_int32 && (Sample.ExistingWaterZ < -32768 ||
-                     Sample.ExistingWaterZ > 32768 || Sample.OriginalGround >= Sample.ExistingWaterZ ||
-                     (Sample.ExistingBodyId.High == 0 && Sample.ExistingBodyId.Low == 0))))
-                { OutError = TEXT("Invalid original terrain or receiving-water section sample"); return EVoxelHydrologySharedSearchStep::Failed; }
+                if (!bHasCurrentSample)
+                {
+                    FVoxelHydrologySectionSample Sample;
+                    const auto Status = ReadRecent(Cell, Sample, OutError);
+                    if (Status == EVoxelHydrologyClosureRead::Pending) return OutError == TEXT("Canceled") ? EVoxelHydrologySharedSearchStep::Canceled : OutError.StartsWith(TEXT("Yielded")) ? EVoxelHydrologySharedSearchStep::Yielded : OutError.StartsWith(TEXT("CapacityBlocked")) ? EVoxelHydrologySharedSearchStep::CapacityBlocked : EVoxelHydrologySharedSearchStep::NeedInput;
+                    if (Status != EVoxelHydrologyClosureRead::Ready)
+                        return OutError == TEXT("Canceled") ? EVoxelHydrologySharedSearchStep::Canceled : OutError.StartsWith(TEXT("Yielded")) ? EVoxelHydrologySharedSearchStep::Yielded : OutError.StartsWith(TEXT("CapacityBlocked")) ? EVoxelHydrologySharedSearchStep::CapacityBlocked : EVoxelHydrologySharedSearchStep::Failed;
+                    if (!Sample.IsValid())
+                    { OutError = TEXT("Invalid original terrain or receiving-water section sample"); return EVoxelHydrologySharedSearchStep::Failed; }
+                    CurrentSample = Sample;
+                    RequiredGround = Sample.OriginalGround - Shape.MaxCutFill;
+                    NextNeighbour = 0;
+                    bHasCurrentSample = true;
+                }
+                const FVoxelHydrologySectionSample& Sample = CurrentSample;
                 auto AddContact = [&](const FIntPoint& Contact, const FVoxelHydrologySectionSample& Wet)
                 {
                     if (Result.FixedWaterZ != MIN_int32 && Result.FixedWaterZ != Wet.ExistingWaterZ)
@@ -82,23 +110,20 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologySectionCertificate::Advance(FRead
                 }
                 else
                 {
-                    int32 RequiredGround = Sample.OriginalGround - Shape.MaxCutFill;
                     static const FIntPoint Directions[4] = { FIntPoint(1,0), FIntPoint(-1,0), FIntPoint(0,1), FIntPoint(0,-1) };
-                    for (const FIntPoint& Direction : Directions)
+                    for (; NextNeighbour < 4; ++NextNeighbour)
                     {
+                        const FIntPoint& Direction = Directions[NextNeighbour];
                         const int64 NX = WX + Direction.X, NY = WY + Direction.Y;
                         if (NX < WorldMinimum.X || NY < WorldMinimum.Y || NX > WorldMaximum.X || NY > WorldMaximum.Y)
                         { bOpenFootprint = true; continue; }
                         const FIntPoint Neighbour{int32(NX), int32(NY)};
                         FVoxelHydrologySectionSample Adjacent;
-                        const auto AdjacentStatus = Read(Neighbour, Adjacent, OutError);
+                        const auto AdjacentStatus = ReadRecent(Neighbour, Adjacent, OutError);
                         if (AdjacentStatus == EVoxelHydrologyClosureRead::Pending) return OutError == TEXT("Canceled") ? EVoxelHydrologySharedSearchStep::Canceled : OutError.StartsWith(TEXT("Yielded")) ? EVoxelHydrologySharedSearchStep::Yielded : OutError.StartsWith(TEXT("CapacityBlocked")) ? EVoxelHydrologySharedSearchStep::CapacityBlocked : EVoxelHydrologySharedSearchStep::NeedInput;
                         if (AdjacentStatus != EVoxelHydrologyClosureRead::Ready)
                             return OutError == TEXT("Canceled") ? EVoxelHydrologySharedSearchStep::Canceled : OutError.StartsWith(TEXT("Yielded")) ? EVoxelHydrologySharedSearchStep::Yielded : OutError.StartsWith(TEXT("CapacityBlocked")) ? EVoxelHydrologySharedSearchStep::CapacityBlocked : EVoxelHydrologySharedSearchStep::Failed;
-                        if (Adjacent.OriginalGround < -32768 || Adjacent.OriginalGround > 32768 ||
-                            (Adjacent.ExistingWaterZ != MIN_int32 && (Adjacent.ExistingWaterZ < -32768 ||
-                             Adjacent.ExistingWaterZ > 32768 || Adjacent.OriginalGround >= Adjacent.ExistingWaterZ ||
-                             (Adjacent.ExistingBodyId.High == 0 && Adjacent.ExistingBodyId.Low == 0))))
+                        if (!Adjacent.IsValid())
                         { OutError = TEXT("Invalid adjacent receiving-water sample"); return EVoxelHydrologySharedSearchStep::Failed; }
                         if (Adjacent.ExistingWaterZ == MIN_int32) continue;
 
@@ -134,6 +159,10 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologySectionCertificate::Advance(FRead
                 }
             }
         }
+        // 当前格及四邻全部认证后才提交游标，完成项不因续跑而重放。
+        bHasCurrentSample = false;
+        CurrentSample = FVoxelHydrologySectionSample();
+        RequiredGround = NextNeighbour = 0;
         if (++X > Radius) { X = -Radius; ++Y; }
     }
     if (Y <= Radius) return EVoxelHydrologySharedSearchStep::Yielded;
@@ -152,4 +181,7 @@ void FVoxelHydrologySectionCertificate::Reset()
     Result = FVoxelHydrologySectionInterval();
     bInitialized = bReady = bConflictingWater = bOpenFootprint = false;
     Radius = X = Y = MinimumWater = 0;
+    CurrentSample = FVoxelHydrologySectionSample();
+    RequiredGround = NextNeighbour = 0;
+    bHasCurrentSample = false;
 }

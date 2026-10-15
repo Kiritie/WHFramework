@@ -50,6 +50,7 @@ enum class EVoxelHydrologyFineWaterStep : uint8
 class WHFRAMEWORK_API FVoxelHydrologyFineWaterQuery
 {
 public:
+    static constexpr int32 DryTileSide = 16;
     using FReadCell = FVoxelHydrologySharedSearch::FReadCell;
     using FWetHint = FVoxelHydrologyDryWitness::FWetHint;
     FVoxelHydrologyFineWaterQuery() = default;
@@ -59,6 +60,9 @@ public:
         const FIntPoint& MaximumInclusive, FString& OutError);
     EVoxelHydrologyFineWaterStep Advance(FReadCell ReadCertifiedFineCell, int32 WorkBudget,
         FString& OutError, const TAtomic<bool>* Cancel = nullptr, const FWetHint* WetHint = nullptr);
+    // 从现有干证明沿不降的四邻路径逐格扩展；原始受水格和未证明低洼不加入。
+    EVoxelHydrologyFineWaterStep ExpandCertifiedDryTile(FReadCell ReadOriginalFineCell, int32 WorkBudget,
+        FString& OutError, const TAtomic<bool>* Cancel = nullptr);
     bool IsReady() const { return bReady; }
     int32 GetSearchCellCount() const { return Search.GetCellCount(); }
     int32 GetSearchThreshold() const { return Search.GetThreshold(); }
@@ -100,7 +104,6 @@ private:
     int64 SortRight = 0;
     int64 SortWrite = 0;
     bool bMergeStarted = false;
-    bool bSortCopy = false;
     uint8 Stage = 0;
     bool bInitialized = false;
     bool bReady = false;

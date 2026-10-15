@@ -402,8 +402,17 @@ EVoxelHydrologyClosureRead FVoxelHydrologyComponentBuild::ReadCertifiedFineCell(
         OutError.Reset();
         return EVoxelHydrologyClosureRead::Ready;
     };
+    const auto PublishRoot = [&](const FCertifiedFineRoot& InValue)
+    {
+        FVoxelHydrologySharedCell Value;
+        Value.Cell = InCell;
+        Value.GroundZ = InValue.GroundZ;
+        Value.ReceiverWaterZ = InValue.WaterZ;
+        Value.ReceiverId = InValue.ReceiverId;
+        return PublishCell(Value);
+    };
     if (const auto* Existing = CertifiedFineRoots.Find(InCell))
-        return PublishCell(*Existing);
+        return PublishRoot(*Existing);
     FVoxelHydrologySharedCell Raw;
     const auto Read = ReadRawFineCell(InCell, InLookup, Raw, OutError);
     if (Read != EVoxelHydrologyClosureRead::Ready) return Read;
@@ -412,7 +421,7 @@ EVoxelHydrologyClosureRead FVoxelHydrologyComponentBuild::ReadCertifiedFineCell(
     if (!Raw.IsReceiver() || Raw.ReceiverId == OceanId)
         return PublishCell(Raw);
     if (const auto* Existing = CertifiedFineRoots.Find(InCell))
-        return PublishCell(*Existing);
+        return PublishRoot(*Existing);
     if (!bLakeCertificateActive)
     {
         const int32 Minimum = int32(VoxelGeneration::WorldCellMin);
@@ -444,7 +453,7 @@ EVoxelHydrologyClosureRead FVoxelHydrologyComponentBuild::ReadCertifiedFineCell(
             { Certified.ReceiverWaterZ = MIN_int32; Certified.ReceiverId = FVoxelStableId(); }
             if (const auto* Existing = CertifiedFineRoots.Find(Value.Cell))
             {
-                if (Existing->ReceiverWaterZ != Certified.ReceiverWaterZ || !(Existing->ReceiverId == Certified.ReceiverId))
+                if (Existing->WaterZ != Certified.ReceiverWaterZ || !(Existing->ReceiverId == Certified.ReceiverId))
                 { OutError = TEXT("HydrologyComponentConflict: independent fine-lake root certificates disagree"); return EVoxelHydrologyClosureRead::Failed; }
             }
             else
@@ -456,7 +465,8 @@ EVoxelHydrologyClosureRead FVoxelHydrologyComponentBuild::ReadCertifiedFineCell(
                     if (!VoxelGenerationAllocation::RetainMap(CertifiedFineRoots, Capacity, OutError)) return EVoxelHydrologyClosureRead::Failed;
                     FineRootCapacity = Capacity;
                 }
-                CertifiedFineRoots.Add(Value.Cell, Certified);
+                CertifiedFineRoots.Add(Value.Cell,
+                    {Certified.GroundZ, Certified.ReceiverWaterZ, Certified.ReceiverId});
             }
         }
         ++LakeCertificateCopyIndex;
@@ -466,7 +476,7 @@ EVoxelHydrologyClosureRead FVoxelHydrologyComponentBuild::ReadCertifiedFineCell(
     LakeCertificate.FreeBacking();
     bLakeCertificateActive = false;
     if (const auto* Existing = CertifiedFineRoots.Find(InCell))
-        return PublishCell(*Existing);
+        return PublishRoot(*Existing);
     OutError = TEXT("Yielded: another existing lake needs fine-shore certification");
     return EVoxelHydrologyClosureRead::Pending;
 }
@@ -478,6 +488,27 @@ EVoxelHydrologyClosureRead FVoxelHydrologyComponentBuild::ReadFineWater(const FI
     if (ActiveFineCache)
     {
         check(ActiveConfig && ActiveConfig->IsValid());
+        if (!VoxelGeneration::IsWorldCell(InCell.X) || !VoxelGeneration::IsWorldCell(InCell.Y))
+        { OutError = TEXT("Fine receiving-water read outside physical world"); return EVoxelHydrologyClosureRead::Failed; }
+        const int32 OriginalGround = Terrain->SampleSurfaceHeight(InCell.X, InCell.Y);
+        if (OriginalGround < -32768 || OriginalGround > 32768)
+        { OutError = TEXT("Invalid fine receiving-water ground"); return EVoxelHydrologyClosureRead::Failed; }
+        // 与原始细水读取使用同一冻结地面和物理海水规则；无需逐列建立固定水计划。
+        if (OriginalGround < Recipe->Settings.SeaLevel)
+        {
+            const int32 SeaLevel = Recipe->Settings.SeaLevel;
+            const auto OceanId = VoxelGeneration::MakeStableId(Recipe->Settings.Seed,
+                FIntVector(0, 0, SeaLevel), 0x4F4345414E524543ull, 0);
+            if (SeaLevel < -32768 || SeaLevel > 32768 || (OceanId.High == 0 && OceanId.Low == 0))
+            { OutError = TEXT("Invalid physical ocean receiver"); return EVoxelHydrologyClosureRead::Failed; }
+            OutWater = FVoxelHydrologyReceivingVoxel();
+            OutWater.OriginalGroundZ = OriginalGround;
+            OutWater.WaterZ = SeaLevel;
+            OutWater.BodyId = OceanId;
+            OutWater.bOcean = true;
+            OutError.Reset();
+            return EVoxelHydrologyClosureRead::Ready;
+        }
         if (!PinnedFinePlan || !PinnedFinePlan->Contains(InCell))
         {
             PinnedFinePlan.Reset();
@@ -494,7 +525,7 @@ EVoxelHydrologyClosureRead FVoxelHydrologyComponentBuild::ReadFineWater(const FI
         }
         const auto Fine = PinnedFinePlan->SampleWater(InCell);
         OutWater = FVoxelHydrologyReceivingVoxel();
-        OutWater.OriginalGroundZ = Terrain->SampleSurfaceHeight(InCell.X, InCell.Y);
+        OutWater.OriginalGroundZ = OriginalGround;
         OutWater.WaterZ = Fine.WaterZ;
         if (Fine.bFixedWater) OutWater.BodyId = Fine.FixedId;
         else if (Fine.bNaturalWater)

@@ -1,5 +1,6 @@
 #include "Voxel/Generation/Hydrology/VoxelHydrologyFineWaterQuery.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
+#include "Voxel/Generation/VoxelGenerationMath.h"
 
 namespace
 {
@@ -44,6 +45,76 @@ bool FVoxelHydrologyFineWaterQuery::Initialize(const FIntPoint& Seed, const FInt
     WorldMaximum = MaximumInclusive;
     bInitialized = true;
     return true;
+}
+
+EVoxelHydrologyFineWaterStep FVoxelHydrologyFineWaterQuery::ExpandCertifiedDryTile(
+    FReadCell Reader, int32 WorkBudget, FString& OutError, const TAtomic<bool>* Cancel)
+{
+    OutError.Reset();
+    if (Cancel && Cancel->Load()) { OutError = TEXT("Canceled"); return EVoxelHydrologyFineWaterStep::Canceled; }
+    if (!bReady) { OutError = TEXT("Dry tile expansion requires a ready seed certificate"); return EVoxelHydrologyFineWaterStep::Failed; }
+    if (Stage == 7) return EVoxelHydrologyFineWaterStep::Ready;
+    if (WorkBudget <= 0) return EVoxelHydrologyFineWaterStep::Yielded;
+    if (Stage != 6)
+    {
+        if (Result.IsWet() || !Members.IsEmpty() || !FixedContacts.IsEmpty() || Certificates.Num() != 1 ||
+            !Certificates[0].bIncluded || Certificates[0].IsReceiver() ||
+            Certificates[0].GroundZ < Certificates[0].SpillZ) return EVoxelHydrologyFineWaterStep::Ready;
+        if (!VoxelGenerationAllocation::RetainArray(Visited, DryTileSide * DryTileSide, OutError)) return FineWaterFailure(OutError);
+        Visited.SetNumZeroed(DryTileSide * DryTileSide);
+        Cursor = Face = 0;
+        Stage = 6;
+    }
+    const FIntPoint Seed = Certificates[0].Cell;
+    const FIntPoint Origin(int32(VoxelGeneration::FloorDivideWide(Seed.X, DryTileSide) * DryTileSide),
+        int32(VoxelGeneration::FloorDivideWide(Seed.Y, DryTileSide) * DryTileSide));
+    const FIntPoint Minimum(FMath::Max(WorldMinimum.X, Origin.X), FMath::Max(WorldMinimum.Y, Origin.Y));
+    const FIntPoint Maximum(FMath::Min(WorldMaximum.X, Origin.X + DryTileSide - 1),
+        FMath::Min(WorldMaximum.Y, Origin.Y + DryTileSide - 1));
+    Visited[(Seed.Y - Origin.Y) * DryTileSide + Seed.X - Origin.X] = 1;
+    static const FIntPoint Directions[] = {FIntPoint(-1, 0), FIntPoint(1, 0), FIntPoint(0, -1), FIntPoint(0, 1)};
+    while (Cursor < Certificates.Num() && WorkBudget-- > 0)
+    {
+        if (Cancel && Cancel->Load()) { OutError = TEXT("Canceled"); return EVoxelHydrologyFineWaterStep::Canceled; }
+        const FVoxelHydrologyFineWaterCertificate Parent = Certificates[Cursor];
+        const int64 X = int64(Parent.Cell.X) + Directions[Face].X;
+        const int64 Y = int64(Parent.Cell.Y) + Directions[Face].Y;
+        if (X >= Minimum.X && Y >= Minimum.Y && X <= Maximum.X && Y <= Maximum.Y)
+        {
+            const FIntPoint Cell{int32(X), int32(Y)};
+            const int32 Index = (Cell.Y - Origin.Y) * DryTileSide + Cell.X - Origin.X;
+            if (!Visited[Index])
+            {
+                FVoxelHydrologySharedCell Value;
+                const auto Read = Reader(Cell, Value, OutError);
+                if (Read == EVoxelHydrologyClosureRead::Pending)
+                    return OutError.StartsWith(TEXT("Yielded")) ? EVoxelHydrologyFineWaterStep::Yielded :
+                        OutError.StartsWith(TEXT("CapacityBlocked")) ? EVoxelHydrologyFineWaterStep::CapacityBlocked :
+                        OutError == TEXT("Canceled") ? EVoxelHydrologyFineWaterStep::Canceled : EVoxelHydrologyFineWaterStep::NeedTiles;
+                if (Read != EVoxelHydrologyClosureRead::Ready) return FineWaterFailure(OutError);
+                if (Value.GroundZ < -32768 || Value.GroundZ > 32768 || Value.RainWeight > 10000 ||
+                    Value.bHasCertifiedDryOutlet || Value.bHasLocalOutlet ||
+                    (Value.IsReceiver() && (Value.GroundZ >= Value.ReceiverWaterZ || Value.ReceiverWaterZ < -32768 ||
+                        Value.ReceiverWaterZ > 32768 || (Value.ReceiverId.High == 0 && Value.ReceiverId.Low == 0))))
+                { OutError = TEXT("Invalid original fine cell in dry tile expansion"); return EVoxelHydrologyFineWaterStep::Failed; }
+                if (Value.IsReceiver()) Visited[Index] = 1;
+                else if (Value.GroundZ >= Parent.GroundZ)
+                {
+                    Value.Cell = Cell;
+                    Value.SpillZ = Value.GroundZ;
+                    Value.bIncluded = true;
+                    Value.Parent = INDEX_NONE;
+                    Value.bParentIsLocalOutlet = false;
+                    if (!AddCertificate(Value, OutError)) return FineWaterFailure(OutError);
+                    Visited[Index] = 1;
+                }
+            }
+        }
+        if (++Face == 4) { Face = 0; ++Cursor; }
+    }
+    if (Cursor < Certificates.Num()) return EVoxelHydrologyFineWaterStep::Yielded;
+    Stage = 7;
+    return EVoxelHydrologyFineWaterStep::Ready;
 }
 
 bool FVoxelHydrologyFineWaterQuery::AddMember(const FIntPoint& Position, int32 CertificateIndex, FString& OutError)
@@ -235,21 +306,15 @@ EVoxelHydrologyFineWaterStep FVoxelHydrologyFineWaterQuery::Advance(FReadCell Re
                 Stage = 5;
                 continue;
             }
-            if (bSortCopy)
+            if (SortRun >= Members.Num())
             {
-                if (Cursor < Members.Num())
-                {
-                    Members[Cursor] = SortBuffer[Cursor];
-                    MemberGrounds[Cursor] = GroundSortBuffer[Cursor];
-                    ++Cursor;
-                    continue;
-                }
+                // 每轮完整写入后成对交换同一账本下的坐标与地面数组，中间不让出或新增分配。
+                Swap(Members, SortBuffer);
+                Swap(MemberGrounds, GroundSortBuffer);
                 SortWidth *= 2;
                 SortRun = 0;
-                bSortCopy = false;
                 continue;
             }
-            if (SortRun >= Members.Num()) { Cursor = 0; bSortCopy = true; continue; }
             const int64 Mid = FMath::Min<int64>(SortRun + SortWidth, Members.Num());
             const int64 End = FMath::Min<int64>(SortRun + SortWidth * 2, Members.Num());
             if (!bMergeStarted)
@@ -317,7 +382,7 @@ void FVoxelHydrologyFineWaterQuery::FreeBacking()
     SeedGround = Cursor = Face = 0;
     SortWidth = 1;
     SortRun = SortLeft = SortRight = SortWrite = 0;
-    bMergeStarted = bSortCopy = false;
+    bMergeStarted = false;
     Stage = 0;
     bInitialized = bReady = false;
     bWitnessFinished = false;
