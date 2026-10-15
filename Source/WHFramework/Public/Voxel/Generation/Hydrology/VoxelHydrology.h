@@ -290,6 +290,7 @@ struct WHFRAMEWORK_API FVoxelHydrologyPlan
     TArray<TSharedPtr<const FVoxelHydrologyPlan, ESPMode::ThreadSafe>> TopologyPlans;
     TArray<TSharedPtr<const FVoxelHydrologyRiverComponent, ESPMode::ThreadSafe>> RiverComponents;
     bool bCompleteRiverIndex = false;
+    bool bMacroAuthoritative = false;
     FVoxelHydrologyRegionKey Key;
     int32 RiverShapeSmoothingPasses = 1;
     int32 RiverSeed = 0;
@@ -317,7 +318,9 @@ struct WHFRAMEWORK_API FVoxelHydrologyPlan
 	bool HasSelectedRiverCell(const FIntPoint& InCell) const;
 	void VisitHydrologyLeases(TFunctionRef<void(const FVoxelTerrainResourceLease*)> InVisit) const;
 	bool BuildGeometry(FString& OutError, const TAtomic<bool>* InCancel = nullptr);
+	bool BuildRiverGeometry(int32 InRiverIndex, FString& OutError, const TAtomic<bool>* InCancel = nullptr);
 	bool BuildSpatialIndex(FString& OutError, const TAtomic<bool>* InCancel = nullptr);
+	const FVoxelLakePlan* FindLakeAtOrigin(const FIntPoint& InOrigin) const;
 	bool SampleBaseWater(int32 InWorldX, int32 InWorldY, int32 InOriginalGround, FVoxelHydrologyInfluence& OutInfluence) const;
 	bool SampleRiverInfluence(int32 InWorldX, int32 InWorldY, int32 InOriginalGround, FVoxelHydrologyInfluence& OutInfluence) const;
 #if WITH_DEV_AUTOMATION_TESTS
@@ -342,7 +345,7 @@ private:
 	TMap<
 		FIntPoint,
 		int32>
-		LakeWaterByCellOrigin;
+		LakeByCellOrigin;
 
 	TMap<
 		FIntPoint,
@@ -358,6 +361,12 @@ public:
         TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> InTerrain);
 
 public:
+    bool BuildTopology(
+        const FVoxelHydrologyRegionKey& InKey,
+        FVoxelHydrologyPlan& OutPlan,
+        FString& OutError,
+        const TAtomic<bool>* InCancel = nullptr) const;
+
     bool BuildPlan(
         const FVoxelHydrologyRegionKey& InKey,
         FVoxelHydrologyPlan& OutPlan,

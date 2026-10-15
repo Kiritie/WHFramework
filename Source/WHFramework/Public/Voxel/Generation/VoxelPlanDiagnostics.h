@@ -8,8 +8,7 @@ enum class EVoxelGenerationPlanKind : uint8
 	Cave,
 	Structure,
 	Feature,
-	Ecology,
-	FineWater
+	Ecology
 };
 
 struct WHFRAMEWORK_API FVoxelPlanDiagnostics

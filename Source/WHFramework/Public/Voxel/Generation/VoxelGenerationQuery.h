@@ -89,9 +89,6 @@ public:
 		MissingHydrologyObserver = InObserver;
 	}
 
-	bool EnsureFineWater(const FIntPoint& InCell, FVoxelHydrologyFinePlanPtr& OutPlan,
-		FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
-
 	bool EnsureHydrologyPlan(
 		const FVoxelHydrologyRegionKey& InKey,
 		FVoxelHydrologyPlanPtr& OutPlan,

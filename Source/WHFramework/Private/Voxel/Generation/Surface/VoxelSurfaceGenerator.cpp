@@ -53,24 +53,6 @@ uint32 FVoxelSurfaceGenerator::ResolveSymbol(
     }
 
 
-    if (Recipe->AlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion)
-    {
-        const int32 ShoreWidth = FMath::Max(1, Recipe->Settings.RiverShoreWidth);
-        const int32 BankDistance = FMath::Max(0, InColumn.BankDistanceCells);
-        const int32 BankStrength = int32(FMath::Clamp<int64>(
-            (int64(ShoreWidth) - BankDistance) * 32767 / ShoreWidth, 0, 32767));
-        const int32 PatchNoise = VoxelGeneration::Noise2D(
-            Recipe->Settings.Seed, InCell.X, InCell.Y, 96,
-            0x524956455242414Eull);
-        if (InDepthFromSurface == 0 &&
-            InColumn.RiverZone == EVoxelRiverSurfaceZone::DryBank &&
-            Recipe->Palette.Sand != MAX_uint16 &&
-            BankStrength + FMath::Max(0, PatchNoise) / 3 > 14000)
-        {
-            return Recipe->Palette.Sand;
-        }
-    }
-
     const auto ApplySediment = [&](const uint32 BaseSymbol, const bool bProtectedRule)
     {
         const FVoxelGenerationPalette& Palette = Recipe->Palette;
@@ -78,8 +60,7 @@ uint32 FVoxelSurfaceGenerator::ResolveSymbol(
             (BaseSymbol == Palette.Grass || BaseSymbol == Palette.Dirt) &&
             BaseSymbol != Palette.Stone && BaseSymbol != Palette.Snow &&
             BaseSymbol != Palette.Bedrock && BaseSymbol != Palette.Road;
-        if (Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion &&
-            !bProtectedRule && bLooseSubstrate && InDepthFromSurface == 0 &&
+        if (!bProtectedRule && bLooseSubstrate && InDepthFromSurface == 0 &&
             !bKeepSubsoil && !InColumn.bCoast && !InColumn.bLake && !InColumn.bOcean &&
             InColumn.RiverZone == EVoxelRiverSurfaceZone::DryBank && Palette.Sand != MAX_uint16 &&
             VoxelRiverSediment::HasDryBankDeposit(Recipe->Settings.Seed, InCell.X, InCell.Y,

@@ -40,6 +40,7 @@ struct WHFRAMEWORK_API FVoxelTerrainResourceSnapshot
 	uint64 ReleaseVersion = 0;
 	uint64 PublishedRetirementVersion = 0;
 	uint64 RootInputBytes = 0;
+	uint64 RequiredResidentHeadroomBytes = 0;
 	uint64 LedgerMetadataBytes = 0;
 	uint64 LeaseHandleBytes = 0;
 	int32 LeaseCount = 0;

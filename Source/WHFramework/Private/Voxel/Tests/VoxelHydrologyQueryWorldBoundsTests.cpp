@@ -22,6 +22,7 @@ bool FVoxelHydrologyWorldBoundsTest::RunTest(const FString& InParameters)
 	MutableRecipe.Settings.HydrologyCellSize = 3;
 	MutableRecipe.Settings.HydrologyRegionSide = 8;
 	MutableRecipe.Settings.RiverSourceSpacing = 4;
+	MutableRecipe.Settings.MaxZ = 4096;
 	MutableRecipe.Settings.SeaLevel = MutableRecipe.Settings.MaxZ - 1;
 	const auto Recipe = MakeShared<const FVoxelGenerationRecipe, ESPMode::ThreadSafe>(MoveTemp(MutableRecipe));
 	const auto Climate = MakeShared<const FVoxelClimateGenerator, ESPMode::ThreadSafe>(Recipe);
@@ -30,9 +31,9 @@ bool FVoxelHydrologyWorldBoundsTest::RunTest(const FString& InParameters)
 	FString Error;
 	for (const int32 Coordinate : {MIN_int32, MAX_int32 - 1})
 	{
-		const auto Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(Coordinate, Coordinate, Recipe->Settings, FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion);
+		const auto Key = FVoxelGenerationQuery::HydrologyTopologyKeyForVoxel(Coordinate, Coordinate, Recipe->Settings);
 		FVoxelHydrologyPlan Plan;
-		if (!TestTrue(TEXT("Native hydrology builds at both world edges"), Generator.BuildPlan(Key, Plan, Error))) return false;
+		if (!TestTrue(TEXT("Native hydrology builds at both world edges"), Generator.BuildTopology(Key, Plan, Error))) return false;
 		const int64 CoreOrigin = int64(Key.Coordinate.X) * Recipe->Settings.HydrologyRegionSide * Plan.Grid.CellSize;
 		TestEqual(TEXT("Hydrology core uses voxel units"), Plan.CoreMin.X,
 			int32(FMath::Max(CoreOrigin, VoxelGeneration::WorldCellMin)));
@@ -48,6 +49,7 @@ bool FVoxelHydrologyWorldBoundsTest::RunTest(const FString& InParameters)
 			TestFalse(TEXT("Clipped halo never duplicates a physical cell"), Samples.Contains(Sample));
 			Samples.Add(Sample);
 			TestEqual(TEXT("Grid contains the terrain value at its physical sample"), Plan.Grid.GroundPlane[Index], Terrain->SampleMacro(Sample.X, Sample.Y).SurfaceZ);
+			TestTrue(TEXT("Wet world-edge fixture has positive macro water depth"), Plan.Grid.GroundPlane[Index] < Recipe->Settings.SeaLevel);
 		}
 		FVoxelHydrologyInfluence Influence;
 		TestTrue(TEXT("World edge is consumable by the native plan"), Plan.Sample(Coordinate, Coordinate, 32, Influence));
@@ -55,7 +57,7 @@ bool FVoxelHydrologyWorldBoundsTest::RunTest(const FString& InParameters)
 	}
 	FVoxelHydrologyPlan Unchanged;
 	Unchanged.Key = {FIntPoint(3, 4)};
-	TestFalse(TEXT("An out-of-domain region is rejected"), Generator.BuildPlan({FIntPoint(MAX_int32, 0)}, Unchanged, Error));
+	TestFalse(TEXT("An out-of-domain region is rejected"), Generator.BuildTopology({FIntPoint(MAX_int32, 0)}, Unchanged, Error));
 	TestEqual(TEXT("Invalid region preserves the caller's plan"), Unchanged.Key.Coordinate, FIntPoint(3, 4));
 	return true;
 }

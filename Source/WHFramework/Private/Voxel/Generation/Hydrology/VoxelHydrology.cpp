@@ -1261,13 +1261,8 @@ bool FVoxelHydrologyGenerator::BuildHeightGrid(
                 return false;
             }
 
-            const FVoxelMacroTerrainSample TerrainSample =
-                Terrain->SampleMacro(
-                    World.X,
-                    World.Y);
-
             Grid.GroundPlane[Index] =
-                TerrainSample.SurfaceZ;
+                Terrain->SampleSurfaceHeight(World.X, World.Y);
 
             const int32 RainNoise =
                 VoxelGeneration::Noise2D(
@@ -1330,7 +1325,7 @@ bool FVoxelHydrologyGenerator::AddOceanOutlets(
     int32 OceanCount = 0;
     for (const int32 Ground : InOutGrid.GroundPlane)
     {
-        OceanCount += Ground <= SeaLevel ? 1 : 0;
+        OceanCount += Ground < SeaLevel ? 1 : 0;
     }
     if (!VoxelGenerationAllocation::RetainMap(InOutGrid.OceanOutlets, OceanCount, OutError))
     {
@@ -1343,7 +1338,7 @@ bool FVoxelHydrologyGenerator::AddOceanOutlets(
                 InOutGrid.GroundPlane.Num());
         ++Index)
     {
-        if (InOutGrid.GroundPlane[Index] <=
+        if (InOutGrid.GroundPlane[Index] <
             SeaLevel)
         {
             InOutGrid.OceanOutlets.Add(
@@ -1487,6 +1482,110 @@ bool FVoxelHydrologyGenerator::AddCanonicalSinkOutlets(
             }
         }
     }
+    OutError.Reset();
+    return true;
+}
+
+bool FVoxelHydrologyGenerator::BuildTopology(
+    const FVoxelHydrologyRegionKey& InKey,
+    FVoxelHydrologyPlan& OutPlan,
+    FString& OutError,
+    const TAtomic<bool>* InCancel) const
+{
+    const auto* Allocation = FVoxelGenerationAllocationScope::Get();
+    if (!(Allocation ? Allocation->Check(OutError) : FVoxelGenerationAllocationScope::AllowPassive(OutError)))
+    {
+        return false;
+    }
+    FVoxelHydrologyPlan Plan;
+    Plan.Key = InKey;
+
+    FInt64Vector2 CoreMin, CoreMax;
+    if (!GetWorldHydrologyCore(InKey, Recipe->Settings, CoreMin, CoreMax))
+    {
+        OutError = TEXT("Invalid hydrology core outside world domain");
+        return false;
+    }
+    const int64 CellSize = Recipe->Settings.HydrologyCellSize;
+    Plan.CoreMin = FIntPoint(int32(FMath::Max(CoreMin.X * CellSize, VoxelGeneration::WorldCellMin)),
+        int32(FMath::Max(CoreMin.Y * CellSize, VoxelGeneration::WorldCellMin)));
+    Plan.CoreMax = FIntPoint(int32(FMath::Min(CoreMax.X * CellSize, VoxelGeneration::WorldCellMaxExclusive)),
+        int32(FMath::Min(CoreMax.Y * CellSize, VoxelGeneration::WorldCellMaxExclusive)));
+
+    if (!BuildHeightGrid(
+            InKey,
+            Plan.Grid,
+            OutError,
+            InCancel))
+    {
+        return false;
+    }
+
+    FVoxelGenerationWorkspace Workspace;
+    FVoxelDrainageResult Drainage;
+    ON_SCOPE_EXIT
+    {
+        VoxelGenerationAllocation::FreeRetainedArray(Drainage.Parent);
+        VoxelGenerationAllocation::FreeRetainedArray(Drainage.SpillPlane);
+        VoxelGenerationAllocation::FreeRetainedArray(Drainage.SettledOrder);
+        VoxelGenerationAllocation::FreeRetainedArray(Drainage.Accumulation);
+    };
+    FVoxelDrainageInput DrainageInput;
+    DrainageInput.WorldMinCell =
+        Plan.Grid.WorldMinCell;
+    DrainageInput.Width =
+        Plan.Grid.Width;
+    DrainageInput.Height =
+        Plan.Grid.Height;
+    if (!Workspace.ReserveArray(DrainageInput.GroundPlane, Plan.Grid.GroundPlane.Num(), OutError) ||
+        !Workspace.ReserveArray(DrainageInput.RainWeight, Plan.Grid.RainWeight.Num(), OutError) ||
+        !Workspace.ReserveArray(DrainageInput.Allowed, Plan.Grid.Allowed.Num(), OutError) ||
+        !Workspace.ReserveMap(DrainageInput.Outlets,
+            Plan.Grid.OceanOutlets.Num() + Plan.Grid.CanonicalSinkOutlets.Num(), OutError))
+    {
+        return false;
+    }
+    DrainageInput.GroundPlane.Append(Plan.Grid.GroundPlane);
+    DrainageInput.RainWeight.Append(Plan.Grid.RainWeight);
+    DrainageInput.Allowed.Append(Plan.Grid.Allowed);
+    for (const auto& Pair : Plan.Grid.OceanOutlets)
+    {
+        DrainageInput.Outlets.Add(Pair.Key, Pair.Value);
+    }
+
+    for (const TPair<uint32, int32>& Pair :
+        Plan.Grid.CanonicalSinkOutlets)
+    {
+        DrainageInput.Outlets.Add(
+            Pair.Key,
+            Pair.Value);
+    }
+
+    if (!VoxelHydrology::BuildDrainage(
+            DrainageInput,
+            Drainage,
+            OutError,
+            InCancel))
+    {
+        return false;
+    }
+
+    if (!BuildLakes(Plan.Grid, DrainageInput, Drainage, InKey, Plan.Lakes, OutError, InCancel))
+    {
+        return false;
+    }
+    Workspace.FreeArray(DrainageInput.GroundPlane);
+    Workspace.FreeArray(DrainageInput.RainWeight);
+    Workspace.FreeArray(DrainageInput.Allowed);
+    Workspace.FreeMap(DrainageInput.Outlets);
+    VoxelGenerationAllocation::FreeRetainedArray(Plan.Grid.Allowed);
+    VoxelGenerationAllocation::FreeRetainedMap(Plan.Grid.CanonicalSinkOutlets);
+    Plan.Lakes.Sort([](const FVoxelLakePlan& InFirst, const FVoxelLakePlan& InSecond)
+    {
+        return InFirst.Id < InSecond.Id;
+    });
+    if (!Plan.BuildSpatialIndex(OutError, InCancel)) return false;
+    OutPlan = MoveTemp(Plan);
     OutError.Reset();
     return true;
 }

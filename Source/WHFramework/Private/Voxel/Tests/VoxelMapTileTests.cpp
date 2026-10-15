@@ -288,9 +288,7 @@ bool FVoxelMapSparseDependenciesTest::RunTest(const FString& InParameters)
 			{
 				const auto Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(
 					Origin.X + Column * Step, Origin.Y + Row * Step, Config->Recipe->Settings, Config->Recipe->AlgorithmVersion);
-				Expected.Add(Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion
-					? FIntVector(Origin.X + Column * Step, Origin.Y + Row * Step, 0)
-					: FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
+				Expected.Add(FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
 			}
 		}
 		TestEqual(TEXT("依赖数等于真实采样点去重数"), Capture.Values.Num(), Expected.Num());
@@ -298,8 +296,7 @@ bool FVoxelMapSparseDependenciesTest::RunTest(const FString& InParameters)
 		for (const auto& Dependency : Capture.Values)
 		{
 			TestTrue(TEXT("地图只准备所用版本的真实水文事实"), Dependency.Kind ==
-				(Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion
-					? EVoxelGenerationPlanKind::FineWater : EVoxelGenerationPlanKind::Hydrology));
+				EVoxelGenerationPlanKind::Hydrology);
 			TestTrue(TEXT("每个依赖都来自真实采样点"), Expected.Contains(Dependency.Coordinate()));
 			Actual.Add(Dependency.Coordinate());
 		}

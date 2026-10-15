@@ -1,18 +1,12 @@
 #pragma once
 
-#include "Voxel/Generation/Hydrology/VoxelHydrology.h"
-#include "Voxel/Generation/Hydrology/VoxelHydrologyBasinClosure.h"
-#include "Voxel/Generation/Hydrology/VoxelHydrologySharedSearch.h"
-#include "Voxel/Generation/Hydrology/VoxelHydrologyLakeCertificate.h"
-#include "Voxel/Generation/Hydrology/VoxelHydrologyFineWaterQuery.h"
-#include "Voxel/Generation/Hydrology/VoxelHydrologyRoutingGrid.h"
-#include "Voxel/Generation/Hydrology/VoxelHydrologyWidthRoutingQuery.h"
-#include "Voxel/Generation/Hydrology/VoxelHydrologyRiverDecoration.h"
-#include "Voxel/Generation/Hydrology/VoxelHydrologyBucketOutlet.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
+#include "Voxel/Generation/Hydrology/VoxelHydrologyMacroInput.h"
+#include "Voxel/Generation/Hydrology/VoxelHydrologyLocalRunoff.h"
+#include "Voxel/Generation/Hydrology/VoxelHydrologyChannelPlan.h"
 
 struct FVoxelGenerationRecipe;
 struct FVoxelGenerationRuntimeConfig;
-struct FVoxelHydrologyFinePlan;
 class FVoxelGenerationPlanCache;
 class FVoxelTerrainGenerator;
 
@@ -28,27 +22,17 @@ enum class EVoxelHydrologyComponentStep : uint8
     Canceled
 };
 
-struct WHFRAMEWORK_API FVoxelHydrologyReceivingVoxel
-{
-    int32 OriginalGroundZ = 0;
-    int32 WaterZ = MIN_int32;
-    FVoxelStableId BodyId;
-    bool bOcean = false;
-};
-
 struct WHFRAMEWORK_API FVoxelHydrologyRiverComponent
 {
     TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
     FIntPoint Key = FIntPoint::ZeroValue;
     uint64 Fingerprint = 0;
-    uint64 RunoffFingerprint = 0;
-    uint64 TotalRainWeight = 0, ReceivedRainWeight = 0;
-    TMap<FIntPoint,FVoxelHydrologyBucketOutletResult> RunoffOutlets;
+    uint64 TotalRainWeight = 0;
+    uint64 IncomingRainWeight = 0;
+    uint64 ReceivedRainWeight = 0;
+    uint64 ExportedRainWeight = 0;
     TArray<FIntPoint> DrainageCells;
     FVoxelHydrologyPlan Plan;
-    TMap<FIntPoint, int32> LakeWaterByVoxel;
-    TMap<FIntPoint, FVoxelHydrologyReceivingVoxel> ReceivingWaterByVoxel;
-    FVoxelHydrologyReceivingVoxel ExpandedReceivingWater;
 
     uint64 GetAllocatedBytes() const;
     bool ContainsCell(const FIntPoint& InCell) const;
@@ -66,7 +50,6 @@ struct WHFRAMEWORK_API FVoxelHydrologyComponentNode
     int32 GroundZ = 0;
     uint64 RainWeight = 0;
     bool bChannelEligible = false;
-    bool bRunoffTerminal = false, bParentRunoffTerminal = false;
     int32 DesiredWaterHalfWidth = 0;
     int32 DesiredDepth = 0;
     int32 ReceiverWaterZ = MIN_int32;
@@ -74,33 +57,21 @@ struct WHFRAMEWORK_API FVoxelHydrologyComponentNode
     bool bHasParent = false;
     bool bSelected = false;
     bool bReceiver = false;
-    bool bExpanded = false;
+    bool bGhost = false;
 };
 
 class WHFRAMEWORK_API FVoxelHydrologyComponentBuild
 {
 public:
-    using FTileLookup = TFunctionRef<const FVoxelHydrologyPlan*(const FVoxelHydrologyRegionKey&)>;
+    using FTileLookup = FVoxelHydrologyMacroInput::FTileLookup;
 
     FVoxelHydrologyComponentBuild(
-        TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> InRecipe,
-        TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> InTerrain,
-        const FIntPoint& InSeedCell);
+        TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+        FVoxelGenerationPlanCache& InCache, const FIntPoint& InSeedCell);
     ~FVoxelHydrologyComponentBuild();
 
     EVoxelHydrologyComponentStep Advance(FTileLookup InLookup, int32 InWorkBudget,
-        FString& OutError, const TAtomic<bool>* InCancel = nullptr,
-        FVoxelGenerationPlanCache* InFineCache = nullptr,
-        const TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>& InConfig = {});
-    void VisitFineSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
-
-
-    void BeginFineInputStep(const TAtomic<bool>* InCancel = nullptr);
-    EVoxelHydrologyClosureRead ReadCertifiedFineCell(const FIntPoint& InCell, FTileLookup InLookup,
-        FVoxelHydrologySharedCell& OutCell, FString& OutError,
-        FVoxelGenerationPlanCache* InCertificateCache = nullptr);
-    EVoxelHydrologyClosureRead ReadFineWater(const FIntPoint& InCell, FTileLookup InLookup,
-        FVoxelHydrologyReceivingVoxel& OutWater, FString& OutError);
+        FString& OutError, const TAtomic<bool>* InCancel = nullptr);
     const TArray<FVoxelHydrologyRegionKey>& GetMissingTiles() const;
     uint64 GetAllocatedBytes() const;
     const FVoxelHydrologyRiverComponent& GetResult() const;
@@ -111,135 +82,53 @@ public:
         TArray<FIntPoint>& OutSeeds, TArray<FVoxelHydrologyRegionKey>& OutMissingTiles,
         FString& OutError);
 
-    static bool CollectRegionSeeds(const FVoxelHydrologyRegionKey& InRegion,
-        const FVoxelGenerationSettings& InSettings, FTileLookup InLookup,
-        TArray<FIntPoint>& OutSeeds, TArray<FVoxelHydrologyRegionKey>& OutMissingTiles,
-        FString& OutError);
+    void VisitSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
 
 private:
     friend class FVoxelGenerationPlanCache;
-    bool InitializeRouting(FString& OutError);
-    bool ReadRoutingFacts(const FIntPoint& InWorld, FTileLookup InLookup, FVoxelHydrologyComponentNode& OutNode, FString& OutError);
-    EVoxelHydrologyClosureRead ReadRawFineCell(const FIntPoint& InCell, FTileLookup InLookup,
-        FVoxelHydrologySharedCell& OutCell, FString& OutError);
-    bool ReadRawNode(const FIntPoint& InCell, FTileLookup InLookup,
-        FVoxelHydrologyComponentNode& OutNode, FString& OutError);
-    bool ReadBucketOutlet(const FIntPoint& InAnchor, FTileLookup InLookup,
-        FVoxelHydrologyBucketOutletResult& OutOutlet, FString& OutError);
-    bool ReadRunoffNode(const FIntPoint& InCell, FTileLookup InLookup,
-        FVoxelHydrologyComponentNode& OutNode, FString& OutError);
-    bool ReadNode(const FIntPoint& InCell, FTileLookup InLookup,
-        FVoxelHydrologyComponentNode& OutNode, FString& OutError, bool InRunoffTerminal = false);
-    bool AddNode(const FVoxelHydrologyComponentNode& InNode, int32& OutIndex, FString& OutError);
-    bool PrepareRiverNodes(FString& OutError, const TAtomic<bool>* InCancel);
-    bool BuildGeometry(FTileLookup InLookup, FString& OutError, const TAtomic<bool>* InCancel);
-    bool FinalizeCertifiedFootprint(FTileLookup InLookup, FString& OutError, const TAtomic<bool>* InCancel);
-    bool ResolveProfiles(FTileLookup InLookup, FString& OutError, const TAtomic<bool>* InCancel);
+    bool PrepareRiverNodes(FTileLookup InLookup, FString& OutError, const TAtomic<bool>* InCancel);
+    bool ReadExteriorNode(const FIntPoint& InCell, FTileLookup InLookup,
+        FVoxelHydrologyComponentNode& OutNode, FString& OutError, const TAtomic<bool>* InCancel);
+    void SetShape(FVoxelHydrologyComponentNode& InOutNode) const;
+    bool BuildGeometry(FString& OutError, const TAtomic<bool>* InCancel);
     bool FinalizeProfileResult(FString& OutError, const TAtomic<bool>* InCancel);
     bool AddMissingTile(const FVoxelHydrologyRegionKey& InKey, FString& OutError);
 
 private:
+    TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
     TSharedRef<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Recipe;
-    TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> Terrain;
-    TSharedPtr<const FVoxelHydrologyFinePlan, ESPMode::ThreadSafe> PinnedFinePlan;
-    // 仅 Advance 调用栈借用；退出时清空，不跨回合持有 Cache/Config 或形成强引用环。
-    FVoxelGenerationPlanCache* ActiveFineCache = nullptr;
-    const TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe>* ActiveConfig = nullptr;
+    FVoxelGenerationPlanCache& Cache;
     FIntPoint SeedCell = FIntPoint::ZeroValue;
-    FVoxelHydrologyRoutingGrid RoutingGrid;
-    FVoxelHydrologyWidthRoutingQuery WidthRouting;
-    FVoxelHydrologyRiverDecoration Decoration;
-    bool bDecorationStarted = false, bDecorationReady = false;
-    int32 DecorationBoundsCursor=0;
-    FVoxelRiverShape RoutingShape;
+    FVoxelHydrologyRegionKey Region;
+    uint64 Generation = 0;
+    TSharedPtr<const FVoxelHydrologyRegionGraph, ESPMode::ThreadSafe> Graph;
+    TSharedPtr<const FVoxelHydrologyNetworkRunoff, ESPMode::ThreadSafe> Runoff;
+    TSharedPtr<const FVoxelHydrologySourcePlan, ESPMode::ThreadSafe> Sources;
+    TSharedPtr<const FVoxelHydrologyChannelPlan, ESPMode::ThreadSafe> Channels;
+    TOptional<FVoxelHydrologyLocalRunoffBuild> LocalBuild;
+    FVoxelHydrologyLocalRunoff Local;
+    bool bLocalReady = false;
     bool bCertifiedGeometryInitialized = false, bCertifiedGeometryRouteStarted = false;
     int32 CertifiedGeometryNode = 0, CertifiedGeometryRiver = INDEX_NONE, CertifiedGeometryPoint = 0;
-    int32 CertifiedRiverSortStage = 0, CertifiedRiverSortIndex = 0, CertifiedRiverSortEnd = 0;
-    bool bCertifiedRasterStarted = false;
-    int32 CertifiedRasterRiver = 0, CertifiedRasterX = 0, CertifiedRasterY = 0;
-    int32 CertifiedRasterInitPoint = 0, CertifiedRasterRadius = 0, CertifiedRasterSegment = 1, CertifiedRasterBestDistance = MAX_int32;
-    FVoxelRiverProjection CertifiedRasterProjection;
-    TArray<FIntPoint> CertifiedReceivingOrder;
+    int32 MacroGeometryIndex = 0;
     int32 CertifiedFinalStage = 0, CertifiedIndexRiver = 0, CertifiedIndexPoint = 0;
     int32 CertifiedFallStart = 0, CertifiedFallEnd = 1, CertifiedIndexCapacity = 0, CertifiedHashCursor = 0;
     FIntPoint CertifiedIndexMin, CertifiedIndexMax, CertifiedIndexCell;
     bool CertifiedIndexBucketActive = false;
     uint64 CertifiedHash = 0;
-    bool bRoutingInitialized = false;
-    bool bSeedMapped = false;
-    bool bSeedInitialized = false;
-    TMap<FIntPoint,uint64> RoutingRain;
-    int32 RoutingRainCapacity = 0;
-    bool bRoutingRainActive = false;
-    FIntPoint RoutingRainSeed, RoutingRainNext, RoutingRainMin, RoutingRainMax;
-    uint64 RoutingRainTotal = 0;
-    struct FCanonicalDrainage
-    {
-        FIntPoint ParentCell = FIntPoint::ZeroValue;
-        int32 SpillZ = 0;
-        int32 PlateauDistance = 0;
-        bool bHasParent = false;
-        bool bParentRunoffTerminal = false;
-    };
-    FVoxelHydrologyBucketOutlet BucketOutlet;
-    TMap<FIntPoint,FVoxelHydrologyBucketOutletResult> BucketOutlets;
-    int32 BucketOutletCapacity=0, PublishedOutletCapacity=0;
-    bool bBucketOutletActive=false;
-    FIntPoint BucketOutletSeed=FIntPoint::ZeroValue;
-    FVoxelHydrologyFineWaterQuery FineWaterQuery;
-    TMap<FIntPoint,int32> RawGroundCache;
-    TArray<FIntPoint> RawGroundRing;
-    int32 RawGroundCapacity = 0, RawGroundEvict = 0;
-    bool bRawGroundCacheDisabled = false;
-    TMap<FIntPoint, FVoxelHydrologyReceivingVoxel> FineWaterCache;
-    int32 FineWaterCapacity = 0;
-    int32 FineWaterCopyIndex = 0;
-    int32 FineDryCopyIndex = 0;
-    FIntPoint FineWaterSeed = FIntPoint::ZeroValue;
-    bool bFineWaterActive = false;
-    FVoxelHydrologyLakeCertificate LakeCertificate;
-    struct FCertifiedFineRoot
-    {
-        int32 GroundZ = 0;
-        int32 WaterZ = MIN_int32;
-        FVoxelStableId ReceiverId;
-    };
-    static_assert(sizeof(FCertifiedFineRoot) <= 24);
-    TMap<FIntPoint, FCertifiedFineRoot> CertifiedFineRoots;
-    int32 FineRootCapacity = 0;
-    int32 LakeCertificateCopyIndex = 0;
-    bool bLakeCertificateActive = false;
-    FVoxelHydrologySharedSearch SharedSearch;
-    TMap<FIntPoint, FCanonicalDrainage> CanonicalDrainage;
-    int32 CanonicalCapacity = 0;
-    int32 CertificateCopyIndex = 0;
-    bool bSharedSearchActive = false;
-    const TAtomic<bool>* ActiveCancel = nullptr;
     TArray<FVoxelHydrologyComponentNode> Nodes;
-    TMap<FIntVector, int32> NodeByCell;
     TArray<FVoxelHydrologyRegionKey> MissingTiles;
-    int32 NodeCapacity = 0;
-    int32 MapCapacity = 0;
-    int32 ExpandIndex = 0;
-    TArray<int32> PrepareChildren, PrepareQueue, PrepareRemap, PrepareWinners;
-    TArray<uint8> PrepareActive, PrepareQualifiedChild;
-    TMap<FIntPoint,int32> PrepareBestSource;
+    TArray<int32> PrepareChildren;
+    TArray<int32> PrepareQueue;
+    TArray<int32> PrepareRemap;
+    TArray<uint8> PrepareActive;
     TArray<FVoxelHydrologyComponentNode> PrepareSelected;
-    int32 PrepareStage = 0, PrepareCursor = 0, PrepareActiveCount = 0;
-    int32 PrepareSortIndex = 0, PrepareSortEnd = 0;
-    uint64 PrepareCoarseCount = 0;
-    FIntPoint PrepareBucketMin, PrepareBucketMax, PrepareBucketNext;
-    bool PrepareBucketActive = false;
-    FVoxelHydrologyBasinClosure ProfileClosure;
-    bool bProfileClosureActive = false;
-    bool bProfileRawFallback = false;
+    TMap<FIntPoint, int32> ExteriorNodes;
+    int32 PrepareStage = 0;
+    int32 PrepareCursor = 0;
+    int32 PrepareSourceCursor = 0;
+    int32 PrepareActiveCount = 0;
     bool bProfilesSolved = false;
-    int32 ProfileClosurePlane = MIN_int32;
-    FVoxelStableId ProfileClosureReceiverId;
-    FVoxelStableId AddedLakeReceiverId;
-    bool bHasAddedLakeReceiver = false;
-    int32 ReceivingVoxelCapacity = 0;
-    FIntPoint ProfileClosureSeed = FIntPoint::ZeroValue;
     bool bNodesFiltered = false;
     bool bGeometryBuilt = false;
     bool bReady = false;

@@ -323,16 +323,7 @@ bool FVoxelGenerationPlanCoordinator::GatherForBounds(
 	for (int64 Y = MinRegion.Y; Y <= MaxRegion.Y; ++Y)
 		for (int64 X = MinRegion.X; X <= MaxRegion.X; ++X)
 			if (!Append(MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(int32(X), int32(Y), 0)))) return false;
-	if (Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion)
-	{
-		const int64 FineWidth = int64(InBounds.Max.X) - InBounds.Min.X;
-		const int64 FineHeight = int64(InBounds.Max.Y) - InBounds.Min.Y;
-		if (FineWidth > MaximumFacts || FineHeight > MaximumFacts / FineWidth)
-		{ OutError = TEXT("Oversized: dense natural column request"); return false; }
-		for (int64 Y = InBounds.Min.Y; Y < InBounds.Max.Y; ++Y)
-			for (int64 X = InBounds.Min.X; X < InBounds.Max.X; ++X)
-				if (!Append(MakeDependency(EVoxelGenerationPlanKind::FineWater, FIntVector(int32(X), int32(Y), 0)))) return false;
-	}
+
 
 	FVoxelGenerationPlanDependencyCapture Candidate;
 	const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<FVoxelGenerationPlanDependency>(Closure.Num());
@@ -361,8 +352,6 @@ bool FVoxelGenerationPlanCoordinator::GatherEnvironmentSamples(const FIntPoint& 
 	const int32 InWidth, const int32 InHeight, const int32 InStep, const FVoxelGenerationConsumerKey& InConsumer,
 	FVoxelGenerationPlanDependencyCapture& OutDependencies, FString& OutError) const
 {
-	if (Config->Recipe && Config->Recipe->AlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion)
-	{
 	check(IsInGameThread());
 	if (!Config->Recipe || !InConsumer.IsValid() || InConsumer.WorldEpoch != WorldEpoch ||
 		InWidth <= 0 || InHeight <= 0 || InStep <= 0 || InWidth > MaximumHydrologyDependencies ||
@@ -447,16 +436,7 @@ bool FVoxelGenerationPlanCoordinator::GatherEnvironmentSamples(const FIntPoint& 
 	OutError.Reset();
 	return true;
 
-	}
 
-	const int64 MaxX = int64(InOrigin.X) + (int64(InWidth) - 1) * InStep + 1;
-	const int64 MaxY = int64(InOrigin.Y) + (int64(InHeight) - 1) * InStep + 1;
-	if (!Config->Recipe || InWidth <= 0 || InHeight <= 0 || InStep <= 0 ||
-		MaxX > VoxelGeneration::WorldCellMaxExclusive || MaxY > VoxelGeneration::WorldCellMaxExclusive)
-	{ OutError = TEXT("Invalid environment sample grid"); return false; }
-	const FVoxelGenerationBounds Bounds{FIntVector(InOrigin.X, InOrigin.Y, Config->Recipe->Settings.MinZ),
-		FIntVector(int32(MaxX), int32(MaxY), Config->Recipe->Settings.MaxZ)};
-	return GatherEnvironmentGeometry(Bounds, InOrigin, InWidth, InHeight, InStep, false, InConsumer, OutDependencies, OutError);
 }
 
 bool FVoxelGenerationPlanCoordinator::GatherEnvironmentGeometry(const FVoxelGenerationBounds& InBounds,
@@ -475,7 +455,6 @@ bool FVoxelGenerationPlanCoordinator::GatherEnvironmentGeometry(const FVoxelGene
 		InOrigin.X < InBounds.Min.X || InOrigin.Y < InBounds.Min.Y || LastX >= InBounds.Max.X || LastY >= InBounds.Max.Y)
 	{ OutError = TEXT("Sparse environment samples outside declared bounds"); return false; }
 	const auto& Settings = Config->Recipe->Settings;
-	const bool bFine = Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ClosureLease;
 	TSet<FVoxelGenerationPlanDependency> Closure;
 	int32 Capacity = 0;
@@ -500,22 +479,10 @@ bool FVoxelGenerationPlanCoordinator::GatherEnvironmentGeometry(const FVoxelGene
 	};
 	const auto AppendCell = [&](const int32 X, const int32 Y)
 	{
-		if (bFine) return Append(MakeDependency(EVoxelGenerationPlanKind::FineWater, FIntVector(X, Y, 0)));
 		const auto Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(X, Y, Settings, Config->Recipe->AlgorithmVersion);
 		return Append(MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0)));
 	};
-	if (!bFine)
-	{
 
-		const auto First = FVoxelGenerationQuery::HydrologyTopologyKeyForVoxel(InBounds.Min.X, InBounds.Min.Y, Settings).Coordinate;
-		const auto Last = FVoxelGenerationQuery::HydrologyTopologyKeyForVoxel(InBounds.Max.X - 1, InBounds.Max.Y - 1, Settings).Coordinate;
-		const int64 W = int64(Last.X) - First.X + 1, H = int64(Last.Y) - First.Y + 1;
-		if (W > MaximumFacts || H > MaximumFacts / W) { OutError = TEXT("Oversized: legacy environment capture"); return false; }
-		for (int64 Y = First.Y; Y <= Last.Y; ++Y) for (int64 X = First.X; X <= Last.X; ++X)
-			if (!Append(MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(int32(X), int32(Y), 0)))) return false;
-	}
-	else
-	{
 		for (int32 Y = 0; Y < InHeight; ++Y) for (int32 X = 0; X < InWidth; ++X)
 			if (!AppendCell(int32(int64(InOrigin.X) + int64(X) * InStep), int32(int64(InOrigin.Y) + int64(Y) * InStep))) return false;
 		const auto& Trees = Settings.Ecology.Tree;
@@ -539,7 +506,7 @@ bool FVoxelGenerationPlanCoordinator::GatherEnvironmentGeometry(const FVoxelGene
 					!AppendCell(XY.X, XY.Y)) return false;
 			}
 		}
-	}
+
 	FVoxelGenerationPlanDependencyCapture Candidate;
 	const uint64 Bytes = VoxelBoundedAllocation::ArrayBytes<FVoxelGenerationPlanDependency>(Closure.Num());
 	const uint64 Limit = Resources->Snapshot().Limits.InputBytes;
@@ -561,15 +528,7 @@ bool FVoxelGenerationPlanCoordinator::GetPrerequisiteRange(const FVoxelGeneratio
 	if (!Config->Recipe) { OutError = TEXT("生成计划缺少配方"); return false; }
 	const auto& Settings = Config->Recipe->Settings;
 	const auto Coordinate = InDependency.Coordinate();
-	if (InDependency.Kind == EVoxelGenerationPlanKind::FineWater)
-	{
-		if (Config->Recipe->AlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion || Coordinate.Z != 0 ||
-			!VoxelGeneration::IsWorldCell(Coordinate.X) || !VoxelGeneration::IsWorldCell(Coordinate.Y))
-		{ OutError = TEXT("Invalid fine water dependency"); return false; }
-		OutMin = OutMax = FVoxelGenerationQuery::HydrologyKeyForVoxel(Coordinate.X, Coordinate.Y,
-			Settings, Config->Recipe->AlgorithmVersion).Coordinate;
-		OutCount = 1; return true;
-	}
+
 	if (InDependency.Kind == EVoxelGenerationPlanKind::Hydrology)
 	{
 		const int64 Side = FVoxelGenerationQuery::HydrologyKeySide(Settings, Config->Recipe->AlgorithmVersion);
@@ -671,14 +630,13 @@ bool FVoxelGenerationPlanCoordinator::RetainDependencies(
 	{
 		const FIntVector Coordinate = Dependency.Coordinate();
 		const bool bHydrology = Dependency.Kind == EVoxelGenerationPlanKind::Hydrology;
-		const bool bFine = Dependency.Kind == EVoxelGenerationPlanKind::FineWater;
 		const bool bEcology = Dependency.Kind == EVoxelGenerationPlanKind::Ecology;
-		const int64 Side = bFine ? 1 : bHydrology ? HydrologySide : bEcology ? FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
+		const int64 Side = bHydrology ? HydrologySide : bEcology ? FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
 		// Cache 按水文/生态中心与其他计划原点回收；保留实际依赖键直到消费者完成。
 		const int64 Offset = bHydrology || bEcology ? Side / 2 : 0;
 		const int64 Distance = FMath::Max(FMath::Abs(static_cast<int64>(Coordinate.X) * Side + Offset - InCenter.X),
 			FMath::Abs(static_cast<int64>(Coordinate.Y) * Side + Offset - InCenter.Y));
-		int32& Radius = bHydrology || bFine ? Point.HydrologyRadiusCells : Point.PlanRadiusCells;
+		int32& Radius = bHydrology ? Point.HydrologyRadiusCells : Point.PlanRadiusCells;
 		Radius = FMath::Max(Radius, static_cast<int32>(FMath::Min<int64>(MAX_int32, Distance)));
 	}
 	return Cache->RetainForTask(Point, Resources, InConsumer, OutRetention, OutError);
@@ -689,8 +647,8 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::EnsureEnvironm
 	const FVoxelHydrologyRegionKey Key = FVoxelGenerationQuery::HydrologyKeyForVoxel(
 		InCell.X, InCell.Y, Config->Recipe->Settings, Config->Recipe->AlgorithmVersion);
 	const FVoxelGenerationPlanDependency Dependency = MakeDependency(
-		Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion ? EVoxelGenerationPlanKind::FineWater : EVoxelGenerationPlanKind::Hydrology,
-		Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion ? FIntVector(InCell.X, InCell.Y, 0) : FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
+		EVoxelGenerationPlanKind::Hydrology,
+		FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
 	const auto Consumer = EnvironmentConsumer({FIntVector(InCell.X, InCell.Y, 0), FIntVector(InCell.X, InCell.Y, 0)}, true);
 	if (!Consumer.IsValid()) return {false, false, TEXT("CapacityBlocked: generation environment attempt")};
 	return Ensure(MakeArrayView(&Dependency, 1), EVoxelWorkClass::Interactive, 0, 0.0, 0.0, Consumer);
@@ -703,19 +661,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::EnsureEnvironm
 	check(IsInGameThread());
 	if (!InBounds.IsValid() || !Config->Recipe)
 		return { false, true, TEXT("Environment preflight received invalid bounds or recipe") };
-	if (Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion)
-	{
-		const int64 W = int64(InBounds.Max.X) - InBounds.Min.X, H = int64(InBounds.Max.Y) - InBounds.Min.Y;
-		if (W > MAX_int32 || H > MAX_int32) return {false, true, TEXT("Oversized: dense fine environment")};
-		const auto Consumer = EnvironmentConsumer(InBounds, false);
-		if (!Consumer.IsValid()) return {false, false, TEXT("CapacityBlocked: fine environment consumer")};
-		FVoxelGenerationPlanDependencyCapture Dependencies; FString Error;
-		if (!GatherEnvironmentGeometry(InBounds, FIntPoint(InBounds.Min.X, InBounds.Min.Y), int32(W), int32(H), 1,
-			false, Consumer, Dependencies, Error)) return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
-		const auto Status = Ensure(Dependencies.Values, InWorkClass, InSourcePriority, InDistanceScore, InForwardScore, Consumer);
-		if (Status.bReady || Status.bFailed) ReleaseConsumer(Consumer);
-		return Status;
-	}
+
 	const auto& Settings = Config->Recipe->Settings;
 	const FIntPoint Min = FVoxelGenerationQuery::HydrologyKeyForVoxel(
 		InBounds.Min.X, InBounds.Min.Y, Settings, Config->Recipe->AlgorithmVersion).Coordinate;
@@ -758,11 +704,7 @@ bool FVoxelGenerationPlanCoordinator::IsCached(
 		FVoxelHydrologyPlanPtr Plan;
 		return Cache->FindHydrology(InDependency.HydrologyKey, Plan);
 	}
-	case EVoxelGenerationPlanKind::FineWater:
-	{
-		FVoxelHydrologyFinePlanPtr Plan;
-		return Cache->FindFineWater(FIntPoint(InDependency.TileKey.Coordinate.X, InDependency.TileKey.Coordinate.Y), Plan);
-	}
+
 	case EVoxelGenerationPlanKind::Cave:
 	{
 		FVoxelCavePlanPtr Plan;
@@ -796,7 +738,7 @@ void FVoxelGenerationPlanCoordinator::RefreshQueuedPriorities()
 	{
 		if (Kind != EVoxelTaskKind::BuildGenerationPlan || Stamp.WorldEpoch != WorldEpoch) return;
 		const uint64 KindValue = Stamp.Revision;
-		if (KindValue > static_cast<uint64>(EVoxelGenerationPlanKind::FineWater)) return;
+		if (KindValue > static_cast<uint64>(EVoxelGenerationPlanKind::Ecology)) return;
 		const FVoxelGenerationPlanDependency Dependency = MakeDependency(
 			static_cast<EVoxelGenerationPlanKind>(KindValue), Stamp.Section);
 		if (const FState* State = Storage->States.Find(Dependency))
@@ -933,9 +875,6 @@ int32 FVoxelGenerationPlanCoordinator::AdvancePendingAdmissions(const double InD
 		}
 		if (IsCached(Dependency))
 		{
-			if (Dependency.Kind == EVoxelGenerationPlanKind::FineWater && State.AttemptId)
-				Cache->CancelFineWaterBuild(FIntPoint(Dependency.TileKey.Coordinate.X, Dependency.TileKey.Coordinate.Y),
-					WorldEpoch, EnvironmentOwnerId, EnvironmentOwnerIncarnation, State.AttemptId);
 			ClearPendingRequest(State);
 			State.State = EVoxelPlanDependencyState::Ready;
 			State.Error.Reset();
@@ -1015,7 +954,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(CaptureConsumer);
 	if ((!InOutState.PrerequisiteRetention || InOutState.bPrerequisiteRetentionPending) && !InOutState.Prerequisites.IsEmpty())
 	{
-		const int64 Side = InDependency.Kind == EVoxelGenerationPlanKind::FineWater ? 1 : InDependency.Kind == EVoxelGenerationPlanKind::Ecology ?
+		const int64 Side = InDependency.Kind == EVoxelGenerationPlanKind::Ecology ?
 			FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
 		const FIntPoint Center(int32(FMath::Clamp<int64>(int64(InDependency.Coordinate().X) * Side, MIN_int32, MAX_int32)),
 			int32(FMath::Clamp<int64>(int64(InDependency.Coordinate().Y) * Side, MIN_int32, MAX_int32)));
@@ -1181,12 +1120,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 						Plan, Result.Error, &Cancel);
 					break;
 				}
-				case EVoxelGenerationPlanKind::FineWater:
-				{
-					FVoxelHydrologyFinePlanPtr Plan;
-					Result.bSuccess = Query.EnsureFineWater(FIntPoint(Dependency.TileKey.Coordinate.X, Dependency.TileKey.Coordinate.Y),
-						Plan, Result.Error, &Cancel); break;
-				}
+
 				case EVoxelGenerationPlanKind::Cave:
 				{
 					FVoxelCavePlanPtr Plan;
@@ -1260,13 +1194,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 					return;
 				}
 				State->bInFlight = false;
-				if (Dependency.Kind == EVoxelGenerationPlanKind::FineWater && IsCached(Dependency))
-				{
-					Cache->CancelFineWaterBuild(FIntPoint(Dependency.TileKey.Coordinate.X, Dependency.TileKey.Coordinate.Y),
-						WorldEpoch, EnvironmentOwnerId, EnvironmentOwnerIncarnation, State->AttemptId);
 
-					Result.bSuccess = true; Result.bCanceled = false; Result.bContinue = false; Result.Error.Reset();
-				}
 				if (!Result.bCanceled && Result.Error.StartsWith(TEXT("DependencyNotReady")))
 				{
 					const auto Reads = StaticCastSharedPtr<const FPlanReadDependencies>(Result.CustomPayload);
@@ -1305,7 +1233,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 							}
 						}
 						State = Storage->States.Find(Dependency);
-						const int64 Side = Dependency.Kind == EVoxelGenerationPlanKind::FineWater ? 1 : Dependency.Kind == EVoxelGenerationPlanKind::Ecology ?
+						const int64 Side = Dependency.Kind == EVoxelGenerationPlanKind::Ecology ?
 							FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
 						const FVoxelGenerationConsumerKey RetentionConsumer{EVoxelGenerationConsumerKind::WorldFact, Result.Stamp.WorldEpoch,
 							Result.Stamp.OwnerId, Result.Stamp.OwnerIncarnation, EVoxelGenerationSpatialKind::Section,
@@ -1624,9 +1552,6 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			const bool bCached = IsCached(Dependency);
 			if (bCached)
 			{
-				if (Dependency.Kind == EVoxelGenerationPlanKind::FineWater && State.AttemptId)
-					Cache->CancelFineWaterBuild(FIntPoint(Dependency.TileKey.Coordinate.X, Dependency.TileKey.Coordinate.Y),
-						WorldEpoch, EnvironmentOwnerId, EnvironmentOwnerIncarnation, State.AttemptId);
 				if (State.PendingRequest.IsSet())
 				{
 					ClearPendingRequest(State);
@@ -1692,11 +1617,7 @@ void FVoxelGenerationPlanCoordinator::Reset()
 				Cache->CancelHydrologyBuild(Pair.Key.HydrologyKey, WorldEpoch, EnvironmentOwnerId,
 					PreviousIncarnation, Pair.Value.AttemptId);
 			}
-			else if (Pair.Key.Kind == EVoxelGenerationPlanKind::FineWater && Pair.Value.AttemptId)
-			{
-				Cache->CancelFineWaterBuild(FIntPoint(Pair.Key.TileKey.Coordinate.X, Pair.Key.TileKey.Coordinate.Y),
-					WorldEpoch, EnvironmentOwnerId, PreviousIncarnation, Pair.Value.AttemptId);
-			}
+
 		}
 	}
 	// 在任何 Scheduler 通知之前撤掉旧存储，重入的新代不能被本次 Reset 再删除。
@@ -1771,11 +1692,7 @@ void FVoxelGenerationPlanCoordinator::RemoveSubscription(const FVoxelGenerationP
 			Cache->CancelHydrologyBuild(InDependency.HydrologyKey, WorldEpoch, EnvironmentOwnerId,
 				EnvironmentOwnerIncarnation, Attempt);
 		}
-		else if (InDependency.Kind == EVoxelGenerationPlanKind::FineWater && Attempt)
-		{
-			Cache->CancelFineWaterBuild(FIntPoint(InDependency.TileKey.Coordinate.X, InDependency.TileKey.Coordinate.Y),
-				WorldEpoch, EnvironmentOwnerId, EnvironmentOwnerIncarnation, Attempt);
-		}
+
 		Scheduler.CancelMatching([Attempt, Epoch = WorldEpoch](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
 		{
 			return Kind == EVoxelTaskKind::BuildGenerationPlan && Stamp.WorldEpoch == Epoch && Stamp.Token == Attempt;
@@ -2167,11 +2084,7 @@ void FVoxelGenerationPlanCoordinator::ForgetFact(const FVoxelGenerationPlanDepen
 			Cache->CancelHydrologyBuild(InDependency.HydrologyKey, WorldEpoch, EnvironmentOwnerId,
 				EnvironmentOwnerIncarnation, Attempt);
 		}
-		else if (InDependency.Kind == EVoxelGenerationPlanKind::FineWater && Attempt)
-		{
-			Cache->CancelFineWaterBuild(FIntPoint(InDependency.TileKey.Coordinate.X, InDependency.TileKey.Coordinate.Y),
-				WorldEpoch, EnvironmentOwnerId, EnvironmentOwnerIncarnation, Attempt);
-		}
+
 		const auto CapturedStorage = Storage;
 		const uint64 Incarnation = EnvironmentOwnerIncarnation;
 		ClearPendingRequest(*State);

@@ -221,7 +221,12 @@ EVoxelHydrologySharedSearchStep FVoxelHydrologySharedSearch::Advance(FReadCell I
         if (Cell.GroundZ < -32768 || Cell.GroundZ > 32768 || Cell.RainWeight > 10000 ||
             (Cell.IsReceiver() && (Cell.ReceiverWaterZ < -32768 || Cell.ReceiverWaterZ > 32768 ||
              Cell.GroundZ >= Cell.ReceiverWaterZ || (Cell.ReceiverId.High == 0 && Cell.ReceiverId.Low == 0))))
-        { OutError = TEXT("Shared drainage input is out of bounds or receiver is not genuinely wet and identified"); return false; }
+        {
+            OutError = FString::Printf(TEXT("Shared drainage input is out of bounds or receiver is not genuinely wet and identified: cell=(%d,%d) ground=%d water=%d rain=%u receiver=%d id=(%llu,%llu)"),
+                Cell.Cell.X, Cell.Cell.Y, Cell.GroundZ, Cell.ReceiverWaterZ, Cell.RainWeight,
+                Cell.IsReceiver(), Cell.ReceiverId.High, Cell.ReceiverId.Low);
+            return false;
+        }
         if (Cell.bHasLocalOutlet && (Cell.IsReceiver() || Cell.LocalOutletBarrier < Cell.GroundZ ||
             Cell.LocalOutletBarrier < Cell.LocalOutletWaterZ || Cell.LocalOutletBarrier > 32768 ||
             Cell.LocalOutletWaterZ < -32768 || Cell.LocalOutletWaterZ > 32768 ||

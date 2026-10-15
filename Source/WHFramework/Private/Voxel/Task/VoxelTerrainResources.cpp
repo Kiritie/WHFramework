@@ -154,6 +154,11 @@ void FVoxelTerrainResources::AdvanceVersion(const bool bInCapacityReleased, cons
 {
 	checkf(State.Version != MAX_uint64, TEXT("Terrain capacity version exhausted"));
 	++State.Version;
+	if (State.RequiredResidentHeadroomBytes &&
+		CanAdd(EVoxelTerrainResourcePool::Resident, State.RequiredResidentHeadroomBytes))
+	{
+		State.RequiredResidentHeadroomBytes = 0;
+	}
 	if (bInCapacityReleased)
 	{
 		checkf(State.ReleaseVersion != MAX_uint64, TEXT("Terrain release version exhausted"));
@@ -200,6 +205,7 @@ bool FVoxelTerrainResources::Configure(const FVoxelTerrainResourceLimits& InLimi
 	State.LedgerMetadataBytes = 0;
 	EntryCapacity = 0;
 	State.Limits = InLimits;
+	State.RequiredResidentHeadroomBytes = 0;
 	AdvanceVersion(true, ControlConsumer.IsValid() ? &ControlConsumer : nullptr);
 	return true;
 }
@@ -342,6 +348,11 @@ EVoxelTerrainResourceAdmission FVoxelTerrainResources::TryAcquire(const FVoxelGe
 		InReservedSplits, InRequiredInputBytes, InRequiredLeaseCount);
 	if (Admission != EVoxelTerrainResourceAdmission::Granted)
 	{
+		if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked &&
+			InPool == EVoxelTerrainResourcePool::Resident && !CanAdd(InPool, InBytes))
+		{
+			State.RequiredResidentHeadroomBytes = FMath::Max(State.RequiredResidentHeadroomBytes, InBytes);
+		}
 		return Admission;
 	}
 	const uint64 InputBytes = InPool == EVoxelTerrainResourcePool::Input ? InBytes : 0;
@@ -419,7 +430,14 @@ EVoxelTerrainResourceAdmission FVoxelTerrainResources::TryResize(const uint64 In
 	{
 		if (!CanFitRequired(Entry->Pool, InBytes, Entry->ReservedSplits, InRequiredInputBytes, InRequiredLeaseCount))
 			return EVoxelTerrainResourceAdmission::CapacityUnachievable;
-		if (!CanAdd(Entry->Pool, InBytes - Entry->Bytes)) return EVoxelTerrainResourceAdmission::CapacityBlocked;
+		if (!CanAdd(Entry->Pool, InBytes - Entry->Bytes))
+		{
+			if (Entry->Pool == EVoxelTerrainResourcePool::Resident)
+			{
+				State.RequiredResidentHeadroomBytes = FMath::Max(State.RequiredResidentHeadroomBytes, InBytes - Entry->Bytes);
+			}
+			return EVoxelTerrainResourceAdmission::CapacityBlocked;
+		}
 	}
 	if (Entry->Bytes != InBytes)
 	{

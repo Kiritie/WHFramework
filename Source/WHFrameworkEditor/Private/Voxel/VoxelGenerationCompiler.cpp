@@ -266,6 +266,7 @@ bool FVoxelGenerationCompiler::BuildRecipe(
 	FVoxelGenerationRecipe& OutRecipe,
 	FString& OutError)
 {
+	const uint32 AlgorithmVersion = FVoxelGenerationRecipe::CurrentAlgorithmVersion;
 	if (InProfile.TargetCellCentimeters <= 0)
 	{
 		OutError = TEXT("Voxel generation profile target cell size must be positive");
@@ -297,7 +298,7 @@ bool FVoxelGenerationCompiler::BuildRecipe(
 	FVoxelGenerationRecipe Recipe;
 
 	Recipe.AlgorithmVersion =
-		FVoxelGenerationRecipe::CurrentAlgorithmVersion;
+		AlgorithmVersion;
 
 	Recipe.CellCentimeters =
 		InProfile.TargetCellCentimeters;

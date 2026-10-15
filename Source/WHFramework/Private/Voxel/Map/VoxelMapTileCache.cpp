@@ -432,10 +432,6 @@ bool FVoxelMapTileCache::ReservePendingStorage(const int32 InRequired, FString& 
 int32 FVoxelMapTileCache::SelectBatchRows(const FVoxelMapTileKey& InKey, const FIntPoint& InOrigin,
 	const int32 InStartRow) const
 {
-	if (Config->Recipe->AlgorithmVersion > FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion)
-	{
-		return 1;
-	}
 	const auto& Settings = Config->Recipe->Settings;
 	int32 UniqueColumns = 0;
 	int32 PreviousX = 0;

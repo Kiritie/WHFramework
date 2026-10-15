@@ -223,8 +223,15 @@ bool FVoxelSourceCapacityOwnedPrefixTest::RunTest(const FString& Parameters)
 	Fixture.Previous.Reset();
 	Fixture.OtherPool.Reset();
 	const auto After = Resources->Snapshot();
+	TestEqual(TEXT("全部实际租约归还"), After.LeaseCount, Before.LeaseCount);
+	TestEqual(TEXT("全部拆分预留归还"), After.ReservedSplitCount, Before.ReservedSplitCount);
+	TestEqual(TEXT("全部句柄归还"), After.LeaseHandleBytes, Before.LeaseHandleBytes);
+	TestEqual(TEXT("只保留账本自身仍存活的原始页容量"), After.Used[int32(EVoxelTerrainResourcePool::Input)],
+		Before.Used[int32(EVoxelTerrainResourcePool::Input)] + After.LedgerMetadataBytes - Before.LedgerMetadataBytes);
+	if (!TestTrue(TEXT("没有活租约时可真实释放账本页且保持原预算"), Resources->Configure(Before.Limits))) return false;
+	const auto Released = Resources->Snapshot();
 	for (int32 Pool = 0; Pool < int32(EVoxelTerrainResourcePool::Count); ++Pool)
-		TestEqual(TEXT("取消未提交前缀及释放已移交来源后全部池归还"), After.Used[Pool], Before.Used[Pool]);
+		TestEqual(TEXT("取消未提交前缀及释放已移交来源和账本页后全部池归还"), Released.Used[Pool], Before.Used[Pool]);
 	return true;
 }
 

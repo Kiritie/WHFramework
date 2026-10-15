@@ -4041,9 +4041,7 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewProxyEnvironment);
 		RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
-		if (!(Config->Recipe->AlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion
-			? Module.EnsureEnvironmentBounds(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)
-			: Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)).bReady)
+		if (!(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)).bReady)
 			return false;
 	}
 	if (bDataOnly)
@@ -4352,9 +4350,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	const auto EnvironmentRetention = bDataOnly ? RetainPreparedEnvironment(DataKey, *Generator, OverlayBounds) : nullptr;
 	if (bDataOnly && !EnvironmentRetention) return false;
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
-	if (bDataOnly && !(Config->Recipe->AlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion
-			? Module.EnsureEnvironmentBounds(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)
-			: Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)).bReady)
+	if (bDataOnly && !(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)).bReady)
 		return false;
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("ProjectOverlayPreflight"));
 	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
@@ -4666,9 +4662,7 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 	const auto EnvironmentRetention = bDataOnly ? RetainPreparedEnvironment(DataKey, *Generator, Bounds) : nullptr;
 	if (bDataOnly && !EnvironmentRetention) return false;
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
-	if (bDataOnly && !(Config->Recipe->AlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion
-			? Module.EnsureEnvironmentBounds(Bounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)
-			: Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)).bReady)
+	if (bDataOnly && !(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)).bReady)
 		return false;
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("ProjectOverlayPreflight"));
 	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(Bounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)

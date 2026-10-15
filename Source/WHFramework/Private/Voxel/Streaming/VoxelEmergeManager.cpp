@@ -1487,11 +1487,6 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentSamples(
 	const int32 DependencyCount = Consumer->Dependencies.Values.Num();
 
 
-	if (Generator->GetRuntimeConfig()->Recipe->AlgorithmVersion <= FVoxelGenerationRecipe::LegacyHydrologyAlgorithmVersion &&
-		DependencyCount > 64)
-	{
-		return {false, true, TEXT("InvalidRequest: map sample batch exceeds active dependency limit")};
-	}
 	if (!Consumer->SampleRetentionStorageLease)
 	{
 		const uint64 Bytes = VoxelGenerationAllocation::Private::ArrayReserveBytes<
@@ -1535,11 +1530,8 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentSamples(
 	while (Consumer->SampleRetentions.Num() < RetentionEnd)
 	{
 		const auto& Dependency = Consumer->Dependencies.Values[Consumer->SampleRetentions.Num()];
-		const bool bFineWater = Dependency.Kind == EVoxelGenerationPlanKind::FineWater;
-		const int64 CenterX = bFineWater ? int64(Dependency.TileKey.Coordinate.X) :
-			int64(Dependency.HydrologyKey.Coordinate.X) * HydrologySide + HydrologySide / 2;
-		const int64 CenterY = bFineWater ? int64(Dependency.TileKey.Coordinate.Y) :
-			int64(Dependency.HydrologyKey.Coordinate.Y) * HydrologySide + HydrologySide / 2;
+		const int64 CenterX = int64(Dependency.HydrologyKey.Coordinate.X) * HydrologySide + HydrologySide / 2;
+		const int64 CenterY = int64(Dependency.HydrologyKey.Coordinate.Y) * HydrologySide + HydrologySide / 2;
 		FVoxelGenerationCacheRetentionPoint Point;
 		Point.Center = FIntPoint(int32(FMath::Clamp<int64>(CenterX, MIN_int32, MAX_int32)),
 			int32(FMath::Clamp<int64>(CenterY, MIN_int32, MAX_int32)));
