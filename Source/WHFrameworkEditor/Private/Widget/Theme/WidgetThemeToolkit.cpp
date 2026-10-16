@@ -6,6 +6,13 @@
 #include "Widget/Theme/WidgetThemeResolver.h"
 #include "Widget/Common/CommonTextBlockN.h"
 #include "Widget/Common/CommonImageN.h"
+#include "Widget/Common/CommonInput.h"
+#include "Widget/Common/CommonToggle.h"
+#include "Widget/Common/CommonRange.h"
+#include "Widget/Common/CommonProgress.h"
+#include "Widget/Common/CommonScroll.h"
+#include "Widget/Common/CommonBorderN.h"
+
 #include "AssetTypeActions_Base.h"
 #include "AssetToolsModule.h"
 #include "Editor.h"
@@ -99,17 +106,17 @@ void RegisterWidgetThemeAssetEditor()
 											 MakeShared<FWidgetThemeToolkit>()->Open(Default, nullptr);
 										 }
 									 })));
-			Section.AddMenuEntry("ShowThemeFolders", LOCTEXT("ShowThemeFolders", "Show Themes folders in Content Browser"), FText(), FSlateIcon(),
+			Section.AddMenuEntry("ShowExternalAssetFolders", LOCTEXT("ShowExternalAssetFolders", "Show external asset folders in Content Browser"), FText(), FSlateIcon(),
 								 FUIAction(FExecuteAction::CreateLambda(
 											   []
 											   {
 												   auto* Settings = GetMutableDefault<UWidgetThemeEditorSettings>();
-												   Settings->bHideThemeFolders = !Settings->bHideThemeFolders;
+												   Settings->bHideExternalAssetFolders = !Settings->bHideExternalAssetFolders;
 												   Settings->SaveConfig();
 												   UWidgetThemeEditorSettings::ApplyFolderVisibility();
 											   }),
 										   FCanExecuteAction(),
-										   FIsActionChecked::CreateLambda([] { return !GetDefault<UWidgetThemeEditorSettings>()->bHideThemeFolders; })),
+										   FIsActionChecked::CreateLambda([] { return !GetDefault<UWidgetThemeEditorSettings>()->bHideExternalAssetFolders; })),
 								 EUserInterfaceActionType::ToggleButton);
 		}));
 	if (!ThemeActions)
@@ -158,6 +165,53 @@ void FWidgetThemeToolkit::Open(UWidgetTheme* InTheme, const TSharedPtr<IToolkitH
 	PreviewText->SetJustification(ETextJustify::Center);
 	PreviewImage = NewObject<UCommonImageN>(PreviewRoot);
 	PreviewImage->SetDesignerFlags(EWidgetDesignFlags::Designing);
+	auto PrepareControl = [this](UWidget* Control)
+	{
+		Control->SetDesignerFlags(EWidgetDesignFlags::Designing);
+		if (UUserWidget* UserWidget = Cast<UUserWidget>(Control))
+		{
+			UserWidget->Initialize();
+		}
+	};
+	UCommonInput* Input = NewObject<UCommonInput>(PreviewRoot);
+	PrepareControl(Input);
+	Input->SetText(LOCTEXT("InputPreview", "Input text 输入"));
+	PreviewControls.Add(EWidgetStyleKind::Input, Input);
+	UCommonToggle* Toggle = NewObject<UCommonToggle>(PreviewRoot);
+	PrepareControl(Toggle);
+	PreviewControls.Add(EWidgetStyleKind::Toggle, Toggle);
+	UCommonRange* Range = NewObject<UCommonRange>(PreviewRoot);
+	PrepareControl(Range);
+	FCommonRangeConfig RangeConfig;
+	RangeConfig.bHasMin = true;
+	RangeConfig.bHasMax = true;
+	Range->Configure(RangeConfig);
+	Range->SetValue(0.5);
+	PreviewControls.Add(EWidgetStyleKind::Range, Range);
+	UCommonProgress* Progress = NewObject<UCommonProgress>(PreviewRoot);
+	PrepareControl(Progress);
+	Progress->SetPercent(0.5f);
+	PreviewControls.Add(EWidgetStyleKind::Progress, Progress);
+	UCommonScroll* Scroll = NewObject<UCommonScroll>(PreviewRoot);
+	PrepareControl(Scroll);
+	for (int32 Index = 0; Index < 5; ++Index)
+	{
+		UCommonTextBlockN* Label = NewObject<UCommonTextBlockN>(Scroll);
+		Label->SetText(FText::Format(LOCTEXT("ScrollPreview", "Scroll item {0}"), FText::AsNumber(Index + 1)));
+		Scroll->AddChild(Label);
+	}
+	PreviewControls.Add(EWidgetStyleKind::Scroll, Scroll);
+	UCommonBorderN* Border = NewObject<UCommonBorderN>(PreviewRoot);
+	PrepareControl(Border);
+	UCommonTextBlockN* BorderText = NewObject<UCommonTextBlockN>(Border);
+	BorderText->SetText(LOCTEXT("BorderPreview", "Border 面板"));
+	Border->SetContent(BorderText);
+	PreviewControls.Add(EWidgetStyleKind::Border, Border);
+	UCommonTextBlockN* TextScroll = NewObject<UCommonTextBlockN>(PreviewRoot);
+	PrepareControl(TextScroll);
+	TextScroll->SetText(LOCTEXT("TextScrollPreview", "Long text scroll preview — 长文字滚动效果预览 Aa 0123456789"));
+	TextScroll->SetScrollingEnabled(true);
+	PreviewControls.Add(EWidgetStyleKind::TextScroll, TextScroll);
 	FDetailsViewArgs Args;
 	Args.bAllowSearch = true;
 	Args.bHideSelectionTip = true;
@@ -171,7 +225,7 @@ void FWidgetThemeToolkit::Open(UWidgetTheme* InTheme, const TSharedPtr<IToolkitH
 		{
 			if (!FWidgetThemeEditorService::IsBusy() && !bEditingDetails)
 			{
-				Refresh();
+				RequestRefresh();
 			}
 		});
 	PropertyHandle = FCoreUObjectDelegates::OnObjectPropertyChanged.AddLambda(
@@ -185,9 +239,16 @@ void FWidgetThemeToolkit::Open(UWidgetTheme* InTheme, const TSharedPtr<IToolkitH
 			{
 				Refresh();
 			}
-			else if (Object && (Object->IsA<UCommonButtonStyle>() || Object->IsA<UCommonTextStyle>() || Object->IsA<UWidgetBrushStyle>()))
+			else if (Object)
 			{
-				UpdatePreview();
+				for (EWidgetStyleKind Kind : WidgetStyleTags::Kinds())
+				{
+					if (Object->IsA(FWidgetThemeResolver::NativeBase(Kind)))
+					{
+						UpdatePreview();
+						break;
+					}
+				}
 			}
 		});
 	CompileHandle = GEditor->OnBlueprintCompiled().AddLambda(
@@ -195,7 +256,7 @@ void FWidgetThemeToolkit::Open(UWidgetTheme* InTheme, const TSharedPtr<IToolkitH
 		{
 			if (!FWidgetThemeEditorService::IsBusy() && !bEditingDetails)
 			{
-				Refresh();
+				RequestRefresh();
 			}
 		});
 	const auto Layout = CreateDefaultLayout();
@@ -210,6 +271,7 @@ void FWidgetThemeToolkit::Open(UWidgetTheme* InTheme, const TSharedPtr<IToolkitH
 
 FWidgetThemeToolkit::~FWidgetThemeToolkit()
 {
+	FTSTicker::GetCoreTicker().RemoveTicker(RefreshHandle);
 	if (Details)
 	{
 		Details->OnFinishedChangingProperties().Remove(DetailsFinishedHandle);
@@ -231,6 +293,10 @@ void FWidgetThemeToolkit::AddReferencedObjects(FReferenceCollector& Collector)
 	Collector.AddReferencedObject(PreviewButton);
 	Collector.AddReferencedObject(PreviewText);
 	Collector.AddReferencedObject(PreviewImage);
+	for (auto& Control : PreviewControls)
+	{
+		Collector.AddReferencedObject(Control.Value);
+	}
 }
 
 void FWidgetThemeToolkit::RegisterTabSpawners(const TSharedRef<FTabManager>& Manager)
@@ -412,29 +478,27 @@ TSharedRef<SDockTab> FWidgetThemeToolkit::SpawnTags(const FSpawnTabArgs& Args)
 			.IsEnabled_Lambda(MoveTemp(Enabled))
 			.OnClicked_Lambda([this, Label, Operation] { return Run(Label, Operation); });
 	};
-	TSharedRef<SHorizontalBox> Types = SNew(SHorizontalBox);
-	for (EWidgetStyleKind Type : {EWidgetStyleKind::None, EWidgetStyleKind::Button, EWidgetStyleKind::Text, EWidgetStyleKind::Brush})
+	StyleTypes.Reset();
+	StyleTypes.Add(MakeShared<EWidgetStyleKind>(EWidgetStyleKind::None));
+	for (EWidgetStyleKind Type : WidgetStyleTags::Kinds())
 	{
-		const FString Label = Type == EWidgetStyleKind::None	 ? TEXT("All")
-							  : Type == EWidgetStyleKind::Button ? TEXT("Button")
-							  : Type == EWidgetStyleKind::Text	 ? TEXT("Text")
-																 : TEXT("Brush");
-		Types->AddSlot().FillWidth(1).Padding(
-			1, 0)[SNew(SCheckBox)
-					  .Style(FAppStyle::Get(), "SegmentedCombo.ButtonOnly")
-					  .HAlign(HAlign_Center)
-					  .Padding(FMargin(2, 3))
-					  .IsChecked_Lambda([this, Type] { return TypeFilter == Type ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
-					  .OnCheckStateChanged_Lambda(
-						  [this, Type](ECheckBoxState State)
-						  {
-							  if (State == ECheckBoxState::Checked)
-							  {
-								  TypeFilter = Type;
-								  Refresh();
-							  }
-						  })[SNew(STextBlock).Text(FText::FromString(Label)).Justification(ETextJustify::Center)]];
+		StyleTypes.Add(MakeShared<EWidgetStyleKind>(Type));
 	}
+	TSharedRef<SWidget> Types = SNew(SComboBox<TSharedPtr<EWidgetStyleKind>>)
+		.OptionsSource(&StyleTypes)
+		.InitiallySelectedItem(StyleTypes[0])
+		.OnGenerateWidget_Lambda([](TSharedPtr<EWidgetStyleKind> Type)
+		{
+			return SNew(STextBlock).Text(FText::FromString(WidgetStyleTags::Label(*Type)));
+		})
+		.OnSelectionChanged_Lambda([this](TSharedPtr<EWidgetStyleKind> Type, ESelectInfo::Type)
+		{
+			if (Type)
+			{
+				TypeFilter = *Type;
+				Refresh();
+			}
+		})[SNew(STextBlock).Text_Lambda([this] { return FText::FromString(WidgetStyleTags::Label(TypeFilter)); })];
 	TSharedRef<SHorizontalBox> Actions = SNew(SHorizontalBox);
 	Actions->AddSlot().FillWidth(1)[SNew(SButton)
 										.HAlign(HAlign_Center)
@@ -547,6 +611,10 @@ TSharedRef<SDockTab> FWidgetThemeToolkit::SpawnPreview(const FSpawnTabArgs& Args
 										   PreviewButton->SetIsEnabled(Enabled);
 										   PreviewText->SetIsEnabled(Enabled);
 										   PreviewImage->SetIsEnabled(Enabled);
+										   for (const auto& Control : PreviewControls)
+										   {
+											   Control.Value->SetIsEnabled(Enabled);
+										   }
 									   })[SNew(STextBlock).Text(LOCTEXT("Disabled", "Disabled"))]];
 	Header->AddSlot()
 		.AutoWidth()
@@ -574,15 +642,18 @@ TSharedRef<SDockTab> FWidgetThemeToolkit::SpawnPreview(const FSpawnTabArgs& Args
 			.HeightOverride_Lambda([this] { return PreviewSize.Y; })
 			.Visibility_Lambda([Visibility, Type] { return Visibility(Type); })[Widget];
 	};
-	return SNew(SDockTab).ShouldAutosize(
-		false)[SNew(SOverlay) +
-			   SOverlay::Slot()
-				   .HAlign(HAlign_Center)
-				   .VAlign(VAlign_Center)[SNew(SVerticalBox) +
-										  SVerticalBox::Slot().AutoHeight()[PreviewBox(EWidgetStyleKind::Button, PreviewButton->TakeWidget())] +
-										  SVerticalBox::Slot().AutoHeight()[PreviewBox(EWidgetStyleKind::Text, PreviewText->TakeWidget())] +
-										  SVerticalBox::Slot().AutoHeight()[PreviewBox(EWidgetStyleKind::Brush, PreviewImage->TakeWidget())]] +
-			   SOverlay::Slot().VAlign(VAlign_Top).Padding(8)[Header]];
+	TSharedRef<SVerticalBox> Previews = SNew(SVerticalBox);
+	Previews->AddSlot().AutoHeight()[PreviewBox(EWidgetStyleKind::Button, PreviewButton->TakeWidget())];
+	Previews->AddSlot().AutoHeight()[PreviewBox(EWidgetStyleKind::Text, PreviewText->TakeWidget())];
+	Previews->AddSlot().AutoHeight()[PreviewBox(EWidgetStyleKind::Brush, PreviewImage->TakeWidget())];
+	for (const auto& Control : PreviewControls)
+	{
+		Previews->AddSlot().AutoHeight()[PreviewBox(Control.Key, Control.Value->TakeWidget())];
+	}
+	return SNew(SDockTab).ShouldAutosize(false)[SNew(SOverlay)
+		+ SOverlay::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center)[Previews]
+		+ SOverlay::Slot().VAlign(VAlign_Top).Padding(8)[Header]];
+
 }
 
 TSharedRef<SDockTab> FWidgetThemeToolkit::SpawnDetails(const FSpawnTabArgs& Args)
@@ -595,6 +666,25 @@ TSharedRef<SDockTab> FWidgetThemeToolkit::SpawnContext(const FSpawnTabArgs& Args
 	return SNew(SDockTab).ShouldAutosize(
 		false)[SNew(SScrollBox).ScrollBarAlwaysVisible(true) +
 			   SScrollBox::Slot().Padding(8)[SNew(STextBlock).AutoWrapText(true).Text_Lambda([this] { return FText::FromString(Report); })]];
+}
+
+void FWidgetThemeToolkit::RequestRefresh()
+{
+	if (!RefreshHandle.IsValid())
+	{
+		RefreshHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateSP(this, &FWidgetThemeToolkit::HandleDeferredRefresh));
+	}
+}
+
+bool FWidgetThemeToolkit::HandleDeferredRefresh(float DeltaTime)
+{
+	if (FWidgetThemeEditorService::IsBusy() || bEditingDetails)
+	{
+		return true;
+	}
+	RefreshHandle.Reset();
+	Refresh();
+	return false;
 }
 
 void FWidgetThemeToolkit::Refresh()
@@ -643,7 +733,7 @@ void FWidgetThemeToolkit::Select(TSharedPtr<FThemeTreeItem> Item, ESelectInfo::T
 void FWidgetThemeToolkit::BindDetails()
 {
 	EWidgetStyleKind Type;
-	UClass* StyleClass = FWidgetThemeEditorService::Kind(SelectedTag, Type) ? Theme->GetStyleClass(SelectedTag, Type) : nullptr;
+	UClass* StyleClass = FWidgetThemeEditorService::Kind(SelectedTag, Type) ? Theme->ResolveStyleClass(SelectedTag, Type) : nullptr;
 	Details->SetObject(StyleClass ? StyleClass->GetDefaultObject() : nullptr, true);
 }
 
@@ -654,7 +744,7 @@ void FWidgetThemeToolkit::UpdatePreview()
 	{
 		return;
 	}
-	UClass* StyleClass = Theme->GetStyleClass(SelectedTag, Type);
+	UClass* StyleClass = Theme->ResolveStyleClass(SelectedTag, Type);
 	if (!StyleClass)
 	{
 		return;
@@ -663,22 +753,39 @@ void FWidgetThemeToolkit::UpdatePreview()
 	if (Type == EWidgetStyleKind::Button)
 	{
 		PreviewButton->SetStyleTag(SelectedTag);
-		PreviewButton->SetStyle(Theme->GetStyleClass(SelectedTag, Type));
+		PreviewButton->SetStyle(Theme->ResolveStyleClass(SelectedTag, Type));
 		PreviewButton->SetPreviewTextVisible(bShowPreviewText);
 	}
 	else if (Type == EWidgetStyleKind::Text)
 	{
 		PreviewText->SetStyleTag(SelectedTag);
-		PreviewText->SetStyle(Theme->GetStyleClass(SelectedTag, Type));
+		PreviewText->SetStyle(Theme->ResolveStyleClass(SelectedTag, Type));
 	}
-	else
+	else if (Type == EWidgetStyleKind::Brush)
 	{
 		PreviewImage->SetStyleTag(SelectedTag);
-		if (const UWidgetBrushStyle* Style = Theme->GetStyleClass(SelectedTag, Type)->GetDefaultObject<UWidgetBrushStyle>())
+		PreviewImage->SetBrush(StyleClass->GetDefaultObject<UWidgetBrushStyle>()->Brush);
+	}
+	else if (TObjectPtr<UWidget>* Control = PreviewControls.Find(Type))
+	{
+		if (UCommonWidget* Common = Cast<UCommonWidget>(Control->Get()))
 		{
-			PreviewImage->SetBrush(Style->Brush);
+			Common->SetStyleTag(SelectedTag);
+		}
+		else if (UCommonScroll* Scroll = Cast<UCommonScroll>(Control->Get()))
+		{
+			Scroll->SetStyleTag(SelectedTag);
+		}
+		else if (UCommonBorderN* Border = Cast<UCommonBorderN>(Control->Get()))
+		{
+			Border->SetStyleTag(SelectedTag);
+		}
+		else if (UCommonTextBlockN* TextScroll = Cast<UCommonTextBlockN>(Control->Get()))
+		{
+			TextScroll->SetTextScrollStyleTag(SelectedTag);
 		}
 	}
+
 }
 
 void FWidgetThemeToolkit::UpdatePreviewSize(UObject* Style, EWidgetStyleKind Kind)

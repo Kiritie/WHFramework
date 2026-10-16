@@ -17,6 +17,7 @@ public:
 	static UBlueprint* Blueprint(UWidgetTheme* Theme, FGameplayTag Tag);
 	static bool Validate(UWidgetTheme* Theme, FString& Report);
 	static TArray<FString> GetCreationRoots();
+	static bool GetTagSourceFilename(const FString& OwnerPath, FString& Filename, FString& Report);
 	static bool Create(UWidgetTheme* Theme, FGameplayTag Parent, const FString& Name, EWidgetStyleKind Kind, const FString& DestinationRoot,
 					   bool bInheritParent, FString& Report);
 	static bool Associate(UWidgetTheme* Theme, FGameplayTag Parent, const FString& Name, UWidgetTheme* SourceTheme, FGameplayTag SourceTag, FString& Report);
@@ -38,10 +39,11 @@ public:
 	static bool SetProjectDefault(UWidgetTheme* Theme, FString& Report);
 	static bool OrganizeAssets(UWidgetTheme* Theme, FString& Report);
 	static bool IsBusy();
+	static UBlueprint* CreateForTag(UWidgetTheme* Theme, const FString& FullTag, UClass* ParentClass, const FString& DestinationRoot, FString& Report);
 	static TArray<FProperty*> EditableProperties(UClass* Class);
 
 private:
 	static bool bBusy;
-	static bool RegisterTag(const FString& Name, FString& Report);
+	static bool RegisterTag(const FString& Name, const FString& OwnerPath, FString& Report);
 	static bool RenameTag(FGameplayTag OldTag, FGameplayTag NewTag, FString& Report);
 };

@@ -7,6 +7,14 @@ UWidgetThemeSettings::UWidgetThemeSettings()
 	ButtonStyleBase = USubWidgetStyle::StaticClass();
 	TextStyleBase = UCommonTextStyle::StaticClass();
 	BrushStyleBase = UWidgetBrushStyle::StaticClass();
+	InputStyleBase = UCommonInputStyle::StaticClass();
+	ToggleStyleBase = UCommonToggleStyle::StaticClass();
+	RangeStyleBase = UCommonRangeStyle::StaticClass();
+	ProgressStyleBase = UCommonProgressStyle::StaticClass();
+	ScrollStyleBase = UCommonScrollStyle::StaticClass();
+	BorderStyleBase = UCommonBorderStyle::StaticClass();
+	TextScrollStyleBase = UCommonTextScrollStyle::StaticClass();
+
 }
 
 UClass* UWidgetThemeSettings::GetStyleBase(EWidgetStyleKind Kind) const
@@ -19,6 +27,20 @@ UClass* UWidgetThemeSettings::GetStyleBase(EWidgetStyleKind Kind) const
 		return TextStyleBase.Get();
 	case EWidgetStyleKind::Brush:
 		return BrushStyleBase.Get();
+	case EWidgetStyleKind::Input:
+		return InputStyleBase.Get();
+	case EWidgetStyleKind::Toggle:
+		return ToggleStyleBase.Get();
+	case EWidgetStyleKind::Range:
+		return RangeStyleBase.Get();
+	case EWidgetStyleKind::Progress:
+		return ProgressStyleBase.Get();
+	case EWidgetStyleKind::Scroll:
+		return ScrollStyleBase.Get();
+	case EWidgetStyleKind::Border:
+		return BorderStyleBase.Get();
+	case EWidgetStyleKind::TextScroll:
+		return TextScrollStyleBase.Get();
 	default:
 		return nullptr;
 	}

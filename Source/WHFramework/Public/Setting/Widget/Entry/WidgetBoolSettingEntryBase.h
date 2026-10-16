@@ -4,7 +4,7 @@
 
 #include "WidgetBoolSettingEntryBase.generated.h"
 
-class UCommonButton;
+class UCommonToggle;
 
 UCLASS()
 class WHFRAMEWORK_API UWidgetBoolSettingEntryBase : public UWidgetSettingEntryBase
@@ -14,18 +14,16 @@ class WHFRAMEWORK_API UWidgetBoolSettingEntryBase : public UWidgetSettingEntryBa
 public:
 	UWidgetBoolSettingEntryBase(const FObjectInitializer& ObjectInitializer);
 
-	//////////////////////////////////////////////////////////////////////////
-	/// ObjectPool
-public:
-	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-
-	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
-
 protected:
+	virtual UWidget* GetValueControl() const override;
+	virtual FName GetRendererName() const override;
+	virtual void BindValueControl() override;
+	virtual void UnbindValueControl() override;
 	virtual void ApplyValueToControl_Implementation(const FParameter& InValue) override;
 
-	void OnValueChanged(bool bInSelected);
+	UFUNCTION()
+	void OnValueChanged(UCommonToggle* InToggle, bool bInChecked);
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
-	TObjectPtr<UCommonButton> Btn_Value;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget), Category = "Components")
+	TObjectPtr<UCommonToggle> Toggle_Value;
 };

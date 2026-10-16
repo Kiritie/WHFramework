@@ -9,5 +9,12 @@ enum class EWidgetStyleKind : uint8
 	None,
 	Button,
 	Text,
-	Brush
+	Brush,
+	Input,
+	Toggle,
+	Range,
+	Progress,
+	Scroll,
+	Border,
+	TextScroll,
 };

@@ -3,7 +3,7 @@
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
 #include "Misc/NamePermissionList.h"
-#include "Widget/Theme/WidgetThemeSettings.h"
+#include "Misc/Paths.h"
 #include "Widget/Theme/WidgetThemeEditorService.h"
 
 void UWidgetThemeEditorSettings::PostEditChangeProperty(FPropertyChangedEvent& Event)
@@ -15,14 +15,14 @@ void UWidgetThemeEditorSettings::PostEditChangeProperty(FPropertyChangedEvent& E
 void UWidgetThemeEditorSettings::ApplyFolderVisibility()
 {
 	ClearFolderVisibility();
-	if (!GetDefault<UWidgetThemeEditorSettings>()->bHideThemeFolders)
+	if (!GetDefault<UWidgetThemeEditorSettings>()->bHideExternalAssetFolders)
 	{
 		return;
 	}
 	auto& Visibility = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get().GetFolderPermissionList();
 	for (const FString& Root : FWidgetThemeEditorService::GetCreationRoots())
 	{
-		Visibility->AddDenyListItem(TEXT("WidgetThemeEditor"), Root);
+		Visibility->AddDenyListItem(TEXT("WidgetThemeEditor"), FPaths::GetPath(Root));
 	}
 }
 

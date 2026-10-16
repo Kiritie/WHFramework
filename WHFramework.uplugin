@@ -50,6 +50,11 @@
 		}
 	],
 	"Plugins": [
+		{
+			"Name": "ToolsetRegistry",
+			"Enabled": true,
+			"TargetAllowList": ["Editor"]
+		},
         {
             "Name": "StructUtils",
             "Enabled": true

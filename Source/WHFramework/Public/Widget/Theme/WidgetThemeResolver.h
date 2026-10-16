@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "Widget/Theme/WidgetStyleTypes.h"
 class UWidgetTheme;
 class WHFRAMEWORK_API FWidgetThemeResolver

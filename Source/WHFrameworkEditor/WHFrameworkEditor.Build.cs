@@ -24,6 +24,7 @@ public class WHFrameworkEditor : ModuleRules
 			new string[]
 			{
 				"Projects",
+				"ToolsetRegistry",
 				"DeveloperToolSettings",
 				"GameplayTagsEditor",
 				"InputCore",

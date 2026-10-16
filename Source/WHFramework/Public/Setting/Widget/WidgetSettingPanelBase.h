@@ -11,6 +11,7 @@ class UWidgetSettingPageBase;
 class UCommonButton;
 class UCommonButtonGroup;
 class UPanelWidget;
+class UCommonTextBlockN;
 /**
  * 
  */
@@ -33,6 +34,8 @@ public:
 
 	virtual void OnDestroy(EObjectDespawnMode InMode) override;
 
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+
 protected:
 	UFUNCTION(BlueprintNativeEvent)
 	void OnPageItemSelected(UCommonButtonBase* AssociatedButton, int32 ButtonIndex);
@@ -47,6 +50,12 @@ protected:
 	void OnSettingEditStateChanged(const FSettingEditState& InState);
 
 	void RefreshActionButtonState();
+	void RefreshPages();
+	void RefreshConfirmation();
+	void OnCloseButtonClicked();
+	void OnConfirmButtonClicked();
+	void OnRevertButtonClicked();
+	FTimerHandle ConfirmationRefreshTimer;
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnConfirmationRequested")
 	void K2_OnConfirmationRequested(float InTimeout);
@@ -67,14 +76,32 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UCommonButton* Btn_Reset;
 
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UCommonButton> Btn_Close;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UPanelWidget> ConfirmationContent;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UCommonTextBlockN> Txt_Confirmation;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UCommonButton> Btn_Confirm;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UCommonButton> Btn_Revert;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = true), Category = "Components")
 	TObjectPtr<UPanelWidget> PageItemContainer;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "Components")
 	UCommonButtonGroup* PageItemGroup;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	TSubclassOf<UCommonButton> PageItemClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "Style.Button"))
+	FGameplayTag PageItemStyleTag;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	TSubclassOf<UWidgetSettingPageBase> SettingPageClass;

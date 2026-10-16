@@ -37,7 +37,7 @@ bool FWidgetThemeTypedMapTest::RunTest(const FString& Parameters)
 	TestNull(TEXT("No cross-type map lookup"), Theme->GetStyleClass(TAG_ThemeTestButton, EWidgetStyleKind::Text));
 	Theme->RemoveStyle(TAG_ThemeTestBrush, EWidgetStyleKind::Brush);
 	TestTrue(TEXT("Missing mapping does not invalidate a theme"), FWidgetThemeResolver::Validate(Theme.Get(), Error));
-	for (EWidgetStyleKind Kind : {EWidgetStyleKind::Button, EWidgetStyleKind::Text, EWidgetStyleKind::Brush})
+	for (EWidgetStyleKind Kind : WidgetStyleTags::Kinds())
 	{
 		TestEqual(TEXT("Runtime fallback and authoring use the configured base"), FWidgetThemeResolver::DefaultStyle(Kind),
 				  GetDefault<UWidgetThemeSettings>()->GetStyleBase(Kind));

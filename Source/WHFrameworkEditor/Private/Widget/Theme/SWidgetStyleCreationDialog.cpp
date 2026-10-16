@@ -34,7 +34,7 @@ void SWidgetStyleCreationDialog::Construct(const FArguments& InArgs)
 	{
 		TSharedPtr<FString> Item = MakeShared<FString>(Root);
 		CreationRoots.Add(Item);
-		if (Theme.IsValid() && Theme->GetOutermost()->GetName().StartsWith(FPaths::GetPath(Root) + TEXT("/")))
+		if (Theme.IsValid() && Theme->GetOutermost()->GetName().StartsWith(Root.Left(Root.Find(TEXT("/"), ESearchCase::CaseSensitive, ESearchDir::FromStart, 1)) + TEXT("/")))
 		{
 			CreationRoot = Item;
 		}
@@ -59,34 +59,46 @@ void SWidgetStyleCreationDialog::Construct(const FArguments& InArgs)
 															  FWidgetThemeEditorService::ValidateName(Text.ToString(), Error);
 															  NameInput->SetError(FText::FromString(Error));
 														  }))];
-	TSharedRef<SHorizontalBox> Types = SNew(SHorizontalBox).IsEnabled(!bTypeLocked);
-	for (EWidgetStyleKind Type : {EWidgetStyleKind::Button, EWidgetStyleKind::Text, EWidgetStyleKind::Brush})
+	TSharedPtr<EWidgetStyleKind> SelectedType;
+	for (EWidgetStyleKind Type : WidgetStyleTags::Kinds())
 	{
-		const FString Label = Type == EWidgetStyleKind::Button ? TEXT("Button") : Type == EWidgetStyleKind::Text ? TEXT("Text") : TEXT("Brush");
-		Types->AddSlot().FillWidth(1).Padding(
-			1, 0)[SNew(SCheckBox)
-					  .Style(FAppStyle::Get(), "SegmentedCombo.ButtonOnly")
-					  .HAlign(HAlign_Center)
-					  .Padding(FMargin(4, 3))
-					  .IsChecked_Lambda([this, Type] { return Kind == Type ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
-					  .OnCheckStateChanged_Lambda(
-						  [this, Type](ECheckBoxState State)
-						  {
-							  if (State == ECheckBoxState::Checked)
-							  {
-								  Kind = Type;
-								  ParentTag = WidgetStyleTags::Root(Type);
-								  SourceTag = FGameplayTag();
-								  bInheritParent = false;
-							  }
-						  })[SNew(STextBlock).Text(FText::FromString(Label)).Justification(ETextJustify::Center)]];
+		TSharedPtr<EWidgetStyleKind> Item = MakeShared<EWidgetStyleKind>(Type);
+		StyleTypes.Add(Item);
+		if (Type == Kind)
+		{
+			SelectedType = Item;
+		}
 	}
-	Body->AddSlot().AutoHeight()[Row(TEXT("Type"), Types)];
+	Body->AddSlot().AutoHeight()[Row(TEXT("Type"), SNew(SComboBox<TSharedPtr<EWidgetStyleKind>>)
+		.IsEnabled(!bTypeLocked)
+		.OptionsSource(&StyleTypes)
+		.InitiallySelectedItem(SelectedType)
+		.OnGenerateWidget_Lambda([](TSharedPtr<EWidgetStyleKind> Type)
+		{
+			return SNew(STextBlock).Text(FText::FromString(WidgetStyleTags::Label(*Type)));
+		})
+		.OnSelectionChanged_Lambda([this](TSharedPtr<EWidgetStyleKind> Type, ESelectInfo::Type)
+		{
+			if (Type)
+			{
+				Kind = *Type;
+				ParentTag = WidgetStyleTags::Root(Kind);
+				SourceTag = FGameplayTag();
+				bInheritParent = false;
+			}
+		})[SNew(STextBlock).Text_Lambda([this] { return FText::FromString(WidgetStyleTags::Label(Kind)); })])];
+
 	Body->AddSlot()
 		.AutoHeight()[Row(TEXT("Parent Tag"), SNew(SComboButton)
 												  .IsEnabled(bTypeLocked)
 												  .OnGetMenuContent(this, &SWidgetStyleCreationDialog::BuildParentMenu)
 												  .ButtonContent()[SNew(STextBlock).Text_Lambda([this] { return FText::FromName(ParentTag.GetTagName()); })])];
+	auto RootLabel = [](const FString& Root)
+	{
+		const int32 Separator = Root.Find(TEXT("/"), ESearchCase::CaseSensitive, ESearchDir::FromStart, 1);
+		const FString Mount = Separator == INDEX_NONE ? Root : Root.Left(Separator);
+		return FText::FromString(Mount.Mid(1));
+	};
 	if (Operation == EWidgetStyleOperation::Create)
 	{
 		Body->AddSlot().AutoHeight()[Row(
@@ -95,10 +107,10 @@ void SWidgetStyleCreationDialog::Construct(const FArguments& InArgs)
 				.OptionsSource(&CreationRoots)
 				.InitiallySelectedItem(CreationRoot)
 				.OnGenerateWidget_Lambda(
-					[](TSharedPtr<FString> Root)
-					{ return SNew(STextBlock).Text(FText::FromString((*Root == TEXT("/Game/Themes") ? TEXT("Game | ") : TEXT("Plugin | ")) + *Root)); })
+					[RootLabel](TSharedPtr<FString> Root)
+					{ return SNew(STextBlock).Text(RootLabel(*Root)); })
 				.OnSelectionChanged_Lambda([this](TSharedPtr<FString> Root, ESelectInfo::Type)
-										   { CreationRoot = Root; })[SNew(STextBlock).Text_Lambda([this] { return FText::FromString(*CreationRoot); })])];
+										   { CreationRoot = Root; })[SNew(STextBlock).Text_Lambda([this, RootLabel] { return RootLabel(*CreationRoot); })])];
 		TSharedRef<SHorizontalBox> Inheritance = SNew(SHorizontalBox);
 		for (bool Inherit : {false, true})
 		{
@@ -170,7 +182,10 @@ TSharedRef<SWidget> SWidgetStyleCreationDialog::BuildParentMenu()
 {
 	FMenuBuilder Menu(true, nullptr);
 	TArray<FGameplayTag> Parents{WidgetStyleTags::Root(Kind)};
-	Parents.Append(FWidgetThemeEditorService::Tags(Theme.Get()));
+	if (Theme.IsValid())
+	{
+		Parents.Append(Theme->GetStyleTags(Kind, true));
+	}
 	for (FGameplayTag StyleTag : Parents)
 	{
 		EWidgetStyleKind Type;

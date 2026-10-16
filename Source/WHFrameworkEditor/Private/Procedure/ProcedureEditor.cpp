@@ -20,6 +20,9 @@
 #include "IDetailsView.h"
 #include "UObject/UObjectHash.h"
 #include "Procedure/Graph/ProcedureGraphOperations.h"
+#include "Procedure/ProcedureEditorToolset.h"
+#include "ToolsetRegistry/UToolsetRegistry.h"
+#include "Misc/CoreDelegates.h"
 
 
 #define LOCTEXT_NAMESPACE "FProcedureEditor"
@@ -38,13 +41,34 @@ void FProcedureEditorModule::StartupModule()
 	FProcedureEditorCommands::Register();
 	GraphNodeFactory = CreateProcedureGraphNodeFactory();
 	FEdGraphUtilities::RegisterVisualNodeFactory(GraphNodeFactory);
+	if (!IsRunningCommandlet())
+	{
+		if (UToolsetRegistry::IsAvailable())
+		{
+			RegisterToolsets();
+		}
+		else
+		{
+			FCoreDelegates::OnAllModuleLoadingPhasesComplete.AddRaw(this, &FProcedureEditorModule::RegisterToolsets);
+		}
+	}
 }
 
 void FProcedureEditorModule::ShutdownModule()
 {
+	FCoreDelegates::OnAllModuleLoadingPhasesComplete.RemoveAll(this);
+	if (UToolsetRegistry::IsAvailable())
+	{
+		UToolsetRegistry::UnregisterToolsetClass(UProcedureEditorToolset::StaticClass());
+	}
 	FEdGraphUtilities::UnregisterVisualNodeFactory(GraphNodeFactory);
 	GraphNodeFactory.Reset();
 	FProcedureEditorCommands::Unregister();
+}
+
+void FProcedureEditorModule::RegisterToolsets()
+{
+	UToolsetRegistry::RegisterToolsetClass(UProcedureEditorToolset::StaticClass());
 }
 
 void FProcedureEditorModule::RegisterCommands(const TSharedPtr<FUICommandList>& Commands)

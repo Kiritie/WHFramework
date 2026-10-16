@@ -4,13 +4,29 @@
 
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
+#include "CommonTextScrollStyleBinding.h"
 
-UCommonTextBlockN::UCommonTextBlockN(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
+UCommonTextBlockN::UCommonTextBlockN(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+{
+}
+
+TSharedRef<SWidget> UCommonTextBlockN::RebuildWidget()
+{
+	TextScrollBinding = MakeShared<FCommonTextScrollStyleBinding>();
+	ApplyStyleTag();
+	return TextScrollBinding->Build([this] { return Super::RebuildWidget(); });
+}
+
+void UCommonTextBlockN::ReleaseSlateResources(bool bReleaseChildren)
+{
+	Super::ReleaseSlateResources(bReleaseChildren);
+	TextScrollBinding.Reset();
+}
 
 void UCommonTextBlockN::SynchronizeProperties()
 {
 	EnsureThemeSubscription();
-	if (StyleTag.IsValid() && !bApplyingStyleTag)
+	if ((StyleTag.IsValid() || TextScrollStyleTag.IsValid()) && !bApplyingStyleTag)
 	{
 		ApplyStyleTag();
 	}
@@ -101,7 +117,7 @@ void UCommonTextBlockN::SetStyleTag(FGameplayTag InStyleTag)
 
 void UCommonTextBlockN::ApplyStyleTag()
 {
-	if (!StyleTag.IsValid())
+	if ((!StyleTag.IsValid() && !TextScrollStyleTag.IsValid()) || HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject))
 	{
 		return;
 	}
@@ -111,7 +127,35 @@ void UCommonTextBlockN::ApplyStyleTag()
 		return;
 	}
 	TGuardValue<bool> Guard(bApplyingStyleTag, true);
-	SetStyle(FWidgetThemeResolver::ResolveClass(this, StyleTag, EWidgetStyleKind::Text));
+	if (StyleTag.IsValid())
+	{
+		SetStyle(FWidgetThemeResolver::ResolveClass(this, StyleTag, EWidgetStyleKind::Text));
+	}
+	if (TextScrollStyleTag.IsValid())
+	{
+		if (!TextScrollBinding)
+		{
+			TextScrollBinding = MakeShared<FCommonTextScrollStyleBinding>();
+		}
+		TextScrollBinding->Apply(this, FWidgetThemeResolver::ResolveClass(this, TextScrollStyleTag, EWidgetStyleKind::TextScroll),
+			[this] { return Super::RebuildWidget(); });
+	}
+	Super::SynchronizeProperties();
+}
+
+void UCommonTextBlockN::SetTextScrollStyleTag(FGameplayTag InStyleTag)
+{
+	TextScrollStyleTag = InStyleTag;
+	if (!InStyleTag.IsValid())
+	{
+		TGuardValue<bool> Guard(bApplyingStyleTag, true);
+		if (TextScrollBinding)
+		{
+			TextScrollBinding->Apply(this, nullptr, [this] { return Super::RebuildWidget(); });
+		}
+		Super::SynchronizeProperties();
+	}
+	ApplyStyleTag();
 }
 
 void UCommonTextBlockN::EnsureThemeSubscription()

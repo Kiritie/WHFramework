@@ -45,6 +45,7 @@ public class WHFramework : ModuleRules
 				"RenderCore",
 				"Chaos",
 				"Slate",
+				"Projects",
 				"Paper2D",
 				"Sockets",
 				"Media",

@@ -1,102 +1,68 @@
 #include "Setting/Widget/Entry/WidgetOptionSettingEntryBase.h"
 
-#include "Components/EditableTextBox.h"
 #include "Setting/SettingEntry.h"
-#include "Widget/Common/CommonButton.h"
+#include "Widget/Common/CommonOptionSelector.h"
 
-UWidgetOptionSettingEntryBase::UWidgetOptionSettingEntryBase(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
+UWidgetOptionSettingEntryBase::UWidgetOptionSettingEntryBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }
 
-void UWidgetOptionSettingEntryBase::OnSpawn_Implementation(const FParameter& InParam)
+UWidget* UWidgetOptionSettingEntryBase::GetValueControl() const
 {
-	Super::OnSpawn_Implementation(InParam);
+	return Selector_Value;
 }
 
-void UWidgetOptionSettingEntryBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
+FName UWidgetOptionSettingEntryBase::GetRendererName() const
 {
-	if(Btn_Last)
+	return TEXT("Option");
+}
+
+void UWidgetOptionSettingEntryBase::BindValueControl()
+{
+	if (Selector_Value)
 	{
-		Btn_Last->SetStyleTag(FGameplayTag::RequestGameplayTag(FName(TEXT("Style.Button.Setting.Previous")), false));
-		Btn_Last->OnClicked().RemoveAll(this);
+		Selector_Value->OnOptionChanged.AddUniqueDynamic(this, &ThisClass::OnOptionChanged);
 	}
-	if(Btn_Next)
+}
+
+void UWidgetOptionSettingEntryBase::UnbindValueControl()
+{
+	if (Selector_Value)
 	{
-		Btn_Next->SetStyleTag(FGameplayTag::RequestGameplayTag(FName(TEXT("Style.Button.Setting.Next")), false));
-		Btn_Next->OnClicked().RemoveAll(this);
+		Selector_Value->OnOptionChanged.RemoveDynamic(this, &ThisClass::OnOptionChanged);
 	}
-	Super::OnDespawn_Implementation(InMode);
+}
+
+void UWidgetOptionSettingEntryBase::ConfigureValueControl()
+{
+	if (Selector_Value && SettingEntry)
+	{
+		TArray<FText> Labels;
+		for (const FSettingOption& Option : SettingEntry->GetDefinition().Options)
+		{
+			Labels.Add(Option.DisplayName);
+		}
+		Selector_Value->SetUseDropdown(bUseDropdown);
+		Selector_Value->SetOptions(Labels);
+	}
 }
 
 void UWidgetOptionSettingEntryBase::ApplyValueToControl_Implementation(const FParameter& InValue)
 {
-	if(!SettingEntry)
+	if (Selector_Value && SettingEntry)
 	{
-		return;
-	}
-	const int32 Index = GetCurrentOptionIndex();
-	const TArray<FSettingOption>& Options = SettingEntry->GetDefinition().Options;
-	if(Btn_Last)
-	{
-		Btn_Last->OnClicked().RemoveAll(this);
-		Btn_Last->OnClicked().AddUObject(this, &ThisClass::OnPreviousClicked);
-	}
-	if(Btn_Next)
-	{
-		Btn_Next->OnClicked().RemoveAll(this);
-		Btn_Next->OnClicked().AddUObject(this, &ThisClass::OnNextClicked);
-	}
-	if(TxtBox_Value)
-	{
-		TxtBox_Value->SetIsReadOnly(true);
-		TxtBox_Value->SetText(Options.IsValidIndex(Index) ? Options[Index].DisplayName : FText::GetEmpty());
-	}
-	if(Btn_Last)
-	{
-		Btn_Last->SetIsEnabled(Index > 0);
-	}
-	if(Btn_Next)
-	{
-		Btn_Next->SetIsEnabled(Index != INDEX_NONE && Index < Options.Num() - 1);
+		const int32 Index = SettingEntry->GetDefinition().Options.IndexOfByPredicate([&InValue](const FSettingOption& Option)
+		{
+			return Option.Value == InValue;
+		});
+		Selector_Value->SetOptionIndex(Index);
 	}
 }
 
-void UWidgetOptionSettingEntryBase::OnPreviousClicked()
+void UWidgetOptionSettingEntryBase::OnOptionChanged(UCommonOptionSelector* InSelector, int32 InIndex)
 {
-	if(!SettingEntry)
+	if (SettingEntry && SettingEntry->GetDefinition().Options.IsValidIndex(InIndex))
 	{
-		return;
+		CommitUserValue(SettingEntry->GetDefinition().Options[InIndex].Value);
 	}
-	const int32 Index = GetCurrentOptionIndex();
-	if(SettingEntry->GetDefinition().Options.IsValidIndex(Index - 1))
-	{
-		CommitUserValue(SettingEntry->GetDefinition().Options[Index - 1].Value);
-	}
-}
-
-void UWidgetOptionSettingEntryBase::OnNextClicked()
-{
-	if(!SettingEntry)
-	{
-		return;
-	}
-	const int32 Index = GetCurrentOptionIndex();
-	if(SettingEntry->GetDefinition().Options.IsValidIndex(Index + 1))
-	{
-		CommitUserValue(SettingEntry->GetDefinition().Options[Index + 1].Value);
-	}
-}
-
-int32 UWidgetOptionSettingEntryBase::GetCurrentOptionIndex() const
-{
-	if(!SettingEntry)
-	{
-		return INDEX_NONE;
-	}
-	const FParameter CurrentValue = SettingEntry->GetPendingValue();
-	return SettingEntry->GetDefinition().Options.IndexOfByPredicate([&CurrentValue](const FSettingOption& Option)
-	{
-		return Option.Value == CurrentValue;
-	});
 }

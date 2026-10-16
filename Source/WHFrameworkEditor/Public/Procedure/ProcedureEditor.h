@@ -42,6 +42,8 @@ public:
 	TSharedRef<FProcedureEditor> CreateProcedureEditor( const EToolkitMode::Type Mode, const TSharedPtr< class IToolkitHost >& InitToolkitHost, UProcedureAsset* Procedure );
 
 private:
+	void RegisterToolsets();
+
 	void OnClickedProcedureEditorButton();
 	TSharedPtr<struct FGraphPanelNodeFactory> GraphNodeFactory;
 };

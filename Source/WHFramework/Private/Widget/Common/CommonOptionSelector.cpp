@@ -1,144 +1,466 @@
 #include "Widget/Common/CommonOptionSelector.h"
 
-#include "Components/EditableTextBox.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
+#include "Components/SizeBox.h"
+#include "Components/NativeWidgetHost.h"
+#include "Components/ComboBoxKey.h"
+#include "Widgets/Input/SComboBox.h"
+#include "Widgets/Layout/SScrollBar.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widget/Common/CommonButton.h"
+#include "Widget/Common/CommonTextBlockN.h"
+#include "Widget/Common/CommonImageN.h"
+#include "Widget/Style/CommonInputStyle.h"
+#include "Widget/Style/CommonScrollStyle.h"
+#include "Widget/Style/WidgetBrushStyle.h"
+#include "Widget/Theme/WidgetThemeResolver.h"
 #include "Widget/WidgetModuleTypes.h"
+#include "CommonBorder.h"
 
-UCommonOptionSelector::UCommonOptionSelector(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
+UCommonOptionSelector::UCommonOptionSelector(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	bReadOnly = true;
+	DropdownStyle = GetDefault<UComboBoxKey>()->GetWidgetStyle();
+	DropdownItemStyle = GetDefault<UComboBoxKey>()->GetItemStyle();
+	DropdownScrollStyle = GetDefault<UComboBoxKey>()->GetScrollBarStyle();
+}
+
+void UCommonOptionSelector::BuildNativeLayout()
+{
+	UHorizontalBox* Root = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("OptionLayout"));
+	WidgetTree->RootWidget = Root;
+	NativeLabelBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("LabelSize"));
+	NativeLabel = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass(), TEXT("OptionLabel"));
+	NativeLabelBox->SetContent(NativeLabel);
+	Root->AddChildToHorizontalBox(NativeLabelBox)->SetVerticalAlignment(VAlign_Center);
+	UOverlay* ValueArea = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("ValueArea"));
+	Root->AddChildToHorizontalBox(ValueArea)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	NativeValueBackground = WidgetTree->ConstructWidget<UCommonImageN>(UCommonImageN::StaticClass(), TEXT("ValueBackground"));
+	UOverlaySlot* BackgroundSlot = ValueArea->AddChildToOverlay(NativeValueBackground);
+	BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
+	BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
+	UHorizontalBox* Controls = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("ValueControls"));
+	UOverlaySlot* ControlsSlot = ValueArea->AddChildToOverlay(Controls);
+	ControlsSlot->SetHorizontalAlignment(HAlign_Fill);
+	ControlsSlot->SetVerticalAlignment(VAlign_Fill);
+	Btn_Last = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_Last"));
+	Btn_Last->SetTitle(FText::FromString(TEXT("‹")));
+	Controls->AddChildToHorizontalBox(Btn_Last);
+	TxtBox_Value = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass(), TEXT("TxtBox_Value"));
+	Controls->AddChildToHorizontalBox(TxtBox_Value)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	Combo_Value = WidgetTree->ConstructWidget<UNativeWidgetHost>(UNativeWidgetHost::StaticClass(), TEXT("Combo_Value"));
+	Controls->AddChildToHorizontalBox(Combo_Value)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	Btn_Next = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_Next"));
+	Btn_Next->SetTitle(FText::FromString(TEXT("›")));
+	Controls->AddChildToHorizontalBox(Btn_Next);
+	RefreshLabel();
+	BuildDropdown();
+}
+
+void UCommonOptionSelector::BuildDropdown()
+{
+	if (!Combo_Value || Dropdown)
+	{
+		return;
+	}
+	DropdownScrollbar = SNew(SScrollBar).Style(&DropdownScrollStyle).Thickness(DropdownScrollBarThickness);
+	SAssignNew(Dropdown, SComboBox<FName>)
+		.ComboBoxStyle(&DropdownStyle)
+		.ItemStyle(&DropdownItemStyle)
+		.OptionsSource(&OptionKeys)
+		.CustomScrollbar(DropdownScrollbar)
+		.EnableGamepadNavigationMode(true)
+		.OnGenerateWidget_UObject(this, &ThisClass::GenerateOptionSlate)
+		.OnSelectionChanged_UObject(this, &ThisClass::HandleSelectionChanged)
+		[
+			SAssignNew(SelectedContent, SBox)
+		];
+	Combo_Value->SetContent(Dropdown.ToSharedRef());
+	RefreshValue();
+}
+
+void UCommonOptionSelector::ReleaseSlateResources(bool bReleaseChildren)
+{
+	Super::ReleaseSlateResources(bReleaseChildren);
+	Dropdown.Reset();
+	DropdownScrollbar.Reset();
+	SelectedContent.Reset();
+}
+
+void UCommonOptionSelector::RefreshSelectedLabel()
+{
+	if (SelectedContent)
+	{
+		SelectedContent->SetContent(GenerateSelectedOption(OptionKeys.IsValidIndex(OptionIndex) ? OptionKeys[OptionIndex] : NAME_None)->TakeWidget());
+	}
+}
+
+TSharedRef<SWidget> UCommonOptionSelector::GenerateOptionSlate(FName InKey)
+{
+	return GenerateOption(InKey)->TakeWidget();
+}
+
+void UCommonOptionSelector::SynchronizeProperties()
+{
+	Super::SynchronizeProperties();
+	RefreshLabel();
+	BuildDropdown();
+	RefreshValue();
 }
 
 void UCommonOptionSelector::OnSpawn_Implementation(const FParameter& InParam)
 {
 	Super::OnSpawn_Implementation(InParam);
-	if(const FCommonOptionSelectorSpawnParameter* Param = InParam.GetPtr<FCommonOptionSelectorSpawnParameter>())
+	if (const FCommonOptionSelectorSpawnParameter* Parameter = InParam.GetPtr<FCommonOptionSelectorSpawnParameter>())
 	{
-		OptionNames = Param->Options;
-		bEditable = Param->bEditable;
-		SetTitle(Param->Title);
-	}
-
-	if(Btn_Last)
-	{
-		Btn_Last->SetStyleTag(FGameplayTag::RequestGameplayTag(FName(TEXT("Style.Button.Setting.Previous")), false));
-		Btn_Last->OnClicked().RemoveAll(this);
-		Btn_Last->OnClicked().AddUObject(this, &ThisClass::OnPreviousClicked);
-	}
-	if(Btn_Next)
-	{
-		Btn_Next->SetStyleTag(FGameplayTag::RequestGameplayTag(FName(TEXT("Style.Button.Setting.Next")), false));
-		Btn_Next->OnClicked().RemoveAll(this);
-		Btn_Next->OnClicked().AddUObject(this, &ThisClass::OnNextClicked);
-	}
-	if(TxtBox_Value)
-	{
-		TxtBox_Value->OnTextChanged.RemoveDynamic(this, &ThisClass::OnTextValueChanged);
-		TxtBox_Value->OnTextChanged.AddDynamic(this, &ThisClass::OnTextValueChanged);
-		TxtBox_Value->SetIsReadOnly(!bEditable);
+		bEditable = Parameter->bEditable;
+		SetLabel(Parameter->Title);
+		SetOptionNames(Parameter->Options);
 	}
 	RefreshValue();
 }
 
 void UCommonOptionSelector::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	if(Btn_Last)
+	Super::OnDespawn_Implementation(InMode);
+	OnOptionChanged.Clear();
+	const UCommonOptionSelector* Defaults = CastChecked<UCommonOptionSelector>(GetArchetype());
+	bEditable = Defaults->bEditable;
+	bUseDropdown = Defaults->bUseDropdown;
+	Label = Defaults->Label;
+	LabelWidth = Defaults->LabelWidth;
+	RefreshLabel();
+	SetOptions(Defaults->Options);
+	SetOptionIndex(Defaults->OptionIndex);
+}
+
+void UCommonOptionSelector::BindControlEvents()
+{
+	Super::BindControlEvents();
+	if (Btn_Last)
+	{
+		Btn_Last->OnClicked().RemoveAll(this);
+		Btn_Last->OnClicked().AddUObject(this, &ThisClass::OnPreviousClicked);
+	}
+	if (Btn_Next)
+	{
+		Btn_Next->OnClicked().RemoveAll(this);
+		Btn_Next->OnClicked().AddUObject(this, &ThisClass::OnNextClicked);
+	}
+}
+
+void UCommonOptionSelector::UnbindControlEvents()
+{
+	if (Btn_Last)
 	{
 		Btn_Last->OnClicked().RemoveAll(this);
 	}
-	if(Btn_Next)
+	if (Btn_Next)
 	{
 		Btn_Next->OnClicked().RemoveAll(this);
 	}
-	if(TxtBox_Value)
-	{
-		TxtBox_Value->OnTextChanged.RemoveDynamic(this, &ThisClass::OnTextValueChanged);
-	}
-	OnValueChanged.Clear();
-	OptionNames.Reset();
-	OptionIndex = 0;
-	SetTitle(FText::GetEmpty());
-
-	Super::OnDespawn_Implementation(InMode);
+	Super::UnbindControlEvents();
 }
 
-void UCommonOptionSelector::OnTextValueChanged(const FText& InText)
+void UCommonOptionSelector::ApplyResolvedStyle(const UObject* InStyle)
 {
-	if(!bEditable)
+	const UCommonInputStyle* Style = Cast<UCommonInputStyle>(InStyle);
+	bUseStyleBackground = !Style || !Style->OptionStyles.ValueBackgroundBrushStyleTag.IsValid();
+	Super::ApplyResolvedStyle(InStyle);
+	if (!Style)
 	{
 		return;
 	}
-
-	const int32 NewIndex = OptionNames.IndexOfByKey(InText.ToString());
-	if(NewIndex != INDEX_NONE && NewIndex != OptionIndex)
+	if (NativeLabel)
 	{
-		OptionIndex = NewIndex;
+		NativeLabel->SetStyleTag(Style->OptionStyles.LabelTextStyleTag);
+	}
+	if (NativeValueBackground)
+	{
+		NativeValueBackground->SetStyleTag(Style->OptionStyles.ValueBackgroundBrushStyleTag);
+	}
+	if (Btn_Last)
+	{
+		Btn_Last->SetInheritedStyleTag(Style->OptionStyles.PreviousButtonStyleTag);
+	}
+	if (Btn_Next)
+	{
+		Btn_Next->SetInheritedStyleTag(Style->OptionStyles.NextButtonStyleTag);
+	}
+	OptionTextStyleTag = Style->OptionStyles.ItemTextStyleTag;
+	for (const auto& Pair : GeneratedLabels)
+	{
+		Pair.Value->SetStyleTag(OptionTextStyleTag);
+	}
+	if (SelectedLabel)
+	{
+		SelectedLabel->SetStyleTag(OptionTextStyleTag);
+	}
+	DropdownStyle = Style->ComboBoxStyle;
+	DropdownItemStyle = Style->ComboItemStyle;
+	DropdownScrollStyle = GetDefault<UComboBoxKey>()->GetScrollBarStyle();
+	DropdownScrollBarThickness = GetDefault<UCommonScrollStyle>()->ScrollBarThickness;
+	UClass* ExpandClass = FWidgetThemeResolver::ResolveClass(this, Style->OptionStyles.ExpandButtonStyleTag, EWidgetStyleKind::Button);
+	if (const UCommonButtonStyle* Expand = ExpandClass ? ExpandClass->GetDefaultObject<UCommonButtonStyle>() : nullptr)
+	{
+		Expand->GetNormalBaseBrush(DropdownStyle.ComboButtonStyle.ButtonStyle.Normal);
+		Expand->GetNormalHoveredBrush(DropdownStyle.ComboButtonStyle.ButtonStyle.Hovered);
+		Expand->GetNormalPressedBrush(DropdownStyle.ComboButtonStyle.ButtonStyle.Pressed);
+		Expand->GetDisabledBrush(DropdownStyle.ComboButtonStyle.ButtonStyle.Disabled);
+		Expand->GetButtonPadding(DropdownStyle.ComboButtonStyle.ContentPadding);
+	}
+	UClass* ArrowClass = FWidgetThemeResolver::ResolveClass(this, Style->OptionStyles.ArrowBrushStyleTag, EWidgetStyleKind::Brush);
+	if (const UWidgetBrushStyle* Arrow = ArrowClass ? ArrowClass->GetDefaultObject<UWidgetBrushStyle>() : nullptr;
+		Style->OptionStyles.ArrowBrushStyleTag.IsValid() && Arrow)
+	{
+		DropdownStyle.ComboButtonStyle.DownArrowImage = Arrow->Brush;
+	}
+	UClass* ItemClass = FWidgetThemeResolver::ResolveClass(this, Style->OptionStyles.ItemButtonStyleTag, EWidgetStyleKind::Button);
+	if (const UCommonButtonStyle* Item = ItemClass ? ItemClass->GetDefaultObject<UCommonButtonStyle>() : nullptr)
+	{
+		Item->GetNormalBaseBrush(DropdownItemStyle.EvenRowBackgroundBrush);
+		DropdownItemStyle.OddRowBackgroundBrush = DropdownItemStyle.EvenRowBackgroundBrush;
+		Item->GetNormalHoveredBrush(DropdownItemStyle.EvenRowBackgroundHoveredBrush);
+		DropdownItemStyle.OddRowBackgroundHoveredBrush = DropdownItemStyle.EvenRowBackgroundHoveredBrush;
+		Item->GetSelectedBaseBrush(DropdownItemStyle.ActiveBrush);
+		Item->GetSelectedHoveredBrush(DropdownItemStyle.ActiveHoveredBrush);
+		DropdownItemStyle.InactiveBrush = DropdownItemStyle.ActiveBrush;
+		DropdownItemStyle.InactiveHoveredBrush = DropdownItemStyle.ActiveHoveredBrush;
+	}
+	UClass* BorderClass = FWidgetThemeResolver::ResolveClass(this, Style->OptionStyles.PopupBorderStyleTag, EWidgetStyleKind::Border);
+	if (const UCommonBorderStyle* Border = BorderClass ? BorderClass->GetDefaultObject<UCommonBorderStyle>() : nullptr)
+	{
+		DropdownStyle.ComboButtonStyle.MenuBorderBrush = Border->Background;
+	}
+	UClass* ScrollClass = FWidgetThemeResolver::ResolveClass(this, Style->OptionStyles.PopupScrollStyleTag, EWidgetStyleKind::Scroll);
+	if (const UCommonScrollStyle* Scroll = ScrollClass ? ScrollClass->GetDefaultObject<UCommonScrollStyle>() : nullptr)
+	{
+		DropdownScrollStyle = Scroll->ScrollBarStyle;
+		DropdownScrollBarThickness = Scroll->ScrollBarThickness;
+	}
+	if (Dropdown)
+	{
+		DropdownScrollbar->SetStyle(&DropdownScrollStyle);
+		DropdownScrollbar->SetThickness(DropdownScrollBarThickness);
+		Dropdown->InvalidateStyle();
+		Dropdown->InvalidateItemStyle();
+	}
+	RefreshValue();
+}
+
+void UCommonOptionSelector::SetOptions(const TArray<FText>& InOptions)
+{
+	TGuardValue<bool> Guard(bSynchronizingValue, true);
+	Options = InOptions;
+	OptionIndex = INDEX_NONE;
+	OptionKeys.Reset();
+	if (Dropdown)
+	{
+		Dropdown->ClearSelection();
+	}
+	GeneratedLabels.Reset();
+	for (int32 Index = 0; Index < Options.Num(); ++Index)
+	{
+		const FName Key(*FString::Printf(TEXT("Option_%d"), Index));
+		OptionKeys.Add(Key);
+	}
+	if (Dropdown)
+	{
+		Dropdown->RefreshOptions();
+	}
+	RefreshValue();
+}
+
+void UCommonOptionSelector::SetOptionNames(const TArray<FString>& InOptionNames)
+{
+	TArray<FText> Labels;
+	for (const FString& Option : InOptionNames)
+	{
+		Labels.Add(FText::FromString(Option));
+	}
+	SetOptions(Labels);
+}
+
+TArray<FString> UCommonOptionSelector::GetOptionNames() const
+{
+	TArray<FString> Labels;
+	for (const FText& Option : Options)
+	{
+		Labels.Add(Option.ToString());
+	}
+	return Labels;
+}
+
+void UCommonOptionSelector::SetOptionIndex(int32 InOptionIndex, bool bNotify)
+{
+	const int32 NewIndex = Options.IsValidIndex(InOptionIndex) ? InOptionIndex : INDEX_NONE;
+	const bool bChanged = NewIndex != OptionIndex;
+	OptionIndex = NewIndex;
+	RefreshValue();
+	if (bNotify && bChanged)
+	{
+		OnOptionChanged.Broadcast(this, OptionIndex);
 		OnValueChanged.Broadcast(this, GetValue());
+	}
+}
+
+int32 UCommonOptionSelector::GetOptionIndex() const
+{
+	return OptionIndex;
+}
+
+FString UCommonOptionSelector::GetSelectedOption() const
+{
+	return Options.IsValidIndex(OptionIndex) ? Options[OptionIndex].ToString() : FString();
+}
+
+void UCommonOptionSelector::SetValue(const FParameter& InValue)
+{
+	Super::SetValue(InValue);
+	const FString ValueText = GetText().ToString();
+	SetOptionIndex(Options.IndexOfByPredicate([&ValueText](const FText& Option) { return Option.ToString() == ValueText; }));
+}
+
+void UCommonOptionSelector::SetUseDropdown(bool bInUseDropdown)
+{
+	bUseDropdown = bInUseDropdown;
+	RefreshValue();
+}
+
+void UCommonOptionSelector::SetLabel(const FText& InLabel)
+{
+	Label = InLabel;
+	RefreshLabel();
+}
+
+void UCommonOptionSelector::SetLabelWidth(float InWidth)
+{
+	LabelWidth = FMath::IsFinite(InWidth) ? FMath::Max(0.f, InWidth) : 0.f;
+	RefreshLabel();
+}
+
+void UCommonOptionSelector::RefreshLabel()
+{
+	if (!NativeLabelBox || !NativeLabel)
+	{
+		return;
+	}
+	NativeLabel->SetText(Label);
+	NativeLabelBox->SetVisibility(Label.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+	if (LabelWidth > 0.f)
+	{
+		NativeLabelBox->SetWidthOverride(LabelWidth);
+	}
+	else
+	{
+		NativeLabelBox->ClearWidthOverride();
+	}
+	if (UHorizontalBoxSlot* LabelSlot = Cast<UHorizontalBoxSlot>(NativeLabelBox->Slot))
+	{
+		LabelSlot->SetPadding(LabelWidth > 0.f ? FMargin(0.f) : FMargin(0.f, 0.f, 12.f, 0.f));
+	}
+}
+
+void UCommonOptionSelector::RefreshValue()
+{
+	TGuardValue<bool> Guard(bSynchronizingValue, true);
+	SetIsReadOnly(!bEditable);
+	SetText(Options.IsValidIndex(OptionIndex) ? Options[OptionIndex] : (bEditable ? Text : FText::GetEmpty()));
+	if (NativeValueBackground)
+	{
+		NativeValueBackground->SetVisibility(!bUseDropdown && NativeValueBackground->GetStyleTag().IsValid()
+			? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	if (TxtBox_Value)
+	{
+		TxtBox_Value->SetVisibility(bUseDropdown ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+	}
+	if (Combo_Value)
+	{
+		Combo_Value->SetVisibility(bUseDropdown ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+	if (Dropdown)
+	{
+		if (OptionKeys.IsValidIndex(OptionIndex))
+		{
+			Dropdown->SetSelectedItem(OptionKeys[OptionIndex]);
+		}
+		else
+		{
+			Dropdown->ClearSelection();
+		}
+		RefreshSelectedLabel();
+	}
+	if (Btn_Last)
+	{
+		Btn_Last->SetVisibility(bUseDropdown ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+		Btn_Last->SetIsEnabled(OptionIndex > 0);
+	}
+	if (Btn_Next)
+	{
+		Btn_Next->SetVisibility(bUseDropdown ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+		Btn_Next->SetIsEnabled(Options.IsValidIndex(OptionIndex + 1));
 	}
 }
 
 void UCommonOptionSelector::OnPreviousClicked()
 {
-	SetOptionIndex(OptionIndex - 1);
+	SetOptionIndex(OptionIndex - 1, true);
 }
 
 void UCommonOptionSelector::OnNextClicked()
 {
-	SetOptionIndex(OptionIndex + 1);
+	SetOptionIndex(OptionIndex + 1, true);
 }
 
-void UCommonOptionSelector::RefreshValue()
+void UCommonOptionSelector::HandleTextChanged(const FText& InText)
 {
-	OptionIndex = OptionNames.IsValidIndex(OptionIndex) ? OptionIndex : 0;
-	if(TxtBox_Value)
+	const int32 PreviousIndex = OptionIndex;
+	if (!bSynchronizingValue && bEditable)
 	{
-		TxtBox_Value->SetText(
-			OptionNames.IsValidIndex(OptionIndex)
-				? FText::FromString(OptionNames[OptionIndex])
-				: FText::GetEmpty());
+		const FString Value = InText.ToString();
+		OptionIndex = Options.IndexOfByPredicate([&Value](const FText& Option) { return Option.ToString() == Value; });
 	}
-	if(Btn_Last)
+	Super::HandleTextChanged(InText);
+	if (!bSynchronizingValue && bEditable && PreviousIndex != OptionIndex)
 	{
-		Btn_Last->SetIsEnabled(OptionIndex > 0);
-	}
-	if(Btn_Next)
-	{
-		Btn_Next->SetIsEnabled(OptionNames.IsValidIndex(OptionIndex + 1));
+		OnOptionChanged.Broadcast(this, OptionIndex);
 	}
 }
 
-void UCommonOptionSelector::SetOptionNames(const TArray<FString>& InOptionNames)
+void UCommonOptionSelector::HandleSelectionChanged(FName InKey, ESelectInfo::Type InSelectionType)
 {
-	OptionNames = InOptionNames;
-	OptionIndex = 0;
-	RefreshValue();
-}
-
-FString UCommonOptionSelector::GetSelectedOption() const
-{
-	return OptionNames.IsValidIndex(OptionIndex) ? OptionNames[OptionIndex] : FString();
-}
-
-FParameter UCommonOptionSelector::GetValue() const
-{
-	return GetSelectedOption();
-}
-
-void UCommonOptionSelector::SetValue(const FParameter& InValue)
-{
-	if(const FString* Value = InValue.GetPtr<FString>())
+	if (!bSynchronizingValue && InSelectionType != ESelectInfo::Direct)
 	{
-		SetOptionIndex(OptionNames.IndexOfByKey(*Value));
+		SetOptionIndex(OptionKeys.IndexOfByKey(InKey), true);
 	}
 }
 
-void UCommonOptionSelector::SetOptionIndex(int32 InOptionIndex)
+UWidget* UCommonOptionSelector::GenerateOption(FName InKey)
 {
-	if(!OptionNames.IsValidIndex(InOptionIndex) || InOptionIndex == OptionIndex)
+	TObjectPtr<UCommonTextBlockN>& OptionLabel = GeneratedLabels.FindOrAdd(InKey);
+	if (!OptionLabel)
 	{
-		return;
+		OptionLabel = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass());
 	}
+	const int32 Index = OptionKeys.IndexOfByKey(InKey);
+	OptionLabel->SetText(Options.IsValidIndex(Index) ? Options[Index] : FText::GetEmpty());
+	OptionLabel->SetStyleTag(OptionTextStyleTag);
+	return OptionLabel;
+}
 
-	OptionIndex = InOptionIndex;
-	RefreshValue();
-	OnValueChanged.Broadcast(this, GetValue());
+UWidget* UCommonOptionSelector::GenerateSelectedOption(FName InKey)
+{
+	if (!SelectedLabel)
+	{
+		SelectedLabel = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass());
+	}
+	const int32 Index = OptionKeys.IndexOfByKey(InKey);
+	SelectedLabel->SetText(Options.IsValidIndex(Index) ? Options[Index] : FText::GetEmpty());
+	SelectedLabel->SetStyleTag(OptionTextStyleTag);
+	return SelectedLabel;
 }

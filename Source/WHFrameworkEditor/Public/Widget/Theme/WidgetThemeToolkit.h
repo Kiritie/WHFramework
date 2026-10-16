@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Ticker.h"
 #include "Toolkits/AssetEditorToolkit.h"
 #include "EditorUndoClient.h"
 #include "Misc/NotifyHook.h"
@@ -15,6 +16,7 @@ class UWidgetThemePreviewButton;
 class UCommonTextBlockN;
 class UCommonImageN;
 class IDetailsView;
+class UWidget;
 class SEditableTextBox;
 enum class EWidgetStyleOperation : uint8;
 
@@ -62,6 +64,7 @@ private:
 	TObjectPtr<UWidgetThemePreviewButton> PreviewButton = nullptr;
 	TObjectPtr<UCommonTextBlockN> PreviewText = nullptr;
 	TObjectPtr<UCommonImageN> PreviewImage = nullptr;
+	TMap<EWidgetStyleKind, TObjectPtr<UWidget>> PreviewControls;
 	TSharedPtr<IDetailsView> Details;
 	TSharedPtr<STreeView<TSharedPtr<FThemeTreeItem>>> Tree;
 	FVector2D PreviewSize = FVector2D(200, 60);
@@ -69,6 +72,7 @@ private:
 	bool bPreviewHeightEdited = false;
 	bool bShowPreviewText = true;
 	TArray<TSharedPtr<FThemeTreeItem>> Roots;
+	TArray<TSharedPtr<EWidgetStyleKind>> StyleTypes;
 	FGameplayTag SelectedTag;
 	FString Search;
 	FString Report;
@@ -79,6 +83,7 @@ private:
 	FDelegateHandle PropertyHandle;
 	FDelegateHandle CompileHandle;
 	FDelegateHandle DetailsFinishedHandle;
+	FTSTicker::FDelegateHandle RefreshHandle;
 	TSharedRef<SDockTab> SpawnTags(const FSpawnTabArgs& Args);
 	TSharedRef<SDockTab> SpawnPreview(const FSpawnTabArgs& Args);
 	TSharedRef<SDockTab> SpawnDetails(const FSpawnTabArgs& Args);
@@ -87,6 +92,8 @@ private:
 	FReply OpenStyleDialog(EWidgetStyleOperation Operation);
 	FReply OpenRenameDialog();
 	void Refresh();
+	void RequestRefresh();
+	bool HandleDeferredRefresh(float DeltaTime);
 	void Select(TSharedPtr<FThemeTreeItem> Item, ESelectInfo::Type Type);
 	void BindDetails();
 	void UpdatePreview();

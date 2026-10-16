@@ -10,8 +10,10 @@
 
 class UImage;
 class UCommonTextBlockN;
+class USubWidgetStyle;
+class UStackBox;
 
-UCLASS(Abstract, BlueprintType, Blueprintable, ClassGroup = UI, meta = (Category = "Common UI", DisplayName = "Common Button", DisableNativeTick))
+UCLASS(BlueprintType, Blueprintable, ClassGroup = UI, meta = (Category = "Common UI", DisplayName = "Common Button", DisableNativeTick))
 class WHFRAMEWORK_API UCommonButton : public UCommonButtonBase, public IObjectPoolInterface
 {
 	friend class UCommonButtonGroup;
@@ -34,6 +36,7 @@ public:
 	virtual void NativePreConstruct() override;
 
 	virtual void NativeConstruct() override;
+	virtual TSharedRef<SWidget> RebuildWidget() override;
 
 	virtual void NativeOnDragEnter(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
@@ -48,15 +51,33 @@ public:
 	virtual void NativeOnDeselected(bool bBroadcast) override;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
+	virtual UCommonButtonInternalBase* ConstructInternalButton() override;
+	virtual void BuildNativeLayout();
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "Components")
 	UImage* Img_Icon;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UCommonTextBlockN* Txt_Title;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional), Category = "Components")
+	TObjectPtr<UImage> Img_SelectionMarker;
+
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Content")
 	FText Title;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Content")
+	TEnumAsByte<EOrientation> ContentOrientation = Orient_Horizontal;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Content")
+	TEnumAsByte<EHorizontalAlignment> ContentHorizontalAlignment = HAlign_Center;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Content", meta = (ClampMin = "0"))
+	float ContentSpacing = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Brush"))
+	FGameplayTag IconStyleTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true, EditCondition = "bSelectable"), Category = "Selection")
 	bool bStandalone;
@@ -67,16 +88,32 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Button"))
 	FGameplayTag StyleTag;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
+	bool bOverrideStyleTag = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (Categories = "Input"))
 	FGameplayTag TriggeringActionTag;
+
+protected:
+	virtual void OnResolvedStyleChanged(const USubWidgetStyle* InStyle);
 
 private:
 	void ApplyStyleTag();
 	void EnsureThemeSubscription();
 	FDelegateHandle ThemeChangedHandle;
 	virtual void BeginDestroy() override;
+	FGameplayTag InheritedStyleTag;
+	UPROPERTY(Transient)
+	TObjectPtr<UStackBox> NativeContent;
+	UPROPERTY(Transient)
+	FSlateBrush IconOverride;
+
+	bool bHasIconOverride = false;
 
 	void ApplyTitleStyle();
+	void ApplyIconStyle(const USubWidgetStyle* InStyle);
+	void ApplySelectionMarker();
+	void ApplyContentLayout();
 
 	void ApplyTriggeringActionTag();
 
@@ -102,6 +139,12 @@ public:
 
 	void SetIconBrush(const FSlateBrush& InBrush);
 
+	UFUNCTION(BlueprintCallable, Category = "Style")
+	void SetIconStyleTag(FGameplayTag InStyleTag);
+
+	UFUNCTION(BlueprintCallable, Category = "Content")
+	void SetContentOrientation(EOrientation InOrientation);
+
 	UFUNCTION(BlueprintCallable)
 
 	void SetMinWidth(int32 InValue);
@@ -125,12 +168,15 @@ public:
 
 	void SetStyleTag(FGameplayTag InStyleTag);
 
+	UFUNCTION(BlueprintCallable, Category = "Style")
+	void SetInheritedStyleTag(FGameplayTag InStyleTag);
+
+	UFUNCTION(BlueprintCallable, Category = "Style")
+	void ClearStyleOverride();
+
 	UFUNCTION(BlueprintPure, Category = "Style")
 
-	FGameplayTag GetStyleTag() const
-	{
-		return StyleTag;
-	}
+	FGameplayTag GetStyleTag() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
 

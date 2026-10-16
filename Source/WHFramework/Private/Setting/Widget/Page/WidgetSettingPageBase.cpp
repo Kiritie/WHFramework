@@ -12,6 +12,7 @@
 #include "Setting/Widget/Entry/WidgetSettingCategoryEntry.h"
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
+#include "Widget/Common/CommonTextBlockN.h"
 
 UWidgetSettingPageBase::UWidgetSettingPageBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
@@ -21,10 +22,10 @@ UWidgetSettingPageBase::UWidgetSettingPageBase(const FObjectInitializer& ObjectI
 
 void UWidgetSettingPageBase::OnCreate(const FParameter& InParam)
 {
-    if (!ThemeChangedHandle.IsValid())
-    {
-        ThemeChangedHandle = FWidgetThemeResolver::OnThemeChanged().AddUObject(this, &ThisClass::RefreshEntries);
-    }
+	if (!ThemeChangedHandle.IsValid())
+	{
+		ThemeChangedHandle = FWidgetThemeResolver::OnThemeChanged().AddUObject(this, &ThisClass::HandleThemeChanged);
+	}
 	Super::OnCreate(InParam);
 
 	if(!SettingList && WidgetTree)
@@ -53,7 +54,7 @@ void UWidgetSettingPageBase::OnCreate(const FParameter& InParam)
 	}
 	if(!EmptyState && WidgetTree)
 	{
-		UTextBlock* EmptyText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("EmptyState"));
+		UCommonTextBlockN* EmptyText = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass(), TEXT("EmptyState"));
 		EmptyText->SetText(NSLOCTEXT("WH.Setting", "EmptyParameterPage", "No configurable parameters."));
 		EmptyState = EmptyText;
 		if(UPanelWidget* RootPanel = Cast<UPanelWidget>(WidgetTree->RootWidget))
@@ -97,8 +98,8 @@ void UWidgetSettingPageBase::OnReset(bool bForce)
 
 void UWidgetSettingPageBase::OnDestroy(EObjectDespawnMode InMode)
 {
-    FWidgetThemeResolver::OnThemeChanged().Remove(ThemeChangedHandle);
-    ThemeChangedHandle.Reset();
+	FWidgetThemeResolver::OnThemeChanged().Remove(ThemeChangedHandle);
+	ThemeChangedHandle.Reset();
 	USettingModule::Get().OnSettingValueChanged.RemoveDynamic(this, &ThisClass::OnSettingValueChanged);
 	Super::OnDestroy(InMode);
 }
@@ -127,12 +128,29 @@ void UWidgetSettingPageBase::OnSettingValueChanged(FSettingId InSettingId)
 	for(UUserWidget* EntryWidget : SettingList->GetDisplayedEntryWidgets())
 	{
 		UWidgetSettingEntryBase* SettingEntryWidget = Cast<UWidgetSettingEntryBase>(EntryWidget);
-		if(SettingEntryWidget && SettingEntryWidget->GetSettingEntry()
-			&& SettingEntryWidget->GetSettingEntry()->GetDefinition().SettingId != InSettingId)
+		if(SettingEntryWidget && SettingEntryWidget->GetSettingEntry())
 		{
 			SettingEntryWidget->RefreshFromModel();
 		}
 	}
+}
+
+void UWidgetSettingPageBase::HandleThemeChanged()
+{
+	if (!SettingList)
+	{
+		return;
+	}
+	for (UObject* Item : SettingList->GetListItems())
+	{
+		UUserWidget* EntryWidget = SettingList->GetEntryWidgetFromItem(Item);
+		if (EntryWidget && EntryWidget->GetClass() != ResolveEntryClass(Item).Get())
+		{
+			SettingList->RegenerateAllEntries();
+			return;
+		}
+	}
+	// Common controls already subscribe to style changes; retain the list, focus and current drafts.
 }
 
 bool UWidgetSettingPageBase::CanApply_Implementation() const

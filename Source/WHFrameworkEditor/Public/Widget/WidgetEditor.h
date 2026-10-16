@@ -21,4 +21,7 @@ public:
 	virtual void RegisterCustomization(FPropertyEditorModule& PropertyEditor) override;
 
 	virtual void UnRegisterCustomization(FPropertyEditorModule& PropertyEditor) override;
+
+private:
+	void RegisterToolsets();
 };

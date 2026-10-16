@@ -69,7 +69,8 @@ protected:
 	TSubclassOf<UUserWidget> ResolveEntryClass(UObject* InItem) const;
 
 private:
-    FDelegateHandle ThemeChangedHandle;
+	void HandleThemeChanged();
+	FDelegateHandle ThemeChangedHandle;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = true), Category = "Components")

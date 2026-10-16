@@ -1,38 +1,47 @@
 #include "Setting/Widget/Entry/WidgetBoolSettingEntryBase.h"
 
-#include "Widget/Common/CommonButton.h"
+#include "Setting/SettingEntry.h"
+#include "Widget/Common/CommonToggle.h"
 
-UWidgetBoolSettingEntryBase::UWidgetBoolSettingEntryBase(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
+UWidgetBoolSettingEntryBase::UWidgetBoolSettingEntryBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }
 
-void UWidgetBoolSettingEntryBase::OnSpawn_Implementation(const FParameter& InParam)
+UWidget* UWidgetBoolSettingEntryBase::GetValueControl() const
 {
-	Super::OnSpawn_Implementation(InParam);
+	return Toggle_Value;
 }
 
-void UWidgetBoolSettingEntryBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
+FName UWidgetBoolSettingEntryBase::GetRendererName() const
 {
-	if(Btn_Value)
+	return TEXT("Bool");
+}
+
+void UWidgetBoolSettingEntryBase::BindValueControl()
+{
+	if (Toggle_Value)
 	{
-		Btn_Value->SetStyleTag(FGameplayTag::RequestGameplayTag(FName(TEXT("Style.Button.Setting.Toggle")), false));
-		Btn_Value->OnIsSelectedChanged().RemoveAll(this);
+		Toggle_Value->OnValueChanged.AddUniqueDynamic(this, &ThisClass::OnValueChanged);
 	}
-	Super::OnDespawn_Implementation(InMode);
+}
+
+void UWidgetBoolSettingEntryBase::UnbindValueControl()
+{
+	if (Toggle_Value)
+	{
+		Toggle_Value->OnValueChanged.RemoveDynamic(this, &ThisClass::OnValueChanged);
+	}
 }
 
 void UWidgetBoolSettingEntryBase::ApplyValueToControl_Implementation(const FParameter& InValue)
 {
-	if(Btn_Value)
+	if (Toggle_Value)
 	{
-		Btn_Value->OnIsSelectedChanged().RemoveAll(this);
-		Btn_Value->OnIsSelectedChanged().AddUObject(this, &ThisClass::OnValueChanged);
-		Btn_Value->SetIsSelected(InValue.Get<bool>());
+		Toggle_Value->SetIsChecked(InValue.Get<bool>());
 	}
 }
 
-void UWidgetBoolSettingEntryBase::OnValueChanged(bool bInSelected)
+void UWidgetBoolSettingEntryBase::OnValueChanged(UCommonToggle* InToggle, bool bInChecked)
 {
-	CommitUserValue(FParameter(bInSelected));
+	CommitUserValue(FParameter(bInChecked));
 }

@@ -4,8 +4,7 @@
 
 #include "WidgetOptionSettingEntryBase.generated.h"
 
-class UCommonButton;
-class UEditableTextBox;
+class UCommonOptionSelector;
 
 UCLASS()
 class WHFRAMEWORK_API UWidgetOptionSettingEntryBase : public UWidgetSettingEntryBase
@@ -15,28 +14,20 @@ class WHFRAMEWORK_API UWidgetOptionSettingEntryBase : public UWidgetSettingEntry
 public:
 	UWidgetOptionSettingEntryBase(const FObjectInitializer& ObjectInitializer);
 
-	//////////////////////////////////////////////////////////////////////////
-	/// ObjectPool
-public:
-	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-
-	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
-
 protected:
+	virtual UWidget* GetValueControl() const override;
+	virtual FName GetRendererName() const override;
+	virtual void BindValueControl() override;
+	virtual void UnbindValueControl() override;
 	virtual void ApplyValueToControl_Implementation(const FParameter& InValue) override;
+	virtual void ConfigureValueControl() override;
 
-	void OnPreviousClicked();
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	bool bUseDropdown = false;
 
-	void OnNextClicked();
+	UFUNCTION()
+	void OnOptionChanged(UCommonOptionSelector* InSelector, int32 InIndex);
 
-	int32 GetCurrentOptionIndex() const;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
-	TObjectPtr<UCommonButton> Btn_Last;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
-	TObjectPtr<UCommonButton> Btn_Next;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
-	TObjectPtr<UEditableTextBox> TxtBox_Value;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget), Category = "Components")
+	TObjectPtr<UCommonOptionSelector> Selector_Value;
 };

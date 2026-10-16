@@ -6,7 +6,7 @@ TArray<TSharedPtr<FThemeTreeItem>> FWidgetThemeTree::Build(UWidgetTheme* Theme, 
 {
 	TArray<TSharedPtr<FThemeTreeItem>> Roots;
 	TMap<FGameplayTag, TSharedPtr<FThemeTreeItem>> Items;
-	for (EWidgetStyleKind Type : {EWidgetStyleKind::Button, EWidgetStyleKind::Text, EWidgetStyleKind::Brush})
+	for (EWidgetStyleKind Type : WidgetStyleTags::Kinds())
 	{
 		if (TypeFilter != EWidgetStyleKind::None && TypeFilter != Type)
 		{
@@ -20,7 +20,12 @@ TArray<TSharedPtr<FThemeTreeItem>> FWidgetThemeTree::Build(UWidgetTheme* Theme, 
 		Items.Add(Root->Tag, Root);
 	}
 	TSet<FGameplayTag> Matches;
-	for (FGameplayTag Tag : FWidgetThemeEditorService::Tags(Theme))
+	TArray<FGameplayTag> AllTags;
+	for (EWidgetStyleKind StyleKind : WidgetStyleTags::Kinds())
+	{
+		AllTags.Append(Theme->GetStyleTags(StyleKind, true));
+	}
+	for (FGameplayTag Tag : AllTags)
 	{
 		EWidgetStyleKind Type;
 		if (!FWidgetThemeEditorService::Kind(Tag, Type) || (TypeFilter != EWidgetStyleKind::None && TypeFilter != Type))
@@ -48,11 +53,11 @@ TArray<TSharedPtr<FThemeTreeItem>> FWidgetThemeTree::Build(UWidgetTheme* Theme, 
 		EWidgetStyleKind Type;
 		FWidgetThemeEditorService::Kind(Entry.Key, Type);
 		FGameplayTag Parent = WidgetStyleTags::Root(Type);
-		UClass* StyleClass = Theme->GetStyleClass(Entry.Key, Type);
+		UClass* StyleClass = Theme->ResolveStyleClass(Entry.Key, Type);
 		TArray<FGameplayTag> Candidates;
 		for (const auto& Candidate : Items)
 		{
-			if (!Candidate.Value->bRoot && Candidate.Key != Entry.Key && StyleClass && Theme->GetStyleClass(Candidate.Key, Type) == StyleClass->GetSuperClass())
+			if (!Candidate.Value->bRoot && Candidate.Key != Entry.Key && StyleClass && Theme->ResolveStyleClass(Candidate.Key, Type) == StyleClass->GetSuperClass())
 			{
 				Candidates.Add(Candidate.Key);
 			}

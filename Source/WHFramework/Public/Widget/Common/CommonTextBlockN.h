@@ -19,6 +19,8 @@ public:
 	UCommonTextBlockN(const FObjectInitializer& ObjectInitializer);
 
 protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
 	virtual void SynchronizeProperties() override;
 
 	virtual void OnBindingChanged(const FName& Property) override;
@@ -34,6 +36,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Text"))
 	FGameplayTag StyleTag;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.TextScroll"))
+	FGameplayTag TextScrollStyleTag;
+
 private:
 	void ApplyStyleTag();
 	void EnsureThemeSubscription();
@@ -41,6 +46,7 @@ private:
 	virtual void BeginDestroy() override;
 
 	bool bApplyingStyleTag = false;
+	TSharedPtr<class FCommonTextScrollStyleBinding> TextScrollBinding;
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Getter, Setter, BlueprintGetter = "GetHighlightText", BlueprintSetter = "SetHighlightText",
@@ -80,6 +86,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Style")
 
 	void SetStyleTag(FGameplayTag InStyleTag);
+
+	UFUNCTION(BlueprintCallable, Category = "Style")
+	void SetTextScrollStyleTag(FGameplayTag InStyleTag);
 
 	UFUNCTION(BlueprintPure, Category = "Style")
 

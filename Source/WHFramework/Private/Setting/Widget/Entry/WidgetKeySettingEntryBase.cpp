@@ -5,24 +5,47 @@
 #include "Setting/Widget/Misc/WidgetPressAnyKeyPanelBase.h"
 #include "Widget/Common/CommonButton.h"
 #include "Widget/WidgetModuleStatics.h"
+#include "Setting/SettingEntry.h"
 
 UWidgetKeySettingEntryBase::UWidgetKeySettingEntryBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 }
 
-void UWidgetKeySettingEntryBase::OnSpawn_Implementation(const FParameter& InParam)
+UWidget* UWidgetKeySettingEntryBase::GetValueControl() const
 {
-	Super::OnSpawn_Implementation(InParam);
+	return Btn_Value;
 }
 
-void UWidgetKeySettingEntryBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
+FName UWidgetKeySettingEntryBase::GetRendererName() const
 {
+	return TEXT("Key");
+}
+
+void UWidgetKeySettingEntryBase::BindValueControl()
+{
+	if (Btn_Value)
+	{
+		Btn_Value->OnClicked().RemoveAll(this);
+		Btn_Value->OnClicked().AddUObject(this, &ThisClass::OnValueClicked);
+	}
+}
+
+void UWidgetKeySettingEntryBase::UnbindValueControl()
+{
+	ReleaseCapture(true);
 	if(Btn_Value)
 	{
 		Btn_Value->OnClicked().RemoveAll(this);
 	}
-	Super::OnDespawn_Implementation(InMode);
+}
+
+void UWidgetKeySettingEntryBase::OnModelStateChanged()
+{
+	if (!SettingEntry || !SettingEntry->IsEnabled() || !SettingEntry->IsVisible())
+	{
+		ReleaseCapture(true);
+	}
 }
 
 void UWidgetKeySettingEntryBase::ApplyValueToControl_Implementation(const FParameter& InValue)
@@ -31,9 +54,6 @@ void UWidgetKeySettingEntryBase::ApplyValueToControl_Implementation(const FParam
 	{
 		return;
 	}
-	Btn_Value->SetStyleTag(FGameplayTag::RequestGameplayTag(FName(TEXT("Style.Button.Setting.Key")), false));
-	Btn_Value->OnClicked().RemoveAll(this);
-	Btn_Value->OnClicked().AddUObject(this, &ThisClass::OnValueClicked);
 	const FKey* Key = InValue.GetPtr<FKey>();
 	Btn_Value->SetIconBrush(FSlateBrush());
 	Btn_Value->SetTitle(Key ? Key->GetDisplayName(false) : FText::GetEmpty());
@@ -54,8 +74,14 @@ void UWidgetKeySettingEntryBase::ApplyValueToControl_Implementation(const FParam
 
 void UWidgetKeySettingEntryBase::OnValueClicked()
 {
+	if (!SettingEntry || !SettingEntry->IsEnabled() || !SettingEntry->IsVisible() || CapturePanel.IsValid())
+	{
+		return;
+	}
 	if(UWidgetPressAnyKeyPanelBase* Panel = UWidgetModuleStatics::CreateUserWidget<UWidgetPressAnyKeyPanelBase>())
 	{
+		CapturePanel = Panel;
+		CaptureEntry = SettingEntry;
 		Panel->OnKeySelected.AddUObject(this, &ThisClass::OnKeySelected, Panel);
 		Panel->OnKeySelectionCanceled.AddUObject(this, &ThisClass::OnKeySelectionCanceled, Panel);
 		Panel->Open(FWidgetPressAnyKeyOpenParameter());
@@ -64,19 +90,34 @@ void UWidgetKeySettingEntryBase::OnValueClicked()
 
 void UWidgetKeySettingEntryBase::OnKeySelected(FKey InKey, UWidgetPressAnyKeyPanelBase* InPanel)
 {
-	if(InPanel)
+	if (CapturePanel.Get() != InPanel || CaptureEntry.Get() != SettingEntry)
 	{
-		InPanel->OnKeySelected.RemoveAll(this);
-		InPanel->OnKeySelectionCanceled.RemoveAll(this);
+		return;
 	}
+	ReleaseCapture(false);
 	CommitUserValue(FParameter(InKey));
 }
 
 void UWidgetKeySettingEntryBase::OnKeySelectionCanceled(UWidgetPressAnyKeyPanelBase* InPanel)
 {
-	if(InPanel)
+	if (CapturePanel.Get() == InPanel)
 	{
-		InPanel->OnKeySelected.RemoveAll(this);
-		InPanel->OnKeySelectionCanceled.RemoveAll(this);
+		ReleaseCapture(false);
+	}
+}
+
+void UWidgetKeySettingEntryBase::ReleaseCapture(bool bClosePanel)
+{
+	UWidgetPressAnyKeyPanelBase* Panel = CapturePanel.Get();
+	CapturePanel.Reset();
+	CaptureEntry.Reset();
+	if (Panel)
+	{
+		Panel->OnKeySelected.RemoveAll(this);
+		Panel->OnKeySelectionCanceled.RemoveAll(this);
+		if (bClosePanel)
+		{
+			Panel->Close(true);
+		}
 	}
 }

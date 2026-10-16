@@ -1,6 +1,9 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Widget/WidgetEditor.h"
+#include "Widget/WidgetEditorToolset.h"
+#include "ToolsetRegistry/UToolsetRegistry.h"
+#include "Misc/CoreDelegates.h"
 #include "Widget/Theme/WidgetThemeToolkit.h"
 #include "Widget/Theme/WidgetThemeDesignerIntegration.h"
 #include "Widget/Theme/WidgetThemeEditorSettings.h"
@@ -25,10 +28,19 @@ void FWidgetEditorModule::StartupModule()
 	UWidgetThemeEditorSettings::ApplyFolderVisibility();
 	RegisterWidgetThemeAssetEditor();
 	RegisterWidgetThemeDesignerIntegration();
+	if (UToolsetRegistry::IsAvailable())
+	{
+		RegisterToolsets();
+	}
+	else
+	{
+		FCoreDelegates::OnAllModuleLoadingPhasesComplete.AddRaw(this, &FWidgetEditorModule::RegisterToolsets);
+	}
 }
 
 void FWidgetEditorModule::ShutdownModule()
 {
+	FCoreDelegates::OnAllModuleLoadingPhasesComplete.RemoveAll(this);
 	UWidgetThemeEditorSettings::ClearFolderVisibility();
 	if (IsRunningCommandlet())
 	{
@@ -36,6 +48,15 @@ void FWidgetEditorModule::ShutdownModule()
 	}
 	UnregisterWidgetThemeDesignerIntegration();
 	UnregisterWidgetThemeAssetEditor();
+	if (UToolsetRegistry::IsAvailable())
+	{
+		UToolsetRegistry::UnregisterToolsetClass(UWidgetEditorToolset::StaticClass());
+	}
+}
+
+void FWidgetEditorModule::RegisterToolsets()
+{
+	UToolsetRegistry::RegisterToolsetClass(UWidgetEditorToolset::StaticClass());
 }
 
 void FWidgetEditorModule::RegisterCustomization(FPropertyEditorModule& PropertyEditor)

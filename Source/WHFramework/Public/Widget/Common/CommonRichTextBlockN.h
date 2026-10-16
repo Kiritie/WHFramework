@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CommonRichTextBlock.h"
+#include "GameplayTagContainer.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 
 #include "CommonRichTextBlockN.generated.h"
@@ -26,12 +27,35 @@ public:
 
 public:
 	virtual void SetText(const FText& InText) override;
+	virtual void SynchronizeProperties() override;
+
+	UFUNCTION(BlueprintCallable)
+	void SetStyleTag(FGameplayTag InStyleTag);
+
+	UFUNCTION(BlueprintCallable)
+	void SetTextScrollStyleTag(FGameplayTag InStyleTag);
 
 public:
 	UFUNCTION(BlueprintCallable)
 	void RefreshRichStyle();
 
 protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Appearance)
 	bool bUseCommonRichStyle;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (Categories = "Style.Text"))
+	FGameplayTag StyleTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (Categories = "Style.TextScroll"))
+	FGameplayTag TextScrollStyleTag;
+
+private:
+	virtual void BeginDestroy() override;
+	void ApplyStyleTags();
+	FDelegateHandle ThemeChangedHandle;
+	bool bApplyingStyleTags = false;
+	TSharedPtr<class FCommonTextScrollStyleBinding> TextScrollBinding;
 };

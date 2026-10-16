@@ -22,6 +22,27 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
 	TSubclassOf<UWidgetBrushStyle> BrushStyleBase;
 
+	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
+	TSubclassOf<UCommonInputStyle> InputStyleBase;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
+	TSubclassOf<UCommonToggleStyle> ToggleStyleBase;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
+	TSubclassOf<UCommonRangeStyle> RangeStyleBase;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
+	TSubclassOf<UCommonProgressStyle> ProgressStyleBase;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
+	TSubclassOf<UCommonScrollStyle> ScrollStyleBase;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
+	TSubclassOf<UCommonBorderStyle> BorderStyleBase;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
+	TSubclassOf<UCommonTextScrollStyle> TextScrollStyleBase;
+
 	UClass* GetStyleBase(EWidgetStyleKind Kind) const;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Themes")

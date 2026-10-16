@@ -6,6 +6,7 @@
 #include "WidgetSettingEntryBase.generated.h"
 
 class USettingEntry;
+class UCommonTextBlockN;
 
 UCLASS(Abstract)
 class WHFRAMEWORK_API UWidgetSettingEntryBase : public UCommonButton, public IUserObjectListEntry
@@ -21,7 +22,17 @@ public:
 	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
 
 protected:
+	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 	virtual void NativeOnListItemObjectSet(UObject* InListItemObject) override;
+	virtual void NativeOnEntryReleased() override;
+	virtual void OnResolvedStyleChanged(const USubWidgetStyle* InStyle) override;
+	virtual UWidget* GetValueControl() const;
+	virtual FName GetRendererName() const;
+	virtual void BindValueControl();
+	virtual void UnbindValueControl();
+	virtual void ConfigureValueControl();
+	virtual void OnModelStateChanged();
 
 public:
 	UFUNCTION(BlueprintCallable)
@@ -40,6 +51,9 @@ protected:
 	TObjectPtr<USettingEntry> SettingEntry;
 
 	bool bRefreshingFromModel = false;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UCommonTextBlockN> Txt_Reason;
 
 public:
 	UFUNCTION(BlueprintPure)

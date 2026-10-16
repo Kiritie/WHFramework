@@ -54,6 +54,21 @@ UClass* FWidgetThemeResolver::NativeBase(EWidgetStyleKind Kind)
 		return UCommonTextStyle::StaticClass();
 	case EWidgetStyleKind::Brush:
 		return UWidgetBrushStyle::StaticClass();
+	case EWidgetStyleKind::Input:
+		return UCommonInputStyle::StaticClass();
+	case EWidgetStyleKind::Toggle:
+		return UCommonToggleStyle::StaticClass();
+	case EWidgetStyleKind::Range:
+		return UCommonRangeStyle::StaticClass();
+	case EWidgetStyleKind::Progress:
+		return UCommonProgressStyle::StaticClass();
+	case EWidgetStyleKind::Scroll:
+		return UCommonScrollStyle::StaticClass();
+	case EWidgetStyleKind::Border:
+		return UCommonBorderStyle::StaticClass();
+	case EWidgetStyleKind::TextScroll:
+		return UCommonTextScrollStyle::StaticClass();
+
 	}
 	return nullptr;
 }
@@ -70,7 +85,7 @@ bool FWidgetThemeResolver::Validate(const UWidgetTheme* Theme, FString& Error)
 		Error = TEXT("Theme failed to load.");
 		return false;
 	}
-	for (EWidgetStyleKind Kind : {EWidgetStyleKind::Button, EWidgetStyleKind::Text, EWidgetStyleKind::Brush})
+	for (EWidgetStyleKind Kind : WidgetStyleTags::Kinds())
 	{
 		UClass* Base = DefaultStyle(Kind);
 		if (!Base || !Base->IsChildOf(NativeBase(Kind)) || Base->HasAnyClassFlags(CLASS_Deprecated | CLASS_NewerVersionExists))
@@ -79,35 +94,31 @@ bool FWidgetThemeResolver::Validate(const UWidgetTheme* Theme, FString& Error)
 			return false;
 		}
 	}
-	TSet<FGameplayTag> Seen;
-	auto CheckEntry = [&](FGameplayTag Tag, EWidgetStyleKind Kind) -> bool
+	TSet<const UWidgetTheme*> Visited;
+	for (const UWidgetTheme* Layer = Theme; Layer; Layer = Layer->ParentTheme)
 	{
-		EWidgetStyleKind TagKind;
-		UClass* Class = Theme->GetStyleClass(Tag, Kind);
-		if (!WidgetStyleTags::Kind(Tag, TagKind) || TagKind != Kind || Seen.Contains(Tag) || !Class || !Class->IsChildOf(NativeBase(Kind)) ||
-			Class->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
+		if (Visited.Contains(Layer))
 		{
-			Error = FString::Printf(TEXT("Invalid, duplicate or incompatible style: %s"), *Tag.ToString());
+			Error = TEXT("Theme parent chain contains a cycle.");
 			return false;
 		}
-		Seen.Add(Tag);
-		return true;
-	};
-	for (const auto& Entry : Theme->GetButtonStyles())
-	{
-		if (!CheckEntry(Entry.Key, EWidgetStyleKind::Button))
-			return false;
+		Visited.Add(Layer);
+		for (EWidgetStyleKind Kind : WidgetStyleTags::Kinds())
+		{
+			for (FGameplayTag Tag : Layer->GetStyleTags(Kind))
+			{
+				EWidgetStyleKind TagKind;
+				UClass* Class = Layer->GetStyleClass(Tag, Kind);
+				if (!WidgetStyleTags::Kind(Tag, TagKind) || TagKind != Kind || WidgetStyleTags::IsRoot(Tag) || !Class ||
+					!Class->IsChildOf(NativeBase(Kind)) || Class->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
+				{
+					Error = FString::Printf(TEXT("Invalid style in %s: %s"), *Layer->GetPathName(), *Tag.ToString());
+					return false;
+				}
+			}
+		}
 	}
-	for (const auto& Entry : Theme->GetTextStyles())
-	{
-		if (!CheckEntry(Entry.Key, EWidgetStyleKind::Text))
-			return false;
-	}
-	for (const auto& Entry : Theme->GetBrushStyles())
-	{
-		if (!CheckEntry(Entry.Key, EWidgetStyleKind::Brush))
-			return false;
-	}
+
 	return true;
 }
 const UWidgetTheme* FWidgetThemeResolver::ResolveTheme(const UObject* Context)
@@ -143,11 +154,21 @@ const UWidgetTheme* FWidgetThemeResolver::ResolveTheme(const UObject* Context)
 }
 UClass* FWidgetThemeResolver::ResolveClass(const UObject* Context, FGameplayTag Tag, EWidgetStyleKind Kind)
 {
+	UClass* Base = NativeBase(Kind);
+	if (!Base)
+	{
+		return nullptr;
+	}
 	const UWidgetTheme* Theme = ResolveTheme(Context);
 	EWidgetStyleKind TagKind;
-	UClass* Class = Theme ? Theme->GetStyleClass(Tag, Kind) : nullptr;
-	if (WidgetStyleTags::Kind(Tag, TagKind) && TagKind == Kind && Class && Class->IsChildOf(NativeBase(Kind)) &&
+	UClass* Class = Theme ? Theme->ResolveStyleClass(Tag, Kind) : nullptr;
+	if (WidgetStyleTags::Kind(Tag, TagKind) && TagKind == Kind && Class && Class->IsChildOf(Base) &&
 		!Class->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
+	{
+		return Class;
+	}
+	Class = Theme ? Theme->ResolveStyleClass(WidgetStyleTags::CommonDefault(Kind), Kind) : nullptr;
+	if (Class && Class->IsChildOf(Base) && !Class->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
 	{
 		return Class;
 	}

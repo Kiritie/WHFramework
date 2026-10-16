@@ -1046,6 +1046,11 @@ void USettingModule::CancelEditSession()
 	BroadcastEditStateChanged();
 }
 
+double USettingModule::GetConfirmationTimeRemaining() const
+{
+	return ConfirmationTransaction.bActive ? FMath::Max(0.0, ConfirmationTransaction.ExpiresAt - FPlatformTime::Seconds()) : 0.0;
+}
+
 bool USettingModule::ConfirmPendingSettings()
 {
 	if (!EditSession.bActive || !ConfirmationTransaction.bActive)

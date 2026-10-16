@@ -2,6 +2,8 @@
 #include "Misc/AutomationTest.h"
 #include "Tests/WidgetThemeTestTags.h"
 #include "Widget/Theme/WidgetThemeEditorService.h"
+#include "Widget/Theme/WidgetThemeEditorLibrary.h"
+#include "Engine/Texture2D.h"
 #include "Widget/Theme/WidgetThemeFactory.h"
 #include "Widget/Theme/WidgetStyleTags.h"
 #include "Widget/Theme/WidgetThemeSettings.h"
@@ -18,6 +20,8 @@
 #include "BlueprintEditorLibrary.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "Misc/NamePermissionList.h"
+#include "Misc/Paths.h"
+#include "Misc/ScopeExit.h"
 #include "Misc/PackageName.h"
 #include "Editor.h"
 #include "ObjectTools.h"
@@ -39,6 +43,7 @@
 #include "GameplayTagsManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/ConfigCacheIni.h"
+#include "Settings/ProjectPackagingSettings.h"
 
 namespace WidgetThemeEditorTests
 {
@@ -49,12 +54,31 @@ namespace WidgetThemeEditorTests
 		FString Directory;
 		FString Clipboard;
 		TArray<uint8> TagConfig;
+		TMap<FString, TArray<uint8>> StyleTagConfigs;
+		TSet<FString> MissingStyleTagConfigs;
 		TArray<FString> TextFiles;
 		FFixture()
 		{
 			Directory = TEXT("/Game/WidgetThemeTests/") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
 			WidgetStyleClipboard::Read(Clipboard);
 			FFileHelper::LoadFileToArray(TagConfig, *GetDefault<UGameplayTagsSettings>()->GetDefaultConfigFilename());
+			for (const FString& Root : FWidgetThemeEditorService::GetCreationRoots())
+			{
+				FString Filename;
+				FString Error;
+				if (FWidgetThemeEditorService::GetTagSourceFilename(Root, Filename, Error))
+				{
+					TArray<uint8>& Bytes = StyleTagConfigs.FindOrAdd(Filename);
+					if (IFileManager::Get().FileExists(*Filename))
+					{
+						ensure(FFileHelper::LoadFileToArray(Bytes, *Filename));
+					}
+					else
+					{
+						MissingStyleTagConfigs.Add(Filename);
+					}
+				}
+			}
 		}
 		~FFixture()
 		{
@@ -79,6 +103,24 @@ namespace WidgetThemeEditorTests
 				}
 				Objects.AddUnique(Theme.Get());
 			}
+			TArray<FString> SavedFiles;
+			for (UObject* Object : Objects)
+			{
+				if (IsValid(Object))
+				{
+					const FString Filename = FPackageName::LongPackageNameToFilename(Object->GetOutermost()->GetName(), FPackageName::GetAssetPackageExtension());
+					if (IFileManager::Get().FileExists(*Filename))
+					{
+						SavedFiles.Add(Filename);
+					}
+				}
+			}
+			if (!SavedFiles.IsEmpty())
+			{
+				IAssetRegistry& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
+				Registry.ScanFilesSynchronous(SavedFiles, true);
+				Registry.WaitForCompletion();
+			}
 			for (UObject* Object : Objects)
 			{
 				if (!IsValid(Object))
@@ -87,15 +129,15 @@ namespace WidgetThemeEditorTests
 				}
 				const FString Filename = FPackageName::LongPackageNameToFilename(Object->GetOutermost()->GetName(), FPackageName::GetAssetPackageExtension());
 				ResetLoaders(Object->GetOutermost());
+				if (IFileManager::Get().FileExists(*Filename))
+				{
+					IFileManager::Get().Delete(*Filename);
+				}
 				FAssetRegistryModule::AssetDeleted(Object);
 				Object->ClearFlags(RF_Public | RF_Standalone);
 				Object->GetOutermost()->SetDirtyFlag(false);
 				const FString Name = TEXT("ThemeTestDiscard_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
 				Object->Rename(*Name, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
-				if (IFileManager::Get().FileExists(*Filename))
-				{
-					IFileManager::Get().Delete(*Filename);
-				}
 			}
 			for (const FString& File : TextFiles)
 			{
@@ -105,6 +147,19 @@ namespace WidgetThemeEditorTests
 			GConfig->UnloadFile(GetDefault<UGameplayTagsSettings>()->GetDefaultConfigFilename());
 			GConfig->LoadFile(GetDefault<UGameplayTagsSettings>()->GetDefaultConfigFilename());
 			GetMutableDefault<UGameplayTagsSettings>()->ReloadConfig();
+			for (const auto& Config : StyleTagConfigs)
+			{
+				GConfig->UnloadFile(Config.Key);
+				if (MissingStyleTagConfigs.Contains(Config.Key))
+				{
+					IFileManager::Get().Delete(*Config.Key);
+				}
+				else
+				{
+					FFileHelper::SaveArrayToFile(Config.Value, *Config.Key);
+					GConfig->LoadFile(Config.Key);
+				}
+			}
 			UGameplayTagsManager::Get().EditorRefreshGameplayTagTree();
 			WidgetStyleClipboard::Write(Clipboard);
 			FWidgetThemeResolver::InvalidateEditorDefault();
@@ -135,7 +190,7 @@ namespace WidgetThemeEditorTests
 		}
 		bool Parent(UWidgetTheme* Theme, FString& Error)
 		{
-			return FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Brush, TEXT("ThemeEditorParentA"), EWidgetStyleKind::Brush, TEXT("/Game/Themes"),
+			return FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Brush, TEXT("ThemeEditorParentA"), EWidgetStyleKind::Brush, TEXT("/Game/__ExternalAsset__/Styles"),
 													 false, Error);
 		}
 		UWidgetBrushStyle* Brush(UWidgetTheme* Theme, FGameplayTag Tag = TAG_ThemeEditorParentA)
@@ -164,6 +219,60 @@ namespace WidgetThemeEditorTests
 	};
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeAllTypesAndParentChainTest, "WHFramework.WidgetTheme.Editor.AllTypesAndParentChain",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FThemeAllTypesAndParentChainTest::RunTest(const FString& Parameters)
+{
+	using namespace WidgetThemeEditorTests;
+	FFixture Fixture;
+	UWidgetTheme* Framework = Fixture.Theme(TEXT("Framework"));
+	UWidgetTheme* Utilities = Fixture.Theme(TEXT("Utilities"));
+	UWidgetTheme* Game = Fixture.Theme(TEXT("Game"));
+	Utilities->ParentTheme = Framework;
+	Game->ParentTheme = Utilities;
+	FString Error;
+	TestEqual(TEXT("Exactly ten supported style kinds"), WidgetStyleTags::Kinds().Num(), 10);
+	for (EWidgetStyleKind Type : WidgetStyleTags::Kinds())
+	{
+		const FString FullTag = WidgetStyleTags::Root(Type).ToString() + TEXT(".ThemeParentChain");
+		UBlueprint* Base = FWidgetThemeEditorService::CreateForTag(Framework, FullTag, FWidgetThemeEditorService::CreationBase(Type),
+			TEXT("/Game/__ExternalAsset__/Styles"), Error);
+		if (!TestNotNull(*Error, Base))
+		{
+			return false;
+		}
+		const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*FullTag));
+		TestFalse(TEXT("Parent mapping is not copied into child map"), Game->HasLocalStyle(Tag, Type));
+		TestEqual(TEXT("Three-layer resolution reaches framework"), Game->ResolveStyleClass(Tag, Type), Base->GeneratedClass.Get());
+		TestTrue(TEXT("Inherited tag appears in the editor inventory"), Game->GetStyleTags(Type, true).Contains(Tag));
+		FGuid Identity;
+		TestTrue(TEXT("Managed style name is a digits GUID"), FGuid::ParseExact(Base->GetName(), EGuidFormats::Digits, Identity));
+		TestTrue(TEXT("Underscored managed style directory"), Base->GetOutermost()->GetName().StartsWith(TEXT("/Game/__ExternalAsset__/Styles/")));
+		UBlueprint* Override = FWidgetThemeEditorService::CreateForTag(Utilities, FullTag, Base->GeneratedClass,
+			TEXT("/Game/__ExternalAsset__/Styles"), Error);
+		if (!TestNotNull(*Error, Override))
+		{
+			return false;
+		}
+		TestEqual(TEXT("Nearest theme override wins"), Game->ResolveStyleClass(Tag, Type), Override->GeneratedClass.Get());
+		TestEqual(TEXT("Style class keeps its actual base"), Override->ParentClass.Get(), Base->GeneratedClass.Get());
+		const FWidgetStyleBinding OwnedBinding = Utilities->Bindings.FindChecked(Tag);
+		Utilities->RemoveStyle(Tag, Type);
+		TestEqual(TEXT("Removing an override reveals parent"), Game->ResolveStyleClass(Tag, Type), Base->GeneratedClass.Get());
+		// Restore ownership so the fixture also cleans up the detached test Blueprint.
+		Utilities->SetStyleClass(Tag, Type, Override->GeneratedClass);
+		Utilities->Bindings.Add(Tag, OwnedBinding);
+		TestEqual(TEXT("Local lookup remains local"), Game->GetStyleClass(Tag, Type), static_cast<UClass*>(nullptr));
+	}
+	TestTrue(TEXT("Valid parent chain"), FWidgetThemeResolver::Validate(Game, Error));
+	Framework->ParentTheme = Game;
+	TestFalse(TEXT("Cycle rejected"), FWidgetThemeResolver::Validate(Game, Error));
+	Framework->ParentTheme = nullptr;
+	TestTrue(TEXT("Old directory cannot create styles"), !FWidgetThemeEditorService::CreateForTag(Game,
+		TEXT("Style.Brush.ThemeRejectedDirectory"), FWidgetThemeEditorService::CreationBase(EWidgetStyleKind::Brush), TEXT("/Game/Themes"), Error));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeNativeInheritanceTest, "WHFramework.WidgetTheme.Editor.NativeInheritance",
 								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FThemeNativeInheritanceTest::RunTest(const FString& Parameters)
@@ -177,7 +286,7 @@ bool FThemeNativeInheritanceTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	if (!TestTrue(*Error,
-				  FWidgetThemeEditorService::Create(Theme, TAG_ThemeEditorParentA, TEXT("Child"), EWidgetStyleKind::Brush, TEXT("/Game/Themes"), true, Error)))
+				  FWidgetThemeEditorService::Create(Theme, TAG_ThemeEditorParentA, TEXT("Child"), EWidgetStyleKind::Brush, TEXT("/Game/__ExternalAsset__/Styles"), true, Error)))
 	{
 		return false;
 	}
@@ -205,7 +314,7 @@ bool FThemeDuplicationTest::RunTest(const FString& Parameters)
 	FString Error;
 	UWidgetTheme* Source = Fixture.Theme(TEXT("DA_Source"));
 	if (!Fixture.Parent(Source, Error) || !Fixture.Tint(Source, TAG_ThemeEditorParentA, FLinearColor::Red, Error) ||
-		!FWidgetThemeEditorService::Create(Source, TAG_ThemeEditorParentA, TEXT("Child"), EWidgetStyleKind::Brush, TEXT("/Game/Themes"), true, Error))
+		!FWidgetThemeEditorService::Create(Source, TAG_ThemeEditorParentA, TEXT("Child"), EWidgetStyleKind::Brush, TEXT("/Game/__ExternalAsset__/Styles"), true, Error))
 	{
 		AddError(Error);
 		return false;
@@ -312,6 +421,75 @@ bool FThemeClipboardTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemePropertyRoundTripTest, "WHFramework.WidgetTheme.Editor.PropertyDefaultValues",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FThemePropertyRoundTripTest::RunTest(const FString& Parameters)
+{
+	using namespace WidgetThemeEditorTests;
+	const TSharedRef<FFixture> DeferredFixture = MakeShared<FFixture>();
+	FFixture& Fixture = DeferredFixture.Get();
+	ADD_LATENT_AUTOMATION_COMMAND(FDelayedFunctionLatentCommand([DeferredFixture]()
+	{
+	}, 1.f));
+	FString Error;
+	UWidgetTheme* Theme = Fixture.Theme(TEXT("DA_PropertyDefaults"));
+	if (!Fixture.Parent(Theme, Error))
+	{
+		AddError(Error);
+		return false;
+	}
+	TStrongObjectPtr<UTexture2D> Texture(NewObject<UTexture2D>());
+	UWidgetBrushStyle* Defaults = Fixture.Brush(Theme);
+	Defaults->Brush.SetResourceObject(Texture.Get());
+	Defaults->Brush.DrawAs = ESlateBrushDrawType::Image;
+	Defaults->Brush.ImageSize = FVector2D(80, 40);
+	Defaults->Brush.OutlineSettings.RoundingType = ESlateBrushRoundingType::HalfHeightRadius;
+	Defaults->Brush.OutlineSettings.Width = 4.f;
+	if (!TestTrue(TEXT("Managed property edit accepts explicit defaults"), UWidgetThemeEditorLibrary::SetStyleProperty(
+		Theme, TAG_ThemeEditorParentA, TEXT("Brush"),
+		TEXT("(DrawAs=NoDrawType,ResourceObject=None,ImageSize=(X=0,Y=0),OutlineSettings=(RoundingType=FixedRadius,Width=0))"), Error)))
+	{
+		AddError(Error);
+		return false;
+	}
+	Defaults = Fixture.Brush(Theme);
+	TestNull(TEXT("Explicit null clears the previous resource"), Defaults->Brush.GetResourceObject());
+	TestEqual(TEXT("Zero enum replaces the old draw mode"), Defaults->Brush.DrawAs.GetValue(), ESlateBrushDrawType::NoDrawType);
+	TestEqual(TEXT("Zero image dimensions replace the old size"), FVector2D(Defaults->Brush.ImageSize), FVector2D::ZeroVector);
+	TestEqual(TEXT("Nested zero enum replaces the old rounding mode"), Defaults->Brush.OutlineSettings.RoundingType.GetValue(), ESlateBrushRoundingType::FixedRadius);
+	TestEqual(TEXT("Nested zero width replaces the old outline"), Defaults->Brush.OutlineSettings.Width, 0.f);
+	if (!TestTrue(TEXT("Managed theme retains the edited style while saving"), UWidgetThemeEditorLibrary::SaveTheme(Theme, Error)))
+	{
+		AddError(Error);
+		return false;
+	}
+	TestFalse(TEXT("Saving an editor-only theme does not register a runtime cook root"),
+		GetDefault<UProjectPackagingSettings>()->DirectoriesToAlwaysCook.ContainsByPredicate(
+			[&Fixture](const FDirectoryPath& Directory) { return Directory.Path == Fixture.Directory; }));
+	Defaults = Fixture.Brush(Theme);
+	TestNull(TEXT("Blueprint compilation preserves the cleared resource"), Defaults->Brush.GetResourceObject());
+	TestEqual(TEXT("Blueprint compilation preserves the zero draw mode"), Defaults->Brush.DrawAs.GetValue(), ESlateBrushDrawType::NoDrawType);
+	UWidgetTheme* Target = Fixture.Theme(TEXT("DA_PropertyDefaultsPaste"));
+	if (!Fixture.Parent(Target, Error))
+	{
+		AddError(Error);
+		return false;
+	}
+	Fixture.Brush(Target)->Brush.SetResourceObject(Texture.Get());
+	Fixture.Brush(Target)->Brush.DrawAs = ESlateBrushDrawType::Image;
+	Fixture.Brush(Target)->Brush.ImageSize = FVector2D(80, 40);
+	if (!FWidgetThemeEditorService::CopyProperties(Theme, TAG_ThemeEditorParentA, Error) ||
+		!FWidgetThemeEditorService::PasteProperties(Target, TAG_ThemeEditorParentA, Error))
+	{
+		AddError(Error);
+		return false;
+	}
+	TestNull(TEXT("Clipboard paste clears a previous resource"), Fixture.Brush(Target)->Brush.GetResourceObject());
+	TestEqual(TEXT("Clipboard paste clears the old draw mode"), Fixture.Brush(Target)->Brush.DrawAs.GetValue(), ESlateBrushDrawType::NoDrawType);
+	TestEqual(TEXT("Clipboard paste clears the old dimensions"), FVector2D(Fixture.Brush(Target)->Brush.ImageSize), FVector2D::ZeroVector);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeClipboardGuardsTest, "WHFramework.WidgetTheme.Editor.ClipboardGuards",
 								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FThemeClipboardGuardsTest::RunTest(const FString& Parameters)
@@ -322,7 +500,7 @@ bool FThemeClipboardGuardsTest::RunTest(const FString& Parameters)
 	UWidgetTheme* Theme = Fixture.Theme(TEXT("DA_ClipboardGuards"));
 	UWidgetTheme* Shared = Fixture.Theme(TEXT("DA_Readonly"));
 	if (!Fixture.Parent(Theme, Error) ||
-		!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Text, TEXT("ThemeEditorText"), EWidgetStyleKind::Text, TEXT("/Game/Themes"), false, Error) ||
+		!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Text, TEXT("ThemeEditorText"), EWidgetStyleKind::Text, TEXT("/Game/__ExternalAsset__/Styles"), false, Error) ||
 		!FWidgetThemeEditorService::Associate(Shared, WidgetStyleTags::Brush, TEXT("ThemeEditorAlias"), Theme, TAG_ThemeEditorParentA, Error))
 	{
 		AddError(Error);
@@ -388,7 +566,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeRootTest, "WHFramework.WidgetTheme.Editor
 								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FThemeRootTest::RunTest(const FString& Parameters)
 {
-	for (EWidgetStyleKind Type : {EWidgetStyleKind::Button, EWidgetStyleKind::Text, EWidgetStyleKind::Brush})
+	for (EWidgetStyleKind Type : WidgetStyleTags::Kinds())
 	{
 		EWidgetStyleKind Actual;
 		TestTrue(TEXT("Static root registered"), WidgetStyleTags::Root(Type).IsValid());
@@ -396,12 +574,12 @@ bool FThemeRootTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Root kind"), Actual, Type);
 	}
 	const TArray<FString> Roots = FWidgetThemeEditorService::GetCreationRoots();
-	TestEqual(TEXT("Game first"), Roots[0], FString(TEXT("/Game/Themes")));
+	TestEqual(TEXT("Game first"), Roots[0], FString(TEXT("/Game/__ExternalAsset__/Styles")));
 	for (const TSharedRef<IPlugin>& Plugin : IPluginManager::Get().GetEnabledPlugins())
 	{
 		if (Plugin->GetLoadedFrom() == EPluginLoadedFrom::Engine)
 		{
-			TestFalse(*Plugin->GetName(), Roots.Contains(Plugin->GetMountedAssetPath() / TEXT("Themes")));
+			TestFalse(*Plugin->GetName(), Roots.Contains(Plugin->GetMountedAssetPath() / TEXT("__ExternalAsset__/Styles")));
 		}
 	}
 	return true;
@@ -437,8 +615,8 @@ bool FThemeOwnedRemoveTest::RunTest(const FString& Parameters)
 	FFixture Fixture;
 	FString Error;
 	UWidgetTheme* Theme = Fixture.Theme(TEXT("DA_InternalReferences"));
-	if (!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Text, TEXT("ThemeEditorText"), EWidgetStyleKind::Text, TEXT("/Game/Themes"), false, Error) ||
-		!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Button, TEXT("ThemeEditorButton"), EWidgetStyleKind::Button, TEXT("/Game/Themes"), false,
+	if (!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Text, TEXT("ThemeEditorText"), EWidgetStyleKind::Text, TEXT("/Game/__ExternalAsset__/Styles"), false, Error) ||
+		!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Button, TEXT("ThemeEditorButton"), EWidgetStyleKind::Button, TEXT("/Game/__ExternalAsset__/Styles"), false,
 										   Error))
 	{
 		AddError(Error);
@@ -467,7 +645,7 @@ bool FThemeOwnedRemoveTest::RunTest(const FString& Parameters)
 		return false;
 	TestNull(TEXT("Deleted text class reference cleared"), TextProperty->GetObjectPropertyValue_InContainer(ButtonStyle->GeneratedClass->GetDefaultObject()));
 	if (!Fixture.Parent(Theme, Error) ||
-		!FWidgetThemeEditorService::Create(Theme, TAG_ThemeEditorParentA, TEXT("Child"), EWidgetStyleKind::Brush, TEXT("/Game/Themes"), true, Error))
+		!FWidgetThemeEditorService::Create(Theme, TAG_ThemeEditorParentA, TEXT("Child"), EWidgetStyleKind::Brush, TEXT("/Game/__ExternalAsset__/Styles"), true, Error))
 		return false;
 	UClass* OriginalParent = FWidgetThemeEditorService::Blueprint(Theme, TAG_ThemeEditorParentA)->ParentClass;
 	TestTrue(TEXT("Owned parent with child can be removed"), FWidgetThemeEditorService::CanRemove(Theme, TAG_ThemeEditorParentA, Error));
@@ -488,7 +666,7 @@ bool FThemeReferencedTagRemoveTest::RunTest(const FString& Parameters)
 	UWidgetTheme* Owner = Fixture.Theme(TEXT("DA_TagOwner"));
 	UWidgetTheme* Consumer = Fixture.Theme(TEXT("DA_TagConsumer"));
 	const FString Name = TEXT("TestReferenced_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
-	if (!FWidgetThemeEditorService::Create(Owner, WidgetStyleTags::Brush, Name, EWidgetStyleKind::Brush, TEXT("/Game/Themes"), false, Error))
+	if (!FWidgetThemeEditorService::Create(Owner, WidgetStyleTags::Brush, Name, EWidgetStyleKind::Brush, TEXT("/Game/__ExternalAsset__/Styles"), false, Error))
 		return false;
 	const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*(TEXT("Style.Brush.") + Name)));
 	const FSoftObjectPath StylePath(FWidgetThemeEditorService::Blueprint(Owner, Tag));
@@ -603,13 +781,69 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeFolderTest, "WHFramework.WidgetTheme.Edit
 								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FThemeFolderTest::RunTest(const FString& Parameters)
 {
+	UWidgetThemeEditorSettings* Settings = GetMutableDefault<UWidgetThemeEditorSettings>();
+	const bool bOriginalHide = Settings->bHideExternalAssetFolders;
+	ON_SCOPE_EXIT
+	{
+		Settings->bHideExternalAssetFolders = bOriginalHide;
+		UWidgetThemeEditorSettings::ApplyFolderVisibility();
+	};
+	Settings->bHideExternalAssetFolders = true;
 	UWidgetThemeEditorSettings::ApplyFolderVisibility();
 	auto Visibility = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get().GetFolderPermissionList();
-	if (GetDefault<UWidgetThemeEditorSettings>()->bHideThemeFolders)
+	for (const FString& StyleRoot : FWidgetThemeEditorService::GetCreationRoots())
 	{
-		TestFalse(TEXT("Style folder hidden"), Visibility->PassesStartsWithFilter(TEXT("/Game/Themes")));
-		TestTrue(TEXT("Theme asset folder visible"), Visibility->PassesStartsWithFilter(TEXT("/Game/DataAssets/Theme")));
+		const FString ExternalRoot = FPaths::GetPath(StyleRoot);
+		TestFalse(*ExternalRoot, Visibility->PassesStartsWithFilter(ExternalRoot));
+		TestFalse(*StyleRoot, Visibility->PassesStartsWithFilter(StyleRoot));
+		TestFalse(TEXT("Future managed asset categories are hidden"), Visibility->PassesStartsWithFilter(ExternalRoot / TEXT("OtherAssets")));
 	}
+	TestTrue(TEXT("Theme asset folder visible"), Visibility->PassesStartsWithFilter(TEXT("/Game/DataAssets/Theme")));
+	TestTrue(TEXT("Imported UI resources visible"), Visibility->PassesStartsWithFilter(TEXT("/Game/UI")));
+	TestTrue(TEXT("Similar sibling folder remains visible"), Visibility->PassesStartsWithFilter(TEXT("/Game/__ExternalAsset__Other")));
+	Settings->bHideExternalAssetFolders = false;
+	UWidgetThemeEditorSettings::ApplyFolderVisibility();
+	TestTrue(TEXT("Explicit show restores the external root"), Visibility->PassesStartsWithFilter(TEXT("/Game/__ExternalAsset__")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeTagSourceTest, "WHFramework.WidgetTheme.Editor.TagSourceOwnership",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FThemeTagSourceTest::RunTest(const FString& Parameters)
+{
+	using namespace WidgetThemeEditorTests;
+	FFixture Fixture;
+	FString Error;
+	FString Filename;
+	TestFalse(TEXT("Engine assets cannot own editable project style Tags"), FWidgetThemeEditorService::GetTagSourceFilename(TEXT("/Engine/Invalid"), Filename, Error));
+	for (const FString& Root : FWidgetThemeEditorService::GetCreationRoots())
+	{
+		if (!Root.StartsWith(TEXT("/Game/")) && !Root.StartsWith(TEXT("/WHFrameworkUtilities/")))
+		{
+			continue;
+		}
+		TestTrue(TEXT("Owner resolves a dedicated Tag source"), FWidgetThemeEditorService::GetTagSourceFilename(Root, Filename, Error));
+		const FString Name = TEXT("ModuleSource_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+		const FString ThemePackage = Root.LeftChop(FString(TEXT("/__ExternalAsset__/Styles")).Len()) / TEXT("WidgetThemeTests") / Name;
+		UWidgetTheme* Theme = NewObject<UWidgetTheme>(CreatePackage(*ThemePackage), FName(*Name), RF_Public | RF_Standalone | RF_Transactional);
+		Theme->GetOutermost()->MarkAsFullyLoaded();
+		FAssetRegistryModule::AssetCreated(Theme);
+		Fixture.Themes.Add(Theme);
+		if (!TestTrue(TEXT("Creating a style registers its Tag in the owner source"), FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Brush, Name, EWidgetStyleKind::Brush, Root, false, Error)))
+		{
+			AddError(Error);
+			return false;
+		}
+		const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*(TEXT("Style.Brush.") + Name)));
+		const TSharedPtr<FGameplayTagNode> Node = UGameplayTagsManager::Get().FindTagNode(Tag);
+		TestTrue(TEXT("Registered Tag identifies its owning module source"), Node && Node->GetAllSourceNames().Contains(FName(*FPaths::GetCleanFilename(Filename))));
+		FString Written;
+		TestTrue(TEXT("Owner source is saved"), FFileHelper::LoadFileToString(Written, *Filename));
+		TestTrue(TEXT("Definition is present in the owner source"), Written.Contains(Tag.ToString()));
+	}
+	TArray<uint8> CurrentDefault;
+	FFileHelper::LoadFileToArray(CurrentDefault, *GetDefault<UGameplayTagsSettings>()->GetDefaultConfigFilename());
+	TestTrue(TEXT("Creating module Tags leaves the project default Tag configuration unchanged"), CurrentDefault == Fixture.TagConfig);
 	return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeTreeAndLayoutTest, "WHFramework.WidgetTheme.Editor.TreeAndDockLayout",
@@ -623,13 +857,13 @@ bool FThemeTreeAndLayoutTest::RunTest(const FString& Parameters)
 	UWidgetTheme* Theme = Fixture.Theme(TEXT("DA_Tree"));
 	if (!Fixture.Parent(Owner, Error) ||
 		!FWidgetThemeEditorService::Associate(Theme, WidgetStyleTags::Brush, TEXT("ThemeEditorParentA"), Owner, TAG_ThemeEditorParentA, Error) ||
-		!FWidgetThemeEditorService::Create(Theme, TAG_ThemeEditorParentA, TEXT("Child"), EWidgetStyleKind::Brush, TEXT("/Game/Themes"), true, Error))
+		!FWidgetThemeEditorService::Create(Theme, TAG_ThemeEditorParentA, TEXT("Child"), EWidgetStyleKind::Brush, TEXT("/Game/__ExternalAsset__/Styles"), true, Error))
 	{
 		AddError(Error);
 		return false;
 	}
 	const auto Roots = FWidgetThemeTree::Build(Theme, EWidgetStyleKind::None, TEXT(""));
-	TestEqual(TEXT("Three roots always present"), Roots.Num(), 3);
+	TestEqual(TEXT("Ten roots always present"), Roots.Num(), 10);
 	TestTrue(TEXT("No outer Style node"), Roots[0]->bRoot && Roots[0]->Tag == WidgetStyleTags::Button);
 	const auto BrushRoot = Roots[2];
 	TestEqual(TEXT("Shared parent visible"), BrushRoot->Children.Num(), 1);
@@ -701,7 +935,7 @@ bool FThemeExistingUIPreviewTest::RunTest(const FString& Parameters)
 					TestEqual(TEXT("Existing text style applied"), StyleProperty->GetObjectPropertyValue_InContainer(Text.Get()),
 							  static_cast<UObject*>(StyleClass));
 			}
-			else
+			else if (Kind == EWidgetStyleKind::Brush)
 			{
 				Image->SetStyleTag(Tag);
 				TestEqual(TEXT("Existing brush applied"), Image->GetBrush().GetResourceObject(),
@@ -797,7 +1031,7 @@ bool FThemeUnusedTagTest::RunTest(const FString& Parameters)
 	FString Error;
 	UWidgetTheme* Theme = Fixture.Theme(TEXT("DA_UnusedTag"));
 	const FString Name = TEXT("TestCleanup_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
-	if (!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Brush, Name, EWidgetStyleKind::Brush, TEXT("/Game/Themes"), false, Error))
+	if (!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Brush, Name, EWidgetStyleKind::Brush, TEXT("/Game/__ExternalAsset__/Styles"), false, Error))
 	{
 		AddError(Error);
 		return false;
@@ -817,7 +1051,7 @@ bool FThemeRenameReferenceTest::RunTest(const FString& Parameters)
 	FString Error;
 	UWidgetTheme* Theme = Fixture.Theme(TEXT("DA_RenameReferences"));
 	const FString Name = TEXT("TestRename_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
-	if (!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Brush, Name, EWidgetStyleKind::Brush, TEXT("/Game/Themes"), false, Error))
+	if (!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Brush, Name, EWidgetStyleKind::Brush, TEXT("/Game/__ExternalAsset__/Styles"), false, Error))
 	{
 		AddError(Error);
 		return false;
@@ -888,7 +1122,7 @@ bool FThemeBlueprintFieldDuplicateTest::RunTest(const FString& Parameters)
 	}
 	Property->ContainerPtrToValuePtr<FSlateBrush>(Parent->GeneratedClass->GetDefaultObject())->ImageSize = FVector2D(67, 29);
 	FWidgetThemeEditorService::CompileStyle(Source, TAG_ThemeEditorParentA, Error);
-	if (!FWidgetThemeEditorService::Create(Source, TAG_ThemeEditorParentA, TEXT("Child"), EWidgetStyleKind::Brush, TEXT("/Game/Themes"), true, Error))
+	if (!FWidgetThemeEditorService::Create(Source, TAG_ThemeEditorParentA, TEXT("Child"), EWidgetStyleKind::Brush, TEXT("/Game/__ExternalAsset__/Styles"), true, Error))
 	{
 		AddError(Error);
 		return false;

@@ -10,7 +10,7 @@ class WHFRAMEWORKEDITOR_API UWidgetThemeEditorSettings : public UDeveloperSettin
 
 public:
 	UPROPERTY(Config, EditAnywhere, Category = "Content Browser")
-	bool bHideThemeFolders = true;
+	bool bHideExternalAssetFolders = true;
 
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& Event) override;
 

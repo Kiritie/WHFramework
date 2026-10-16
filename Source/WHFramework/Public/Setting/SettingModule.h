@@ -167,6 +167,9 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool HasPendingConfirmation() const { return ConfirmationTransaction.bActive; }
 
+	UFUNCTION(BlueprintPure)
+	double GetConfirmationTimeRemaining() const;
+
 	UFUNCTION(BlueprintCallable)
 	void ResetAllToDefault();
 

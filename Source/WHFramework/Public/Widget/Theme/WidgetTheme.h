@@ -3,6 +3,13 @@
 #include "CommonButtonBase.h"
 #include "CommonTextBlock.h"
 #include "Engine/DataAsset.h"
+#include "CommonBorder.h"
+#include "Widget/Style/CommonInputStyle.h"
+#include "Widget/Style/CommonToggleStyle.h"
+#include "Widget/Style/CommonRangeStyle.h"
+#include "Widget/Style/CommonProgressStyle.h"
+#include "Widget/Style/CommonScrollStyle.h"
+
 #include "GameplayTagContainer.h"
 #include "Setting/SettingModuleTypes.h"
 
@@ -79,6 +86,77 @@ public:
 	TSubclassOf<UWidgetBrushStyle> Style;
 };
 
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWidgetInputStyleData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
+	TSubclassOf<UCommonInputStyle> Style;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWidgetToggleStyleData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
+	TSubclassOf<UCommonToggleStyle> Style;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWidgetRangeStyleData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
+	TSubclassOf<UCommonRangeStyle> Style;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWidgetProgressStyleData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
+	TSubclassOf<UCommonProgressStyle> Style;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWidgetScrollStyleData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
+	TSubclassOf<UCommonScrollStyle> Style;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWidgetBorderStyleData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
+	TSubclassOf<UCommonBorderStyle> Style;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWidgetTextScrollStyleData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
+	TSubclassOf<UCommonTextScrollStyle> Style;
+};
+
 USTRUCT()
 struct WHFRAMEWORK_API FWidgetStyleBinding
 {
@@ -103,11 +181,16 @@ public:
 
 #if WITH_EDITOR
 	virtual void PostDuplicate(EDuplicateMode::Type DuplicateMode) override;
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& Event) override;
+	virtual void PostEditUndo() override;
 	static FWidgetThemeDuplicateDelegate DuplicateStyles;
 #endif
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Theme")
 	bool bRuntimeTheme = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Theme")
+	TObjectPtr<UWidgetTheme> ParentTheme;
 
 #if WITH_EDITORONLY_DATA
 	UPROPERTY()
@@ -116,6 +199,10 @@ public:
 	TMap<FGameplayTag, FWidgetStyleBinding> Bindings;
 #endif
 	UClass* GetStyleClass(FGameplayTag Tag, EWidgetStyleKind Kind) const;
+	bool HasLocalStyle(FGameplayTag Tag, EWidgetStyleKind Kind) const;
+	UClass* ResolveStyleClass(FGameplayTag Tag, EWidgetStyleKind Kind) const;
+	TArray<FGameplayTag> GetStyleTags(EWidgetStyleKind Kind, bool bIncludeInherited = false) const;
+
 #if WITH_EDITOR
 	bool SetStyleClass(FGameplayTag Tag, EWidgetStyleKind Kind, UClass* StyleClass);
 	void RemoveStyle(FGameplayTag Tag, EWidgetStyleKind Kind);
@@ -130,6 +217,28 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Brush"))
 	TMap<FGameplayTag, FWidgetBrushStyleData> BrushStyles;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Input"))
+	TMap<FGameplayTag, FWidgetInputStyleData> InputStyles;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Toggle"))
+	TMap<FGameplayTag, FWidgetToggleStyleData> ToggleStyles;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Range"))
+	TMap<FGameplayTag, FWidgetRangeStyleData> RangeStyles;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Progress"))
+	TMap<FGameplayTag, FWidgetProgressStyleData> ProgressStyles;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Scroll"))
+	TMap<FGameplayTag, FWidgetScrollStyleData> ScrollStyles;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Border"))
+	TMap<FGameplayTag, FWidgetBorderStyleData> BorderStyles;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.TextScroll"))
+	TMap<FGameplayTag, FWidgetTextScrollStyleData> TextScrollStyles;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setting")
 	FSettingRendererClasses SettingRendererClasses;
@@ -153,15 +262,48 @@ public:
 		return BrushStyles;
 	}
 
+
+	const TMap<FGameplayTag, FWidgetInputStyleData>& GetInputStyles() const
+	{
+		return InputStyles;
+	}
+
+	const TMap<FGameplayTag, FWidgetToggleStyleData>& GetToggleStyles() const
+	{
+		return ToggleStyles;
+	}
+
+	const TMap<FGameplayTag, FWidgetRangeStyleData>& GetRangeStyles() const
+	{
+		return RangeStyles;
+	}
+
+	const TMap<FGameplayTag, FWidgetProgressStyleData>& GetProgressStyles() const
+	{
+		return ProgressStyles;
+	}
+
+	const TMap<FGameplayTag, FWidgetScrollStyleData>& GetScrollStyles() const
+	{
+		return ScrollStyles;
+	}
+
+	const TMap<FGameplayTag, FWidgetBorderStyleData>& GetBorderStyles() const
+	{
+		return BorderStyles;
+	}
+
+	const TMap<FGameplayTag, FWidgetTextScrollStyleData>& GetTextScrollStyles() const
+	{
+		return TextScrollStyles;
+	}
+
 	const FSettingRendererClasses& GetSettingRendererClasses() const
 	{
 		return SettingRendererClasses;
 	}
 
-	TSubclassOf<UWidgetSettingCategoryEntry> GetSettingCategoryEntryClass() const
-	{
-		return SettingCategoryEntryClass;
-	}
+	TSubclassOf<UWidgetSettingCategoryEntry> GetSettingCategoryEntryClass() const;
 
 	const FWidgetButtonStyleData* FindButtonStyle(FGameplayTag InStyleTag) const;
 

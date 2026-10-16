@@ -34,6 +34,7 @@ private:
 	bool bInheritParent = false;
 	FGameplayTag ParentTag;
 	FGameplayTag SourceTag;
+	TArray<TSharedPtr<EWidgetStyleKind>> StyleTypes;
 	TArray<TSharedPtr<FString>> CreationRoots;
 	TSharedPtr<FString> CreationRoot;
 	TSharedPtr<SEditableTextBox> NameInput;

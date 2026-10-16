@@ -1,9 +1,10 @@
 #pragma once
 
-#include "Components/EditableTextBox.h"
 #include "Setting/Widget/Entry/WidgetSettingEntryBase.h"
-
+#include "Types/SlateEnums.h"
 #include "WidgetTextSettingEntryBase.generated.h"
+
+class UCommonInput;
 
 UCLASS()
 class WHFRAMEWORK_API UWidgetTextSettingEntryBase : public UWidgetSettingEntryBase
@@ -13,21 +14,16 @@ class WHFRAMEWORK_API UWidgetTextSettingEntryBase : public UWidgetSettingEntryBa
 public:
 	UWidgetTextSettingEntryBase(const FObjectInitializer& ObjectInitializer);
 
-	//////////////////////////////////////////////////////////////////////////
-	/// ObjectPool
-public:
-	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
-
-	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
-
 protected:
+	virtual UWidget* GetValueControl() const override;
+	virtual FName GetRendererName() const override;
+	virtual void BindValueControl() override;
+	virtual void UnbindValueControl() override;
 	virtual void ApplyValueToControl_Implementation(const FParameter& InValue) override;
 
 	UFUNCTION()
-	void OnTextCommitted(const FText& InText, ETextCommit::Type InCommitMethod);
+	void OnTextCommitted(UCommonInput* InInput, const FText& InText, ETextCommit::Type InCommitMethod);
 
-	FParameter MakeTypedValue(const FString& InText) const;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
-	TObjectPtr<UEditableTextBox> TxtBox_Value;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget), Category = "Components")
+	TObjectPtr<UCommonInput> Input_Value;
 };

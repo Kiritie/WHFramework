@@ -20,6 +20,7 @@
 #include "KismetCompiler.h"
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
+#include "Misc/App.h"
 #include "Misc/FileHelper.h"
 #include "UObject/StrongObjectPtr.h"
 #include "ObjectTools.h"
@@ -109,13 +110,13 @@ namespace WidgetThemeEdit
 	}
 	static FString ThemeRoot(const UObject* Asset)
 	{
-		return MountRoot(Asset->GetOutermost()->GetName()) / TEXT("Themes");
+		return MountRoot(Asset->GetOutermost()->GetName()) / TEXT("__ExternalAsset__/Styles");
 	}
 	static bool NewPackage(const FString& DestinationRoot, FString& Package, FGuid& ID, FString& Report)
 	{
 		if (!FWidgetThemeEditorService::GetCreationRoots().Contains(DestinationRoot))
 		{
-			Report = TEXT("Select Game or an enabled content plugin's Themes directory.");
+			Report = TEXT("Select Game or a plugin; managed styles are stored under __ExternalAsset__/Styles.");
 			return false;
 		}
 		const FString R = DestinationRoot;
@@ -769,7 +770,7 @@ namespace WidgetThemeEdit
 		if (StylesOnly)
 		{
 			TArray<FTopLevelAssetPath> Bases;
-			for (EWidgetStyleKind Type : {EWidgetStyleKind::Button, EWidgetStyleKind::Text, EWidgetStyleKind::Brush})
+			for (EWidgetStyleKind Type : WidgetStyleTags::Kinds())
 			{
 				Bases.Add(FWidgetThemeResolver::NativeBase(Type)->GetClassPathName());
 			}
@@ -831,6 +832,49 @@ bool FWidgetThemeEditorService::IsBusy()
 {
 	return bBusy;
 }
+
+UBlueprint* FWidgetThemeEditorService::CreateForTag(UWidgetTheme* Theme, const FString& FullTag, UClass* ParentClass, const FString& DestinationRoot, FString& Report)
+{
+	if (!Theme || !ParentClass || !GetCreationRoots().Contains(DestinationRoot) || !RegisterTag(FullTag, DestinationRoot, Report))
+	{
+		return nullptr;
+	}
+	const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*FullTag));
+	EWidgetStyleKind Type;
+	if (!Kind(Tag, Type) || WidgetStyleTags::IsRoot(Tag) || Tags(Theme).Contains(Tag) ||
+		!ParentClass->IsChildOf(FWidgetThemeResolver::NativeBase(Type)) ||
+		ForbiddenFrameworkReference(ParentClass->GetPathName(), MountRoot(DestinationRoot)))
+	{
+		Report = TEXT("Style type, parent, ownership or destination is invalid.");
+		return nullptr;
+	}
+	FString Package;
+	FGuid Identity;
+	if (!Writable(Theme->GetOutermost(), Report) || !NewPackage(DestinationRoot, Package, Identity, Report))
+	{
+		return nullptr;
+	}
+	FScopedTransaction Transaction(NSLOCTEXT("WidgetTheme", "CreateForTag", "Create managed style"));
+	Theme->Modify();
+	UBlueprint* Style = FKismetEditorUtilities::CreateBlueprint(ParentClass, CreatePackage(*Package), FName(*FPackageName::GetShortName(Package)),
+		BPTYPE_Normal, UBlueprint::StaticClass(), UBlueprintGeneratedClass::StaticClass(), TEXT("WidgetThemeEditor"));
+	if (!Style || !Compile(Style, Report) || !DependencySafe(Style->GeneratedClass->GetDefaultObject(), Report) ||
+		!Theme->SetStyleClass(Tag, Type, Style->GeneratedClass))
+	{
+		Abandon(Style);
+		Transaction.Cancel();
+		return nullptr;
+	}
+	FWidgetStyleBinding Binding;
+	Binding.bManaged = true;
+	Binding.AssetId = Identity;
+	Theme->Bindings.Add(Tag, Binding);
+	FAssetRegistryModule::AssetCreated(Style);
+	Style->MarkPackageDirty();
+	Theme->MarkPackageDirty();
+	FWidgetThemeResolver::NotifyThemeChanged();
+	return Style;
+}
 UClass* FWidgetThemeEditorService::CreationBase(EWidgetStyleKind Kind)
 {
 	return FWidgetThemeResolver::DefaultStyle(Kind);
@@ -842,17 +886,9 @@ TArray<FGameplayTag> FWidgetThemeEditorService::Tags(const UWidgetTheme* T)
 	{
 		return Out;
 	}
-	for (const auto& I : T->GetButtonStyles())
+	for (EWidgetStyleKind Type : WidgetStyleTags::Kinds())
 	{
-		Out.AddUnique(I.Key);
-	}
-	for (const auto& I : T->GetTextStyles())
-	{
-		Out.AddUnique(I.Key);
-	}
-	for (const auto& I : T->GetBrushStyles())
-	{
-		Out.AddUnique(I.Key);
+		Out.Append(T->GetStyleTags(Type));
 	}
 	Out.Sort([](const FGameplayTag& A, const FGameplayTag& B) { return A.ToString() < B.ToString(); });
 	return Out;
@@ -860,7 +896,7 @@ TArray<FGameplayTag> FWidgetThemeEditorService::Tags(const UWidgetTheme* T)
 UBlueprint* FWidgetThemeEditorService::Blueprint(UWidgetTheme* T, FGameplayTag Tag)
 {
 	EWidgetStyleKind K;
-	UClass* C = Kind(Tag, K) ? T->GetStyleClass(Tag, K) : nullptr;
+	UClass* C = T && Kind(Tag, K) ? T->ResolveStyleClass(Tag, K) : nullptr;
 	return C ? Cast<UBlueprint>(C->ClassGeneratedBy) : nullptr;
 }
 TArray<FProperty*> FWidgetThemeEditorService::EditableProperties(UClass* C)
@@ -886,13 +922,36 @@ TArray<UWidgetTheme*> FWidgetThemeEditorService::Themes()
 FString FWidgetThemeEditorService::DescribeTag(const UWidgetTheme* Theme, FGameplayTag Tag)
 {
 	EWidgetStyleKind Kind;
-	UClass* Class = Theme && FWidgetThemeEditorService::Kind(Tag, Kind) ? Theme->GetStyleClass(Tag, Kind) : nullptr;
+	UClass* Class = Theme && FWidgetThemeEditorService::Kind(Tag, Kind) ? Theme->ResolveStyleClass(Tag, Kind) : nullptr;
 	UClass* ParentClass = Class ? Class->GetSuperClass() : nullptr;
 	FString Parent = GetPathNameSafe(ParentClass);
 	bool bFoundManagedParent = false;
 	FString Owner = Theme ? Theme->GetPathName() : FString();
-	for (UWidgetTheme* Candidate : AllThemes())
+	TArray<const UWidgetTheme*> Candidates;
+	TSet<const UWidgetTheme*> Visited;
+	if (Theme)
 	{
+		Candidates.Add(Theme);
+	}
+	for (int32 Index = 0; Index < Candidates.Num(); ++Index)
+	{
+		const UWidgetTheme* Candidate = Candidates[Index];
+		if (!Candidate || Visited.Contains(Candidate))
+		{
+			continue;
+		}
+		Visited.Add(Candidate);
+		if (Candidate->ParentTheme)
+		{
+			Candidates.Add(Candidate->ParentTheme);
+		}
+		for (const auto& SourceBinding : Candidate->Bindings)
+		{
+			if (SourceBinding.Value.SourceTheme)
+			{
+				Candidates.Add(SourceBinding.Value.SourceTheme);
+			}
+		}
 		for (FGameplayTag CandidateTag : Tags(Candidate))
 		{
 			EWidgetStyleKind CandidateKind;
@@ -916,18 +975,67 @@ FString FWidgetThemeEditorService::DescribeTag(const UWidgetTheme* Theme, FGamep
 		   (Class && Class->ClassGeneratedBy ? Class->ClassGeneratedBy->GetPathName() : GetPathNameSafe(Class)) + TEXT("\nTag parent: ") +
 		   Tag.RequestDirectParent().ToString() + TEXT("\nStyle parent: ") + Parent;
 }
-bool FWidgetThemeEditorService::RegisterTag(const FString& Name, FString& Report)
+bool FWidgetThemeEditorService::GetTagSourceFilename(const FString& OwnerPath, FString& Filename, FString& Report)
 {
-	if (!Name.StartsWith(TEXT("Style.Button.")) && !Name.StartsWith(TEXT("Style.Text.")) && !Name.StartsWith(TEXT("Style.Brush.")))
+	Filename.Reset();
+	const FString Owner = MountRoot(OwnerPath);
+	if (Owner == TEXT("/Game"))
 	{
-		Report = TEXT("A style Tag must use Style.Button.*, Style.Text.* or Style.Brush.*.");
+		Filename = FPaths::ConvertRelativePathToFull(FPaths::ProjectConfigDir() / TEXT("Tags") / (FString(FApp::GetProjectName()) + TEXT(".WidgetStyles.ini")));
+		return true;
+	}
+	for (const TSharedRef<IPlugin>& Plugin : IPluginManager::Get().GetEnabledPlugins())
+	{
+		if (Plugin->CanContainContent() && Plugin->GetLoadedFrom() == EPluginLoadedFrom::Project && MountRoot(Plugin->GetMountedAssetPath()) == Owner)
+		{
+			Filename = FPaths::ConvertRelativePathToFull(Plugin->GetBaseDir() / TEXT("Config/Tags") / (Plugin->GetName() + TEXT(".WidgetStyles.ini")));
+			return true;
+		}
+	}
+	Report = TEXT("Select Game or an enabled project content plugin for the Tag definition.");
+	return false;
+}
+
+bool FWidgetThemeEditorService::RegisterTag(const FString& Name, const FString& OwnerPath, FString& Report)
+{
+	bool bValidRoot = false;
+	for (EWidgetStyleKind Type : WidgetStyleTags::Kinds())
+	{
+		bValidRoot |= Name.StartsWith(WidgetStyleTags::Root(Type).ToString() + TEXT("."));
+	}
+	if (!bValidRoot)
+	{
+		Report = TEXT("A style Tag must be below a supported Style type root.");
 		return false;
 	}
 	if (FGameplayTag::RequestGameplayTag(FName(*Name), false).IsValid())
 	{
 		return true;
 	}
-	if (!IGameplayTagsEditorModule::Get().AddNewGameplayTagToINI(Name, TEXT("Widget theme style")))
+	FString Filename;
+	if (!GetTagSourceFilename(OwnerPath, Filename, Report))
+	{
+		return false;
+	}
+	const FString Directory = FPaths::GetPath(Filename);
+	const FName SourceName(*FPaths::GetCleanFilename(Filename));
+	if (!IFileManager::Get().MakeDirectory(*Directory, true))
+	{
+		Report = TEXT("Could not create the owning module Tag directory: ") + Directory;
+		return false;
+	}
+	if (!UGameplayTagsManager::Get().FindTagSource(SourceName) && !IGameplayTagsEditorModule::Get().AddNewGameplayTagSource(SourceName.ToString(), Directory))
+	{
+		Report = TEXT("Could not create the owning module Tag source: ") + Filename;
+		return false;
+	}
+	const FGameplayTagSource* Source = UGameplayTagsManager::Get().FindTagSource(SourceName);
+	if (!Source || !Source->SourceTagList || FPaths::ConvertRelativePathToFull(Source->SourceTagList->ConfigFileName) != Filename)
+	{
+		Report = TEXT("The Tag source name belongs to a different module directory: ") + SourceName.ToString();
+		return false;
+	}
+	if (!IGameplayTagsEditorModule::Get().AddNewGameplayTagToINI(Name, TEXT("Widget theme style"), SourceName))
 	{
 		Report = TEXT("Could not register the gameplay Tag. Check its name and config write access.");
 		return false;
@@ -941,11 +1049,11 @@ TArray<FString> FWidgetThemeEditorService::GetCreationRoots()
 	{
 		if (Plugin->CanContainContent() && Plugin->GetLoadedFrom() == EPluginLoadedFrom::Project)
 		{
-			Plugins.Add(Plugin->GetMountedAssetPath() / TEXT("Themes"));
+			Plugins.Add(Plugin->GetMountedAssetPath() / TEXT("__ExternalAsset__/Styles"));
 		}
 	}
 	Plugins.Sort();
-	TArray<FString> Roots{TEXT("/Game/Themes")};
+	TArray<FString> Roots{TEXT("/Game/__ExternalAsset__/Styles")};
 	Roots.Append(Plugins);
 	return Roots;
 }
@@ -979,7 +1087,13 @@ bool FWidgetThemeEditorService::Validate(UWidgetTheme* Theme, FString& Report)
 		Report += TEXT("Missing theme or incomplete asset duplication.\n");
 		return false;
 	}
-	bool Good = DependencySafe(Theme, Report);
+	FString RuntimeError;
+	bool Good = FWidgetThemeResolver::Validate(Theme, RuntimeError);
+	if (!Good)
+	{
+		Report += RuntimeError + TEXT("\n");
+	}
+	Good &= DependencySafe(Theme, Report);
 	TSet<FGameplayTag> Seen;
 	for (FGameplayTag Tag : Tags(Theme))
 	{
@@ -1015,7 +1129,7 @@ bool FWidgetThemeEditorService::Create(UWidgetTheme* Theme, FGameplayTag Parent,
 {
 	EWidgetStyleKind ParentType;
 	if (!Theme || !ValidateName(Name, Report) || !Kind(Parent, ParentType) || Type != ParentType ||
-		(!WidgetStyleTags::IsRoot(Parent) && !Tags(Theme).Contains(Parent)))
+		(!WidgetStyleTags::IsRoot(Parent) && !Theme->GetStyleTags(Type, true).Contains(Parent)))
 	{
 		Report += TEXT("Select a matching type root or a style in this theme.\n");
 		return false;
@@ -1027,7 +1141,7 @@ bool FWidgetThemeEditorService::Create(UWidgetTheme* Theme, FGameplayTag Parent,
 		Report = TEXT("This theme already contains the name.");
 		return false;
 	}
-	UClass* ParentClass = bInheritParent ? Theme->GetStyleClass(Parent, Type) : CreationBase(Type);
+	UClass* ParentClass = bInheritParent ? Theme->ResolveStyleClass(Parent, Type) : CreationBase(Type);
 	if (!ParentClass || ForbiddenFrameworkReference(ParentClass->GetPathName(), MountRoot(DestinationRoot)))
 	{
 		Report = TEXT("The selected parent has no style or cannot be referenced from this destination.");
@@ -1048,7 +1162,7 @@ bool FWidgetThemeEditorService::Create(UWidgetTheme* Theme, FGameplayTag Parent,
 	{
 		Style->GetOutermost()->MarkAsFullyLoaded();
 	}
-	if (!Style || !Compile(Style, Report) || !DependencySafe(Style->GeneratedClass->GetDefaultObject(), Report) || !RegisterTag(FullName, Report))
+	if (!Style || !Compile(Style, Report) || !DependencySafe(Style->GeneratedClass->GetDefaultObject(), Report) || !RegisterTag(FullName, DestinationRoot, Report))
 	{
 		Abandon(Style);
 		Transaction.Cancel();
@@ -1088,7 +1202,7 @@ bool FWidgetThemeEditorService::Associate(UWidgetTheme* Theme, FGameplayTag Pare
 		Report += TEXT("Source ownership, destination name or dependency is invalid.\n");
 		return false;
 	}
-	if (!RegisterTag(FullName, Report))
+	if (!RegisterTag(FullName, Theme->GetOutermost()->GetName(), Report))
 	{
 		return false;
 	}
@@ -1145,7 +1259,8 @@ bool FWidgetThemeEditorService::RenameStyle(UWidgetTheme* Theme, FGameplayTag Ta
 		Report = TEXT("Choose a different unused name.");
 		return false;
 	}
-	if (!RegisterTag(FullName, Report) || !RenameTag(Tag, FGameplayTag::RequestGameplayTag(FName(*FullName)), Report))
+	UBlueprint* Style = Blueprint(Theme, Tag);
+	if (!Style || !RegisterTag(FullName, Style->GetOutermost()->GetName(), Report) || !RenameTag(Tag, FGameplayTag::RequestGameplayTag(FName(*FullName)), Report))
 	{
 		return false;
 	}
@@ -1238,7 +1353,8 @@ bool FWidgetThemeEditorService::CopyProperties(UWidgetTheme* Theme, FGameplayTag
 		for (int32 Index = 0; Index < Property->ArrayDim; ++Index)
 		{
 			FString Value;
-			Property->ExportText_InContainer(Index, Value, Style->GeneratedClass->GetDefaultObject(), nullptr, nullptr, PPF_None);
+			UObject* Defaults = Style->GeneratedClass->GetDefaultObject();
+			Property->ExportText_InContainer(Index, Value, Defaults, Defaults, Defaults, PPF_None);
 			Values.Add(MakeShared<FJsonValueString>(Value));
 		}
 		TSharedRef<FJsonObject> Field = MakeShared<FJsonObject>();
@@ -1301,11 +1417,12 @@ bool FWidgetThemeEditorService::PasteProperties(UWidgetTheme* Theme, FGameplayTa
 		{
 			TSharedPtr<IPropertyHandle> Element = Property->ArrayDim > 1 ? Handle->GetChildHandle(Index) : Handle;
 			FString Value;
-			if (!Element || Element->GetValueAsFormattedString(Value, PPF_None) != FPropertyAccess::Success)
+			if (!Element)
 			{
 				Good = false;
 				break;
 			}
+			Property->ExportText_InContainer(Index, Value, Defaults, Defaults, Defaults, PPF_None);
 			Original.Add(Element, Value);
 			if (Element->SetValueFromFormattedString(Values[Index]->AsString()) != FPropertyAccess::Success)
 			{
@@ -1605,14 +1722,22 @@ namespace WidgetThemeEdit
 			IFileManager::Get().FindFilesRecursive(Files, *Directory, TEXT("*"), true, false);
 			for (const FString& File : Files)
 			{
-				if (FPaths::GetCleanFilename(File) == TEXT("DefaultGameplayTags.ini"))
-				{
-					continue;
-				}
 				FString Text;
-				if (FFileHelper::LoadFileToString(Text, *File) && ContainsTagText(Text, Tag.ToString()))
+				if (FFileHelper::LoadFileToString(Text, *File))
 				{
-					return true;
+					TArray<FString> Lines;
+					Text.ParseIntoArrayLines(Lines, false);
+					for (const FString& Line : Lines)
+					{
+						if (FPaths::GetExtension(File).Equals(TEXT("ini"), ESearchCase::IgnoreCase) && Line.Contains(TEXT("GameplayTagList=")))
+						{
+							continue;
+						}
+						if (ContainsTagText(Line, Tag.ToString()))
+						{
+							return true;
+						}
+					}
 				}
 			}
 		}
@@ -1733,10 +1858,9 @@ bool FWidgetThemeEditorService::CanDeleteAssets(const TArray<UObject*>& Assets, 
 		}
 		if (UBlueprint* Style = Cast<UBlueprint>(Asset); Style && Style->GeneratedClass && Style->GeneratedClass->IsChildOf(UObject::StaticClass()))
 		{
-			EWidgetStyleKind Type;
-			for (Type = EWidgetStyleKind::Button; Type <= EWidgetStyleKind::Brush; Type = static_cast<EWidgetStyleKind>(static_cast<uint8>(Type) + 1))
+			for (EWidgetStyleKind StyleKind : WidgetStyleTags::Kinds())
 			{
-				HasThemeStyles |= Style->GeneratedClass->IsChildOf(FWidgetThemeResolver::NativeBase(Type));
+				HasThemeStyles |= Style->GeneratedClass->IsChildOf(FWidgetThemeResolver::NativeBase(StyleKind));
 			}
 			Objects.Add(Style->GeneratedClass);
 			Objects.Add(Style->GeneratedClass->GetDefaultObject());
@@ -2233,16 +2357,19 @@ bool FWidgetThemeEditorService::Save(UWidgetTheme* T, FString& Report)
 	}
 	if (Good)
 	{
-		auto* Packaging = GetMutableDefault<UProjectPackagingSettings>();
-		FDirectoryPath Directory;
-		Directory.Path = FPaths::GetPath(T->GetOutermost()->GetName());
-		if (!Packaging->DirectoriesToAlwaysCook.ContainsByPredicate([&](const FDirectoryPath& Item) { return Item.Path == Directory.Path; }))
+		if (T->bRuntimeTheme)
 		{
-			Packaging->DirectoriesToAlwaysCook.Add(Directory);
-			if (!Packaging->TryUpdateDefaultConfigFile())
+			auto* Packaging = GetMutableDefault<UProjectPackagingSettings>();
+			FDirectoryPath Directory;
+			Directory.Path = FPaths::GetPath(T->GetOutermost()->GetName());
+			if (!Packaging->DirectoriesToAlwaysCook.ContainsByPredicate([&](const FDirectoryPath& Item) { return Item.Path == Directory.Path; }))
 			{
-				Report += TEXT("Could not persist the theme cook root.\n");
-				return false;
+				Packaging->DirectoriesToAlwaysCook.Add(Directory);
+				if (!Packaging->TryUpdateDefaultConfigFile())
+				{
+					Report += TEXT("Could not persist the theme cook root.\n");
+					return false;
+				}
 			}
 		}
 		auto* Settings = GetMutableDefault<UWidgetThemeSettings>();
@@ -2343,17 +2470,13 @@ bool FWidgetThemeEditorService::ExportInventory(const FString& Filename, FString
 			UClass* Class = Kind(Tag, Type) ? T->GetStyleClass(Tag, Type) : nullptr;
 			if (!Class)
 			{
-				if (T->GetButtonStyles().Contains(Tag))
+				for (EWidgetStyleKind StyleKind : WidgetStyleTags::Kinds())
 				{
-					Class = T->GetStyleClass(Tag, EWidgetStyleKind::Button);
-				}
-				if (T->GetTextStyles().Contains(Tag))
-				{
-					Class = T->GetStyleClass(Tag, EWidgetStyleKind::Text);
-				}
-				if (T->GetBrushStyles().Contains(Tag))
-				{
-					Class = T->GetStyleClass(Tag, EWidgetStyleKind::Brush);
+					if (UClass* Candidate = T->GetStyleClass(Tag, StyleKind))
+					{
+						Class = Candidate;
+						break;
+					}
 				}
 			}
 			Maps->SetStringField(Tag.ToString(), GetPathNameSafe(Class));
@@ -2440,7 +2563,7 @@ bool FWidgetThemeEditorService::OrganizeAssets(UWidgetTheme* Theme, FString& Rep
 	auto& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
 	Registry.SearchAllAssets(true);
 	TArray<FTopLevelAssetPath> Bases;
-	for (EWidgetStyleKind Kind : {EWidgetStyleKind::Button, EWidgetStyleKind::Text, EWidgetStyleKind::Brush})
+	for (EWidgetStyleKind Kind : WidgetStyleTags::Kinds())
 	{
 		Bases.Add(FWidgetThemeResolver::NativeBase(Kind)->GetClassPathName());
 	}
@@ -2495,7 +2618,7 @@ bool FWidgetThemeEditorService::OrganizeAssets(UWidgetTheme* Theme, FString& Rep
 		FString AssetName = Asset->GetName();
 		if (Asset->IsA<UWidgetTheme>())
 		{
-			AssetName = SourcePackage.StartsWith(TEXT("/Game/")) ? TEXT("DA_WidgetTheme_Default") : TEXT("DA_WidgetTheme_") + MountRoot(SourcePackage).Mid(1);
+			AssetName = SourcePackage.StartsWith(TEXT("/Game/")) ? TEXT("DA_WidgetTheme_Game") : TEXT("DA_WidgetTheme_") + MountRoot(SourcePackage).Mid(1);
 		}
 		const FString Destination = DestinationRoot / AssetName;
 		if (Destinations.Contains(Destination) || FindPackage(nullptr, *Destination) || FPackageName::DoesPackageExist(Destination))
