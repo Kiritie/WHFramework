@@ -258,6 +258,7 @@ private:
 	void WakeConsumers(const FVoxelGenerationPlanDependency& InDependency);
 	FVoxelGenerationConsumerKey EnvironmentConsumer(const FVoxelGenerationBounds& InBounds, bool bInColumn);
 	bool IsCached(const FVoxelGenerationPlanDependency& InDependency) const;
+	FVoxelTaskStamp MakeTaskStamp(const FVoxelGenerationPlanDependency& InDependency, uint64 InAttempt) const;
 	bool Queue(const FVoxelGenerationPlanDependency& InDependency, FState& InOutState);
 	void LinkPendingAdmission(FState& InState);
 	void UnlinkPendingAdmission(FState& InState);

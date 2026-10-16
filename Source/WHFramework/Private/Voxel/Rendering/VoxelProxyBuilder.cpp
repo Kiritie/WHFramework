@@ -305,7 +305,7 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 		{
 			static_cast<const FVoxelGenerationQuery*>(InContext)->VisitRequiredSources(InVisit);
 		});
-	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, true,
+	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, false,
 		Generator && Generator->RequiresPlanPreflight()))
 	{
 		return false;
@@ -325,6 +325,7 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 	auto SampleColumn = [&Query, &OutError, &bSampleFailed, InCancel](
 		const FIntVector& Position, FVoxelColumnSample& Column)
 	{
+		if (bSampleFailed) return false;
 		if (!Query.SampleEnvironmentColumn(Position.X, Position.Y, Column,
 			OutError, InCancel))
 		{
@@ -381,7 +382,12 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 			FVoxelColumnSample Column;
 			if (!SampleColumn(Anchor, Column)) return;
 			const FVoxelTreeSpecies Species = Ecology.SelectTreeSpecies(Column, TreeId);
-			if (!Config->ToRuntime(Species.Trunk, Trunk) || !Config->ToRuntime(Species.LeavesMid, Leaves)) { bSampleFailed = true; return; }
+			if (!Config->ToRuntime(Species.Trunk, Trunk) || !Config->ToRuntime(Species.LeavesMid, Leaves))
+			{
+				OutError = TEXT("InvalidResource: proxy tree species symbols are invalid");
+				bSampleFailed = true;
+				return;
+			}
 			for (int32 Z = 0; Z < Height; ++Z)
 			{
 				FVoxelBlockState EditedTrunk = Trunk;
@@ -480,7 +486,7 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 			Cache,
 			Query,
 			OutError,
-			true,
+			false,
 			Generator && Generator->RequiresPlanPreflight()))
 	{
 		return false;

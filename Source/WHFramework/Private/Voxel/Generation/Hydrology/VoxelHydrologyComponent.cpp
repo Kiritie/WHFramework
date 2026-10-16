@@ -51,9 +51,17 @@ EVoxelHydrologyComponentStep FVoxelHydrologyComponentBuild::Advance(FTileLookup 
 {
     OutError.Reset();
     MissingTiles.Reset();
+    TOptional<FVoxelHydrologyRegionKey> RequestedTile;
+    const auto Request = [&](const FVoxelHydrologyRegionKey& InKey, FString&)
+    {
+        if (!RequestedTile.IsSet()) RequestedTile = InKey;
+        return true;
+    };
     const auto Failure = [&]()
     {
         if (OutError == TEXT("Canceled")) return EVoxelHydrologyComponentStep::Canceled;
+        if (RequestedTile.IsSet() && !AddMissingTile(RequestedTile.GetValue(), OutError))
+            return OutError.StartsWith(TEXT("CapacityBlocked")) ? EVoxelHydrologyComponentStep::CapacityBlocked : EVoxelHydrologyComponentStep::Failed;
         if (!MissingTiles.IsEmpty()) return EVoxelHydrologyComponentStep::NeedTiles;
         if (OutError.StartsWith(TEXT("Yielded")) || OutError.StartsWith(TEXT("DependencyNotReady"))) return EVoxelHydrologyComponentStep::Yielded;
         if (OutError.StartsWith(TEXT("CapacityBlocked"))) return EVoxelHydrologyComponentStep::CapacityBlocked;
@@ -66,7 +74,6 @@ EVoxelHydrologyComponentStep FVoxelHydrologyComponentBuild::Advance(FTileLookup 
     }
     if (bReady) return EVoxelHydrologyComponentStep::Ready;
     if (InWorkBudget <= 0) return EVoxelHydrologyComponentStep::Yielded;
-    const auto Request = [&](const FVoxelHydrologyRegionKey& InKey, FString& InError) { return AddMissingTile(InKey, InError); };
     if (!bLocalReady)
     {
         if (!Graph && !Cache.AdvanceHydrologyGraph(Region, Config, InLookup, Request, Graph, OutError, InCancel)) return Failure();
@@ -100,7 +107,7 @@ EVoxelHydrologyComponentStep FVoxelHydrologyComponentBuild::Advance(FTileLookup 
     }
     if (!bNodesFiltered)
     {
-        if (!PrepareRiverNodes(InLookup, OutError, InCancel)) return Failure();
+        if (!PrepareRiverNodes(InLookup, Request, OutError, InCancel)) return Failure();
         bNodesFiltered = true;
     }
     if (!bGeometryBuilt)
@@ -152,16 +159,16 @@ void FVoxelHydrologyComponentBuild::SetShape(FVoxelHydrologyComponentNode& Node)
 }
 
 bool FVoxelHydrologyComponentBuild::ReadExteriorNode(const FIntPoint& InCell, FTileLookup InLookup,
+    FVoxelHydrologyMacroInput::FRequestTile InRequestTile,
     FVoxelHydrologyComponentNode& OutNode, FString& OutError, const TAtomic<bool>* InCancel)
 {
-    const auto Request = [&](const FVoxelHydrologyRegionKey& InKey, FString& InError) { return AddMissingTile(InKey, InError); };
     FVoxelHydrologyRegionSample Sample;
     FIntPoint World;
-    if (FVoxelHydrologyMacroInput::Read(Recipe->Settings, InCell, InLookup, Request, Sample, World, OutError) != EVoxelHydrologyClosureRead::Ready) return false;
+    if (FVoxelHydrologyMacroInput::Read(Recipe->Settings, InCell, InLookup, InRequestTile, Sample, World, OutError) != EVoxelHydrologyClosureRead::Ready) return false;
     const int32 Side = Recipe->Settings.HydrologyRegionSide;
     const FVoxelHydrologyRegionKey Key{FIntPoint(VoxelGeneration::FloorDivide(InCell.X, Side), VoxelGeneration::FloorDivide(InCell.Y, Side))};
     TSharedPtr<const FVoxelHydrologyNetworkRunoff, ESPMode::ThreadSafe> Outside;
-    if (!Cache.AdvanceHydrologyRunoff(Key, Config, InLookup, Request, Outside, OutError, InCancel)) return false;
+    if (!Cache.AdvanceHydrologyRunoff(Key, Config, InLookup, InRequestTile, Outside, OutError, InCancel)) return false;
     const auto* Control = Outside->Find(InCell);
     if (!Control)
     {
@@ -183,7 +190,8 @@ bool FVoxelHydrologyComponentBuild::ReadExteriorNode(const FIntPoint& InCell, FT
     return true;
 }
 
-bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FString& OutError, const TAtomic<bool>* InCancel)
+bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVoxelHydrologyMacroInput::FRequestTile InRequestTile,
+    FString& OutError, const TAtomic<bool>* InCancel)
 {
     int32 Work = 256;
     const int32 Count = Local.Cells.Num();
@@ -294,7 +302,7 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FStr
                 if (!Existing)
                 {
                     FVoxelHydrologyComponentNode Exterior;
-                    if (!ReadExteriorNode(ParentCell, InLookup, Exterior, OutError, InCancel)) return false;
+                    if (!ReadExteriorNode(ParentCell, InLookup, InRequestTile, Exterior, OutError, InCancel)) return false;
                     if (!VoxelGenerationAllocation::RetainMap(ExteriorNodes, ExteriorNodes.Num() + 1, OutError)) return false;
                     const int32 ExteriorIndex = PrepareSelected.Add(Exterior);
                     Existing = &ExteriorNodes.Add(ParentCell, ExteriorIndex);

@@ -427,8 +427,9 @@ bool FVoxelHydrologyRuntimeVersionTest::RunTest(const FString& InParameters)
 	{
 		Recipe.BlockNames[Index] = Registry.Definitions[Index].BlockName;
 	}
-	for (const uint32 Version : {uint32(0), uint32(12), uint32(13), uint32(14), uint32(16)})
+	for (uint32 Version = 0; Version <= FVoxelGenerationRecipe::CurrentAlgorithmVersion + 1; ++Version)
 	{
+        if (Version == FVoxelGenerationRecipe::CurrentAlgorithmVersion) continue;
 		FVoxelGenerationRecipe Retired = Recipe;
 		Retired.AlgorithmVersion = Version;
 		FString Error;

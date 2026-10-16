@@ -1,6 +1,7 @@
 #include "Voxel/Generation/Hydrology/VoxelHydrologyNetworkSearch.h"
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "HAL/PlatformTime.h"
 
 namespace
 {
@@ -74,8 +75,17 @@ bool FVoxelHydrologyNetworkSearch::Initialize(const FIntPoint& InSeedNode, const
 	CellSize = InCellSize;
 	RegionSide = InRegionSide;
 	Result.Generation = InGeneration;
-	Stage = EStage::Seed;
+	PendingRegion = FIntPoint(VoxelGeneration::FloorDivide(Seed.X, RegionSide), VoxelGeneration::FloorDivide(Seed.Y, RegionSide));
+	Stage = EStage::LoadRegion;
 	OutError.Reset();
+	return true;
+}
+
+bool FVoxelHydrologyNetworkSearch::InitializeRegion(const FIntPoint& InSeedNode, const int32 InCellSize,
+	const int32 InRegionSide, const uint64 InGeneration, FString& OutError)
+{
+	if (!Initialize(InSeedNode, InCellSize, InRegionSide, InGeneration, OutError)) return false;
+	bEntireRegion = true;
 	return true;
 }
 
@@ -180,7 +190,7 @@ bool FVoxelHydrologyNetworkSearch::AppendNode(const int32 InRegion, const int32 
 }
 
 EVoxelHydrologyClosureRead FVoxelHydrologyNetworkSearch::ReadConnection(const int32 InNode, const int32 InSlot,
-	const bool bDiscover, FReadRegion InRead, FConnection& OutConnection, FString& OutError)
+	FReadRegion InRead, FConnection& OutConnection, FString& OutError)
 {
 	OutConnection = {};
 	const FNode Node = Nodes[InNode];
@@ -206,14 +216,7 @@ EVoxelHydrologyClosureRead FVoxelHydrologyNetworkSearch::ReadConnection(const in
 		OutConnection.BarrierZ = Edge.BarrierZ;
 		OutConnection.Steps = Edge.CellSteps;
 		OutConnection.LastBarrierDistance = Graph->GetLastBarrierDistance(OutConnection.Edge, OutConnection.bFromFirst);
-		if (bDiscover)
-		{
-			if (!AppendNode(Node.Region, Other, *Graph, OutConnection.Neighbor, OutError))
-			{
-				return EVoxelHydrologyClosureRead::Failed;
-			}
-		}
-		else if (const int32* Existing = ByCell.Find(Graph->Nodes[Other].Cell))
+		if (const int32* Existing = ByCell.Find(Graph->Nodes[Other].Cell))
 		{
 			OutConnection.Neighbor = *Existing;
 		}
@@ -235,21 +238,6 @@ EVoxelHydrologyClosureRead FVoxelHydrologyNetworkSearch::ReadConnection(const in
 	if (const int32* Existing = ByCell.Find(OtherCell))
 	{
 		OutConnection.Neighbor = *Existing;
-	}
-	else if (bDiscover)
-	{
-		const FIntPoint OtherRegion(VoxelGeneration::FloorDivide(OtherCell.X, RegionSide), VoxelGeneration::FloorDivide(OtherCell.Y, RegionSide));
-		int32 RegionIndex = INDEX_NONE;
-		const FVoxelHydrologyRegionGraph* OtherGraph = nullptr;
-		const auto OtherRead = ReadRegion(OtherRegion, InRead, RegionIndex, OtherGraph, OutError);
-		if (OtherRead != EVoxelHydrologyClosureRead::Ready)
-		{
-			return OtherRead;
-		}
-		if (!AppendNode(RegionIndex, OtherGraph->FindNodeIndex(OtherCell), *OtherGraph, OutConnection.Neighbor, OutError))
-		{
-			return EVoxelHydrologyClosureRead::Failed;
-		}
 	}
 	if (OutConnection.Neighbor != INDEX_NONE)
 	{
@@ -288,6 +276,11 @@ EVoxelHydrologyClosureRead FVoxelHydrologyNetworkSearch::ResolveNeighborPotentia
 	}
 	OutPotential = Route.Potential;
 	return EVoxelHydrologyClosureRead::Ready;
+}
+
+bool FVoxelHydrologyNetworkSearch::IsSolveRoot(const FNode& InNode) const
+{
+	return InNode.IsReceiver() || (bSolvingLower && InNode.UnknownFaces != 0);
 }
 
 bool FVoxelHydrologyNetworkSearch::EventLess(const FEvent& InFirst, const FEvent& InSecond) const
@@ -377,6 +370,15 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::ReadFailure(const EVoxe
 EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 InGeneration, FReadRegion InReadRegion,
 	int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel)
 {
+	// 续跑可能更换 Worker；跨线程共享的节流仅限制日志，不参与求解状态。
+	static TAtomic<uint64> NextDiagnosticMilliseconds{0};
+	const uint64 Now = uint64(FPlatformTime::Seconds() * 1000.0);
+	uint64 Expected = NextDiagnosticMilliseconds.Load();
+	if (Now >= Expected && NextDiagnosticMilliseconds.CompareExchange(Expected, Now + 5000))
+	{
+		UE_LOG(LogTemp, Display, TEXT("Voxel macro control progress: generation=%llu seed=(%d,%d) stage=%d lower=%d nodes=%d regions=%d cursor=%d frontier=%d"),
+			Result.Generation, Seed.X, Seed.Y, int32(Stage), bSolvingLower ? 1 : 0, Nodes.Num(), Regions.Num(), Cursor, Frontier.Num());
+	}
 	OutError.Reset();
 	if (Stage == EStage::None || Stage == EStage::Taken || InGeneration != Result.Generation)
 	{
@@ -395,86 +397,58 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 			OutError = TEXT("Canceled");
 			return Failure(OutError);
 		}
-		if (Stage == EStage::Seed)
+		if (Stage == EStage::LoadRegion)
 		{
-			const FIntPoint Coordinate(VoxelGeneration::FloorDivide(Seed.X, RegionSide), VoxelGeneration::FloorDivide(Seed.Y, RegionSide));
 			int32 Region = INDEX_NONE;
 			const FVoxelHydrologyRegionGraph* Graph = nullptr;
-			const auto Read = ReadRegion(Coordinate, InReadRegion, Region, Graph, OutError);
-			if (Read != EVoxelHydrologyClosureRead::Ready)
+			const auto Read = ReadRegion(PendingRegion, InReadRegion, Region, Graph, OutError);
+			if (Read != EVoxelHydrologyClosureRead::Ready) return ReadFailure(Read, OutError);
+			if (LoadCursor < Graph->Nodes.Num())
 			{
-				return ReadFailure(Read, OutError);
-			}
-			int32 Index = INDEX_NONE;
-			if (!AppendNode(Region, Graph->FindNodeIndex(Seed), *Graph, Index, OutError))
-			{
-				return Failure(OutError);
-			}
-			const int32 Plane = Nodes[Index].IsReceiver() ? Nodes[Index].WaterZ : Nodes[Index].GroundZ;
-			if (!Push({Index, Plane, 0}, OutError))
-			{
-				return Failure(OutError);
-			}
-			Nodes[Index].EntryZ = Plane;
-			Stage = EStage::Discover;
-		}
-		else if (Stage == EStage::Discover)
-		{
-			if (Current == INDEX_NONE)
-			{
-				if (Frontier.IsEmpty() || Frontier[0].Plane > Result.Threshold)
-				{
-					if (Result.Threshold == MAX_int32)
-					{
-						OutError = TEXT("Hydrology network component has no physical wet receiver");
-						return EVoxelHydrologyNetworkStep::NoReceiver;
-					}
-					Frontier.Reset();
-					Cursor = 0;
-					Stage = EStage::SpillSeeds;
-					continue;
-				}
-				ActiveEvent = Pop();
-				FNode& Node = Nodes[ActiveEvent.Index];
-				if (Node.bIncluded || Node.EntryZ != ActiveEvent.Plane)
-				{
-					continue;
-				}
-				Node.bIncluded = true;
-				++IncludedCount;
-				if (Node.IsReceiver())
-				{
-					Result.Threshold = FMath::Min(Result.Threshold, ActiveEvent.Plane);
-					continue;
-				}
-				Current = ActiveEvent.Index;
-				Slot = 0;
-			}
-			FConnection Connection;
-			const auto Read = ReadConnection(Current, Slot, true, InReadRegion, Connection, OutError);
-			if (Read != EVoxelHydrologyClosureRead::Ready)
-			{
-				return ReadFailure(Read, OutError);
-			}
-			if (Connection.bAtEnd)
-			{
-				Current = INDEX_NONE;
+				int32 Index = INDEX_NONE;
+				if (!AppendNode(Region, LoadCursor, *Graph, Index, OutError)) return Failure(OutError);
+				++LoadCursor;
 				continue;
 			}
-			if (Connection.Neighbor != INDEX_NONE)
+			const int32* Target = ByCell.Find(Seed);
+			if (!Target)
 			{
-				FNode& Other = Nodes[Connection.Neighbor];
-				const int32 Plane = FMath::Max(ActiveEvent.Plane, Connection.BarrierZ);
-				if (!Other.bIncluded && Plane < Other.EntryZ)
-				{
-					if (!Push({Connection.Neighbor, Plane, 0}, OutError))
-					{
-						return Failure(OutError);
-					}
-					Other.EntryZ = Plane;
-				}
+				OutError = TEXT("Hydrology network seed has no retained regional node");
+				return Failure(OutError);
 			}
-			++Slot;
+			TargetIndex = *Target;
+			Cursor = 0;
+			Frontier.Reset();
+			bSolvingLower = true;
+			Stage = EStage::ResetSolve;
+		}
+		else if (Stage == EStage::ResetSolve)
+		{
+			if (Cursor == Nodes.Num())
+			{
+				Cursor = 0;
+				Stage = EStage::SpillSeeds;
+				continue;
+			}
+			auto& Node = Nodes[Cursor];
+			const FVoxelHydrologyRegionGraph* Graph = nullptr;
+			const auto Read = ReadKnownRegion(Node.Region, InReadRegion, Graph, OutError);
+			if (Read != EVoxelHydrologyClosureRead::Ready) return ReadFailure(Read, OutError);
+			Node.UnknownFaces = 0;
+			static const FIntPoint Offsets[] = {FIntPoint(-1, 0), FIntPoint(1, 0), FIntPoint(0, -1), FIntPoint(0, 1)};
+			for (int32 Face = 0; Face < 4; ++Face)
+			{
+				if (!(Graph->Nodes[Node.LocalIndex].BoundaryFaces & (1 << Face))) continue;
+				const int64 X = int64(Node.Cell.X) + Offsets[Face].X;
+				const int64 Y = int64(Node.Cell.Y) + Offsets[Face].Y;
+				if (X >= Minimum.X && Y >= Minimum.Y && X <= Maximum.X && Y <= Maximum.Y &&
+					!ByCell.Contains(FIntPoint(int32(X), int32(Y)))) Node.UnknownFaces |= 1 << Face;
+			}
+			Node.Potential = {};
+			Node.ParentCell = FIntPoint::ZeroValue;
+			Node.bHasParent = false;
+			Node.bIncluded = false;
+			++Cursor;
 		}
 		else if (Stage == EStage::SpillSeeds)
 		{
@@ -485,13 +459,13 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 				continue;
 			}
 			FNode& Node = Nodes[Cursor];
-			if (Node.bIncluded && Node.IsReceiver())
+			if (IsSolveRoot(Node))
 			{
-				if (!Push({Cursor, Node.WaterZ, 0}, OutError))
+				if (!Push({Cursor, Node.IsReceiver() ? Node.WaterZ : Node.GroundZ, 0}, OutError))
 				{
 					return Failure(OutError);
 				}
-				Node.Potential.SpillZ = Node.WaterZ;
+				Node.Potential.SpillZ = Node.IsReceiver() ? Node.WaterZ : Node.GroundZ;
 			}
 			++Cursor;
 		}
@@ -517,7 +491,7 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 				Slot = 0;
 			}
 			FConnection Connection;
-			const auto Read = ReadConnection(Current, Slot, false, InReadRegion, Connection, OutError);
+			const auto Read = ReadConnection(Current, Slot, InReadRegion, Connection, OutError);
 			if (Read != EVoxelHydrologyClosureRead::Ready)
 			{
 				return ReadFailure(Read, OutError);
@@ -530,7 +504,7 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 			if (Connection.Neighbor != INDEX_NONE)
 			{
 				FNode& Other = Nodes[Connection.Neighbor];
-				if (Other.bIncluded && !Other.IsReceiver())
+				if (!IsSolveRoot(Other))
 				{
 					if (!bPlateaus)
 					{
@@ -571,41 +545,27 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 			if (Cursor == Nodes.Num())
 			{
 				Current = INDEX_NONE;
-				if (bParents)
-				{
-					if (!VoxelGenerationAllocation::RetainArray(Result.Cells, IncludedCount, OutError))
-					{
-						return Failure(OutError);
-					}
-					Stage = EStage::Emit;
-				}
-				else
-				{
-					Stage = EStage::Plateaus;
-				}
+				Stage = bParents ? (bSolvingLower ? EStage::SaveLower : EStage::Certify) : EStage::Plateaus;
 				Cursor = 0;
 				continue;
 			}
 			FNode& Node = Nodes[Cursor];
-			if (!Node.bIncluded)
+			if (Node.Potential.SpillZ == MAX_int32)
 			{
 				++Cursor;
 				Slot = 0;
 				continue;
 			}
-			if (Node.Potential.SpillZ == MAX_int32 || (bParents && Node.Potential.PlateauDistance == MAX_int64))
+			if (bParents && Node.Potential.PlateauDistance == MAX_int64)
 			{
-				OutError = TEXT("Hydrology network contains an unresolved included node");
+				OutError = TEXT("Hydrology network contains an unresolved bounded plateau");
 				return Failure(OutError);
 			}
-			if (Node.IsReceiver())
+			if (IsSolveRoot(Node))
 			{
 				if (!bParents)
 				{
-					if (!Push({Cursor, Node.WaterZ, 0}, OutError))
-					{
-						return Failure(OutError);
-					}
+					if (!Push({Cursor, Node.Potential.SpillZ, 0}, OutError)) return Failure(OutError);
 					Node.Potential.PlateauDistance = 0;
 				}
 				++Cursor;
@@ -613,7 +573,7 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 				continue;
 			}
 			FConnection Connection;
-			const auto Read = ReadConnection(Cursor, Slot, false, InReadRegion, Connection, OutError);
+			const auto Read = ReadConnection(Cursor, Slot, InReadRegion, Connection, OutError);
 			if (Read != EVoxelHydrologyClosureRead::Ready)
 			{
 				return ReadFailure(Read, OutError);
@@ -634,7 +594,7 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 				Slot = 0;
 				continue;
 			}
-			if (Connection.Neighbor != INDEX_NONE && Nodes[Connection.Neighbor].bIncluded && Connection.BarrierZ <= Node.Potential.SpillZ)
+			if (Connection.Neighbor != INDEX_NONE && Connection.BarrierZ <= Node.Potential.SpillZ)
 			{
 				const FNode& Other = Nodes[Connection.Neighbor];
 				if (!bParents && Other.Potential.SpillZ < Node.Potential.SpillZ)
@@ -660,6 +620,95 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 				}
 			}
 			++Slot;
+		}
+		else if (Stage == EStage::SaveLower)
+		{
+			if (Cursor == Nodes.Num())
+			{
+				Cursor = 0;
+				Frontier.Reset();
+				bSolvingLower = false;
+				Stage = EStage::ResetSolve;
+				continue;
+			}
+			auto& Node = Nodes[Cursor++];
+			Node.LowerPotential = Node.Potential;
+			Node.LowerParentCell = Node.ParentCell;
+			Node.bLowerHasParent = Node.bHasParent;
+		}
+		else if (Stage == EStage::Certify)
+		{
+			if (Cursor == 0)
+			{
+				IncludedCount = 0;
+				if (bEntireRegion) TargetIndex = INDEX_NONE;
+			}
+			if (Cursor < Nodes.Num())
+			{
+				auto& Node = Nodes[Cursor++];
+				// 未知边界在 lower 中仅作最乐观的地面锚点；upper 只来自真实湿根。
+				// 势值及最小父方向两端一致时，任意合法境外延伸都不能改变该控制。
+				Node.bIncluded = Node.Potential.SpillZ != MAX_int32 && Node.Potential == Node.LowerPotential &&
+					Node.bHasParent == Node.bLowerHasParent && (!Node.bHasParent || Node.ParentCell == Node.LowerParentCell);
+				IncludedCount += Node.bIncluded;
+				if (bEntireRegion && Node.Region == 0 && !Node.bIncluded && TargetIndex == INDEX_NONE) TargetIndex = Cursor - 1;
+				continue;
+			}
+			if (bEntireRegion ? TargetIndex == INDEX_NONE : Nodes[TargetIndex].bIncluded)
+			{
+				if (!VoxelGenerationAllocation::RetainArray(Result.Cells, IncludedCount, OutError)) return Failure(OutError);
+				Result.Threshold = Nodes[ByCell.FindChecked(Seed)].Potential.SpillZ;
+				Cursor = 0;
+				Stage = EStage::Emit;
+				continue;
+			}
+			if (Nodes[TargetIndex].LowerPotential.SpillZ == MAX_int32)
+			{
+				OutError = TEXT("Hydrology network component has no physical wet receiver");
+				return EVoxelHydrologyNetworkStep::NoReceiver;
+			}
+			Current = TargetIndex;
+			Slot = 0;
+			TraceSteps = 0;
+			Stage = EStage::TraceBoundary;
+		}
+		else if (Stage == EStage::TraceBoundary)
+		{
+			const auto& Node = Nodes[Current];
+			if (!Node.bLowerHasParent)
+			{
+				if (!Node.IsReceiver() && Node.UnknownFaces)
+				{
+					static const FIntPoint Offsets[] = {FIntPoint(-1, 0), FIntPoint(1, 0), FIntPoint(0, -1), FIntPoint(0, 1)};
+					for (int32 Face = 0; Face < 4; ++Face)
+					{
+						if (!(Node.UnknownFaces & (1 << Face))) continue;
+						const FIntPoint Other = Node.Cell + Offsets[Face];
+						PendingRegion = FIntPoint(VoxelGeneration::FloorDivide(Other.X, RegionSide), VoxelGeneration::FloorDivide(Other.Y, RegionSide));
+						LoadCursor = 0;
+						Stage = EStage::LoadRegion;
+						break;
+					}
+					continue;
+				}
+				OutError = TEXT("Hydrology network unresolved proof has no optimistic boundary dependency");
+				return Failure(OutError);
+			}
+			FConnection Connection;
+			const auto Read = ReadConnection(Current, Slot, InReadRegion, Connection, OutError);
+			if (Read != EVoxelHydrologyClosureRead::Ready) return ReadFailure(Read, OutError);
+			if (Connection.bAtEnd || TraceSteps > Nodes.Num())
+			{
+				OutError = TEXT("Hydrology network bounded proof dependency is invalid or cyclic");
+				return Failure(OutError);
+			}
+			if (Connection.Neighbor != INDEX_NONE && Connection.FirstStep == Node.LowerParentCell)
+			{
+				Current = Connection.Neighbor;
+				Slot = 0;
+				++TraceSteps;
+			}
+			else ++Slot;
 		}
 		else if (Stage == EStage::Emit)
 		{

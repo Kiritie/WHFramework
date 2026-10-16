@@ -140,7 +140,7 @@ bool FVoxelHydrologyGraphCacheNetworkTest::RunTest(const FString& Parameters)
 				}
 			});
 		FVoxelGenerationAllocationScope Allocation(Resources, Consumer, Working, Resident, RootBytes);
-		if (!Allocation.Check(Error) || !Search->Initialize(FIntPoint(-7, -7), 32, Side, Cache->GetHydrologyGeneration(), Error)) return false;
+		if (!Allocation.Check(Error) || !Search->Initialize(FIntPoint(-1, -1), 32, Side, Cache->GetHydrologyGeneration(), Error)) return false;
 		const auto ReadGraph = [&](const FIntPoint& Coordinate, const FVoxelHydrologyRegionGraph*& OutGraph, FString& OutError)
 		{
 			FVoxelHydrologyRegionGraphPtr Graph;
@@ -195,6 +195,9 @@ bool FVoxelHydrologyGraphCacheNetworkTest::RunTest(const FString& Parameters)
 	Cache.Reset();
 	TestFalse(TEXT("已发布图不会反向强持缓存形成环"), CacheWeak.IsValid());
 	Held.Empty();
+    TestTrue(TEXT("弱引用控制器仍存活时保留实际Input授额"), Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Input)] > 0);
+    ConfigWeak.Reset();
+    CacheWeak.Reset();
 	const double Deadline = FPlatformTime::Seconds() + 2.0;
 	while (Resources->Snapshot().LeaseCount && FPlatformTime::Seconds() < Deadline) FPlatformProcess::Sleep(0.001f);
 	const auto End = Resources->Snapshot();
@@ -329,6 +332,68 @@ bool FVoxelHydrologyGraphCachePressureTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("回收后的图不再从缓存可见"), Cache->FindHydrologyGraph(Key, Probe));
 	Pressure.Reset();
 	Cache->CancelHydrologyGraphBuild(WaitingKey, Consumer.WorldEpoch, Consumer.OwnerId, Consumer.OwnerIncarnation, Consumer.RequestSerial);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHydrologyNativeRunoffReaderTest,
+	"WHFramework.Voxel.Hydrology.GraphCache.NativeRunoffPinsAcrossSlices",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHydrologyNativeRunoffReaderTest::RunTest(const FString& Parameters)
+{
+	using namespace VoxelHydrologyGraphCacheTests;
+	(void)Parameters;
+	FString Error;
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(413, FGuid::NewGuid(), 1, {}, 1);
+	FVoxelGenerationConsumerScope Identity(Consumer);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
+	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
+	if (!Setup(Consumer, Resources, Config, Cache, Error)) return false;
+	FVoxelGenerationCacheRetention Retention;
+	Retention.Revision = 1;
+	Cache->UpdateRetention(Retention);
+	const FVoxelHydrologyRegionKey Key{FIntPoint(-1, -1)};
+	FVoxelHydrologyRegionGraphPtr Graph;
+	if (!Finish(*Cache, Key, Config.ToSharedRef(), Sample, Graph, Error)) return false;
+	const auto* Original = Graph.Get();
+	Graph.Reset();
+	const auto Lookup = [](const FVoxelHydrologyRegionKey&) -> const FVoxelHydrologyPlan* { return nullptr; };
+	const auto Request = [](const FVoxelHydrologyRegionKey&, FString& OutError)
+	{
+		OutError = TEXT("Yielded: fixture awaits a real neighboring macro input");
+		return false;
+	};
+	TSharedPtr<const FVoxelHydrologyNetworkRunoff, ESPMode::ThreadSafe> Runoff;
+	if (!TestTrue(TEXT("正式汇水在读取冻结图后跨片等待邻区输入"),
+		!Cache->AdvanceHydrologyRunoff(Key, Config.ToSharedRef(), Lookup, Request, Runoff, Error) && Error.StartsWith(TEXT("Yielded"))))
+	{
+		AddError(Error);
+		return false;
+	}
+	const auto State = Resources->Snapshot();
+	const uint64 Limit = State.Limits.ResidentBytes - State.Limits.OverlapBytes;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Pressure;
+	if (!TestTrue(TEXT("原限额内产生真实压力"), Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Resident,
+		Limit - State.Used[int32(EVoxelTerrainResourcePool::Resident)] - 1, Pressure))) return false;
+	// 不保留测试侧强/弱引用；唯一实际读者必须来自正式续跑 owner。
+	const double Deadline = FPlatformTime::Seconds() + 0.1;
+	do
+	{
+		Maintain(*Cache);
+		FVoxelHydrologyRegionGraphPtr Probe;
+		if (!TestTrue(TEXT("压力维护跨片保留正式汇水实际读取的同一图"), Cache->FindHydrologyGraph(Key, Probe) && Probe.Get() == Original)) return false;
+		Probe.Reset();
+		FPlatformProcess::Sleep(0.001f);
+	} while (FPlatformTime::Seconds() < Deadline);
+	Cache->CancelHydrologyBuild(Key, Consumer.WorldEpoch, Consumer.OwnerId, Consumer.OwnerIncarnation, Consumer.RequestSerial);
+	TestTrue(TEXT("取消正式消费者后图的真实读者退出并可回收"), AwaitRetirement(*Cache, Key));
+	Pressure.Reset();
+	Cache.Reset();
+	Config.Reset();
+	const double ReleaseDeadline = FPlatformTime::Seconds() + 2.0;
+	while (Resources->Snapshot().LeaseCount && FPlatformTime::Seconds() < ReleaseDeadline) FPlatformProcess::Sleep(0.001f);
+	TestEqual(TEXT("取消和销毁后所有实际租约归还"), Resources->Snapshot().LeaseCount, 0);
 	return true;
 }
 

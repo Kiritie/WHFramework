@@ -640,6 +640,7 @@ public:
 		double InMaxApplyMilliseconds = 2.0);
 
 	void CancelSection(const FIntVector& InSection);
+	void CancelTask(EVoxelTaskKind InKind, const FVoxelTaskStamp& InStamp);
 	void CancelMatching(
 		TFunctionRef<bool(EVoxelTaskKind, const FVoxelTaskStamp&)> InPredicate);
 	void StopAndJoin();
@@ -787,6 +788,7 @@ private:
 	void BeginEnqueueBatch();
 	void EndEnqueueBatch();
 	void QueueCanceled(FVoxelTaskRequest&& InRequest, EVoxelTaskBlockReason InFailure = EVoxelTaskBlockReason::None);
+	void CancelAttempt(const FVoxelTaskKey& InKey, uint64 InSequence);
 
 	void AddActive(
 		const FVoxelTaskStamp& InStamp,
@@ -796,12 +798,18 @@ private:
 	void RemoveActive(
 		const FVoxelTaskStamp& InStamp,
 		EVoxelTaskKind InKind,
-		EVoxelWorkClass InWorkClass);
+		EVoxelWorkClass InWorkClass,
+		bool bForgetAdmission = true);
 
 	void RecordCompletedResult(const FVoxelTaskResult& InResult);
 	bool PrepareBacking(uint64 InNewBytes);
 	void SettleBacking(uint64 InOldBytes, uint64 InReservedBytes, uint64 InActualBytes);
 	bool PrepareAdmission(const FVoxelTaskKey& InKey);
+	struct FAdmissionAttempt;
+	FAdmissionAttempt& FindOrAddAdmission(const FVoxelTaskKey& InKey);
+	void UnlinkAdmission(const FVoxelTaskKey& InKey, const FAdmissionAttempt& InAttempt);
+	void RemoveAdmission(const FVoxelTaskKey& InKey);
+	void ClearAdmissions();
 	bool PrepareQueues(int32 InAdditionalTasks);
 	void FreeBacking();
 	void FlushSectionIdleNotifications();
@@ -870,6 +878,8 @@ private:
 	uint64 StatisticsRootInputBytes = 0;
 	struct FAdmissionAttempt
 	{
+		FVoxelTaskKey Previous;
+		FVoxelTaskKey Next;
 		double FirstRequested = 0.0;
 		uint64 Sequence = 0;
 		EVoxelTaskBlockReason Blocked = EVoxelTaskBlockReason::None;
@@ -877,7 +887,15 @@ private:
 		uint64 ResultBytes = 0;
 		uint64 Rejections = 0;
 	};
+	struct FCancellationCursor
+	{
+		FCancellationCursor* Previous = nullptr;
+		FVoxelTaskKey Next;
+	};
 	TMap<FVoxelTaskKey, FAdmissionAttempt> AdmissionAttempts;
+	FVoxelTaskKey AdmissionHead;
+	FVoxelTaskKey AdmissionTail;
+	FCancellationCursor* CancellationCursor = nullptr;
 	FVoxelTerrainWorkSelection WorkerSelection;
 	FVoxelTerrainWorkSelection CompletedSelection;
 	FVoxelTaskDiagnostics::TCounts<EVoxelTaskKind, double, FVoxelTaskDiagnostics::KindCapacity> WorkerCostEstimates;

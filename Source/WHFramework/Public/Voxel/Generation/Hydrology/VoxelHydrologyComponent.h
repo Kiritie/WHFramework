@@ -86,8 +86,9 @@ public:
 
 private:
     friend class FVoxelGenerationPlanCache;
-    bool PrepareRiverNodes(FTileLookup InLookup, FString& OutError, const TAtomic<bool>* InCancel);
-    bool ReadExteriorNode(const FIntPoint& InCell, FTileLookup InLookup,
+    bool PrepareRiverNodes(FTileLookup InLookup, FVoxelHydrologyMacroInput::FRequestTile InRequestTile,
+        FString& OutError, const TAtomic<bool>* InCancel);
+    bool ReadExteriorNode(const FIntPoint& InCell, FTileLookup InLookup, FVoxelHydrologyMacroInput::FRequestTile InRequestTile,
         FVoxelHydrologyComponentNode& OutNode, FString& OutError, const TAtomic<bool>* InCancel);
     void SetShape(FVoxelHydrologyComponentNode& InOutNode) const;
     bool BuildGeometry(FString& OutError, const TAtomic<bool>* InCancel);

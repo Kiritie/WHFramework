@@ -48,6 +48,8 @@ public:
 	FVoxelHydrologyNetworkSearch(const FVoxelHydrologyNetworkSearch&) = delete;
 	FVoxelHydrologyNetworkSearch& operator=(const FVoxelHydrologyNetworkSearch&) = delete;
 	bool Initialize(const FIntPoint& InSeedNode, int32 InCellSize, int32 InRegionSide, uint64 InGeneration, FString& OutError);
+	// 汇水正式需要整区控制，在同一证明工作集中闭合全部本区节点，避免逐节点重启。
+	bool InitializeRegion(const FIntPoint& InSeedNode, int32 InCellSize, int32 InRegionSide, uint64 InGeneration, FString& OutError);
 	EVoxelHydrologyNetworkStep Advance(uint64 InGeneration, FReadRegion InReadRegion, int32 InWorkBudget,
 		FString& OutError, const TAtomic<bool>* InCancel = nullptr);
 	const FVoxelHydrologyNetworkResult& GetResult() const;
@@ -60,13 +62,16 @@ private:
 	enum class EStage : uint8
 	{
 		None,
-		Seed,
-		Discover,
+		LoadRegion,
+		ResetSolve,
 		SpillSeeds,
 		Spill,
 		Anchors,
 		Plateaus,
 		Parents,
+		SaveLower,
+		Certify,
+		TraceBoundary,
 		Emit,
 		Sort,
 		Hash,
@@ -89,10 +94,13 @@ private:
 		int32 LocalIndex = INDEX_NONE;
 		int32 GroundZ = 0;
 		int32 WaterZ = MIN_int32;
-		int32 EntryZ = MAX_int32;
 		FVoxelHydrologyRegionPotential Potential;
+		FVoxelHydrologyRegionPotential LowerPotential;
+		FIntPoint LowerParentCell = FIntPoint::ZeroValue;
+		uint8 UnknownFaces = 0;
 		bool bIncluded = false;
 		bool bHasParent = false;
+		bool bLowerHasParent = false;
 		bool IsReceiver() const { return WaterZ != MIN_int32; }
 	};
 
@@ -120,11 +128,12 @@ private:
 	EVoxelHydrologyClosureRead ReadKnownRegion(int32 InRegion, FReadRegion InRead,
 		const FVoxelHydrologyRegionGraph*& OutGraph, FString& OutError);
 	bool AppendNode(int32 InRegion, int32 InLocalIndex, const FVoxelHydrologyRegionGraph& InGraph, int32& OutIndex, FString& OutError);
-	EVoxelHydrologyClosureRead ReadConnection(int32 InNode, int32 InSlot, bool bDiscover, FReadRegion InRead,
+	EVoxelHydrologyClosureRead ReadConnection(int32 InNode, int32 InSlot, FReadRegion InRead,
 		FConnection& OutConnection, FString& OutError);
 	EVoxelHydrologyClosureRead ResolveNeighborPotential(int32 InNode, const FConnection& InConnection, FReadRegion InRead,
 		FVoxelHydrologyRegionPotential& OutPotential, FString& OutError);
 	bool EventLess(const FEvent& InFirst, const FEvent& InSecond) const;
+	bool IsSolveRoot(const FNode& InNode) const;
 	bool Push(const FEvent& InEvent, FString& OutError);
 	FEvent Pop();
 	void SiftResult(int32 InRoot, int32 InEnd);
@@ -139,6 +148,7 @@ private:
 	TMap<FIntPoint, int32> ByRegion;
 	TArray<FEvent> Frontier;
 	FIntPoint Seed = FIntPoint::ZeroValue;
+	FIntPoint PendingRegion = FIntPoint::ZeroValue;
 	FIntPoint Minimum = FIntPoint::ZeroValue;
 	FIntPoint Maximum = FIntPoint::ZeroValue;
 	int32 CellSize = 0;
@@ -146,6 +156,11 @@ private:
 	int32 CellMapCapacity = 0;
 	int32 RegionMapCapacity = 0;
 	int32 IncludedCount = 0;
+	int32 LoadCursor = 0;
+	int32 TargetIndex = INDEX_NONE;
+	int32 TraceSteps = 0;
+	bool bSolvingLower = true;
+	bool bEntireRegion = false;
 	int32 Cursor = 0;
 	int32 Slot = 0;
 	int32 Current = INDEX_NONE;

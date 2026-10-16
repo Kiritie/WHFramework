@@ -2,6 +2,7 @@
 
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "HAL/PlatformTime.h"
 
 uint64 FVoxelHydrologyRegionGraph::GetAllocatedBytes() const
 {
@@ -455,6 +456,14 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Failure(FString& OutE
 
 EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 InGeneration, FReadCell InReadCell, int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel)
 {
+	static TAtomic<uint64> NextDiagnosticMilliseconds{0};
+	const uint64 Now = uint64(FPlatformTime::Seconds() * 1000.0);
+	uint64 Expected = NextDiagnosticMilliseconds.Load();
+	if (Now >= Expected && NextDiagnosticMilliseconds.CompareExchange(Expected, Now + 5000))
+	{
+		UE_LOG(LogTemp, Display, TEXT("Voxel macro graph progress: generation=%llu min=(%d,%d) stage=%d cursor=%d sortEnd=%d cells=%d nodes=%d working=%llu"),
+			Result.Generation, Result.Minimum.X, Result.Minimum.Y, int32(Stage), Cursor, SortEnd, CellCount, Result.Nodes.Num(), GetAllocatedBytes());
+	}
 	OutError.Reset();
 	if (Stage == EStage::None || Stage == EStage::Taken || InGeneration != Result.Generation)
 	{
@@ -480,7 +489,14 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 		}
 		else if (Stage == EStage::Read)
 		{
-			if (Cursor == CellCount) { Cursor = 0; Stage = EStage::Candidates; continue; }
+			if (Cursor == CellCount)
+			{
+				SortRoot = Candidates.Num() / 2 - 1;
+				SortEnd = Candidates.Num() - 1;
+				Cursor = 0;
+				Stage = EStage::Sort;
+				continue;
+			}
 			FVoxelHydrologyRegionSample Sample;
 			const auto Read = InReadCell(Position(Cursor), Sample, OutError);
 			if (Read == EVoxelHydrologyClosureRead::Pending) return EVoxelHydrologyRegionStep::NeedInput;
@@ -498,28 +514,16 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 			Result.InputFingerprint = Sample.AppendFingerprint(Result.InputFingerprint);
 			Result.ForestNeighbors.Add(0);
 			Result.CellLocations.Add(3u << 30);
-			++Cursor;
-		}
-		else if (Stage == EStage::Candidates)
-		{
-			if (Cursor == CellCount)
-			{
-				SortRoot = Candidates.Num() / 2 - 1;
-				SortEnd = Candidates.Num() - 1;
-				Cursor = 0;
-				Stage = EStage::Sort;
-				continue;
-			}
-			const int32 Neighbors[] = {Cursor % Result.Width + 1 < Result.Width ? Cursor + 1 : INDEX_NONE,
-				Cursor / Result.Width + 1 < Result.Height ? Cursor + Result.Width : INDEX_NONE};
+			// 左/上输入已冻结，读格时直接形成同一无向边；排序键仍为原 First/Second。
+			const int32 Neighbors[] = {Cursor % Result.Width > 0 ? Cursor - 1 : INDEX_NONE,
+				Cursor >= Result.Width ? Cursor - Result.Width : INDEX_NONE};
 			for (const int32 Neighbor : Neighbors)
 			{
 				if (Neighbor == INDEX_NONE) continue;
-				const auto& First = Cells[Cursor].Sample;
-				const auto& Second = Cells[Neighbor].Sample;
-				if (First.IsReceiver() && Second.IsReceiver()) continue;
-				Candidates.Add({Cursor, Neighbor, FMath::Max(First.IsReceiver() ? First.WaterZ : First.GroundZ,
-					Second.IsReceiver() ? Second.WaterZ : Second.GroundZ), false});
+				const auto& First = Cells[Neighbor].Sample;
+				if (First.IsReceiver() && Sample.IsReceiver()) continue;
+				Candidates.Add({Neighbor, Cursor, FMath::Max(First.IsReceiver() ? First.WaterZ : First.GroundZ,
+					Sample.IsReceiver() ? Sample.WaterZ : Sample.GroundZ), false});
 			}
 			++Cursor;
 		}
@@ -533,12 +537,16 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 		{
 			if (Cursor == Candidates.Num())
 			{
+				// 稳定压实已选边，保留原 Kruskal 顺序和邻接边顺序，不增加任何 backing。
+				Candidates.SetNum(KeptEdges, EAllowShrinking::No);
+				// 授额等待后仍停在此阶段，游标必须对应压实后的正文长度。
+				Cursor = KeptEdges;
 				if (!VoxelGenerationAllocation::RetainArray(Links, KeptEdges * 2, OutError)) return Failure(OutError);
 				Cursor = 0;
-				Stage = EStage::Anchors;
+				Stage = EStage::Links;
 				continue;
 			}
-			auto& Edge = Candidates[Cursor++];
+			FCandidate Edge = Candidates[Cursor++];
 			if (Cells[Edge.First].Sample.IsReceiver() || Cells[Edge.Second].Sample.IsReceiver()) Edge.bKept = true;
 			else
 			{
@@ -553,19 +561,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 					Edge.bKept = true;
 				}
 			}
-			if (Edge.bKept) ++KeptEdges;
-		}
-		else if (Stage == EStage::Anchors)
-		{
-			if (Cursor == CellCount)
-			{
-				Cursor = 0;
-				Stage = EStage::Links;
-				continue;
-			}
-			FCell& Cell = Cells[Cursor];
-			Cell.bAnchor = !Cell.Sample.IsReceiver() && FindRoot(Cursor) == Cursor;
-			++Cursor;
+			if (Edge.bKept) Candidates[KeptEdges++] = Edge;
 		}
 		else if (Stage == EStage::Links)
 		{
@@ -597,6 +593,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 		else if (Stage == EStage::Leaves)
 		{
 			if (Cursor == CellCount) { Cursor = 0; Stage = EStage::Peel; continue; }
+			Cells[Cursor].bAnchor = !Cells[Cursor].Sample.IsReceiver() && FindRoot(Cursor) == Cursor;
 			QueueLeaf(Cursor++);
 		}
 		else if (Stage == EStage::Peel)
@@ -635,19 +632,23 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 					SummaryHalfEdges += Cells[Cursor].Degree;
 				}
 				else if (!Cells[Cursor].bRemoved && Cells[Cursor].Degree == 2) ++InteriorCells;
+				// 根格索引与稍后发布的节点索引一一对应，RLE 切分数可在此同步精确统计。
+				const int32 Anchor = Cells[Cursor].Sample.IsReceiver() ? INDEX_NONE : FindRoot(Cursor);
+				if (Anchor != PreviousAnchor) { ++AnchorCount; PreviousAnchor = Anchor; }
 				++Cursor;
 				continue;
 			}
 			check(SummaryHalfEdges % 2 == 0);
 			if (!VoxelGenerationAllocation::RetainArray(Result.Nodes, NodeCount, OutError) ||
 				!VoxelGenerationAllocation::RetainArray(Result.Edges, SummaryHalfEdges / 2, OutError) ||
-				!VoxelGenerationAllocation::RetainArray(Result.Profiles, InteriorCells, OutError)) return Failure(OutError);
+				!VoxelGenerationAllocation::RetainArray(Result.Profiles, InteriorCells, OutError) ||
+				!VoxelGenerationAllocation::RetainArray(Result.AnchorRuns, AnchorCount, OutError)) return Failure(OutError);
 			Cursor = 0;
 			Stage = EStage::Nodes;
 		}
 		else if (Stage == EStage::Nodes)
 		{
-			if (Cursor == CellCount) { Cursor = 0; Stage = EStage::CountAnchors; continue; }
+			if (Cursor == CellCount) { Cursor = 0; Stage = EStage::CellAnchors; continue; }
 			if (KeepNode(Cursor))
 			{
 				FCell& Cell = Cells[Cursor];
@@ -656,23 +657,6 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 				Result.CellLocations[Cursor] = uint32(Cell.Node);
 			}
 			++Cursor;
-		}
-		else if (Stage == EStage::CountAnchors)
-		{
-			if (Cursor < CellCount)
-			{
-				const int32 Anchor = Cells[Cursor].Sample.IsReceiver() ? INDEX_NONE : Cells[FindRoot(Cursor)].Node;
-				if (Anchor != PreviousAnchor)
-				{
-					++AnchorCount;
-					PreviousAnchor = Anchor;
-				}
-				++Cursor;
-				continue;
-			}
-			if (!VoxelGenerationAllocation::RetainArray(Result.AnchorRuns, AnchorCount, OutError)) return Failure(OutError);
-			Cursor = 0;
-			Stage = EStage::CellAnchors;
 		}
 		else if (Stage == EStage::CellAnchors)
 		{
@@ -755,7 +739,8 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 				const FLink& Link = Links[LinkCursor];
 				LinkCursor = Link.Next;
 				if (Cells[Link.Neighbor].bRemoved) continue;
-				WalkStart = Cursor - 1;
+				const FIntPoint Local = Result.Nodes[Cursor - 1].Cell - Result.Minimum;
+				WalkStart = Local.X + Local.Y * Result.Width;
 				WalkPrevious = WalkStart;
 				WalkCurrent = WalkFirst = Link.Neighbor;
 				WalkBarrierZ = Candidates[Link.Edge].BarrierZ;
@@ -763,9 +748,10 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 				WalkRainWeight = 0;
 				continue;
 			}
-			if (Cursor < CellCount)
+			if (Cursor < Result.Nodes.Num())
 			{
-				if (Cells[Cursor].Node != INDEX_NONE) LinkCursor = Cells[Cursor].Head;
+				const FIntPoint Local = Result.Nodes[Cursor].Cell - Result.Minimum;
+				LinkCursor = Cells[Local.X + Local.Y * Result.Width].Head;
 				++Cursor;
 				continue;
 			}

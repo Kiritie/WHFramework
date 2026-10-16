@@ -253,7 +253,7 @@ struct FVoxelTerrainCoarsePatchBuilder::FState
 	TSharedPtr<const FVoxelTerrainCoarseExclusions, ESPMode::ThreadSafe> Exclusions;
 	TSharedPtr<FVoxelTerrainCoarsePatch, ESPMode::ThreadSafe> Result;
 	TArray<FWalk, TInlineAllocator<64>> Walk;
-	TArray<FBox, TInlineAllocator<8>> ChangedBounds;
+	TArray<FBox> ChangedBounds;
 	TArray<FFragment> Fragments;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FragmentLease;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
@@ -275,8 +275,9 @@ FVoxelTerrainCoarsePatchBuilder::FVoxelTerrainCoarsePatchBuilder(
 	const bool bInPublicationOutput, const bool bInAllowResidentOverlap)
 {
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	if (InResources->Acquire(InConsumer, EVoxelTerrainResourcePool::Input,
-		VoxelBoundedAllocation::WorkerSharedBytes<FState>(), Lease))
+	InputAdmission = InResources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Input,
+		VoxelBoundedAllocation::WorkerSharedBytes<FState>(), Lease);
+	if (InputAdmission == EVoxelTerrainResourceAdmission::Granted)
 	{
 		State = VoxelBoundedAllocation::MakeWorkerShared<FState>(Lease, MoveTemp(InResources), InConsumer,
 			bInPublicationOutput, bInAllowResidentOverlap);
@@ -296,15 +297,35 @@ bool FVoxelTerrainCoarsePatchBuilder::Initialize(
 {
 	if (!State)
 	{
-		OutError = TEXT("粗层裁切 Worker 容量尚未授予");
+		OutError = InputAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
+			TEXT("CapacityBlocked: 粗层裁切 Worker 输入容量") :
+			InputAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+			TEXT("CapacityUnachievable: 粗层裁切 Worker 输入容量") :
+			TEXT("InvalidRequest: 粗层裁切 Worker 输入容量");
 		return false;
 	}
 	if (State->Geometry || !InGeometry || !InExclusions || !InExclusions->Lease ||
-		(InBase && (InBase->Geometry != InGeometry || InBase->Roots.Num() != InGeometry->Roots.Num())) || InChangedBounds.Num() > 8)
+		(InBase && (InBase->Geometry != InGeometry || InBase->Roots.Num() != InGeometry->Roots.Num())) || InChangedBounds.Num() > 8200)
 	{
-		OutError = TEXT("粗层局部裁切输入或冻结根不合法");
+		OutError = FString::Printf(TEXT("InvalidRequest: 粗层局部裁切输入或冻结根不合法 changes=%d initialized=%d geometry=%d exclusions=%d baseMatches=%d"),
+			InChangedBounds.Num(), State->Geometry.IsValid(), InGeometry.IsValid(),
+			InExclusions && InExclusions->Lease,
+			!InBase || (InGeometry && InBase->Geometry == InGeometry && InBase->Roots.Num() == InGeometry->Roots.Num()));
 		return false;
 	}
+	const uint64 BoundsBytes = VoxelBoundedAllocation::ArrayBytes<FBox>(InChangedBounds.Num());
+	InputAdmission = State->InputLease->TryResize(VoxelBoundedAllocation::WorkerSharedBytes<FState>() + BoundsBytes);
+	if (InputAdmission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		OutError = InputAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
+			TEXT("CapacityBlocked: 粗层裁切变化范围输入容量") :
+			InputAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+			TEXT("CapacityUnachievable: 粗层裁切变化范围输入容量") :
+			TEXT("InvalidRequest: 粗层裁切变化范围输入容量");
+		return false;
+	}
+	State->ChangedBounds.Reserve(InChangedBounds.Num());
+	check(State->ChangedBounds.GetAllocatedSize() <= BoundsBytes);
 	State->Geometry = MoveTemp(InGeometry);
 	State->Base = MoveTemp(InBase);
 	State->Exclusions = MoveTemp(InExclusions);

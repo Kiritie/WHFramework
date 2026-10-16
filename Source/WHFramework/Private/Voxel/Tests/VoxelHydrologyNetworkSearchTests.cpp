@@ -269,43 +269,61 @@ bool FVoxelHydrologyNetworkPathsTest::RunTest(const FString& Parameters)
 			OutError.Reset();
 			return OutGraph ? EVoxelHydrologyClosureRead::Ready : EVoxelHydrologyClosureRead::Pending;
 		};
-		const auto& SeedGraph = Regions[0].Graph;
-		const int32 SeedAnchor = SeedGraph.FindComponentAnchor(FIntPoint(-6, -6));
-		if (!TestTrue(TEXT("查询格定位真实干锚点"), SeedGraph.Nodes.IsValidIndex(SeedAnchor))) return false;
-		FVoxelHydrologyNetworkSearch Search;
-		if (!Search.Initialize(SeedGraph.Nodes[SeedAnchor].Cell, 32, Side, Generation, Error) || !Finish(Search, Read, 127, Error))
+		TMap<FIntPoint, FVoxelHydrologyNetworkCell> Controls;
+		int32 RequiredControls = 0;
+		for (const auto& RequestedRegion : Regions)
 		{
-			AddError(Error);
-			return false;
-		}
-		const auto& Result = Search.GetResult();
-		TestEqual(TEXT("完成后只保留发布正文，不残留原搜索表"), Search.GetAllocatedBytes(), Result.GetAllocatedBytes());
-		TestEqual(TEXT("完成后分页节点已释放"), Search.GetNodeCount(), 0);
-		TestEqual(TEXT("完成后区域元数据已释放"), Search.GetRegionCount(), 0);
-		for (const auto& Cell : Result.Cells)
-		{
-			const int32 Dense = Index(Cell.Cell);
-			if (!TestEqual(TEXT("跨区最低水位等于逐格展开图"), Cell.Potential.SpillZ, Expanded.Potentials[Dense].SpillZ) ||
-				!TestEqual(TEXT("平台距离使用实际边长，而非一条边计一步"), Cell.Potential.PlateauDistance, Expanded.Potentials[Dense].PlateauDistance)) return false;
-			if (!TestTrue(TEXT("发布索引能够找回原格控制"), Result.Find(Cell.Cell) == &Cell)) return false;
-			if (Expanded.Wet[Dense])
+			for (const auto& RequestedNode : RequestedRegion.Graph.Nodes)
 			{
-				TestFalse(TEXT("湿根不能穿越到另一片干地"), Cell.bHasParent);
-			}
-			else
-			{
-				if (!TestTrue(TEXT("父方向等于真实相邻的逐格父节点"), Cell.bHasParent && Cell.ParentCell == Expanded.Position(Expanded.Parents[Dense]))) return false;
-				++CheckedParents;
+				++RequiredControls;
+				if (Controls.Contains(RequestedNode.Cell)) continue;
+				FVoxelHydrologyNetworkSearch Search;
+				if (!Search.InitializeRegion(RequestedNode.Cell, 32, Side, Generation, Error) || !Finish(Search, Read, 127, Error))
+				{
+					AddError(Error);
+					return false;
+				}
+				const auto& Result = Search.GetResult();
+				if (!TestTrue(TEXT("每个请求节点必须由已闭合控制实际发布"), Result.Find(RequestedNode.Cell) != nullptr)) return false;
+				for (const auto& Core : RequestedRegion.Graph.Nodes)
+				{
+					if (!TestTrue(TEXT("整区请求必须闭合全部本区节点，不能只提交首个锚点"), Result.Find(Core.Cell) != nullptr)) return false;
+				}
+				TestEqual(TEXT("完成后只保留发布正文，不残留原搜索表"), Search.GetAllocatedBytes(), Result.GetAllocatedBytes());
+				TestEqual(TEXT("完成后分页节点已释放"), Search.GetNodeCount(), 0);
+				TestEqual(TEXT("完成后区域元数据已释放"), Search.GetRegionCount(), 0);
+				for (const auto& Cell : Result.Cells)
+				{
+					if (const auto* Existing = Controls.Find(Cell.Cell))
+					{
+						if (!TestTrue(TEXT("不同请求的重叠控制完全一致"), *Existing == Cell)) return false;
+					}
+					Controls.Add(Cell.Cell, Cell);
+					const int32 Dense = Index(Cell.Cell);
+					if (!TestEqual(TEXT("跨区最低水位等于逐格展开图"), Cell.Potential.SpillZ, Expanded.Potentials[Dense].SpillZ) ||
+						!TestEqual(TEXT("平台距离使用实际边长，而非一条边计一步"), Cell.Potential.PlateauDistance, Expanded.Potentials[Dense].PlateauDistance)) return false;
+					if (!TestTrue(TEXT("发布索引能够找回原格控制"), Result.Find(Cell.Cell) == &Cell)) return false;
+					if (Expanded.Wet[Dense])
+					{
+						TestFalse(TEXT("湿根不能穿越到另一片干地"), Cell.bHasParent);
+					}
+					else
+					{
+						if (!TestTrue(TEXT("父方向等于真实相邻的逐格父节点"), Cell.bHasParent && Cell.ParentCell == Expanded.Position(Expanded.Parents[Dense]))) return false;
+						++CheckedParents;
+					}
+				}
 			}
 		}
+		TestEqual(TEXT("全部四区摘要节点均有真实已闭合控制"), Controls.Num(), RequiredControls);
 		for (const auto& Region : Regions)
 		{
 			for (int32 EdgeIndex = 0; EdgeIndex < Region.Graph.Edges.Num(); ++EdgeIndex)
 			{
 				const auto& Edge = Region.Graph.Edges[EdgeIndex];
-				const auto* First = Result.Find(Region.Graph.Nodes[Edge.First].Cell);
-				const auto* Second = Result.Find(Region.Graph.Nodes[Edge.Second].Cell);
-				if (!First || !Second || Edge.BarrierZ > Result.Threshold) continue;
+				const auto* First = Controls.Find(Region.Graph.Nodes[Edge.First].Cell);
+				const auto* Second = Controls.Find(Region.Graph.Nodes[Edge.Second].Cell);
+				if (!TestTrue(TEXT("每条边的两端控制均已独立闭合"), First && Second)) return false;
 				for (int32 Offset = 0; Offset < Edge.ProfileCount; ++Offset)
 				{
 					FVoxelHydrologyRegionRoute Route;
@@ -326,6 +344,71 @@ bool FVoxelHydrologyNetworkPathsTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHydrologyNetworkOpenPlateauTest,
+	"WHFramework.Voxel.Hydrology.Network.OpenPlateauClosesDemand",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHydrologyNetworkOpenPlateauTest::RunTest(const FString& Parameters)
+{
+	(void)Parameters;
+	using namespace VoxelHydrologyNetworkSearchTests;
+	FString Error;
+	TArray<FRegion> Regions;
+	const auto Read = [&](const FIntPoint& Coordinate, const FVoxelHydrologyRegionGraph*& OutGraph, FString& OutError)
+	{
+		if (const auto* Existing = FindRegion(Regions, Coordinate))
+		{
+			OutGraph = Existing;
+			return EVoxelHydrologyClosureRead::Ready;
+		}
+		if (Regions.Num() >= 2 || (Coordinate != FIntPoint(0, 0) && Coordinate != FIntPoint(-1, 0)))
+		{
+			OutError = TEXT("Open plateau search expanded beyond the two regions needed to prove the demand");
+			return EVoxelHydrologyClosureRead::Failed;
+		}
+		FVoxelHydrologyRegionGraphBuild Build;
+		if (!Build.Initialize(Coordinate * Side, Side, Side, 32, Generation, OutError)) return EVoxelHydrologyClosureRead::Failed;
+		const auto Sample = [](const FIntPoint& Cell, FVoxelHydrologyRegionSample& OutSample, FString& SampleError)
+		{
+			OutSample.GroundZ = 8;
+			OutSample.RainWeight = 2;
+			if (Cell == FIntPoint(0, 4))
+			{
+				OutSample.GroundZ = -9;
+				OutSample.WaterZ = 0;
+				OutSample.WaterId = {11, 13};
+			}
+			SampleError.Reset();
+			return EVoxelHydrologyClosureRead::Ready;
+		};
+		EVoxelHydrologyRegionStep Step = EVoxelHydrologyRegionStep::None;
+		for (int32 Attempt = 0; Attempt < 10000; ++Attempt)
+		{
+			Step = Build.Advance(Generation, Sample, 113, OutError);
+			if (Step != EVoxelHydrologyRegionStep::Yielded) break;
+		}
+		if (Step != EVoxelHydrologyRegionStep::Ready) return EVoxelHydrologyClosureRead::Failed;
+		auto& Region = Regions.AddDefaulted_GetRef();
+		Region.Coordinate = Coordinate;
+		Region.Graph = Build.TakeResult();
+		OutGraph = &Region.Graph;
+		return EVoxelHydrologyClosureRead::Ready;
+	};
+	FVoxelHydrologyNetworkSearch Search;
+	if (!Search.Initialize(FIntPoint(0, 3), 32, Side, Generation, Error) || !Finish(Search, Read, 127, Error))
+	{
+		AddError(Error);
+		return false;
+	}
+	const auto* Control = Search.GetResult().Find(FIntPoint(0, 3));
+	if (!TestTrue(TEXT("开阔同高平台只在上下界证明闭合后发布请求节点"), Control != nullptr)) return false;
+	TestEqual(TEXT("请求格的真实溢流水位受自身地面约束"), Control->Potential.SpillZ, 8);
+	TestEqual(TEXT("紧邻真实低位湿根的平台距离为零"), Control->Potential.PlateauDistance, int64(0));
+	TestTrue(TEXT("父格沿真实森林边进入湿根"), Control->bHasParent && Control->ParentCell == FIntPoint(0, 4));
+	TestEqual(TEXT("未知边界未当作真实出口，必要邻区被实际读取"), Regions.Num(), 2);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHydrologyNetworkResumeTest,
 	"WHFramework.Voxel.Hydrology.Network.ResumeAndFrozenRegions",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -341,8 +424,7 @@ bool FVoxelHydrologyNetworkResumeTest::RunTest(const FString& Parameters)
 		AddError(Error);
 		return false;
 	}
-	const auto& Graph = Regions[0].Graph;
-	const FIntPoint Seed = Graph.Nodes[Graph.FindComponentAnchor(FIntPoint(-6, -6))].Cell;
+	const FIntPoint Seed(-1, -1);
 	bool bBlock = true;
 	int32 Reads = 0;
 	const auto Read = [&](const FIntPoint& Coordinate, const FVoxelHydrologyRegionGraph*& OutGraph, FString& OutError)
@@ -581,7 +663,7 @@ bool FVoxelHydrologyMacroPipelineConservationTest::RunTest(const FString& Parame
                 Plan->Grid.GroundPlane[CellIndex] = bWet ? -9 : Variant < 6 ? (Local.X * 13 + Local.Y * 7 + Variant * 11) % 17 - 5 : 8;
                 if (bWet) Plan->Grid.OceanOutlets.Add(CellIndex, 0);
             }
-            const auto* Result = Plan.Get();
+            const FVoxelHydrologyPlan* Result = &Plan.Get();
             Topology.Add(InKey, MoveTemp(Plan));
             return Result;
         };

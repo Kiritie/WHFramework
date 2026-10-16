@@ -434,8 +434,27 @@ EVoxelHydrologyClosureRead FVoxelHydrologyNetworkRunoffBuild::ResolveControl(con
 	}
 	if (!ControlSearch.IsSet())
 	{
+		const FVoxelHydrologyRegionGraph* Graph = nullptr;
+		const auto Read = ReadGraph(RegionFor(InCell), InReadRegion, Graph, OutError);
+		if (Read != EVoxelHydrologyClosureRead::Ready) return Read;
+		const int32 Index = Graph->FindNodeIndex(InCell);
+		if (!Graph->Nodes.IsValidIndex(Index))
+		{
+			OutError = TEXT("Hydrology macro control requires a retained frozen node");
+			return EVoxelHydrologyClosureRead::Failed;
+		}
+		const auto& Facts = Graph->Nodes[Index];
+		if (Facts.IsReceiver())
+		{
+			OutControl = {InCell, {Facts.WaterZ, 0}, FIntPoint::ZeroValue, false};
+			OutError.Reset();
+			return EVoxelHydrologyClosureRead::Ready;
+		}
 		ControlSearch.Emplace();
-		if (!ControlSearch->Initialize(InCell, CellSize, RegionSide, Result.Generation, OutError))
+		const bool bInitialized = RegionFor(InCell) == Result.Coordinate
+			? ControlSearch->InitializeRegion(InCell, CellSize, RegionSide, Result.Generation, OutError)
+			: ControlSearch->Initialize(InCell, CellSize, RegionSide, Result.Generation, OutError);
+		if (!bInitialized)
 		{
 			ControlSearch.Reset();
 			return EVoxelHydrologyClosureRead::Failed;

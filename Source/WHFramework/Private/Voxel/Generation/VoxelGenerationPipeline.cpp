@@ -785,11 +785,12 @@ bool FVoxelGenerationPipeline::EnumerateTrees(
 	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
 	FVoxelGenerationQuery Query;
 	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
-	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, true, bRequirePlanPreflight)) return false;
+	if (!FVoxelGenerationQuery::Create(Config, Cache, Query, OutError, false, bRequirePlanPreflight)) return false;
 	bool bSampleFailed = false;
 	FString FirstSampleError;
 	auto SampleColumn = [&](const FIntVector& Position, FVoxelColumnSample& Column)
 	{
+		if (bSampleFailed) return false;
 		FString SampleError;
 		if (!Query.SampleEnvironmentColumn(Position.X, Position.Y, Column, SampleError, InCancel))
 		{

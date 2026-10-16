@@ -905,6 +905,19 @@ int32 FVoxelGenerationPlanCoordinator::AdvancePendingAdmissions(const double InD
 	return Processed;
 }
 
+FVoxelTaskStamp FVoxelGenerationPlanCoordinator::MakeTaskStamp(
+	const FVoxelGenerationPlanDependency& InDependency, const uint64 InAttempt) const
+{
+	FVoxelTaskStamp Stamp;
+	Stamp.WorldEpoch = WorldEpoch;
+	Stamp.Token = InAttempt;
+	Stamp.OwnerId = EnvironmentOwnerId;
+	Stamp.OwnerIncarnation = EnvironmentOwnerIncarnation;
+	Stamp.Revision = static_cast<uint8>(InDependency.Kind);
+	Stamp.Section = InDependency.Coordinate();
+	return Stamp;
+}
+
 bool FVoxelGenerationPlanCoordinator::Queue(
 	const FVoxelGenerationPlanDependency& InDependency,
 	FState& InOutState)
@@ -915,18 +928,13 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 		auto& NewRequest = InOutState.PendingRequest.GetValue();
 		NewRequest.Kind = EVoxelTaskKind::BuildGenerationPlan;
 		NewRequest.TerrainStage = 0;
-		NewRequest.Stamp.WorldEpoch = WorldEpoch;
 		if (!InOutState.bAttemptPendingAdmission)
 		{
 			checkf(NextAttemptId != MAX_uint64, TEXT("Generation attempt serial exhausted"));
 			InOutState.AttemptId = ++NextAttemptId;
 			InOutState.bAttemptPendingAdmission = true;
 		}
-		NewRequest.Stamp.Token = InOutState.AttemptId;
-		NewRequest.Stamp.OwnerId = EnvironmentOwnerId;
-		NewRequest.Stamp.OwnerIncarnation = EnvironmentOwnerIncarnation;
-		NewRequest.Stamp.Revision = static_cast<uint8>(InDependency.Kind);
-		NewRequest.Stamp.Section = InDependency.Coordinate();
+		NewRequest.Stamp = MakeTaskStamp(InDependency, InOutState.AttemptId);
 		NewRequest.GenerationConsumer = {EVoxelGenerationConsumerKind::WorldFact, WorldEpoch,
 			EnvironmentOwnerId, EnvironmentOwnerIncarnation, EVoxelGenerationSpatialKind::Section,
 			NewRequest.Stamp.Section, NewRequest.Stamp.Section, NewRequest.Stamp.Token};
@@ -1161,6 +1169,8 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 				{
 					Result.bSuccess = true;
 					Result.bContinue = true;
+					// 保留生产者的即时续跑证明，复用调度器原有 8ms 时间片，不把每个小片退回 GT 重排。
+					Result.bContinueImmediately = Result.Error.StartsWith(TEXT("YieldedImmediate:"));
 					Result.Error.Reset();
 				}
 
@@ -1687,16 +1697,14 @@ void FVoxelGenerationPlanCoordinator::RemoveSubscription(const FVoxelGenerationP
 	if (State->bInFlight)
 	{
 		const uint64 Attempt = State->AttemptId;
+		const FVoxelTaskStamp Stamp = MakeTaskStamp(InDependency, Attempt);
 		if (InDependency.Kind == EVoxelGenerationPlanKind::Hydrology)
 		{
 			Cache->CancelHydrologyBuild(InDependency.HydrologyKey, WorldEpoch, EnvironmentOwnerId,
 				EnvironmentOwnerIncarnation, Attempt);
 		}
 
-		Scheduler.CancelMatching([Attempt, Epoch = WorldEpoch](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
-		{
-			return Kind == EVoxelTaskKind::BuildGenerationPlan && Stamp.WorldEpoch == Epoch && Stamp.Token == Attempt;
-		});
+		Scheduler.CancelTask(EVoxelTaskKind::BuildGenerationPlan, Stamp);
 	}
 	else
 	{
@@ -2079,6 +2087,7 @@ void FVoxelGenerationPlanCoordinator::ForgetFact(const FVoxelGenerationPlanDepen
 		}
 		const auto Node = State->PriorityNode;
 		const uint64 Attempt = State->AttemptId;
+		const FVoxelTaskStamp Stamp = MakeTaskStamp(InDependency, Attempt);
 		if (InDependency.Kind == EVoxelGenerationPlanKind::Hydrology && Attempt)
 		{
 			Cache->CancelHydrologyBuild(InDependency.HydrologyKey, WorldEpoch, EnvironmentOwnerId,
@@ -2086,7 +2095,6 @@ void FVoxelGenerationPlanCoordinator::ForgetFact(const FVoxelGenerationPlanDepen
 		}
 
 		const auto CapturedStorage = Storage;
-		const uint64 Incarnation = EnvironmentOwnerIncarnation;
 		ClearPendingRequest(*State);
 		auto PrerequisitesLease = MoveTemp(State->PrerequisitesLease);
 		auto Prerequisites = MoveTemp(State->Prerequisites);
@@ -2095,12 +2103,7 @@ void FVoxelGenerationPlanCoordinator::ForgetFact(const FVoxelGenerationPlanDepen
 		Storage->States.Remove(InDependency);
 		if (Attempt)
 		{
-			Scheduler.CancelMatching([Attempt, Epoch = WorldEpoch, Owner = EnvironmentOwnerId,
-				Incarnation](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
-			{
-				return Kind == EVoxelTaskKind::BuildGenerationPlan && Stamp.WorldEpoch == Epoch && Stamp.OwnerId == Owner &&
-					Stamp.OwnerIncarnation == Incarnation && Stamp.Token == Attempt;
-			});
+			Scheduler.CancelTask(EVoxelTaskKind::BuildGenerationPlan, Stamp);
 		}
 		if (Storage != CapturedStorage || !Storage || Storage->Owner != this)
 		{

@@ -123,4 +123,5 @@ public:
 private:
 	struct FState;
 	TSharedPtr<FState, ESPMode::ThreadSafe> State;
+	EVoxelTerrainResourceAdmission InputAdmission = EVoxelTerrainResourceAdmission::None;
 };

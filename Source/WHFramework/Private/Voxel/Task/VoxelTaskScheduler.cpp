@@ -586,6 +586,77 @@ bool FVoxelTaskScheduler::PrepareQueues(const int32 InAdditionalTasks)
 		ReserveSet<TPair<FIntVector, int32>>(SectionTaskCounts, Capacity);
 }
 
+FVoxelTaskScheduler::FAdmissionAttempt& FVoxelTaskScheduler::FindOrAddAdmission(const FVoxelTaskKey& InKey)
+{
+	if (auto* Existing = AdmissionAttempts.Find(InKey))
+	{
+		check(Existing->Sequence != 0);
+		return *Existing;
+	}
+	check(NextSequence != MAX_uint64);
+	auto& Attempt = AdmissionAttempts.Add(InKey);
+	Attempt.FirstRequested = FPlatformTime::Seconds();
+	Attempt.Sequence = ++NextSequence;
+	Attempt.Previous = AdmissionTail;
+	if (AdmissionTail.Kind != EVoxelTaskKind::None)
+	{
+		AdmissionAttempts.FindChecked(AdmissionTail).Next = InKey;
+	}
+	else
+	{
+		AdmissionHead = InKey;
+	}
+	AdmissionTail = InKey;
+	return Attempt;
+}
+
+void FVoxelTaskScheduler::UnlinkAdmission(const FVoxelTaskKey& InKey, const FAdmissionAttempt& InAttempt)
+{
+	if (InAttempt.Previous.Kind != EVoxelTaskKind::None)
+	{
+		AdmissionAttempts.FindChecked(InAttempt.Previous).Next = InAttempt.Next;
+	}
+	else
+	{
+		AdmissionHead = InAttempt.Next;
+	}
+	if (InAttempt.Next.Kind != EVoxelTaskKind::None)
+	{
+		AdmissionAttempts.FindChecked(InAttempt.Next).Previous = InAttempt.Previous;
+	}
+	else
+	{
+		AdmissionTail = InAttempt.Previous;
+	}
+	for (FCancellationCursor* Cursor = CancellationCursor; Cursor; Cursor = Cursor->Previous)
+	{
+		if (Cursor->Next == InKey)
+		{
+			Cursor->Next = InAttempt.Next;
+		}
+	}
+}
+
+void FVoxelTaskScheduler::RemoveAdmission(const FVoxelTaskKey& InKey)
+{
+	if (const auto* Attempt = AdmissionAttempts.Find(InKey))
+	{
+		UnlinkAdmission(InKey, *Attempt);
+		AdmissionAttempts.Remove(InKey);
+	}
+}
+
+void FVoxelTaskScheduler::ClearAdmissions()
+{
+	for (FCancellationCursor* Cursor = CancellationCursor; Cursor; Cursor = Cursor->Previous)
+	{
+		Cursor->Next = {};
+	}
+	AdmissionHead = {};
+	AdmissionTail = {};
+	AdmissionAttempts.Empty();
+}
+
 void FVoxelTaskScheduler::FreeBacking()
 {
 	Pending.Empty();
@@ -598,7 +669,7 @@ void FVoxelTaskScheduler::FreeBacking()
 	SectionIdleNotifications.Empty();
 	ActiveKeys.Empty();
 	SectionTaskCounts.Empty();
-	AdmissionAttempts.Empty();
+	ClearAdmissions();
 	SectionIdleCallback = nullptr;
 	IdleBindingLease.Reset();
 	BackingBytes = 0;
@@ -732,12 +803,7 @@ bool FVoxelTaskScheduler::ObserveDemand(const EVoxelTaskKind InKind, const FVoxe
 	check(IsInGameThread());
 	if (ControlConsumer.IsValid() && !bAllowPassive && InStamp.WorldEpoch != ControlConsumer.WorldEpoch) return false;
 	if (bStopped || !PrepareAdmission({InKind, InStamp})) return false;
-	auto& Attempt = AdmissionAttempts.FindOrAdd({InKind, InStamp});
-	if (Attempt.Sequence == 0)
-	{
-		Attempt.FirstRequested = FPlatformTime::Seconds();
-		Attempt.Sequence = ++NextSequence;
-	}
+	auto& Attempt = FindOrAddAdmission({InKind, InStamp});
 	Attempt.Blocked = InReason;
 	Attempt.InputBytes = InInputBytes;
 	Attempt.ResultBytes = InResultBytes;
@@ -775,12 +841,7 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 			return false;
 		}
 	}
-	FAdmissionAttempt& Attempt = AdmissionAttempts.FindOrAdd(AttemptKey);
-	if (Attempt.Sequence == 0)
-	{
-		Attempt.FirstRequested = FPlatformTime::Seconds();
-		Attempt.Sequence = ++NextSequence;
-	}
+	FAdmissionAttempt& Attempt = FindOrAddAdmission(AttemptKey);
 	Attempt.InputBytes = InRequest.InputBytes;
 	Attempt.ResultBytes = InRequest.ReservedBytes;
 	Attempt.Blocked = EVoxelTaskBlockReason::None;
@@ -930,9 +991,8 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 		Pending.RemoveAtSwap(Index, 1, EAllowShrinking::No);
 		QueuedInputBytes -= Displaced.InputBytes;
 		const FVoxelTaskKey DisplacedKey{Displaced.Kind, Displaced.Stamp};
-		const FAdmissionAttempt Preserved = AdmissionAttempts.FindChecked(DisplacedKey);
-		RemoveActive(Displaced.Stamp, Displaced.Kind, Displaced.WorkClass);
-		AdmissionAttempts.Add(DisplacedKey, Preserved).Blocked = EVoxelTaskBlockReason::PendingCapacity;
+		RemoveActive(Displaced.Stamp, Displaced.Kind, Displaced.WorkClass, false);
+		AdmissionAttempts.FindChecked(DisplacedKey).Blocked = EVoxelTaskBlockReason::PendingCapacity;
 		QueueCanceled(MoveTemp(Displaced));
 	}
 
@@ -1468,7 +1528,13 @@ void FVoxelTaskScheduler::CancelSection(
 {
 	check(IsInGameThread());
 	for (auto It = AdmissionAttempts.CreateIterator(); It; ++It)
-		if (UsesSectionKey(It.Key().Kind) && It.Key().Stamp.Section == InSection) It.RemoveCurrent();
+	{
+		if (UsesSectionKey(It.Key().Kind) && It.Key().Stamp.Section == InSection)
+		{
+			UnlinkAdmission(It.Key(), It.Value());
+			It.RemoveCurrent();
+		}
+	}
 
 	for (int32 Index = Pending.Num() - 1;
 		Index >= 0;
@@ -1510,49 +1576,68 @@ void FVoxelTaskScheduler::CancelSection(
 	FlushSectionIdleNotifications();
 }
 
+void FVoxelTaskScheduler::CancelAttempt(const FVoxelTaskKey& InKey, const uint64 InSequence)
+{
+	if (const FAdmissionAttempt* Attempt = AdmissionAttempts.Find(InKey); Attempt && Attempt->Sequence == InSequence)
+	{
+		RemoveAdmission(InKey);
+	}
+	const int32 PendingIndex = Pending.IndexOfByPredicate([&InKey, InSequence](const FVoxelTaskRequest& Request)
+	{
+		return Request.Sequence == InSequence && Request.Kind == InKey.Kind && Request.Stamp == InKey.Stamp;
+	});
+	if (PendingIndex != INDEX_NONE)
+	{
+		FVoxelTaskRequest Request = MoveTemp(Pending[PendingIndex]);
+		Pending.RemoveAtSwap(PendingIndex, 1, EAllowShrinking::No);
+		QueuedInputBytes -= Request.InputBytes;
+		RemoveActive(Request.Stamp, Request.Kind, Request.WorkClass);
+		QueueCanceled(MoveTemp(Request));
+	}
+	for (auto* Queue : {&Running, &AwaitingApply})
+	{
+		for (FRunning& Request : *Queue)
+		{
+			if (Request.Sequence == InSequence && Request.Kind == InKey.Kind && Request.Stamp == InKey.Stamp)
+			{
+				Request.Slot->Cancel.Store(true);
+			}
+		}
+	}
+}
+
+void FVoxelTaskScheduler::CancelTask(const EVoxelTaskKind InKind, const FVoxelTaskStamp& InStamp)
+{
+	check(IsInGameThread());
+	const FVoxelTaskKey Key{InKind, InStamp};
+	if (const FAdmissionAttempt* Attempt = AdmissionAttempts.Find(Key))
+	{
+		const uint64 Sequence = Attempt->Sequence;
+		CancelAttempt(Key, Sequence);
+	}
+	FlushSectionIdleNotifications();
+}
+
 void FVoxelTaskScheduler::CancelMatching(
 	TFunctionRef<bool(EVoxelTaskKind, const FVoxelTaskStamp&)> InPredicate)
 {
 	check(IsInGameThread());
 	const uint64 LastInitialSequence = NextSequence;
-	uint64 VisitedSequence = 0;
-	while (true)
+	FCancellationCursor Cursor;
+	Cursor.Previous = CancellationCursor;
+	Cursor.Next = AdmissionHead;
+	TGuardValue<FCancellationCursor*> CursorGuard(CancellationCursor, &Cursor);
+	// Preserve initial sequence order without rescanning the map. Predicates may
+	// remove entries or reenter cancellation; unlinking repairs every live cursor.
+	while (Cursor.Next.Kind != EVoxelTaskKind::None)
 	{
-		FVoxelTaskKey Key;
-		uint64 Next = MAX_uint64;
-		for (const auto& Pair : AdmissionAttempts)
-		{
-			if (Pair.Value.Sequence > VisitedSequence && Pair.Value.Sequence <= LastInitialSequence && Pair.Value.Sequence < Next)
-			{
-				Next = Pair.Value.Sequence;
-				Key = Pair.Key;
-			}
-		}
-		if (Next == MAX_uint64) break;
-		VisitedSequence = Next;
+		const FVoxelTaskKey Key = Cursor.Next;
+		const auto& Attempt = AdmissionAttempts.FindChecked(Key);
+		const uint64 Sequence = Attempt.Sequence;
+		if (Sequence > LastInitialSequence) break;
+		Cursor.Next = Attempt.Next;
 		if (!InPredicate(Key.Kind, Key.Stamp)) continue;
-		if (const FAdmissionAttempt* Attempt = AdmissionAttempts.Find(Key); Attempt && Attempt->Sequence == Next)
-			AdmissionAttempts.Remove(Key);
-		const int32 PendingIndex = Pending.IndexOfByPredicate([&Key, Next](const FVoxelTaskRequest& Request)
-		{
-			return Request.Sequence == Next && Request.Kind == Key.Kind && Request.Stamp == Key.Stamp;
-		});
-		if (PendingIndex != INDEX_NONE)
-		{
-			FVoxelTaskRequest Request = MoveTemp(Pending[PendingIndex]);
-			Pending.RemoveAtSwap(PendingIndex, 1, EAllowShrinking::No);
-			QueuedInputBytes -= Request.InputBytes;
-			RemoveActive(Request.Stamp, Request.Kind, Request.WorkClass);
-			QueueCanceled(MoveTemp(Request));
-		}
-		for (auto* Queue : {&Running, &AwaitingApply})
-		{
-			for (FRunning& Request : *Queue)
-			{
-				if (Request.Sequence == Next && Request.Kind == Key.Kind && Request.Stamp == Key.Stamp)
-					Request.Slot->Cancel.Store(true);
-			}
-		}
+		CancelAttempt(Key, Sequence);
 	}
 	FlushSectionIdleNotifications();
 }
@@ -1609,7 +1694,7 @@ void FVoxelTaskScheduler::StopAndJoin()
 	Pending.Empty();
 	WorkerSelection.Reset();
 	CompletedSelection.Reset();
-	AdmissionAttempts.Empty();
+	ClearAdmissions();
 	Running.Empty();
 	AwaitingApply.Empty();
 	Canceled.Empty();
@@ -2208,10 +2293,8 @@ void FVoxelTaskScheduler::Pump()
 					FVoxelTaskRequest Rejected = MoveTemp(Pending[BestIndex]);
 					Pending.RemoveAtSwap(BestIndex, 1, EAllowShrinking::No);
 					QueuedInputBytes -= Rejected.InputBytes;
-					FAdmissionAttempt Preserved = AdmissionAttempts.FindChecked({Rejected.Kind, Rejected.Stamp});
-					Preserved.Blocked = Rejected.Blocked;
-					RemoveActive(Rejected.Stamp, Rejected.Kind, Rejected.WorkClass);
-					AdmissionAttempts.Add({Rejected.Kind, Rejected.Stamp}, Preserved);
+					RemoveActive(Rejected.Stamp, Rejected.Kind, Rejected.WorkClass, false);
+					AdmissionAttempts.FindChecked({Rejected.Kind, Rejected.Stamp}).Blocked = Rejected.Blocked;
 					const EVoxelTaskBlockReason Failure = Rejected.Blocked;
 					QueueCanceled(MoveTemp(Rejected), Failure);
 					continue;
@@ -2394,9 +2477,13 @@ void FVoxelTaskScheduler::AddActive(
 void FVoxelTaskScheduler::RemoveActive(
 	const FVoxelTaskStamp& InStamp,
 	const EVoxelTaskKind InKind,
-	const EVoxelWorkClass InWorkClass)
+	const EVoxelWorkClass InWorkClass,
+	const bool bForgetAdmission)
 {
-	AdmissionAttempts.Remove({InKind, InStamp});
+	if (bForgetAdmission)
+	{
+		RemoveAdmission({InKind, InStamp});
+	}
 	ActiveKeys.Remove({
 		InKind,
 		InStamp

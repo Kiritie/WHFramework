@@ -1087,16 +1087,41 @@ struct FVoxelGenerationPlanCache::FHydrologyFactOwnerBase
     {
         TSharedPtr<const void, ESPMode::ThreadSafe> Body;
         TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+        bool bAcrossSlices = false;
+        const FVoxelHydrologyRegionGraph* Graph = nullptr;
     };
     TArray<FDependency> Dependencies;
     template<typename ResultType>
-    bool Pin(const TSharedPtr<const ResultType, ESPMode::ThreadSafe>& InBody, FString& OutError)
+    bool Pin(const TSharedPtr<const ResultType, ESPMode::ThreadSafe>& InBody, FString& OutError, bool bAcrossSlices = false)
     {
-        if (Dependencies.ContainsByPredicate([&](const FDependency& InDependency) { return InDependency.Body.Get() == InBody.Get(); })) return true;
+        if (auto* Existing = Dependencies.FindByPredicate([&](const FDependency& InDependency) { return InDependency.Body.Get() == InBody.Get(); }))
+        {
+            Existing->bAcrossSlices |= bAcrossSlices;
+            return true;
+        }
         FVoxelGenerationRequiredSourceScope Source(Resources, InBody->ResourceLease.Get());
         if (!VoxelGenerationAllocation::RetainArray(Dependencies, Dependencies.Num() + 1, OutError)) return false;
-        Dependencies.Add({InBody, InBody->ResourceLease});
+        Dependencies.Add({InBody, InBody->ResourceLease, bAcrossSlices});
+        if constexpr (std::is_same_v<ResultType, FVoxelHydrologyRegionGraph>)
+        {
+            Dependencies.Last().Graph = InBody.Get();
+        }
         return true;
+    }
+    const FVoxelHydrologyRegionGraph* FindPinnedGraph(const FIntPoint& InCoordinate, int32 InSide) const
+    {
+        for (const auto& Dependency : Dependencies)
+        {
+            const auto* Graph = Dependency.Graph;
+            if (Graph && VoxelGeneration::FloorDivide(Graph->Minimum.X, InSide) == InCoordinate.X &&
+                VoxelGeneration::FloorDivide(Graph->Minimum.Y, InSide) == InCoordinate.Y) return Graph;
+        }
+        return nullptr;
+    }
+    void ReleaseSliceDependencies()
+    {
+        // 网络续跑仍会按冻结索引重读区域图；完成或取消前它们仍是实际读者。
+        Dependencies.RemoveAll([](const FDependency& InDependency) { return !InDependency.bAcrossSlices; });
     }
     void VisitSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
     {
@@ -1126,6 +1151,7 @@ struct FVoxelGenerationPlanCache::THydrologyFactOwner : FHydrologyFactOwnerBase
     ResultType Result;
     bool bInitialized = false;
     bool bReady = false;
+    double LastDiagnosticSeconds = 0;
     uint64 GetAllocatedBytes() const
     {
         return VoxelGenerationAllocation::AllocatedBytes(Dependencies) + Result.GetAllocatedBytes() + (Build.IsSet() ? Build->GetAllocatedBytes() : 0);
@@ -2089,7 +2115,7 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyFact(const FVoxelHydrologyRegion
     {
         if (!InInitialize(*Owner, OutError))
         {
-            Owner->Dependencies.Reset();
+            Owner->ReleaseSliceDependencies();
             return Stop(OutError);
         }
         Owner->bInitialized = true;
@@ -2097,7 +2123,18 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyFact(const FVoxelHydrologyRegion
 	if (!Owner->bReady)
 	{
         const auto Step = InAdvance(*Owner, OutError);
-        Owner->Dependencies.Reset();
+        Owner->ReleaseSliceDependencies();
+        if constexpr (std::is_same_v<BuildType, FVoxelHydrologyNetworkRunoffBuild>)
+        {
+            const double Now = FPlatformTime::Seconds();
+            if (Now - Owner->LastDiagnosticSeconds >= 5.0)
+            {
+                Owner->LastDiagnosticSeconds = Now;
+                UE_LOG(LogTemp, Display, TEXT("Voxel macro runoff progress: epoch=%llu region=(%d,%d) nodes=%d graphReaders=%d working=%llu step=%d status=%s"),
+                    Owner->Consumer.WorldEpoch, InKey.Coordinate.X, InKey.Coordinate.Y, Owner->Build->GetNodeCount(),
+                    Owner->Dependencies.Num(), Owner->GetAllocatedBytes(), int32(Step), *OutError);
+            }
+        }
 		if ((InCancel && InCancel->Load()) || Owner->bCanceled.Load() || Generation != HydrologyGeneration.Load())
 		{
 			return Stop(TEXT("Canceled"));
@@ -2160,10 +2197,22 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyRunoff(const FVoxelHydrologyRegi
     using FOwner = THydrologyFactOwner<FVoxelHydrologyNetworkRunoffBuild, FVoxelHydrologyNetworkRunoff>;
     const auto ReadGraph = [&](FOwner& InOwner, const FIntPoint& InCoordinate, const FVoxelHydrologyRegionGraph*& OutGraph, FString& InError)
     {
+        if ((InCancel && InCancel->Load()) || InOwner.bCanceled.Load() || InOwner.Generation != HydrologyGeneration.Load())
+        {
+            InError = TEXT("Canceled");
+            return EVoxelHydrologyClosureRead::Failed;
+        }
+        // 正文已经由本 owner 的真实依赖租约固定，无需每个节点再绑定配方及争用缓存锁。
+        if (const auto* Pinned = InOwner.FindPinnedGraph(InCoordinate, InConfig->Recipe->Settings.HydrologyRegionSide))
+        {
+            OutGraph = Pinned;
+            InError.Reset();
+            return EVoxelHydrologyClosureRead::Ready;
+        }
         FVoxelHydrologyRegionGraphPtr Graph;
         if (!AdvanceHydrologyGraph(FVoxelHydrologyRegionKey{InCoordinate}, InConfig, InLookup, InRequestTile, Graph, InError, InCancel))
             return InError.StartsWith(TEXT("Yielded")) || InError.StartsWith(TEXT("DependencyNotReady")) ? EVoxelHydrologyClosureRead::Pending : EVoxelHydrologyClosureRead::Failed;
-        if (!InOwner.Pin(Graph, InError)) return EVoxelHydrologyClosureRead::Failed;
+        if (!InOwner.Pin(Graph, InError, true)) return EVoxelHydrologyClosureRead::Failed;
         OutGraph = Graph.Get();
         return EVoxelHydrologyClosureRead::Ready;
     };
@@ -2193,6 +2242,18 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologySourceBucket(const FVoxelHydrolo
     using FOwner = THydrologyFactOwner<FVoxelHydrologySourceBucketBuild, FVoxelHydrologySourceBucket>;
     const auto ReadGraph = [&](FOwner& InOwner, const FIntPoint& InCoordinate, const FVoxelHydrologyRegionGraph*& OutGraph, FString& InError)
     {
+        if ((InCancel && InCancel->Load()) || InOwner.bCanceled.Load() || InOwner.Generation != HydrologyGeneration.Load())
+        {
+            InError = TEXT("Canceled");
+            return EVoxelHydrologyClosureRead::Failed;
+        }
+        // 正文已经由本 owner 的真实依赖租约固定，无需每个节点再绑定配方及争用缓存锁。
+        if (const auto* Pinned = InOwner.FindPinnedGraph(InCoordinate, InConfig->Recipe->Settings.HydrologyRegionSide))
+        {
+            OutGraph = Pinned;
+            InError.Reset();
+            return EVoxelHydrologyClosureRead::Ready;
+        }
         FVoxelHydrologyRegionGraphPtr Graph;
         if (!AdvanceHydrologyGraph(FVoxelHydrologyRegionKey{InCoordinate}, InConfig, InLookup, InRequestTile, Graph, InError, InCancel))
             return InError.StartsWith(TEXT("Yielded")) || InError.StartsWith(TEXT("DependencyNotReady")) ? EVoxelHydrologyClosureRead::Pending : EVoxelHydrologyClosureRead::Failed;
@@ -2243,6 +2304,18 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologySources(const FVoxelHydrologyReg
     using FOwner = THydrologyFactOwner<FVoxelHydrologySourcePlanBuild, FVoxelHydrologySourcePlan>;
     const auto ReadGraph = [&](FOwner& InOwner, const FIntPoint& InCoordinate, const FVoxelHydrologyRegionGraph*& OutGraph, FString& InError)
     {
+        if ((InCancel && InCancel->Load()) || InOwner.bCanceled.Load() || InOwner.Generation != HydrologyGeneration.Load())
+        {
+            InError = TEXT("Canceled");
+            return EVoxelHydrologyClosureRead::Failed;
+        }
+        // 正文已经由本 owner 的真实依赖租约固定，无需每个节点再绑定配方及争用缓存锁。
+        if (const auto* Pinned = InOwner.FindPinnedGraph(InCoordinate, InConfig->Recipe->Settings.HydrologyRegionSide))
+        {
+            OutGraph = Pinned;
+            InError.Reset();
+            return EVoxelHydrologyClosureRead::Ready;
+        }
         FVoxelHydrologyRegionGraphPtr Graph;
         if (!AdvanceHydrologyGraph(FVoxelHydrologyRegionKey{InCoordinate}, InConfig, InLookup, InRequestTile, Graph, InError, InCancel))
             return InError.StartsWith(TEXT("Yielded")) || InError.StartsWith(TEXT("DependencyNotReady")) ? EVoxelHydrologyClosureRead::Pending : EVoxelHydrologyClosureRead::Failed;
@@ -2298,6 +2371,18 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyChannels(const FVoxelHydrologyRe
     using FOwner = THydrologyFactOwner<FVoxelHydrologyChannelPlanBuild, FVoxelHydrologyChannelPlan>;
     const auto ReadGraph = [&](FOwner& InOwner, const FIntPoint& InCoordinate, const FVoxelHydrologyRegionGraph*& OutGraph, FString& InError)
     {
+        if ((InCancel && InCancel->Load()) || InOwner.bCanceled.Load() || InOwner.Generation != HydrologyGeneration.Load())
+        {
+            InError = TEXT("Canceled");
+            return EVoxelHydrologyClosureRead::Failed;
+        }
+        // 正文已经由本 owner 的真实依赖租约固定，无需每个节点再绑定配方及争用缓存锁。
+        if (const auto* Pinned = InOwner.FindPinnedGraph(InCoordinate, InConfig->Recipe->Settings.HydrologyRegionSide))
+        {
+            OutGraph = Pinned;
+            InError.Reset();
+            return EVoxelHydrologyClosureRead::Ready;
+        }
         FVoxelHydrologyRegionGraphPtr Graph;
         if (!AdvanceHydrologyGraph(FVoxelHydrologyRegionKey{InCoordinate}, InConfig, InLookup, InRequestTile, Graph, InError, InCancel))
             return InError.StartsWith(TEXT("Yielded")) || InError.StartsWith(TEXT("DependencyNotReady")) ? EVoxelHydrologyClosureRead::Pending : EVoxelHydrologyClosureRead::Failed;
@@ -2787,6 +2872,11 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyPlan(const FVoxelHydrologyRegion
             if (OutError.StartsWith(TEXT("DependencyNotReady")))
                 return Stop(TEXT("Yielded: hydrology component waits for shared fine water: ") + OutError);
             return Stop(TEXT("YieldedImmediate: hydrology component closure"));
+        }
+        if (Step == EVoxelHydrologyComponentStep::CapacityBlocked)
+        {
+            Owner->ReleaseUnusedTiles();
+            return Stop(OutError);
         }
 		if (Step == EVoxelHydrologyComponentStep::Canceled) return Stop(TEXT("Canceled"));
 		if (Step != EVoxelHydrologyComponentStep::Ready)

@@ -1431,19 +1431,34 @@ bool FVoxelGenerationQuery::ApplyHydrology(
 	const FVoxelHydrologyRegionKey Key = HydrologyKeyForVoxel(
 		InX, InY, Config->Recipe->Settings, Config->Recipe->AlgorithmVersion);
 	FVoxelHydrologyPlanPtr Plan;
-	if (bRequireReadyHydrology && !Cache->FindHydrology(Key, Plan))
+	if (bRequireReadyHydrology)
 	{
-		FVoxelGenerationPlanningReadScope::Missing(EVoxelGenerationPlanKind::Hydrology,
-			FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
-		if (MissingHydrologyObserver) MissingHydrologyObserver(MissingHydrologyContext.Get(), Key);
-		OutError = TEXT("DependencyNotReady: Hydrology");
-		return false;
+		if (!ValidateConsumer(OutError)) return false;
+		if ((InCancel && InCancel->Load()) || CacheGeneration != Cache->GetHydrologyGeneration())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		if (!Cache->FindHydrology(Key, Plan))
+		{
+			FVoxelGenerationPlanningReadScope::Missing(EVoxelGenerationPlanKind::Hydrology,
+				FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0));
+			if (MissingHydrologyObserver) MissingHydrologyObserver(MissingHydrologyContext.Get(), Key);
+			OutError = TEXT("DependencyNotReady: Hydrology");
+			return false;
+		}
+		if ((InCancel && InCancel->Load()) || CacheGeneration != Cache->GetHydrologyGeneration())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
 	}
-	if (!EnsureHydrologyPlan(Key, Plan, OutError, InCancel) || !Plan)
+	else if (!EnsureHydrologyPlan(Key, Plan, OutError, InCancel) || !Plan)
 	{
 		return false;
 	}
 
+	FVoxelGenerationRequiredSourceScope PlanSource(Resources.Get(), Plan->ResourceLease.Get());
 	FVoxelHydrologyInfluence Influence;
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_HydrologyPlanSample);
