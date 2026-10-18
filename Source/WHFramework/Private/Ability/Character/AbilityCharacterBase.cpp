@@ -651,12 +651,33 @@ bool AAbilityCharacterBase::CanLookAtTarget()
 
 void AAbilityCharacterBase::SetNameA(FName InName)
 {
+	const bool bChanged = Name != InName;
 	Name = InName;
+	if (bChanged)
+	{
+		OnRep_Identity();
+	}
 }
 
 void AAbilityCharacterBase::SetRaceID(FName InRaceID)
 {
+	const bool bChanged = RaceID != InRaceID;
 	RaceID = InRaceID;
+	if (bChanged)
+	{
+		OnRep_Identity();
+	}
+}
+
+void AAbilityCharacterBase::OnRep_Identity()
+{
+	OnIdentityChanged.Broadcast();
+}
+
+void AAbilityCharacterBase::OnRep_Name()
+{
+	Super::OnRep_Name();
+	OnRep_Identity();
 }
 
 bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
@@ -675,6 +696,10 @@ bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 	if (!AbilitySystem)
 	{
 		bBaseAttributeSourceReady = false;
+		if (bChanged)
+		{
+			OnRep_Identity();
+		}
 		return bChanged;
 	}
 	TArray<TSubclassOf<UEffectBase>> BaseEffects;
@@ -690,6 +715,10 @@ bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 		return false;
 	}
 	bBaseAttributeSourceReady = true;
+	if (bChanged)
+	{
+		OnRep_Identity();
+	}
 	return bChanged;
 }
 

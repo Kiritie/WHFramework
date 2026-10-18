@@ -91,6 +91,7 @@ void UCharacterMovementComponentBase::EndPlay(const EEndPlayReason::Type InReaso
 	ResetMovementSources();
 	EnvironmentProvider.Reset();
 	OnMovementLanded.Clear();
+	OnWaterStateChanged.Clear();
 	Super::EndPlay(InReason);
 }
 
@@ -117,7 +118,7 @@ bool UCharacterMovementComponentBase::SetEnvironmentProvider(UObject* InProvider
 		return false;
 	}
 	EnvironmentProvider = InProvider;
-	Environment = FCharacterMovementEnvironment();
+	SetMovementEnvironment(FCharacterMovementEnvironment());
 	ObservedWorldEpoch = 0;
 	ResetFallTracking();
 	return true;
@@ -346,18 +347,28 @@ void UCharacterMovementComponentBase::RefreshEnvironment()
 		if (Sample.WorldEpoch != 0 && Sample.WorldEpoch != ObservedWorldEpoch)
 		{
 			ObservedWorldEpoch = Sample.WorldEpoch;
-			Environment = FCharacterMovementEnvironment();
+			SetMovementEnvironment(FCharacterMovementEnvironment());
 			ResetFallTracking();
 		}
 		if (!bWaitingForTerrain)
 		{
-			Environment = Sample;
+			SetMovementEnvironment(Sample);
 			if (ConfiguredStepHeight < 0.f)
 			{
 				ConfiguredStepHeight = MaxStepHeight;
 			}
 			MaxStepHeight = Sample.StepHeight >= 0.f ? Sample.StepHeight : ConfiguredStepHeight;
 		}
+	}
+}
+
+void UCharacterMovementComponentBase::SetMovementEnvironment(const FCharacterMovementEnvironment& InEnvironment)
+{
+	const bool bWaterChanged = Environment.bHeadUnderWater != InEnvironment.bHeadUnderWater || Environment.bBodyInWater != InEnvironment.bBodyInWater;
+	Environment = InEnvironment;
+	if (bWaterChanged)
+	{
+		OnWaterStateChanged.Broadcast();
 	}
 }
 
@@ -767,7 +778,7 @@ UCharacterMovementComponentBase::EWaterExitStepResult UCharacterMovementComponen
 	}
 
 
-	Environment = CandidateEnvironment;
+	SetMovementEnvironment(CandidateEnvironment);
 	return EWaterExitStepResult::Stepped;
 }
 
@@ -970,4 +981,9 @@ bool UCharacterMovementComponentBase::IsSprinting() const
 bool UCharacterMovementComponentBase::IsWaitingForTerrain() const
 {
 	return bWaitingForTerrain;
+}
+
+bool UCharacterMovementComponentBase::IsHeadUnderWater() const
+{
+	return Environment.bHeadUnderWater;
 }

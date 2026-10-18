@@ -21,6 +21,9 @@ class WHFRAMEWORK_API IAbilityActorInterface : public IAbilitySystemInterface
 	GENERATED_BODY()
 
 public:
+	FSimpleMulticastDelegate OnAbilityRuntimeChanged;
+	bool HasInitializedAbilities() const { return bAbilitiesInitialized; }
+
 	void InitializeAbilities(AActor* InOwnerActor = nullptr, AActor* InAvatarActor = nullptr);
 
 	void UninitializeAbilities(bool bUnbindAvatar = true);

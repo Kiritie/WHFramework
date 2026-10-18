@@ -4,6 +4,12 @@
 
 #include "Common/Customization/ClassCustomizationBase.h"
 
+struct FWidgetStyleHiddenProperty
+{
+	FName Name;
+	const UStruct* OwnerClass = nullptr;
+};
+
 class FWidgetStyleCustomization : public FClassCustomizationBase
 {
 public:
@@ -13,13 +19,19 @@ public:
 
 	static TSharedRef<IDetailCustomization> MakeImageInstance();
 
+	static TSharedRef<IDetailCustomization> MakeBorderInstance();
+
+	static TSharedRef<IDetailCustomization> MakeRichTextInstance();
+
+	static TSharedRef<IDetailCustomization> MakeScrollInstance();
+
+	static TSharedRef<IDetailCustomization> MakeButtonStyleInstance();
+
 	virtual void CustomizeDetails(IDetailLayoutBuilder& DetailLayoutBuilder) override;
 
 private:
-	FWidgetStyleCustomization(FName InPropertyName, const UStruct* InOwnerClass);
+	explicit FWidgetStyleCustomization(TArray<FWidgetStyleHiddenProperty> InProperties);
 
 private:
-	FName PropertyName;
-
-	const UStruct* OwnerClass;
+	TArray<FWidgetStyleHiddenProperty> Properties;
 };

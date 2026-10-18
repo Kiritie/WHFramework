@@ -25,7 +25,7 @@ void UCommonBorderN::BeginDestroy()
 
 FGameplayTag UCommonBorderN::GetStyleTag() const
 {
-	if (bOverrideStyleTag && StyleTag.IsValid())
+	if (StyleTag.IsValid())
 	{
 		return StyleTag;
 	}
@@ -33,26 +33,18 @@ FGameplayTag UCommonBorderN::GetStyleTag() const
 	{
 		return InheritedStyleTag;
 	}
-	return StyleTag.IsValid() ? StyleTag : WidgetStyleTags::CommonDefault(EWidgetStyleKind::Border);
+	return WidgetStyleTags::CommonDefault(EWidgetStyleKind::Border);
 }
 
 void UCommonBorderN::SetStyleTag(FGameplayTag InStyleTag)
 {
 	StyleTag = InStyleTag;
-	bOverrideStyleTag = InStyleTag.IsValid();
 	ApplyStyleTag();
 }
 
 void UCommonBorderN::SetInheritedStyleTag(FGameplayTag InStyleTag)
 {
 	InheritedStyleTag = InStyleTag;
-	ApplyStyleTag();
-}
-
-void UCommonBorderN::ClearStyleOverride()
-{
-	StyleTag = FGameplayTag();
-	bOverrideStyleTag = false;
 	ApplyStyleTag();
 }
 

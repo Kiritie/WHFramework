@@ -70,13 +70,16 @@ protected:
 
 private:
 	void HandleThemeChanged();
+	void HandleEntryWidgetGenerated(UUserWidget& InEntryWidget);
+	TWeakObjectPtr<UObject> PendingFocusItem;
+	FName PendingFocusWidgetName;
 	FDelegateHandle ThemeChangedHandle;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = true), Category = "Components")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget), Category = "Components")
 	TObjectPtr<UCommonListView> SettingList;
 
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UWidget> EmptyState;
 
 	UPROPERTY(Transient)

@@ -155,6 +155,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "VideoSetting")
 	EVideoQuality ShadingQuality;
 
+	UPROPERTY(EditAnywhere, Category = "VideoSetting")
+	EVideoQuality AmbientOcclusionQuality;
+
 public:
 	UFUNCTION(BlueprintPure)
 	EWindowModeN GetWindowMode() const { return WindowMode; }
@@ -249,7 +252,15 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual void SetShadingQuality(EVideoQuality InQuality, bool bApply = false);
 
+	UFUNCTION(BlueprintPure)
+	EVideoQuality GetAmbientOcclusionQuality() const { return AmbientOcclusionQuality; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetAmbientOcclusionQuality(EVideoQuality InQuality, bool bApply = false);
+
 protected:
+	void ApplyAmbientOcclusionSettings();
+
 	UFUNCTION(BlueprintPure)
 	virtual UGameUserSettings* GetGameUserSettings() const;
 

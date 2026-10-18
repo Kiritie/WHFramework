@@ -33,6 +33,7 @@ public:
 	virtual void OnClose(bool bInstant) override;
 
 	virtual void OnDestroy(EObjectDespawnMode InMode) override;
+	virtual void NativeDestruct() override;
 
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
@@ -52,6 +53,8 @@ protected:
 	void RefreshActionButtonState();
 	void RefreshPages();
 	void RefreshConfirmation();
+	void ReleaseEditSession();
+	bool bOwnsEditSession = false;
 	void OnCloseButtonClicked();
 	void OnConfirmButtonClicked();
 	void OnRevertButtonClicked();
@@ -100,7 +103,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	TSubclassOf<UCommonButton> PageItemClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "Style.Button"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "UI.Style.Button"))
 	FGameplayTag PageItemStyleTag;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Components")

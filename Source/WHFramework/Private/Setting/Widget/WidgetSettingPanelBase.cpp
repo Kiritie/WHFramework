@@ -47,7 +47,7 @@ void UWidgetSettingPanelBase::OnCreate(const FParameter& InParam)
 	BindButton(Btn_Revert, &ThisClass::OnRevertButtonClicked);
 	USettingModule::Get().OnSettingEditStateChanged.AddUniqueDynamic(this, &ThisClass::OnSettingEditStateChanged);
 
-	PageItemGroup = UObjectPoolModuleStatics::SpawnObject<UCommonButtonGroup>();
+	PageItemGroup = NewObject<UCommonButtonGroup>(this);
 	PageItemGroup->SetSelectionRequiredN(true);
 	PageItemGroup->SetBroadcastOnDeselected(false);
 	PageItemGroup->OnSelectedButtonBaseChanged.AddDynamic(this, &UWidgetSettingPanelBase::OnPageItemSelected);
@@ -63,6 +63,7 @@ void UWidgetSettingPanelBase::OnInitialize(const FParameter& InParam)
 void UWidgetSettingPanelBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
 	USettingModule::Get().BeginEdit();
+	bOwnsEditSession = true;
 	RefreshActionButtonState();
 	if(GetSubWidgets<UWidgetSettingPageBase>().IsEmpty())
 	{
@@ -91,14 +92,14 @@ void UWidgetSettingPanelBase::OnOpen(const FParameter& InParam, bool bInstant)
 
 void UWidgetSettingPanelBase::OnClose(bool bInstant)
 {
-	USettingModule::Get().CancelEditSession();
-	USettingModule::Get().EndEdit();
+	ReleaseEditSession();
 	GetWorld()->GetTimerManager().ClearTimer(ConfirmationRefreshTimer);
 	Super::OnClose(bInstant);
 }
 
 void UWidgetSettingPanelBase::OnDestroy(EObjectDespawnMode InMode)
 {
+	ReleaseEditSession();
 	USettingModule::Get().OnSettingEditStateChanged.RemoveDynamic(this, &ThisClass::OnSettingEditStateChanged);
 	GetWorld()->GetTimerManager().ClearTimer(ConfirmationRefreshTimer);
 	for (UCommonButton* Button : {Btn_Apply, Btn_Reset, Btn_Close.Get(), Btn_Confirm.Get(), Btn_Revert.Get()})
@@ -111,10 +112,30 @@ void UWidgetSettingPanelBase::OnDestroy(EObjectDespawnMode InMode)
 	if (PageItemGroup)
 	{
 		PageItemGroup->OnSelectedButtonBaseChanged.RemoveDynamic(this, &ThisClass::OnPageItemSelected);
-		UObjectPoolModuleStatics::DespawnObject(PageItemGroup, InMode);
+		for (UCommonButtonBase* PageButton : PageItemGroup->GetButtons())
+		{
+			UObjectPoolModuleStatics::DespawnObject(PageButton, InMode);
+		}
+		PageItemGroup->RemoveAll();
 		PageItemGroup = nullptr;
 	}
 	Super::OnDestroy(InMode);
+}
+
+void UWidgetSettingPanelBase::NativeDestruct()
+{
+	ReleaseEditSession();
+	Super::NativeDestruct();
+}
+
+void UWidgetSettingPanelBase::ReleaseEditSession()
+{
+	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ConfirmationRefreshTimer);
+	if (bOwnsEditSession)
+	{
+		bOwnsEditSession = false;
+		if (USettingModule* Settings = USettingModule::GetPtr(GetWorld())) Settings->EndEdit();
+	}
 }
 
 FReply UWidgetSettingPanelBase::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
@@ -204,11 +225,11 @@ void UWidgetSettingPanelBase::OnSettingEditStateChanged(const FSettingEditState&
 {
 	if(Btn_Apply)
 	{
-		Btn_Apply->SetIsEnabled(InState.bCanApply);
+		Btn_Apply->SetIsEnabledN(InState.bCanApply);
 	}
 	if(Btn_Reset)
 	{
-		Btn_Reset->SetIsEnabled(InState.bCanReset);
+		Btn_Reset->SetIsEnabledN(InState.bCanReset);
 	}
 	const bool bPending = USettingModule::Get().HasPendingConfirmation();
 	if (Switcher_Page)

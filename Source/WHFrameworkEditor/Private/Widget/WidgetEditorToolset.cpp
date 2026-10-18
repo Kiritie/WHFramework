@@ -1,7 +1,12 @@
 #include "Widget/WidgetEditorToolset.h"
 
 #include "GameplayTagsManager.h"
+#include "EditorReimportHandler.h"
+#include "HAL/FileManager.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Misc/Paths.h"
+#include "Engine/Texture2D.h"
+#include "UObject/Package.h"
 #include "Widget/Common/WidgetBlueprintEditorLibrary.h"
 #include "Widget/Theme/WidgetThemeEditorLibrary.h"
 
@@ -113,6 +118,102 @@ bool UWidgetEditorToolset::SetStyleProperty(UWidgetTheme* Theme, const FString& 
 	}
 	FString Error;
 	const bool bSuccess = UWidgetThemeEditorLibrary::SetStyleProperty(Theme, StyleTag, Property, Value, Error);
+	if (!bSuccess)
+	{
+		UKismetSystemLibrary::RaiseScriptError(Error);
+	}
+	return bSuccess;
+}
+
+bool UWidgetEditorToolset::ReimportTextureSource(UTexture2D* Texture, const FString& SourceFile)
+{
+	if (!Texture)
+	{
+		UKismetSystemLibrary::RaiseScriptError(TEXT("An existing Texture2D asset is required."));
+		return false;
+	}
+
+	const FString ReimportFile = FPaths::ConvertRelativePathToFull(SourceFile);
+	if (!FPaths::GetExtension(ReimportFile).Equals(TEXT("png"), ESearchCase::IgnoreCase) || IFileManager::Get().FileSize(*ReimportFile) == INDEX_NONE)
+	{
+		UKismetSystemLibrary::RaiseScriptError(TEXT("The reimport source must be an existing PNG file."));
+		return false;
+	}
+
+	UPackage* Package = Texture->GetOutermost();
+	if (!Package || Package->IsDirty())
+	{
+		UKismetSystemLibrary::RaiseScriptError(TEXT("Save or discard pending changes to the texture before reimporting it."));
+		return false;
+	}
+
+	FReimportManager* ReimportManager = FReimportManager::Instance();
+	TArray<FString> ExistingSources;
+	if (!ReimportManager || !ReimportManager->CanReimport(Texture, &ExistingSources) || ExistingSources.Num() != 1)
+	{
+		UKismetSystemLibrary::RaiseScriptError(TEXT("The Texture2D asset does not have one supported reimport source."));
+		return false;
+	}
+
+	const bool bSucceeded = ReimportManager->Reimport(Texture, false, false, ReimportFile, nullptr, 0, false, true, false);
+	if (!bSucceeded)
+	{
+		ReimportManager->UpdateReimportPaths(Texture, ExistingSources);
+		UKismetSystemLibrary::RaiseScriptError(TEXT("Texture reimport failed; the original reimport source path was restored."));
+		return false;
+	}
+
+	return true;
+}
+
+bool UWidgetEditorToolset::MigrateStyleTag(const FString& OldTag, const FString& NewTag)
+{
+	FString Error;
+	const bool bSuccess = UWidgetThemeEditorLibrary::MigrateTag(OldTag, NewTag, Error);
+	if (!bSuccess)
+	{
+		UKismetSystemLibrary::RaiseScriptError(Error);
+	}
+	return bSuccess;
+}
+
+bool UWidgetEditorToolset::MigrateStyleTagReferences(const FString& OldTagName, const FString& NewTag)
+{
+	FString Error;
+	const bool bSuccess = UWidgetThemeEditorLibrary::MigrateTagReferences(OldTagName, NewTag, Error);
+	if (!bSuccess)
+	{
+		UKismetSystemLibrary::RaiseScriptError(Error);
+	}
+	return bSuccess;
+}
+
+bool UWidgetEditorToolset::MigrateStyleTagAlias(const FString& OldAlias, const FString& NewTag)
+{
+	FString Error;
+	const bool bSuccess = UWidgetThemeEditorLibrary::MigrateTagAlias(OldAlias, NewTag, Error);
+	if (!bSuccess)
+	{
+		UKismetSystemLibrary::RaiseScriptError(Error);
+	}
+	return bSuccess;
+}
+
+bool UWidgetEditorToolset::RemoveStyleBinding(UWidgetTheme* Theme, const FString& Tag)
+{
+	FString Error;
+	const bool bSuccess = UWidgetThemeEditorLibrary::RemoveStyleBinding(Theme, Tag, Error);
+	if (!bSuccess)
+	{
+		UKismetSystemLibrary::RaiseScriptError(Error);
+	}
+	return bSuccess;
+}
+
+bool UWidgetEditorToolset::RemoveDuplicateGlobalStyleTag(const FString& Tag, const FString& TargetOwnerPath)
+{
+	FString Error;
+	const bool bSuccess = UWidgetThemeEditorLibrary::RemoveDuplicateGlobalTagDefinition(Tag, TargetOwnerPath, Error);
 	if (!bSuccess)
 	{
 		UKismetSystemLibrary::RaiseScriptError(Error);

@@ -5,11 +5,14 @@
 #include "Widget/WidgetModuleStatics.h"
 #include "CommonTextBlock.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
+#include "Widget/Theme/WidgetStyleTags.h"
 #include "CommonTextScrollStyleBinding.h"
 
 UCommonRichTextBlockN::UCommonRichTextBlockN(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	bUseCommonRichStyle = false;
+	StyleTag = WidgetStyleTags::CommonDefault(EWidgetStyleKind::Text);
+	TextScrollStyleTag = WidgetStyleTags::CommonDefault(EWidgetStyleKind::TextScroll);
 }
 
 void UCommonRichTextBlockN::OnSpawn_Implementation(const FParameter& InParam)

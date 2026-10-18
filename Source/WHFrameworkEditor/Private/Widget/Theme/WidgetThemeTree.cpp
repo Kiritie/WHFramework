@@ -53,19 +53,17 @@ TArray<TSharedPtr<FThemeTreeItem>> FWidgetThemeTree::Build(UWidgetTheme* Theme, 
 		EWidgetStyleKind Type;
 		FWidgetThemeEditorService::Kind(Entry.Key, Type);
 		FGameplayTag Parent = WidgetStyleTags::Root(Type);
-		UClass* StyleClass = Theme->ResolveStyleClass(Entry.Key, Type);
-		TArray<FGameplayTag> Candidates;
-		for (const auto& Candidate : Items)
+		FString ParentName = Entry.Key.ToString();
+		int32 ParentSeparator = INDEX_NONE;
+		while (ParentName.FindLastChar(TEXT('.'), ParentSeparator))
 		{
-			if (!Candidate.Value->bRoot && Candidate.Key != Entry.Key && StyleClass && Theme->ResolveStyleClass(Candidate.Key, Type) == StyleClass->GetSuperClass())
+			ParentName.LeftInline(ParentSeparator);
+			const FGameplayTag Candidate = FGameplayTag::RequestGameplayTag(FName(*ParentName), false);
+			if (Candidate.IsValid() && Items.Contains(Candidate))
 			{
-				Candidates.Add(Candidate.Key);
+				Parent = Candidate;
+				break;
 			}
-		}
-		Candidates.Sort([](const FGameplayTag& Left, const FGameplayTag& Right) { return Left.ToString() < Right.ToString(); });
-		if (!Candidates.IsEmpty())
-		{
-			Parent = Candidates[0];
 		}
 		Parents.Add(Entry.Key, Parent);
 	}

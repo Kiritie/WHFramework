@@ -13,7 +13,6 @@
 #include "WidgetModule.generated.h"
 
 class UWorldWidgetContainer;
-class UWidgetTheme;
 struct FEventSetWorldWidgetVisible;
 struct FEventCloseUserWidget;
 struct FEventOpenUserWidget;
@@ -144,19 +143,6 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void RemoveCommonRichTextDecorator(const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator) { CommonRichTextDecorators.Remove(InCommonRichTextDecorator); }
-
-	////////////////////////////////////////////////////
-	// WidgetTheme
-protected:
-	UPROPERTY(meta=(DeprecatedProperty, DeprecationMessage="Migrate explicitly to Project Settings / Widget Theme."))
-	TObjectPtr<UWidgetTheme> DefaultWidgetTheme;
-
-public:
-	UFUNCTION(BlueprintPure)
-	UWidgetTheme* GetDefaultWidgetTheme() const;
-
-	UFUNCTION(BlueprintCallable, meta=(DeprecatedFunction, DeprecationMessage="Use WidgetThemeSubsystem.RequestTheme for async switching. Legacy setter validates and commits loaded themes synchronously."))
-	void SetDefaultWidgetTheme(UWidgetTheme* InTheme);
 
 	////////////////////////////////////////////////////
 	// ScreenWidget

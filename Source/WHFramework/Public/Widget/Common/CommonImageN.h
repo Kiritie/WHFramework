@@ -25,7 +25,7 @@ public:
 	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Brush"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Brush"))
 	FGameplayTag StyleTag;
 
 private:

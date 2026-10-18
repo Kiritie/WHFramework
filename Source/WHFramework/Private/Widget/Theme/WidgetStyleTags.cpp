@@ -2,26 +2,26 @@
 
 namespace WidgetStyleTags
 {
-	UE_DEFINE_GAMEPLAY_TAG(Button, "Style.Button");
-	UE_DEFINE_GAMEPLAY_TAG(Text, "Style.Text");
-	UE_DEFINE_GAMEPLAY_TAG(Brush, "Style.Brush");
-	UE_DEFINE_GAMEPLAY_TAG(Input, "Style.Input");
-	UE_DEFINE_GAMEPLAY_TAG(Toggle, "Style.Toggle");
-	UE_DEFINE_GAMEPLAY_TAG(Range, "Style.Range");
-	UE_DEFINE_GAMEPLAY_TAG(Progress, "Style.Progress");
-	UE_DEFINE_GAMEPLAY_TAG(Scroll, "Style.Scroll");
-	UE_DEFINE_GAMEPLAY_TAG(Border, "Style.Border");
-	UE_DEFINE_GAMEPLAY_TAG(TextScroll, "Style.TextScroll");
-	UE_DEFINE_GAMEPLAY_TAG_STATIC(ButtonDefault, "Style.Button.Common.Default");
-	UE_DEFINE_GAMEPLAY_TAG_STATIC(TextDefault, "Style.Text.Common.Default");
-	UE_DEFINE_GAMEPLAY_TAG_STATIC(BrushDefault, "Style.Brush.Common.Default");
-	UE_DEFINE_GAMEPLAY_TAG_STATIC(InputDefault, "Style.Input.Common.Default");
-	UE_DEFINE_GAMEPLAY_TAG_STATIC(ToggleDefault, "Style.Toggle.Common.Default");
-	UE_DEFINE_GAMEPLAY_TAG_STATIC(RangeDefault, "Style.Range.Common.Default");
-	UE_DEFINE_GAMEPLAY_TAG_STATIC(ProgressDefault, "Style.Progress.Common.Default");
-	UE_DEFINE_GAMEPLAY_TAG_STATIC(ScrollDefault, "Style.Scroll.Common.Default");
-	UE_DEFINE_GAMEPLAY_TAG_STATIC(BorderDefault, "Style.Border.Common.Default");
-	UE_DEFINE_GAMEPLAY_TAG_STATIC(TextScrollDefault, "Style.TextScroll.Common.Default");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Button, "UI.Style.Button", "Root for button styles.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Text, "UI.Style.Text", "Root for text styles.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Brush, "UI.Style.Brush", "Root for brush and image styles.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Input, "UI.Style.Input", "Root for editable input styles.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Toggle, "UI.Style.Toggle", "Root for toggle styles.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Range, "UI.Style.Range", "Root for numeric range and slider styles.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Progress, "UI.Style.Progress", "Root for progress indicator styles.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Scroll, "UI.Style.Scroll", "Root for scroll container styles.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Border, "UI.Style.Border", "Root for common border styles.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(TextScroll, "UI.Style.TextScroll", "Root for scrolling text styles.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(ButtonDefault, "UI.Style.Button.Default", "Fallback button style when no specialized style is configured.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(TextDefault, "UI.Style.Text.Default", "Fallback text style when no specialized style is configured.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(BrushDefault, "UI.Style.Brush.Default", "Fallback brush style when no specialized style is configured.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(InputDefault, "UI.Style.Input.Default", "Fallback editable input style.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(ToggleDefault, "UI.Style.Toggle.Default", "Fallback toggle style.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(RangeDefault, "UI.Style.Range.Default", "Fallback numeric range style.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(ProgressDefault, "UI.Style.Progress.Default", "Fallback progress indicator style.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(ScrollDefault, "UI.Style.Scroll.Default", "Fallback scroll container style.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(BorderDefault, "UI.Style.Border.Default", "Fallback border style.");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(TextScrollDefault, "UI.Style.TextScroll.Default", "Fallback scrolling text style.");
 
 	TConstArrayView<EWidgetStyleKind> Kinds()
 	{

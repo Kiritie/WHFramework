@@ -4,23 +4,46 @@
 #include "Tests/WidgetThemeTestTags.h"
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
-#include "Widget/Style/SubWidgetStyle.h"
+#include "Widget/Style/CommonButtonStyleN.h"
 #include "Widget/Theme/WidgetStyleTags.h"
 #include "Widget/Theme/WidgetThemeSubsystem.h"
 #include "Widget/Theme/WidgetThemeSettings.h"
+#include "Widget/WidgetModule.h"
+#include "Setting/Widget/Entry/WidgetSettingEntryBase.h"
+#include "Setting/Widget/Entry/WidgetNumberSettingEntryBase.h"
 #include "Engine/GameInstance.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Engine/World.h"
 
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ThemeTestButton, "Style.Button.ThemeTest");
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ThemeTestText, "Style.Text.ThemeTest");
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ThemeTestBrush, "Style.Brush.ThemeTest");
-UE_DEFINE_GAMEPLAY_TAG(TAG_ThemeEditorParentA, "Style.Brush.ThemeEditorParentA");
-UE_DEFINE_GAMEPLAY_TAG(TAG_ThemeEditorParentB, "Style.Brush.ThemeEditorParentB");
-UE_DEFINE_GAMEPLAY_TAG(TAG_ThemeEditorChild, "Style.Brush.ThemeEditorParentA.Child");
-UE_DEFINE_GAMEPLAY_TAG(TAG_ThemeEditorAlias, "Style.Brush.ThemeEditorAlias");
-UE_DEFINE_GAMEPLAY_TAG(TAG_ThemeEditorButton, "Style.Button.ThemeEditorButton");
-UE_DEFINE_GAMEPLAY_TAG(TAG_ThemeEditorText, "Style.Text.ThemeEditorText");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ThemeTestButton, "UI.Style.Button.ThemeTest");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ThemeTestText, "UI.Style.Text.ThemeTest");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ThemeTestBrush, "UI.Style.Brush.ThemeTest");
+UE_DEFINE_GAMEPLAY_TAG(TAG_ThemeEditorParentA, "UI.Style.Brush.ThemeEditorParentA");
+UE_DEFINE_GAMEPLAY_TAG(TAG_ThemeEditorParentB, "UI.Style.Brush.ThemeEditorParentB");
+UE_DEFINE_GAMEPLAY_TAG(TAG_ThemeEditorChild, "UI.Style.Brush.ThemeEditorParentA.Child");
+UE_DEFINE_GAMEPLAY_TAG(TAG_ThemeEditorAlias, "UI.Style.Brush.ThemeEditorAlias");
+UE_DEFINE_GAMEPLAY_TAG(TAG_ThemeEditorButton, "UI.Style.Button.ThemeEditorButton");
+UE_DEFINE_GAMEPLAY_TAG(TAG_ThemeEditorText, "UI.Style.Text.ThemeEditorText");
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWidgetThemeProjectDefaultOnlyTest, "WHFramework.WidgetTheme.ProjectDefaultOnly",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FWidgetThemeProjectDefaultOnlyTest::RunTest(const FString& Parameters)
+{
+	const FString ExpectedThemePath = TEXT("/Game/DataAssets/Theme/DA_WidgetTheme_Main.DA_WidgetTheme_Main");
+	const UWidgetThemeSettings* Settings = GetDefault<UWidgetThemeSettings>();
+	TestEqual(TEXT("Project settings own the single default theme path"), Settings->DefaultTheme.ToSoftObjectPath().ToString(), ExpectedThemePath);
+	TestEqual(TEXT("Project settings expose exactly one theme"), Settings->AvailableThemes.Num(), 1);
+	if (Settings->AvailableThemes.Num() == 1)
+	{
+		TestEqual(TEXT("The only available theme is the project Main theme"), Settings->AvailableThemes[0].ToSoftObjectPath().ToString(), ExpectedThemePath);
+	}
+	const UWidgetTheme* ResolvedTheme = FWidgetThemeResolver::ResolveTheme(UWidgetModule::StaticClass()->GetDefaultObject());
+	const UWidgetTheme* ConfiguredTheme = Settings->DefaultTheme.LoadSynchronous();
+	TestNotNull(TEXT("Editor theme resolution loads from project settings"), ResolvedTheme);
+	TestEqual(TEXT("Editor resolution returns the configured Main theme"), ResolvedTheme, ConfiguredTheme);
+	TestNull(TEXT("WidgetModule no longer stores a per-module theme property"), UWidgetModule::StaticClass()->FindPropertyByName(FName(TEXT("DefaultWidgetTheme"))));
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWidgetThemeTypedMapTest, "WHFramework.WidgetTheme.TypedMapAndValidation",
 								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -30,9 +53,9 @@ bool FWidgetThemeTypedMapTest::RunTest(const FString& Parameters)
 	FString Error;
 	TestTrue(TEXT("Partial theme is valid with configured fallback bases"), FWidgetThemeResolver::Validate(Theme.Get(), Error));
 	TestFalse(TEXT("Text class cannot enter button map"), Theme->SetStyleClass(TAG_ThemeTestButton, EWidgetStyleKind::Button, UCommonTextStyle::StaticClass()));
-	TestTrue(TEXT("Button class accepted"), Theme->SetStyleClass(TAG_ThemeTestButton, EWidgetStyleKind::Button, USubWidgetStyle::StaticClass()));
+	TestTrue(TEXT("Button class accepted"), Theme->SetStyleClass(TAG_ThemeTestButton, EWidgetStyleKind::Button, UCommonButtonStyleN::StaticClass()));
 	TestFalse(TEXT("Root determines type"), Theme->SetStyleClass(TAG_ThemeTestButton, EWidgetStyleKind::Text, UCommonTextStyle::StaticClass()));
-	TestTrue(TEXT("Brush class accepted"), Theme->SetStyleClass(TAG_ThemeTestBrush, EWidgetStyleKind::Brush, UWidgetBrushStyle::StaticClass()));
+	TestTrue(TEXT("Brush class accepted"), Theme->SetStyleClass(TAG_ThemeTestBrush, EWidgetStyleKind::Brush, UCommonBrushStyle::StaticClass()));
 	TestTrue(TEXT("Configured mappings validate"), FWidgetThemeResolver::Validate(Theme.Get(), Error));
 	TestNull(TEXT("No cross-type map lookup"), Theme->GetStyleClass(TAG_ThemeTestButton, EWidgetStyleKind::Text));
 	Theme->RemoveStyle(TAG_ThemeTestBrush, EWidgetStyleKind::Brush);
@@ -88,8 +111,8 @@ bool FWidgetThemeSwitchOwnershipTest::RunTest(const FString& Parameters)
 	TStrongObjectPtr<UGameInstance> OwnerB(NewObject<UGameInstance>());
 	TStrongObjectPtr<UWidgetThemeSubsystem> InstanceA(NewObject<UWidgetThemeSubsystem>(OwnerA.Get()));
 	TStrongObjectPtr<UWidgetThemeSubsystem> InstanceB(NewObject<UWidgetThemeSubsystem>(OwnerB.Get()));
-	ThemeA->SetStyleClass(TAG_ThemeTestBrush, EWidgetStyleKind::Brush, UWidgetBrushStyle::StaticClass());
-	ThemeB->SetStyleClass(TAG_ThemeTestBrush, EWidgetStyleKind::Brush, UWidgetBrushStyle::StaticClass());
+	ThemeA->SetStyleClass(TAG_ThemeTestBrush, EWidgetStyleKind::Brush, UCommonBrushStyle::StaticClass());
+	ThemeB->SetStyleClass(TAG_ThemeTestBrush, EWidgetStyleKind::Brush, UCommonBrushStyle::StaticClass());
 	Settings->DefaultTheme = ThemeA.Get();
 	Settings->AvailableThemes = {ThemeA.Get(), ThemeB.Get()};
 	FString Error;
@@ -111,6 +134,47 @@ bool FWidgetThemeSwitchOwnershipTest::RunTest(const FString& Parameters)
 	Settings->DefaultTheme = SavedDefault;
 	Settings->AvailableThemes = SavedAvailable;
 	FWidgetThemeResolver::InvalidateEditorDefault();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FWidgetThemeSettingRendererInheritanceTest, "WHFramework.WidgetTheme.SettingRendererInheritance",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FWidgetThemeSettingRendererInheritanceTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UWidgetTheme> Framework(NewObject<UWidgetTheme>());
+	TStrongObjectPtr<UWidgetTheme> Utilities(NewObject<UWidgetTheme>());
+	TStrongObjectPtr<UWidgetTheme> Game(NewObject<UWidgetTheme>());
+	Utilities->ParentTheme = Framework.Get();
+	Game->ParentTheme = Utilities.Get();
+
+	FSettingRendererClasses FrameworkRenderers;
+	FrameworkRenderers.BoolClass = UWidgetSettingEntryBase::StaticClass();
+	FrameworkRenderers.NumberClass = UWidgetSettingEntryBase::StaticClass();
+	FrameworkRenderers.EnumClass = UWidgetSettingEntryBase::StaticClass();
+	FrameworkRenderers.TextClass = UWidgetSettingEntryBase::StaticClass();
+	FrameworkRenderers.OptionClass = UWidgetSettingEntryBase::StaticClass();
+	FrameworkRenderers.KeyClass = UWidgetSettingEntryBase::StaticClass();
+	FrameworkRenderers.CustomClass = UWidgetSettingEntryBase::StaticClass();
+	Framework->SetSettingRendererClasses(FrameworkRenderers);
+
+	FSettingRendererClasses GameRenderers;
+	GameRenderers.NumberClass = UWidgetNumberSettingEntryBase::StaticClass();
+	Game->SetSettingRendererClasses(GameRenderers);
+
+	TestEqual(TEXT("Game resolves inherited Bool renderer through Utilities to Framework"),
+		Game->FindSettingRendererClass(ESettingRendererType::Bool).Get(), UWidgetSettingEntryBase::StaticClass());
+	TestEqual(TEXT("Game resolves inherited Text renderer through Utilities to Framework"),
+		Game->FindSettingRendererClass(ESettingRendererType::Text).Get(), UWidgetSettingEntryBase::StaticClass());
+	TestEqual(TEXT("Game resolves inherited Enum renderer through Utilities to Framework"),
+		Game->FindSettingRendererClass(ESettingRendererType::Enum).Get(), UWidgetSettingEntryBase::StaticClass());
+	TestEqual(TEXT("Game resolves inherited Option renderer through Utilities to Framework"),
+		Game->FindSettingRendererClass(ESettingRendererType::Option).Get(), UWidgetSettingEntryBase::StaticClass());
+	TestEqual(TEXT("Game resolves inherited Key renderer through Utilities to Framework"),
+		Game->FindSettingRendererClass(ESettingRendererType::Key).Get(), UWidgetSettingEntryBase::StaticClass());
+	TestEqual(TEXT("Game resolves inherited Custom renderer through Utilities to Framework"),
+		Game->FindSettingRendererClass(ESettingRendererType::Custom).Get(), UWidgetSettingEntryBase::StaticClass());
+	TestEqual(TEXT("Game local Number renderer takes precedence"),
+		Game->FindSettingRendererClass(ESettingRendererType::Number).Get(), UWidgetNumberSettingEntryBase::StaticClass());
 	return true;
 }
 #endif

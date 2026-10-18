@@ -10,13 +10,14 @@
 
 class UImage;
 class UCommonTextBlockN;
-class USubWidgetStyle;
+class UCommonButtonStyleN;
 class UStackBox;
 
 UCLASS(BlueprintType, Blueprintable, ClassGroup = UI, meta = (Category = "Common UI", DisplayName = "Common Button", DisableNativeTick))
 class WHFRAMEWORK_API UCommonButton : public UCommonButtonBase, public IObjectPoolInterface
 {
 	friend class UCommonButtonGroup;
+	friend class FCommonIconButtonStateTest;
 
 	GENERATED_BODY()
 
@@ -45,6 +46,10 @@ public:
 	virtual void NativeOnCurrentTextStyleChanged() override;
 
 	virtual void NativeOnClicked() override;
+
+	virtual void NativeOnPressed() override;
+
+	virtual void NativeOnReleased() override;
 
 	virtual void NativeOnSelected(bool bBroadcast) override;
 
@@ -76,8 +81,11 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Content", meta = (ClampMin = "0"))
 	float ContentSpacing = 0.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Brush"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Brush"))
 	FGameplayTag IconStyleTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Text"))
+	FGameplayTag TitleTextStyleTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = true, EditCondition = "bSelectable"), Category = "Selection")
 	bool bStandalone;
@@ -85,17 +93,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn))
 	FParameter WidgetParams;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Button"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Button", ToolTip = "填写时使用当前 Tag；留空时使用外层传入的 Tag，外层未提供时使用类型默认样式。"))
 	FGameplayTag StyleTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
-	bool bOverrideStyleTag = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (Categories = "Input"))
 	FGameplayTag TriggeringActionTag;
 
 protected:
-	virtual void OnResolvedStyleChanged(const USubWidgetStyle* InStyle);
+	virtual void OnResolvedStyleChanged(const UCommonButtonStyleN* InStyle);
 
 private:
 	void ApplyStyleTag();
@@ -111,7 +116,8 @@ private:
 	bool bHasIconOverride = false;
 
 	void ApplyTitleStyle();
-	void ApplyIconStyle(const USubWidgetStyle* InStyle);
+	void ApplyIconStyle(const UCommonButtonStyleN* InStyle);
+	void ApplyIconPresentation();
 	void ApplySelectionMarker();
 	void ApplyContentLayout();
 
@@ -142,6 +148,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Style")
 	void SetIconStyleTag(FGameplayTag InStyleTag);
 
+	UFUNCTION(BlueprintCallable, Category = "Style")
+	void SetTitleTextStyleTag(FGameplayTag InStyleTag);
+
 	UFUNCTION(BlueprintCallable, Category = "Content")
 	void SetContentOrientation(EOrientation InOrientation);
 
@@ -170,9 +179,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Style")
 	void SetInheritedStyleTag(FGameplayTag InStyleTag);
-
-	UFUNCTION(BlueprintCallable, Category = "Style")
-	void ClearStyleOverride();
 
 	UFUNCTION(BlueprintPure, Category = "Style")
 

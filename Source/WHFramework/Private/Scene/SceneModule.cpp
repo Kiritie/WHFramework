@@ -684,6 +684,12 @@ void USceneModule::SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture)
 FSceneMapView USceneModule::GetMapView(ESceneMarkerChannel InChannel) const
 {
 	FSceneMapView View;
+	if (InChannel == ESceneMarkerChannel::Compass)
+	{
+		View.Center = FVector2D(UCameraModuleStatics::GetViewLocation());
+		View.Yaw = UCameraModuleStatics::GetViewRotation().Yaw;
+		return View;
+	}
 	if(InChannel == ESceneMarkerChannel::Map)
 	{
 		View.Center = WorldMapCenter;

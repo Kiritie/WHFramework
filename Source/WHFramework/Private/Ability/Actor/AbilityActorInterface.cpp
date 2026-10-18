@@ -36,10 +36,12 @@ void IAbilityActorInterface::InitializeAbilities(AActor* InOwnerActor, AActor* I
 		AttributeDelegateHandles.Add(Attribute, Delegate);
 	}
 	bAbilitiesInitialized = true;
+	OnAbilityRuntimeChanged.Broadcast();
 }
 
 void IAbilityActorInterface::UninitializeAbilities(bool bUnbindAvatar)
 {
+	const bool bWasInitialized = bAbilitiesInitialized;
 	if (UAbilitySystemComponentBase* AbilitySystem = BoundAbilitySystem.Get())
 	{
 		for (const TPair<FGameplayAttribute, FDelegateHandle>& Entry : AttributeDelegateHandles)
@@ -55,6 +57,10 @@ void IAbilityActorInterface::UninitializeAbilities(bool bUnbindAvatar)
 	BoundAbilitySystem.Reset();
 	BoundAbilityAvatar.Reset();
 	bAbilitiesInitialized = false;
+	if (bWasInitialized)
+	{
+		OnAbilityRuntimeChanged.Broadcast();
+	}
 }
 
 void IAbilityActorInterface::RefreshAttributes()

@@ -189,11 +189,16 @@ public:
 
 protected:
 	// stats
-	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	UPROPERTY(ReplicatedUsing = OnRep_Identity, VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FName RaceID;
 
-	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
+	UPROPERTY(ReplicatedUsing = OnRep_Identity, VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	int32 Level;
+
+	UFUNCTION()
+	virtual void OnRep_Identity();
+
+	virtual void OnRep_Name() override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "CharacterStats")
 	FTransform BirthTransform;
@@ -321,6 +326,7 @@ public:
 	void SetSelectedInventorySlot(const FInventorySlotKey& InSlotKey);
 
 	FInventorySelectionChanged OnInventorySelectionChanged;
+	FSimpleMulticastDelegate OnIdentityChanged;
 
 	virtual UFSMComponent* GetFSMComponent() const override
 	{

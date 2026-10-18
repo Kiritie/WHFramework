@@ -19,22 +19,22 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FSpinBoxStyle SpinBoxStyle;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "Style.Input"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "UI.Style.Input"))
 	FGameplayTag ValueInputStyleTag;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "Style.Brush"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "UI.Style.Brush"))
 	FGameplayTag ValueBackgroundBrushStyleTag;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "Style.Text"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "UI.Style.Text"))
 	FGameplayTag ValueTextStyleTag;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "Style.Text"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "UI.Style.Text"))
 	FGameplayTag LimitTextStyleTag;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "Style.Button"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "UI.Style.Button"))
 	FGameplayTag PreviousButtonStyleTag;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "Style.Button"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "UI.Style.Button"))
 	FGameplayTag NextButtonStyleTag;
 
 };

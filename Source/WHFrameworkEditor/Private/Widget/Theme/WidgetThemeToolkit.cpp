@@ -43,6 +43,8 @@
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "UObject/UObjectGlobals.h"
 #include "ToolMenus.h"
+#include "Subsystems/AssetEditorSubsystem.h"
+#include "SWidgetThemeTreeRow.h"
 
 #include "Widget/Theme/WidgetStyleTags.h"
 #include "Styling/AppStyle.h"
@@ -363,14 +365,12 @@ void FWidgetThemeToolkit::SaveAsset_Execute()
 	Run(TEXT("Save"), [this](FString& Result) { return FWidgetThemeEditorService::Save(Theme, Result); });
 }
 
-FReply FWidgetThemeToolkit::OpenStyleDialog(EWidgetStyleOperation Operation)
+FReply FWidgetThemeToolkit::OpenStyleDialog()
 {
 	FinishDetailsEdit();
-	const FString Title = Operation == EWidgetStyleOperation::Create ? TEXT("Create style") : TEXT("Associate style");
-	TSharedRef<SWindow> Window = SNew(SWindow).Title(FText::FromString(Title)).ClientSize(FVector2D(620, 420)).SupportsMinimize(false).SupportsMaximize(false);
+	TSharedRef<SWindow> Window = SNew(SWindow).Title(LOCTEXT("CreateStyle", "Create style")).ClientSize(FVector2D(620, 420)).SupportsMinimize(false).SupportsMaximize(false);
 	Window->SetContent(SNew(SWidgetStyleCreationDialog)
 						   .Theme(Theme)
-						   .Operation(Operation)
 						   .ParentTag(SelectedTag)
 						   .OnCompleted(FSimpleDelegate::CreateSPLambda(this,
 																		[this]
@@ -401,7 +401,7 @@ FReply FWidgetThemeToolkit::OpenRenameDialog()
 	FString OriginalName;
 	Tag.ToString().Split(TEXT("."), nullptr, &OriginalName, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
 	TSharedRef<SWindow> Window =
-		SNew(SWindow).Title(LOCTEXT("RenameStyle", "Rename style")).ClientSize(FVector2D(340, 120)).SupportsMinimize(false).SupportsMaximize(false);
+		SNew(SWindow).Title(LOCTEXT("RedirectStyle", "Redirect style Tag")).ClientSize(FVector2D(340, 120)).SupportsMinimize(false).SupportsMaximize(false);
 	TSharedRef<SEditableTextBox> Input = SNew(SEditableTextBox)
 											 .Text(FText::FromString(OriginalName))
 											 .SelectAllTextWhenFocused(true)
@@ -468,16 +468,56 @@ FReply FWidgetThemeToolkit::OpenRenameDialog()
 	return FReply::Handled();
 }
 
+TSharedPtr<SWidget> FWidgetThemeToolkit::BuildContextMenu()
+{
+	FMenuBuilder Menu(true, GetToolkitCommands());
+	Menu.AddMenuEntry(LOCTEXT("Create", "Create"), LOCTEXT("CreateHelp", "Create a native style or associate an existing style."), FSlateIcon(),
+		FUIAction(FExecuteAction::CreateSPLambda(this, [this] { OpenStyleDialog(); }),
+			FCanExecuteAction::CreateSPLambda(this, [this] { return Theme && !Theme->bDuplicateFailed && !FWidgetThemeEditorService::IsBusy(); })));
+	Menu.AddMenuEntry(LOCTEXT("Remove", "Remove"), FText(), FSlateIcon(),
+		FUIAction(FExecuteAction::CreateSPLambda(this, [this]
+		{
+			Run(TEXT("Remove"), [this](FString& Result) { return FWidgetThemeEditorService::RemoveBinding(Theme, SelectedTag, Result); });
+		}), FCanExecuteAction::CreateSPLambda(this, [this] { return bCanRemoveSelection && !FWidgetThemeEditorService::IsBusy(); })));
+	Menu.AddMenuEntry(LOCTEXT("CopyProperties", "Copy properties"), FText(), FSlateIcon(),
+		FUIAction(FExecuteAction::CreateSPLambda(this, [this]
+		{
+			Run(TEXT("Copy properties"), [this](FString& Result) { return FWidgetThemeEditorService::CopyProperties(Theme, SelectedTag, Result); });
+		}), FCanExecuteAction::CreateSPLambda(this, [this]
+		{
+			return !FWidgetThemeEditorService::IsBusy() && !WidgetStyleTags::IsRoot(SelectedTag) && FWidgetThemeEditorService::Blueprint(Theme, SelectedTag);
+		})));
+	Menu.AddMenuEntry(LOCTEXT("PasteProperties", "Paste properties"), FText(), FSlateIcon(),
+		FUIAction(FExecuteAction::CreateSPLambda(this, [this]
+		{
+			Run(TEXT("Paste properties"), [this](FString& Result) { return FWidgetThemeEditorService::PasteProperties(Theme, SelectedTag, Result); });
+		}), FCanExecuteAction::CreateSPLambda(this, [this]
+		{
+			return !FWidgetThemeEditorService::IsBusy() && FWidgetThemeEditorService::CanPasteProperties(Theme, SelectedTag);
+		})));
+	Menu.AddMenuEntry(LOCTEXT("Rename", "Rename"), LOCTEXT("RenameHelp", "Rename the Tag, migrate references and retain a redirect from its previous name."), FSlateIcon(),
+		FUIAction(FExecuteAction::CreateSPLambda(this, [this] { OpenRenameDialog(); }),
+			FCanExecuteAction::CreateSPLambda(this, [this] { return CanEditSelection() && !WidgetStyleTags::IsRoot(SelectedTag); })));
+	if (!WidgetStyleTags::IsRoot(SelectedTag) && FWidgetThemeEditorService::Blueprint(Theme, SelectedTag))
+	{
+		Menu.AddMenuEntry(LOCTEXT("OpenAssociatedAsset", "Open associated asset"), FText(), FSlateIcon(),
+			FUIAction(FExecuteAction::CreateSPLambda(this, [this]
+			{
+				FinishDetailsEdit();
+				if (UBlueprint* Style = FWidgetThemeEditorService::Blueprint(Theme, SelectedTag))
+				{
+					GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Style);
+				}
+			}), FCanExecuteAction::CreateSPLambda(this, [this]
+			{
+				return !FWidgetThemeEditorService::IsBusy() && FWidgetThemeEditorService::Blueprint(Theme, SelectedTag);
+			})));
+	}
+	return Menu.MakeWidget();
+}
+
 TSharedRef<SDockTab> FWidgetThemeToolkit::SpawnTags(const FSpawnTabArgs& Args)
 {
-	auto Action = [this](const TCHAR* Label, TFunction<bool()> Enabled, TFunction<bool(FString&)> Operation) -> TSharedRef<SWidget>
-	{
-		return SNew(SButton)
-			.HAlign(HAlign_Center)
-			.Text(FText::FromString(Label))
-			.IsEnabled_Lambda(MoveTemp(Enabled))
-			.OnClicked_Lambda([this, Label, Operation] { return Run(Label, Operation); });
-	};
 	StyleTypes.Reset();
 	StyleTypes.Add(MakeShared<EWidgetStyleKind>(EWidgetStyleKind::None));
 	for (EWidgetStyleKind Type : WidgetStyleTags::Kinds())
@@ -502,26 +542,10 @@ TSharedRef<SDockTab> FWidgetThemeToolkit::SpawnTags(const FSpawnTabArgs& Args)
 	TSharedRef<SHorizontalBox> Actions = SNew(SHorizontalBox);
 	Actions->AddSlot().FillWidth(1)[SNew(SButton)
 										.HAlign(HAlign_Center)
+										.ContentPadding(FMargin(4.f, 7.f))
 										.Text(LOCTEXT("Create", "Create"))
-										.OnClicked_Lambda([this] { return OpenStyleDialog(EWidgetStyleOperation::Create); })];
-	Actions->AddSlot().FillWidth(1).Padding(4, 0)[SNew(SButton)
-													  .HAlign(HAlign_Center)
-													  .Text(LOCTEXT("Associate", "Associate"))
-													  .OnClicked_Lambda([this] { return OpenStyleDialog(EWidgetStyleOperation::Associate); })];
-	Actions->AddSlot().FillWidth(1)[Action(
-		TEXT("Remove"), [this] { return bCanRemoveSelection && !FWidgetThemeEditorService::IsBusy(); },
-		[this](FString& Result) { return FWidgetThemeEditorService::RemoveBinding(Theme, SelectedTag, Result); })];
-	Actions->AddSlot().FillWidth(1).Padding(4, 0)[Action(
-		TEXT("Copy"), [this] { return FWidgetThemeEditorService::Blueprint(Theme, SelectedTag) != nullptr; },
-		[this](FString& Result) { return FWidgetThemeEditorService::CopyProperties(Theme, SelectedTag, Result); })];
-	Actions->AddSlot().FillWidth(1)[Action(
-		TEXT("Paste"), [this] { return FWidgetThemeEditorService::CanPasteProperties(Theme, SelectedTag); },
-		[this](FString& Result) { return FWidgetThemeEditorService::PasteProperties(Theme, SelectedTag, Result); })];
-	Actions->AddSlot().FillWidth(1).Padding(4, 0, 0, 0)[SNew(SButton)
-															.HAlign(HAlign_Center)
-															.Text(LOCTEXT("Rename", "Rename"))
-															.IsEnabled_Lambda([this] { return CanEditSelection() && !WidgetStyleTags::IsRoot(SelectedTag); })
-															.OnClicked(this, &FWidgetThemeToolkit::OpenRenameDialog)];
+										.IsEnabled_Lambda([this] { return Theme && !Theme->bDuplicateFailed && !FWidgetThemeEditorService::IsBusy(); })
+										.OnClicked(this, &FWidgetThemeToolkit::OpenStyleDialog)];
 	TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
 	Body->AddSlot().AutoHeight().Padding(4)[Actions];
 	Body->AddSlot().AutoHeight().Padding(4)[Types];
@@ -538,17 +562,11 @@ TSharedRef<SDockTab> FWidgetThemeToolkit::SpawnTags(const FSpawnTabArgs& Args)
 			   .OnGenerateRow_Lambda(
 				   [](TSharedPtr<FThemeTreeItem> Item, const TSharedRef<STableViewBase>& Owner)
 				   {
-					   return SNew(STableRow<TSharedPtr<FThemeTreeItem>>, Owner)
-						   .ToolTipText(FText::FromString(
-							   Item->Tooltip))[SNew(SHorizontalBox) +
-											   SHorizontalBox::Slot().FillWidth(1)[SNew(STextBlock).Text(FText::FromName(Item->Tag.GetTagName()))] +
-											   SHorizontalBox::Slot().AutoWidth().Padding(8, 0)[SNew(STextBlock)
-																									.Text(FText::FromString(Item->bRoot		? TEXT("Root")
-																															: Item->bShared ? TEXT("Shared")
-																																			: TEXT("")))]];
+					   return SNew(SWidgetThemeTreeRow, Owner).Item(Item);
 				   })
 			   .OnGetChildren_Lambda([](TSharedPtr<FThemeTreeItem> Item, TArray<TSharedPtr<FThemeTreeItem>>& Children) { Children = Item->Children; })
-			   .OnSelectionChanged(this, &FWidgetThemeToolkit::Select)];
+			   .OnSelectionChanged(this, &FWidgetThemeToolkit::Select)
+			   .OnContextMenuOpening(this, &FWidgetThemeToolkit::BuildContextMenu)];
 	Refresh();
 	return SNew(SDockTab).ShouldAutosize(false)[Body];
 }
@@ -764,7 +782,7 @@ void FWidgetThemeToolkit::UpdatePreview()
 	else if (Type == EWidgetStyleKind::Brush)
 	{
 		PreviewImage->SetStyleTag(SelectedTag);
-		PreviewImage->SetBrush(StyleClass->GetDefaultObject<UWidgetBrushStyle>()->Brush);
+		PreviewImage->SetBrush(StyleClass->GetDefaultObject<UCommonBrushStyle>()->Brush);
 	}
 	else if (TObjectPtr<UWidget>* Control = PreviewControls.Find(Type))
 	{
@@ -791,7 +809,7 @@ void FWidgetThemeToolkit::UpdatePreview()
 void FWidgetThemeToolkit::UpdatePreviewSize(UObject* Style, EWidgetStyleKind Kind)
 {
 	FVector2D Size = Kind == EWidgetStyleKind::Brush ? FVector2D(80, 80) : FVector2D(200, 60);
-	if (const UCommonButtonStyle* ButtonStyle = Cast<UCommonButtonStyle>(Style))
+	if (const UCommonButtonStyleN* ButtonStyle = Cast<UCommonButtonStyleN>(Style))
 	{
 		if (ButtonStyle->MinWidth > 0)
 			Size.X = ButtonStyle->MinWidth;
@@ -818,7 +836,12 @@ void FWidgetThemeToolkit::NotifyPreChange(FProperty* Property)
 
 void FWidgetThemeToolkit::NotifyPostChange(const FPropertyChangedEvent& Event, FProperty* Property)
 {
-	if (!(Event.ChangeType & EPropertyChangeType::Interactive))
+	if (Event.ChangeType & EPropertyChangeType::Interactive)
+	{
+		FWidgetThemeResolver::NotifyThemeChanged();
+		UpdatePreview();
+	}
+	else
 	{
 		FinishDetailsEdit();
 	}
@@ -830,7 +853,6 @@ void FWidgetThemeToolkit::FinishDetailsEdit()
 	{
 		return;
 	}
-	bEditingDetails = false;
 	if (UBlueprint* Style = FWidgetThemeEditorService::Blueprint(Theme, SelectedTag))
 	{
 		FBlueprintEditorUtils::MarkBlueprintAsModified(Style);
@@ -839,6 +861,7 @@ void FWidgetThemeToolkit::FinishDetailsEdit()
 		Report += TEXT("Edited ") + SelectedTag.ToString() + TEXT(". Save to persist.\n");
 	}
 	UpdatePreview();
+	bEditingDetails = false;
 }
 
 void FWidgetThemeToolkit::PostUndo(bool Success)

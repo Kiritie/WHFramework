@@ -18,7 +18,6 @@ class SWidgetStyleCreationDialog : public SCompoundWidget
 public:
 	SLATE_BEGIN_ARGS(SWidgetStyleCreationDialog) {}
 	SLATE_ARGUMENT(UWidgetTheme*, Theme)
-	SLATE_ARGUMENT(EWidgetStyleOperation, Operation)
 	SLATE_ARGUMENT(FGameplayTag, ParentTag)
 	SLATE_ARGUMENT(TSharedPtr<SWindow>, Window)
 	SLATE_EVENT(FSimpleDelegate, OnCompleted)
@@ -28,7 +27,7 @@ public:
 private:
 	TWeakObjectPtr<UWidgetTheme> Theme;
 	TWeakObjectPtr<UWidgetTheme> SourceTheme;
-	EWidgetStyleOperation Operation = EWidgetStyleOperation::None;
+	EWidgetStyleOperation Operation = EWidgetStyleOperation::Create;
 	EWidgetStyleKind Kind = EWidgetStyleKind::Button;
 	bool bTypeLocked = false;
 	bool bInheritParent = false;

@@ -14,8 +14,8 @@
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
 #include "Widget/Theme/WidgetStyleTags.h"
-#include "Widget/Style/SubWidgetStyle.h"
-#include "Widget/Style/WidgetBrushStyle.h"
+#include "Widget/Style/CommonButtonStyleN.h"
+#include "Widget/Style/CommonBrushStyle.h"
 
 UCommonButton::UCommonButton(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
@@ -38,8 +38,8 @@ void UCommonButton::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	InheritedStyleTag = FGameplayTag();
 	const UCommonButton* Defaults = CastChecked<UCommonButton>(GetArchetype());
 	StyleTag = Defaults->StyleTag;
-	bOverrideStyleTag = Defaults->bOverrideStyleTag;
 	IconStyleTag = Defaults->IconStyleTag;
+	TitleTextStyleTag = Defaults->TitleTextStyleTag;
 	ContentOrientation = Defaults->ContentOrientation;
 	ContentHorizontalAlignment = Defaults->ContentHorizontalAlignment;
 	ContentSpacing = Defaults->ContentSpacing;
@@ -74,8 +74,8 @@ void UCommonButton::SynchronizeProperties()
 {
 	EnsureThemeSubscription();
 	ApplyStyleTag();
-	Super::SynchronizeProperties();
 	ApplyContentLayout();
+	ApplyTitleStyle();
 }
 
 void UCommonButton::NativePreConstruct()
@@ -85,6 +85,7 @@ void UCommonButton::NativePreConstruct()
 	ApplyStyleTag();
 	ApplyTriggeringActionTag();
 	SetTitle(Title);
+	ApplyTitleStyle();
 }
 
 void UCommonButton::NativeConstruct()
@@ -134,7 +135,7 @@ TSharedRef<SWidget> UCommonButton::RebuildWidget()
 	return Super::RebuildWidget();
 }
 
-void UCommonButton::OnResolvedStyleChanged(const USubWidgetStyle* InStyle)
+void UCommonButton::OnResolvedStyleChanged(const UCommonButtonStyleN* InStyle)
 {
 }
 
@@ -169,11 +170,24 @@ void UCommonButton::NativeOnCurrentTextStyleChanged()
 	Super::NativeOnCurrentTextStyleChanged();
 
 	ApplyTitleStyle();
+	ApplyIconPresentation();
 }
 
 void UCommonButton::NativeOnClicked()
 {
 	Super::NativeOnClicked();
+}
+
+void UCommonButton::NativeOnPressed()
+{
+	Super::NativeOnPressed();
+	ApplyIconPresentation();
+}
+
+void UCommonButton::NativeOnReleased()
+{
+	Super::NativeOnReleased();
+	ApplyIconPresentation();
 }
 
 void UCommonButton::NativeOnSelected(bool bBroadcast)
@@ -194,8 +208,8 @@ void UCommonButton::SetTitle(const FText InTitle)
 	if (Txt_Title)
 	{
 		Txt_Title->SetText(Title);
-		const USubWidgetStyle* ButtonStyle = Cast<USubWidgetStyle>(GetStyle());
-		const bool bIconOnly = ButtonStyle && ButtonStyle->bIconOnly && Img_Icon && Img_Icon->GetBrush().HasUObject();
+		const UCommonButtonStyleN* ButtonStyle = Cast<UCommonButtonStyleN>(GetStyle());
+		const bool bIconOnly = ButtonStyle && ButtonStyle->bIconOnly;
 		Txt_Title->SetVisibility(Title.IsEmpty() || bIconOnly ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
 }
@@ -210,12 +224,19 @@ void UCommonButton::SetIconBrush(const FSlateBrush& InBrush)
 		Img_Icon->SetVisibility(!InBrush.HasUObject() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
 	SetTitle(Title);
+	ApplyIconPresentation();
 }
 
 void UCommonButton::SetIconStyleTag(FGameplayTag InStyleTag)
 {
 	IconStyleTag = InStyleTag;
-	ApplyIconStyle(Cast<USubWidgetStyle>(GetStyle()));
+	ApplyIconStyle(Cast<UCommonButtonStyleN>(GetStyle()));
+}
+
+void UCommonButton::SetTitleTextStyleTag(FGameplayTag InStyleTag)
+{
+	TitleTextStyleTag = InStyleTag;
+	ApplyTitleStyle();
 }
 
 void UCommonButton::SetContentOrientation(EOrientation InOrientation)
@@ -255,27 +276,19 @@ void UCommonButton::SetMinHeight(int32 InValue)
 
 void UCommonButton::SetIsEnabledN(bool bEnable)
 {
-	SetRenderOpacity(bEnable ? 1.f : 0.5f);
-	SetVisibility(bEnable ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::HitTestInvisible);
+	SetIsEnabled(bEnable);
+	ApplyTitleStyle();
 }
 
 void UCommonButton::SetStyleTag(FGameplayTag InStyleTag)
 {
 	StyleTag = InStyleTag;
-	bOverrideStyleTag = InStyleTag.IsValid();
 	ApplyStyleTag();
 }
 
 void UCommonButton::SetInheritedStyleTag(FGameplayTag InStyleTag)
 {
 	InheritedStyleTag = InStyleTag;
-	ApplyStyleTag();
-}
-
-void UCommonButton::ClearStyleOverride()
-{
-	bOverrideStyleTag = false;
-	StyleTag = FGameplayTag();
 	ApplyStyleTag();
 }
 
@@ -287,7 +300,7 @@ void UCommonButton::SetTriggeringActionTag(FGameplayTag InActionTag)
 
 FGameplayTag UCommonButton::GetStyleTag() const
 {
-	if (bOverrideStyleTag && StyleTag.IsValid())
+	if (StyleTag.IsValid())
 	{
 		return StyleTag;
 	}
@@ -295,28 +308,25 @@ FGameplayTag UCommonButton::GetStyleTag() const
 	{
 		return InheritedStyleTag;
 	}
-	return StyleTag.IsValid() ? StyleTag : WidgetStyleTags::CommonDefault(EWidgetStyleKind::Button);
+	return WidgetStyleTags::CommonDefault(EWidgetStyleKind::Button);
 }
 
 void UCommonButton::ApplyStyleTag()
 {
 	const FGameplayTag Tag = GetStyleTag();
-	if (!Tag.IsValid())
-	{
-		ApplyTitleStyle();
-		ApplyIconStyle(Cast<USubWidgetStyle>(GetStyle()));
-		ApplySelectionMarker();
-		return;
-	}
 	EnsureThemeSubscription();
-	SetStyle(FWidgetThemeResolver::ResolveClass(this, Tag, EWidgetStyleKind::Button));
+	if (Tag.IsValid())
+	{
+		SetStyle(FWidgetThemeResolver::ResolveClass(this, Tag, EWidgetStyleKind::Button));
+	}
+	Super::SynchronizeProperties();
 	ApplyTitleStyle();
-	ApplyIconStyle(Cast<USubWidgetStyle>(GetStyle()));
+	ApplyIconStyle(Cast<UCommonButtonStyleN>(GetStyle()));
 	ApplySelectionMarker();
-	OnResolvedStyleChanged(Cast<USubWidgetStyle>(GetStyle()));
+	OnResolvedStyleChanged(Cast<UCommonButtonStyleN>(GetStyle()));
 }
 
-void UCommonButton::ApplyIconStyle(const USubWidgetStyle* InStyle)
+void UCommonButton::ApplyIconStyle(const UCommonButtonStyleN* InStyle)
 {
 	if (Img_Icon)
 	{
@@ -325,7 +335,7 @@ void UCommonButton::ApplyIconStyle(const USubWidgetStyle* InStyle)
 		if (!Brush && GlyphTag.IsValid())
 		{
 			UClass* Class = FWidgetThemeResolver::ResolveClass(this, GlyphTag, EWidgetStyleKind::Brush);
-			const UWidgetBrushStyle* IconStyle = Class ? Class->GetDefaultObject<UWidgetBrushStyle>() : nullptr;
+			const UCommonBrushStyle* IconStyle = Class ? Class->GetDefaultObject<UCommonBrushStyle>() : nullptr;
 			Brush = IconStyle ? &IconStyle->Brush : nullptr;
 		}
 		if (Brush)
@@ -340,6 +350,47 @@ void UCommonButton::ApplyIconStyle(const USubWidgetStyle* InStyle)
 		}
 	}
 	SetTitle(Title);
+	ApplyIconPresentation();
+}
+
+void UCommonButton::ApplyIconPresentation()
+{
+	const UCommonButtonStyleN* ButtonStyle = Cast<UCommonButtonStyleN>(GetStyle());
+	if (!ButtonStyle || !ButtonStyle->bIconOnly)
+	{
+		return;
+	}
+	if (UCommonButtonInternalBase* InternalButton = Cast<UCommonButtonInternalBase>(GetRootWidget()))
+	{
+		FButtonStyle NativeStyle = InternalButton->GetStyle();
+		NativeStyle.Normal.DrawAs = ESlateBrushDrawType::NoDrawType;
+		NativeStyle.Hovered.DrawAs = ESlateBrushDrawType::NoDrawType;
+		NativeStyle.Pressed.DrawAs = ESlateBrushDrawType::NoDrawType;
+		NativeStyle.Disabled.DrawAs = ESlateBrushDrawType::NoDrawType;
+		InternalButton->SetStyle(NativeStyle);
+	}
+	if (Img_Icon)
+	{
+		const FSlateBrush* StateBrush = &ButtonStyle->NormalBase;
+		if (!GetIsEnabled())
+		{
+			StateBrush = &ButtonStyle->Disabled;
+		}
+		else if (GetSelected() && !GetLocked())
+		{
+			StateBrush = IsPressed() ? &ButtonStyle->SelectedPressed
+				: (IsHovered() ? &ButtonStyle->SelectedHovered : &ButtonStyle->SelectedBase);
+		}
+		else if (IsPressed())
+		{
+			StateBrush = &ButtonStyle->NormalPressed;
+		}
+		else if (IsHovered())
+		{
+			StateBrush = &ButtonStyle->NormalHovered;
+		}
+		Img_Icon->SetBrushTintColor(StateBrush->TintColor);
+	}
 }
 
 void UCommonButton::ApplySelectionMarker()
@@ -348,14 +399,14 @@ void UCommonButton::ApplySelectionMarker()
 	{
 		return;
 	}
-	const USubWidgetStyle* ButtonStyle = Cast<USubWidgetStyle>(GetStyle());
+	const UCommonButtonStyleN* ButtonStyle = Cast<UCommonButtonStyleN>(GetStyle());
 	if (!ButtonStyle || !ButtonStyle->SelectionMarkerStyleTag.IsValid())
 	{
 		Img_SelectionMarker->SetVisibility(ESlateVisibility::Collapsed);
 		return;
 	}
 	UClass* Class = FWidgetThemeResolver::ResolveClass(this, ButtonStyle->SelectionMarkerStyleTag, EWidgetStyleKind::Brush);
-	if (const UWidgetBrushStyle* Marker = Class ? Class->GetDefaultObject<UWidgetBrushStyle>() : nullptr)
+	if (const UCommonBrushStyle* Marker = Class ? Class->GetDefaultObject<UCommonBrushStyle>() : nullptr)
 	{
 		FSlateBrush Brush = Marker->Brush;
 		Brush.ImageSize = ButtonStyle->SelectionMarkerSize;
@@ -369,15 +420,18 @@ void UCommonButton::ApplyTitleStyle()
 	if (Txt_Title)
 	{
 		Txt_Title->SetStyleTag(FGameplayTag());
-		FGameplayTag TitleTag;
-		if (const USubWidgetStyle* ButtonStyle = Cast<USubWidgetStyle>(GetStyle()))
+		FGameplayTag TitleTag = TitleTextStyleTag;
+		if (!TitleTag.IsValid())
 		{
-			TitleTag = !GetIsEnabled() ? ButtonStyle->DisabledTextStyleTag
-				: GetSelected() ? (IsHovered() ? ButtonStyle->SelectedHoveredTextStyleTag : ButtonStyle->SelectedTextStyleTag)
-				: (IsHovered() ? ButtonStyle->NormalHoveredTextStyleTag : ButtonStyle->NormalTextStyleTag);
-			if (!TitleTag.IsValid())
+			if (const UCommonButtonStyleN* ButtonStyle = Cast<UCommonButtonStyleN>(GetStyle()))
 			{
-				TitleTag = ButtonStyle->NormalTextStyleTag;
+				TitleTag = !GetIsEnabled() ? ButtonStyle->DisabledTextStyleTag
+					: GetSelected() ? (IsHovered() ? ButtonStyle->SelectedHoveredTextStyleTag : ButtonStyle->SelectedTextStyleTag)
+					: (IsHovered() ? ButtonStyle->NormalHoveredTextStyleTag : ButtonStyle->NormalTextStyleTag);
+				if (!TitleTag.IsValid())
+				{
+					TitleTag = ButtonStyle->NormalTextStyleTag;
+				}
 			}
 		}
 		Txt_Title->SetStyle(TitleTag.IsValid()

@@ -6,10 +6,9 @@
 #include "Ability/Inventory/InventoryTypes.h"
 #include "WidgetInventorySlotView.generated.h"
 
-class UBorder;
-class UImage;
-class UTextBlock;
-class UProgressBar;
+class UCommonImageN;
+class UCommonTextBlockN;
+class UCommonProgress;
 class UWidgetAbilityInventoryBase;
 
 UCLASS()
@@ -46,13 +45,15 @@ class WHFRAMEWORK_API UWidgetInventorySlotView : public UUserWidget
     GENERATED_BODY()
 
 public:
+    UWidgetInventorySlotView(const FObjectInitializer& ObjectInitializer);
     void BindSlot(UWidgetAbilityInventoryBase* InPanel, const FGuid& InInventoryId, const FInventorySlotKey& InSlot);
-    void RefreshSlot(const FInventorySlotState& InState, const FText& InName, UObject* InIcon, const FText& InTooltip);
+    virtual void RefreshSlot(const FInventorySlotState& InState, const FText& InName, UObject* InIcon, const FText& InTooltip);
     void SetPending(bool bInPending);
     void SetSelected(bool bInSelected);
     void SetCooldown(float InRemaining, float InDuration);
     FGuid GetInventoryId() const;
     FInventorySlotKey GetSlotKey() const;
+    UWidgetAbilityInventoryBase* GetInventoryPanel() const;
 
 protected:
     virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -63,21 +64,33 @@ protected:
     virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
     virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
+    UPROPERTY(EditDefaultsOnly, meta = (Categories = "UI.Style.Brush"))
+    FGameplayTag FrameStyleTag;
+
+    UPROPERTY(EditDefaultsOnly, meta = (Categories = "UI.Style.Brush"))
+    FGameplayTag LockedStyleTag;
+
 private:
-    UPROPERTY(Transient)
-    TObjectPtr<UBorder> Frame;
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<UCommonImageN> Frame;
 
-    UPROPERTY(Transient)
-    TObjectPtr<UImage> Icon;
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<UCommonImageN> Icon;
 
-    UPROPERTY(Transient)
-    TObjectPtr<UTextBlock> Count;
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<UCommonTextBlockN> Count;
 
-    UPROPERTY(Transient)
-    TObjectPtr<UTextBlock> Status;
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<UCommonTextBlockN> Status;
 
-    UPROPERTY(Transient)
-    TObjectPtr<UProgressBar> Cooldown;
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<UCommonProgress> Cooldown;
+
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<UCommonImageN> SelectionMarker;
+
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<UCommonImageN> PendingMarker;
 
     TWeakObjectPtr<UWidgetAbilityInventoryBase> Panel;
     FGuid InventoryId;

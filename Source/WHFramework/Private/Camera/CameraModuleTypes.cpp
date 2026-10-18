@@ -3,6 +3,8 @@
 FCameraUserSettings FCameraModuleSaveData::ToUserSettings() const
 {
 	FCameraUserSettings Result;
+	Result.MovementSensitivity = MovementSensitivity;
+	Result.bEnableVerticalPan = bEnableVerticalPan;
 	Result.HorizontalLookSensitivity = HorizontalLookSensitivity;
 	Result.VerticalLookSensitivity = VerticalLookSensitivity;
 	Result.bInvertHorizontalLook = bInvertHorizontalLook;
@@ -23,6 +25,8 @@ FCameraUserSettings FCameraModuleSaveData::ToUserSettings() const
 
 void FCameraModuleSaveData::FromUserSettings(const FCameraUserSettings& InSettings)
 {
+	MovementSensitivity = InSettings.MovementSensitivity;
+	bEnableVerticalPan = InSettings.bEnableVerticalPan;
 	HorizontalLookSensitivity = InSettings.HorizontalLookSensitivity;
 	VerticalLookSensitivity = InSettings.VerticalLookSensitivity;
 	bInvertHorizontalLook = InSettings.bInvertHorizontalLook;

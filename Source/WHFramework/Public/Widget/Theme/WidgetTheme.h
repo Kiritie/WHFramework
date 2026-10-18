@@ -9,11 +9,12 @@
 #include "Widget/Style/CommonRangeStyle.h"
 #include "Widget/Style/CommonProgressStyle.h"
 #include "Widget/Style/CommonScrollStyle.h"
+#include "Widget/Style/CommonButtonStyleN.h"
 
 #include "GameplayTagContainer.h"
 #include "Setting/SettingModuleTypes.h"
 
-#include "Widget/Style/WidgetBrushStyle.h"
+#include "Widget/Style/CommonBrushStyle.h"
 #include "Widget/Theme/WidgetStyleTypes.h"
 #include "WidgetTheme.generated.h"
 
@@ -60,7 +61,7 @@ struct WHFRAMEWORK_API FWidgetButtonStyleData
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
-	TSubclassOf<UCommonButtonStyle> Style;
+	TSubclassOf<UCommonButtonStyleN> Style;
 };
 
 USTRUCT(BlueprintType)
@@ -83,7 +84,7 @@ public:
 	FSlateBrush Brush;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
-	TSubclassOf<UWidgetBrushStyle> Style;
+	TSubclassOf<UCommonBrushStyle> Style;
 };
 
 
@@ -209,35 +210,35 @@ public:
 #endif
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Button"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Button"))
 	TMap<FGameplayTag, FWidgetButtonStyleData> ButtonStyles;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Text"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Text"))
 	TMap<FGameplayTag, FWidgetTextStyleData> TextStyles;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Brush"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Brush"))
 	TMap<FGameplayTag, FWidgetBrushStyleData> BrushStyles;
 
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Input"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Input"))
 	TMap<FGameplayTag, FWidgetInputStyleData> InputStyles;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Toggle"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Toggle"))
 	TMap<FGameplayTag, FWidgetToggleStyleData> ToggleStyles;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Range"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Range"))
 	TMap<FGameplayTag, FWidgetRangeStyleData> RangeStyles;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Progress"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Progress"))
 	TMap<FGameplayTag, FWidgetProgressStyleData> ProgressStyles;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Scroll"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Scroll"))
 	TMap<FGameplayTag, FWidgetScrollStyleData> ScrollStyles;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Border"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Border"))
 	TMap<FGameplayTag, FWidgetBorderStyleData> BorderStyles;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.TextScroll"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.TextScroll"))
 	TMap<FGameplayTag, FWidgetTextScrollStyleData> TextScrollStyles;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setting")

@@ -22,7 +22,6 @@ void UCommonWidget::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	InheritedStyleTag = FGameplayTag();
 	const UCommonWidget* Defaults = CastChecked<UCommonWidget>(GetArchetype());
 	StyleTag = Defaults->StyleTag;
-	bOverrideStyleTag = Defaults->bOverrideStyleTag;
 	SetIsEnabled(Defaults->GetIsEnabled());
 	SetVisibility(Defaults->GetVisibility());
 	bSynchronizingValue = false;
@@ -92,7 +91,7 @@ void UCommonWidget::UnbindControlEvents()
 
 FGameplayTag UCommonWidget::GetStyleTag() const
 {
-	if (bOverrideStyleTag && StyleTag.IsValid())
+	if (StyleTag.IsValid())
 	{
 		return StyleTag;
 	}
@@ -100,30 +99,18 @@ FGameplayTag UCommonWidget::GetStyleTag() const
 	{
 		return InheritedStyleTag;
 	}
-	if (StyleTag.IsValid())
-	{
-		return StyleTag;
-	}
 	return WidgetStyleTags::CommonDefault(GetStyleKind());
 }
 
 void UCommonWidget::SetStyleTag(FGameplayTag InStyleTag)
 {
 	StyleTag = InStyleTag;
-	bOverrideStyleTag = InStyleTag.IsValid();
 	RefreshStyle();
 }
 
 void UCommonWidget::SetInheritedStyleTag(FGameplayTag InStyleTag)
 {
 	InheritedStyleTag = InStyleTag;
-	RefreshStyle();
-}
-
-void UCommonWidget::ClearStyleOverride()
-{
-	bOverrideStyleTag = false;
-	StyleTag = FGameplayTag();
 	RefreshStyle();
 }
 

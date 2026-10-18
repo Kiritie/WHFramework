@@ -5,11 +5,15 @@
 #include "Ability/Inventory/Widget/WidgetInventorySlotView.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Blueprint/WidgetTree.h"
-#include "Components/Button.h"
 #include "Components/HorizontalBox.h"
-#include "Components/ScrollBox.h"
-#include "Components/SpinBox.h"
-#include "Components/TextBlock.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/PanelWidget.h"
+#include "Components/VerticalBoxSlot.h"
+#include "Widget/Common/CommonButton.h"
+#include "Widget/Common/CommonRange.h"
+#include "Widget/Common/CommonTextBlockN.h"
+#include "Widget/Common/CommonScroll.h"
+#include "Widget/Theme/WidgetStyleTags.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/VerticalBox.h"
 #include "GameFramework/PlayerController.h"
@@ -17,61 +21,60 @@
 UWidgetAbilityInventoryBase::UWidgetAbilityInventoryBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
     SlotWidgetClass = UWidgetInventorySlotView::StaticClass();
+    InventoryTitleStyleTag = WidgetStyleTags::CommonDefault(EWidgetStyleKind::Text);
+    GroupTitleStyleTag = InventoryTitleStyleTag;
+    SecondaryButtonStyleTag = WidgetStyleTags::CommonDefault(EWidgetStyleKind::Button);
+    ConfirmButtonStyleTag = SecondaryButtonStyleTag;
 }
 
 TSharedRef<SWidget> UWidgetAbilityInventoryBase::RebuildWidget()
 {
-    if (WidgetTree && WidgetTree->RootWidget && InventoryContent)
-    {
-        TSharedRef<SWidget> Result = Super::RebuildWidget();
-        RebuildViews();
-        return Result;
-    }
     if (!WidgetTree)
     {
         WidgetTree = NewObject<UWidgetTree>(this, TEXT("WidgetTree"));
     }
-    UVerticalBox* Root = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventoryRoot"));
-    ResultText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("InventoryResult"));
-    Root->AddChildToVerticalBox(ResultText);
-    UHorizontalBox* Toolbar = WidgetTree->ConstructWidget<UHorizontalBox>();
-    UButton* Sort = WidgetTree->ConstructWidget<UButton>();
-    UTextBlock* SortLabel = WidgetTree->ConstructWidget<UTextBlock>();
-    SortLabel->SetText(NSLOCTEXT("WH.Inventory", "Sort", "整理当前分组"));
-    Sort->SetContent(SortLabel);
-    Sort->OnClicked.AddDynamic(this, &UWidgetAbilityInventoryBase::SortSelected);
-    Toolbar->AddChildToHorizontalBox(Sort);
-    UButton* Quick = WidgetTree->ConstructWidget<UButton>();
-    UTextBlock* QuickLabel = WidgetTree->ConstructWidget<UTextBlock>();
-    QuickLabel->SetText(NSLOCTEXT("WH.Inventory", "QuickStack", "快捷堆叠"));
-    Quick->SetContent(QuickLabel);
-    Quick->OnClicked.AddDynamic(this, &UWidgetAbilityInventoryBase::QuickStackSelected);
-    Toolbar->AddChildToHorizontalBox(Quick);
-    Root->AddChildToVerticalBox(Toolbar);
-    UScrollBox* Scroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("InventoryScroll"));
-    InventoryContent = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventoryContent"));
-    Scroll->AddChild(InventoryContent);
-    Root->AddChildToVerticalBox(Scroll);
-    SplitControls = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("SplitControls"));
-    SplitCount = WidgetTree->ConstructWidget<USpinBox>(USpinBox::StaticClass(), TEXT("SplitCount"));
-    SplitCount->SetDelta(1.f);
-    SplitControls->AddChildToHorizontalBox(SplitCount);
-    UButton* Confirm = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("ConfirmSplit"));
-    UTextBlock* ConfirmText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ConfirmSplitText"));
-    ConfirmText->SetText(NSLOCTEXT("WH.Inventory", "ConfirmSplit", "确认拆分"));
-    Confirm->SetContent(ConfirmText);
-    Confirm->OnClicked.AddDynamic(this, &UWidgetAbilityInventoryBase::ConfirmSplit);
-    SplitControls->AddChildToHorizontalBox(Confirm);
-    UButton* Cancel = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("CancelSplit"));
-    UTextBlock* CancelText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("CancelSplitText"));
-    CancelText->SetText(NSLOCTEXT("WH.Inventory", "Cancel", "取消"));
-    Cancel->SetContent(CancelText);
-    Cancel->OnClicked.AddDynamic(this, &UWidgetAbilityInventoryBase::CancelSplit);
-    SplitControls->AddChildToHorizontalBox(Cancel);
-    SplitControls->SetVisibility(ESlateVisibility::Collapsed);
-    Root->AddChildToVerticalBox(SplitControls);
-    WidgetTree->RootWidget = Root;
+    if (!WidgetTree->RootWidget)
+    {
+        UVerticalBox* Root = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventoryRoot"));
+        ResultText = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass(), TEXT("ResultText"));
+        Root->AddChildToVerticalBox(ResultText);
+        UHorizontalBox* Toolbar = WidgetTree->ConstructWidget<UHorizontalBox>();
+        Btn_Sort = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_Sort"));
+        Btn_Sort->SetTitle(NSLOCTEXT("WH.Inventory", "Sort", "整理当前分组"));
+        Toolbar->AddChildToHorizontalBox(Btn_Sort);
+        Btn_QuickStack = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_QuickStack"));
+        Btn_QuickStack->SetTitle(NSLOCTEXT("WH.Inventory", "QuickStack", "快捷堆叠"));
+        Toolbar->AddChildToHorizontalBox(Btn_QuickStack);
+        Root->AddChildToVerticalBox(Toolbar);
+        UCommonScroll* Scroll = WidgetTree->ConstructWidget<UCommonScroll>(UCommonScroll::StaticClass(), TEXT("InventoryScroll"));
+        InventoryContent = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventoryContent"));
+        Scroll->AddChild(InventoryContent);
+        Root->AddChildToVerticalBox(Scroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+        SplitControls = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("SplitControls"));
+        SplitCount = WidgetTree->ConstructWidget<UCommonRange>(UCommonRange::StaticClass(), TEXT("SplitCount"));
+        SplitControls->AddChildToHorizontalBox(SplitCount)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+        Btn_ConfirmSplit = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_ConfirmSplit"));
+        Btn_ConfirmSplit->SetTitle(NSLOCTEXT("WH.Inventory", "ConfirmSplit", "确认拆分"));
+        SplitControls->AddChildToHorizontalBox(Btn_ConfirmSplit);
+        Btn_CancelSplit = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_CancelSplit"));
+        Btn_CancelSplit->SetTitle(NSLOCTEXT("WH.Inventory", "Cancel", "取消"));
+        SplitControls->AddChildToHorizontalBox(Btn_CancelSplit);
+        SplitControls->SetVisibility(ESlateVisibility::Collapsed);
+        Root->AddChildToVerticalBox(SplitControls);
+        WidgetTree->RootWidget = Root;
+    }
     TSharedRef<SWidget> Result = Super::RebuildWidget();
+    check(InventoryContent && ResultText && SplitControls && SplitCount && Btn_ConfirmSplit && Btn_CancelSplit);
+    Btn_ConfirmSplit->SetInheritedStyleTag(ConfirmButtonStyleTag);
+    Btn_CancelSplit->SetInheritedStyleTag(SecondaryButtonStyleTag);
+    if (Btn_Sort)
+    {
+        Btn_Sort->SetInheritedStyleTag(SecondaryButtonStyleTag);
+    }
+    if (Btn_QuickStack)
+    {
+        Btn_QuickStack->SetInheritedStyleTag(SecondaryButtonStyleTag);
+    }
     RebuildViews();
     return Result;
 }
@@ -94,8 +97,50 @@ void UWidgetAbilityInventoryBase::OnClose(bool bInstant)
 
 void UWidgetAbilityInventoryBase::NativeDestruct()
 {
+    UnbindControls();
     UnbindInventories();
     Super::NativeDestruct();
+}
+
+void UWidgetAbilityInventoryBase::NativeConstruct()
+{
+    Super::NativeConstruct();
+    BindControls();
+}
+
+void UWidgetAbilityInventoryBase::BindControls()
+{
+    UnbindControls();
+    Btn_ConfirmSplit->OnClicked().AddUObject(this, &ThisClass::ConfirmSplit);
+    Btn_CancelSplit->OnClicked().AddUObject(this, &ThisClass::CancelSplit);
+    if (Btn_Sort)
+    {
+        Btn_Sort->OnClicked().AddUObject(this, &ThisClass::SortSelected);
+    }
+    if (Btn_QuickStack)
+    {
+        Btn_QuickStack->OnClicked().AddUObject(this, &ThisClass::QuickStackSelected);
+    }
+}
+
+void UWidgetAbilityInventoryBase::UnbindControls()
+{
+    if (Btn_ConfirmSplit)
+    {
+        Btn_ConfirmSplit->OnClicked().RemoveAll(this);
+    }
+    if (Btn_CancelSplit)
+    {
+        Btn_CancelSplit->OnClicked().RemoveAll(this);
+    }
+    if (Btn_Sort)
+    {
+        Btn_Sort->OnClicked().RemoveAll(this);
+    }
+    if (Btn_QuickStack)
+    {
+        Btn_QuickStack->OnClicked().RemoveAll(this);
+    }
 }
 
 void UWidgetAbilityInventoryBase::BindInventories(UInventoryNetworkComponent* InNetwork, const TArray<FGuid>& InInventoryIds, bool bInFollowOwner)
@@ -153,15 +198,11 @@ void UWidgetAbilityInventoryBase::UnbindInventories()
     bFollowOwner = false;
     FollowedOwnerId.Invalidate();
     InventoryIds.Reset();
-    Slots.Reset();
+    ClearViews();
     PendingSlots.Reset();
     SelectedInventoryId.Invalidate();
     SelectedSlot = FInventorySlotKey();
     CancelSplit();
-    if (InventoryContent)
-    {
-        InventoryContent->ClearChildren();
-    }
     SetToolTipText(FText::GetEmpty());
 }
 
@@ -176,10 +217,23 @@ void UWidgetAbilityInventoryBase::RebuildViews()
     {
         return;
     }
-    InventoryContent->ClearChildren();
-    Slots.Reset();
-    UHorizontalBox* ColumnsRoot = WidgetTree->ConstructWidget<UHorizontalBox>();
-    InventoryContent->AddChildToVerticalBox(ColumnsRoot);
+    ClearViews();
+    checkf(SlotHostPrefixes.IsEmpty() || InventoryIds.Num() <= 1, TEXT("Fixed inventory slot hosts require one bound inventory."));
+    TMap<FGameplayTag, UPanelWidget*> GroupPanels;
+    for (const TPair<FGameplayTag, FName>& Mapping : GroupPanelNames)
+    {
+        UPanelWidget* Host = Cast<UPanelWidget>(WidgetTree->FindWidget(Mapping.Value));
+        checkf(Host, TEXT("Missing configured inventory group host %s"), *Mapping.Value.ToString());
+        GroupPanels.Add(Mapping.Key, Host);
+    }
+    UPanelWidget* Inventories = nullptr;
+    if (GroupPanelNames.IsEmpty() && SlotHostPrefixes.IsEmpty())
+    {
+        Inventories = bStackInventoriesVertically
+            ? static_cast<UPanelWidget*>(WidgetTree->ConstructWidget<UVerticalBox>())
+            : static_cast<UPanelWidget*>(WidgetTree->ConstructWidget<UHorizontalBox>());
+        InventoryContent->AddChildToVerticalBox(Inventories);
+    }
     for (const FGuid& InventoryId : InventoryIds)
     {
         const FInventorySnapshot* View = Network->FindView(InventoryId);
@@ -187,11 +241,18 @@ void UWidgetAbilityInventoryBase::RebuildViews()
         {
             continue;
         }
-        UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>();
-        ColumnsRoot->AddChildToHorizontalBox(Column);
-        UTextBlock* InventoryTitle = WidgetTree->ConstructWidget<UTextBlock>();
-        InventoryTitle->SetText(InventoryId == Network->GetOwnerInventoryId() ? NSLOCTEXT("WH.Inventory", "Owner", "背包") : NSLOCTEXT("WH.Inventory", "Container", "容器"));
-        Column->AddChildToVerticalBox(InventoryTitle);
+        UVerticalBox* Column = Inventories ? WidgetTree->ConstructWidget<UVerticalBox>() : nullptr;
+        if (Inventories)
+        {
+            Inventories->AddChild(Column);
+        }
+        if (bShowInventoryTitles && Inventories)
+        {
+            UCommonTextBlockN* InventoryTitle = WidgetTree->ConstructWidget<UCommonTextBlockN>();
+            InventoryTitle->SetStyleTag(InventoryTitleStyleTag);
+            InventoryTitle->SetText(InventoryId == Network->GetOwnerInventoryId() ? NSLOCTEXT("WH.Inventory", "Owner", "背包") : NSLOCTEXT("WH.Inventory", "Container", "容器"));
+            Column->AddChildToVerticalBox(InventoryTitle);
+        }
         FGameplayTag LastGroup;
         UUniformGridPanel* Grid = nullptr;
         int32 Position = 0;
@@ -201,27 +262,79 @@ void UWidgetAbilityInventoryBase::RebuildViews()
             {
                 continue;
             }
-            if (SlotState.Key.Group != LastGroup || !Grid)
+            UPanelWidget* FixedHost = nullptr;
+            if (const FName* Prefix = SlotHostPrefixes.Find(SlotState.Key.Group))
+            {
+                const FName HostName(*FString::Printf(TEXT("%s%d"), *Prefix->ToString(), SlotState.Key.Index));
+                FixedHost = Cast<UPanelWidget>(WidgetTree->FindWidget(HostName));
+                checkf(FixedHost, TEXT("Missing configured inventory slot host %s"), *HostName.ToString());
+                FixedHost->ClearChildren();
+            }
+            if (!FixedHost && (SlotState.Key.Group != LastGroup || !Grid))
             {
                 LastGroup = SlotState.Key.Group;
                 Position = 0;
-                UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>();
-                Title->SetText(GroupNames.Contains(LastGroup) ? GroupNames.FindChecked(LastGroup) : FText::FromString(LastGroup.ToString()));
-                Column->AddChildToVerticalBox(Title);
+                UPanelWidget* Destination = GroupPanels.FindRef(LastGroup);
+                if (!Destination)
+                {
+                    Destination = Inventories ? static_cast<UPanelWidget*>(Column) : static_cast<UPanelWidget*>(InventoryContent);
+                }
+                if (bShowGroupTitles)
+                {
+                    UCommonTextBlockN* Title = WidgetTree->ConstructWidget<UCommonTextBlockN>();
+                    Title->SetStyleTag(GroupTitleStyleTag);
+                    Title->SetText(GroupNames.Contains(LastGroup) ? GroupNames.FindChecked(LastGroup) : FText::FromString(LastGroup.ToString()));
+                    Destination->AddChild(Title);
+                }
                 Grid = WidgetTree->ConstructWidget<UUniformGridPanel>();
                 Grid->SetSlotPadding(FMargin(2.f));
-                Column->AddChildToVerticalBox(Grid);
+                Destination->AddChild(Grid);
             }
             UWidgetInventorySlotView* Widget = CreateWidget<UWidgetInventorySlotView>(GetOwningPlayer(), SlotWidgetClass);
             if(!Widget) continue;
             Widget->BindSlot(this, InventoryId, SlotState.Key);
-            Grid->AddChildToUniformGrid(Widget, Position / FMath::Max(1, Columns), Position % FMath::Max(1, Columns));
-            ++Position;
+            if (FixedHost)
+            {
+                FixedHost->AddChild(Widget);
+            }
+            else
+            {
+                const int32 GroupColumnCount = FMath::Max(1, GroupColumns.Contains(SlotState.Key.Group) ? GroupColumns.FindChecked(SlotState.Key.Group) : Columns);
+                Grid->AddChildToUniformGrid(Widget, Position / GroupColumnCount, Position % GroupColumnCount);
+                ++Position;
+            }
             Slots.Add(SlotId(InventoryId, SlotState.Key), Widget);
             RefreshSlot(InventoryId, SlotState);
         }
     }
     RefreshPending();
+}
+
+void UWidgetAbilityInventoryBase::ClearViews()
+{
+    for (const TPair<FString, TWeakObjectPtr<UWidgetInventorySlotView>>& Entry : Slots)
+    {
+        if (Entry.Value.IsValid())
+        {
+            Entry.Value->RemoveFromParent();
+        }
+    }
+    Slots.Reset();
+    if (InventoryContent)
+    {
+        InventoryContent->ClearChildren();
+    }
+    if (WidgetTree)
+    {
+        for (const TPair<FGameplayTag, FName>& Mapping : GroupPanelNames)
+        {
+            UPanelWidget* Host = Cast<UPanelWidget>(WidgetTree->FindWidget(Mapping.Value));
+            if (Host && Host != InventoryContent)
+            {
+                Host->ClearChildren();
+            }
+        }
+    }
 }
 
 void UWidgetAbilityInventoryBase::RefreshSlot(const FGuid& InInventoryId, const FInventorySlotState& InSlot)
@@ -520,7 +633,8 @@ bool UWidgetAbilityInventoryBase::AcceptDrop(const UInventoryDragOperation& InDr
     }
     const FInventorySlotState* Source = FindSlot(InDrag.InventoryId, InDrag.Slot);
     const FInventorySlotState* Target = FindSlot(InTargetInventoryId, InTargetSlot);
-    if (!Source || !Target || Source->Item.Signature() != InDrag.Signature || Source->Item.Count < InDrag.Quantity ||
+    if (!Source || !Target || Source->bLocked || Target->bLocked || InDrag.Quantity <= 0 ||
+        Source->Item.Signature() != InDrag.Signature || Source->Item.Count < InDrag.Quantity ||
         (InDrag.InventoryId == InTargetInventoryId && InDrag.Slot == InTargetSlot))
     {
         return false;
@@ -544,7 +658,7 @@ bool UWidgetAbilityInventoryBase::AcceptDrop(const UInventoryDragOperation& InDr
     }
     if (InDrag.bChooseQuantity)
     {
-        if (!Target->Item.IsEmpty() || !SplitControls || !SplitCount)
+        if (!Target->Item.IsEmpty() || Source->Item.Count <= 1 || Source->Item.InstanceId.IsValid() || !SplitControls || !SplitCount)
         {
             return false;
         }
@@ -555,13 +669,18 @@ bool UWidgetAbilityInventoryBase::AcceptDrop(const UInventoryDragOperation& InDr
         SplitTargetSessionId = Network->GetSessionId(InTargetInventoryId);
         SplitRequest.Operation = EInventoryOperationType::Split;
         SplitRequest.bAllowPartial = false;
-        SplitCount->SetMinValue(1.f);
-        SplitCount->SetMaxValue(static_cast<float>(Source->Item.Count - 1));
-        SplitCount->SetMinSliderValue(1.f);
-        SplitCount->SetMaxSliderValue(static_cast<float>(Source->Item.Count - 1));
-        SplitCount->SetValue(static_cast<float>(Source->Item.Count / 2));
+        FCommonRangeConfig Config;
+        Config.DecimalPlaces = 0;
+        Config.bHasMin = true;
+        Config.bHasMax = true;
+        Config.Min = 1;
+        Config.Max = Source->Item.Count - 1;
+        Config.Step = 1;
+        Config.bShowStepButtons = true;
+        SplitCount->Configure(Config);
+        SplitCount->SetValue(FParameter(Source->Item.Count / 2));
         SplitControls->SetVisibility(ESlateVisibility::Visible);
-        SplitCount->SetKeyboardFocus();
+        SplitCount->SetInputFocus();
         return true;
     }
     return Submit(Request);
@@ -572,7 +691,7 @@ void UWidgetAbilityInventoryBase::ConfirmSplit()
     if (SplitControls && SplitControls->GetVisibility() == ESlateVisibility::Visible)
     {
         FInventoryClientRequest Request = SplitRequest;
-        Request.Quantity = FMath::FloorToInt(SplitCount->GetValue());
+        Request.Quantity = SplitCount->GetValue().Get<int32>();
         const FInventorySlotState* Source = FindSlot(Request.SourceInventoryId, Request.SourceSlot);
         const FInventorySlotState* Target = FindSlot(Request.TargetInventoryId, Request.TargetSlot);
         const bool bMatches = Network.IsValid() && SplitWorldEpoch == Network->GetWorldEpoch() &&

@@ -2,6 +2,7 @@
 
 #include "SWidgetThemePicker.h"
 #include "Widget/Theme/WidgetThemeEditorService.h"
+#include "Widget/Theme/WidgetThemeEditorSettings.h"
 #include "Widget/Theme/WidgetStyleTags.h"
 #include "Styling/AppStyle.h"
 #include "Misc/Paths.h"
@@ -19,7 +20,6 @@
 void SWidgetStyleCreationDialog::Construct(const FArguments& InArgs)
 {
 	Theme = InArgs._Theme;
-	Operation = InArgs._Operation;
 	ParentTag = InArgs._ParentTag;
 	Window = InArgs._Window;
 	bTypeLocked = FWidgetThemeEditorService::Kind(ParentTag, Kind);
@@ -51,6 +51,32 @@ void SWidgetStyleCreationDialog::Construct(const FArguments& InArgs)
 			   SHorizontalBox::Slot().FillWidth(1).Padding(4)[Control];
 	};
 	TSharedRef<SVerticalBox> Body = SNew(SVerticalBox);
+	TSharedRef<SHorizontalBox> Modes = SNew(SHorizontalBox);
+	for (EWidgetStyleOperation Mode : {EWidgetStyleOperation::Create, EWidgetStyleOperation::Associate})
+	{
+		Modes->AddSlot().FillWidth(1.f).Padding(1.f, 0.f)
+		[
+			SNew(SCheckBox)
+			.Style(FAppStyle::Get(), "SegmentedCombo.ButtonOnly")
+			.HAlign(HAlign_Center)
+			.Padding(FMargin(4.f, 3.f))
+			.IsChecked_Lambda([this, Mode] { return Operation == Mode ? ECheckBoxState::Checked : ECheckBoxState::Unchecked; })
+			.OnCheckStateChanged_Lambda([this, Mode](ECheckBoxState State)
+			{
+				if (State == ECheckBoxState::Checked)
+				{
+					Operation = Mode;
+					Report.Reset();
+				}
+			})
+			[
+				SNew(STextBlock).Justification(ETextJustify::Center)
+				.Text(Mode == EWidgetStyleOperation::Create ? NSLOCTEXT("WidgetTheme", "NativeMode", "Native")
+					: NSLOCTEXT("WidgetTheme", "AssociateMode", "Associate"))
+			]
+		];
+	}
+	Body->AddSlot().AutoHeight()[Row(TEXT("Mode"), Modes)];
 	Body->AddSlot().AutoHeight()[Row(TEXT("Tag"), SAssignNew(NameInput, SEditableTextBox)
 													  .OnTextChanged_Lambda(
 														  [this](const FText& Text)
@@ -92,16 +118,17 @@ void SWidgetStyleCreationDialog::Construct(const FArguments& InArgs)
 		.AutoHeight()[Row(TEXT("Parent Tag"), SNew(SComboButton)
 												  .IsEnabled(bTypeLocked)
 												  .OnGetMenuContent(this, &SWidgetStyleCreationDialog::BuildParentMenu)
-												  .ButtonContent()[SNew(STextBlock).Text_Lambda([this] { return FText::FromName(ParentTag.GetTagName()); })])];
+												  .ButtonContent()[SNew(STextBlock).Text_Lambda([this] { return UWidgetThemeEditorSettings::GetStyleTagDisplayName(ParentTag); })])];
 	auto RootLabel = [](const FString& Root)
 	{
 		const int32 Separator = Root.Find(TEXT("/"), ESearchCase::CaseSensitive, ESearchDir::FromStart, 1);
 		const FString Mount = Separator == INDEX_NONE ? Root : Root.Left(Separator);
 		return FText::FromString(Mount.Mid(1));
 	};
-	if (Operation == EWidgetStyleOperation::Create)
 	{
-		Body->AddSlot().AutoHeight()[Row(
+		TSharedRef<SVerticalBox> NativeFields = SNew(SVerticalBox)
+			.Visibility_Lambda([this] { return Operation == EWidgetStyleOperation::Create ? EVisibility::Visible : EVisibility::Collapsed; });
+		NativeFields->AddSlot().AutoHeight()[Row(
 			TEXT("Create in"),
 			SNew(SComboBox<TSharedPtr<FString>>)
 				.OptionsSource(&CreationRoots)
@@ -130,11 +157,13 @@ void SWidgetStyleCreationDialog::Construct(const FArguments& InArgs)
 								  }
 							  })[SNew(STextBlock).Text(FText::FromString(Inherit ? TEXT("Parent Tag") : TEXT("None"))).Justification(ETextJustify::Center)]];
 		}
-		Body->AddSlot().AutoHeight()[Row(TEXT("Inheritance"), Inheritance)];
+		NativeFields->AddSlot().AutoHeight()[Row(TEXT("Inheritance"), Inheritance)];
+		Body->AddSlot().AutoHeight()[NativeFields];
 	}
-	else
 	{
-		Body->AddSlot().AutoHeight()[Row(TEXT("Source theme"), SNew(SWidgetThemePicker)
+		TSharedRef<SVerticalBox> AssociatedFields = SNew(SVerticalBox)
+			.Visibility_Lambda([this] { return Operation == EWidgetStyleOperation::Associate ? EVisibility::Visible : EVisibility::Collapsed; });
+		AssociatedFields->AddSlot().AutoHeight()[Row(TEXT("Source theme"), SNew(SWidgetThemePicker)
 																   .SelectedTheme_Lambda([this] { return SourceTheme.Get(); })
 																   .OnThemeSelected_Lambda(
 																	   [this](UWidgetTheme* Source)
@@ -142,11 +171,12 @@ void SWidgetStyleCreationDialog::Construct(const FArguments& InArgs)
 																		   SourceTheme = Source;
 																		   SourceTag = FGameplayTag();
 																	   }))];
-		Body->AddSlot().AutoHeight()[Row(TEXT("Source Tag"),
+		AssociatedFields->AddSlot().AutoHeight()[Row(TEXT("Source Tag"),
 										 SNew(SComboButton)
 											 .IsEnabled_Lambda([this] { return SourceTheme.IsValid(); })
 											 .OnGetMenuContent(this, &SWidgetStyleCreationDialog::BuildSourceMenu)
-											 .ButtonContent()[SNew(STextBlock).Text_Lambda([this] { return FText::FromName(SourceTag.GetTagName()); })])];
+											 .ButtonContent()[SNew(STextBlock).Text_Lambda([this] { return UWidgetThemeEditorSettings::GetStyleTagDisplayName(SourceTag); })])];
+		Body->AddSlot().AutoHeight()[AssociatedFields];
 	}
 	Body->AddSlot().FillHeight(1).Padding(4)[SNew(STextBlock).AutoWrapText(true).Text_Lambda([this] { return FText::FromString(Report); })];
 	Body->AddSlot().AutoHeight().Padding(4)[SNew(SButton)
@@ -171,7 +201,7 @@ TSharedRef<SWidget> SWidgetStyleCreationDialog::BuildSourceMenu()
 		EWidgetStyleKind Type;
 		if (FWidgetThemeEditorService::Kind(StyleTag, Type) && Type == Kind)
 		{
-			Menu.AddMenuEntry(FText::FromName(StyleTag.GetTagName()), FText::FromString(FWidgetThemeEditorService::DescribeTag(SourceTheme.Get(), StyleTag)),
+			Menu.AddMenuEntry(UWidgetThemeEditorSettings::GetStyleTagDisplayName(StyleTag), FText::FromString(FWidgetThemeEditorService::DescribeTag(SourceTheme.Get(), StyleTag)),
 							  FSlateIcon(), FUIAction(FExecuteAction::CreateSPLambda(this, [this, StyleTag] { SourceTag = StyleTag; })));
 		}
 	}
@@ -191,7 +221,7 @@ TSharedRef<SWidget> SWidgetStyleCreationDialog::BuildParentMenu()
 		EWidgetStyleKind Type;
 		if (FWidgetThemeEditorService::Kind(StyleTag, Type) && Type == Kind)
 		{
-			Menu.AddMenuEntry(FText::FromName(StyleTag.GetTagName()), FText(), FSlateIcon(),
+			Menu.AddMenuEntry(UWidgetThemeEditorSettings::GetStyleTagDisplayName(StyleTag), FText::FromName(StyleTag.GetTagName()), FSlateIcon(),
 							  FUIAction(FExecuteAction::CreateSPLambda(this,
 																	   [this, StyleTag]
 																	   {

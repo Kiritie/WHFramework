@@ -43,6 +43,12 @@ struct WHFRAMEWORK_API FCameraUserSettings
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MovementSensitivity = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bEnableVerticalPan = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float HorizontalLookSensitivity = 1.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -450,6 +456,10 @@ USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FCameraModuleSaveData : public FSaveData
 {
 	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Move")
+	float MovementSensitivity = 1.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera Move")
+	bool bEnableVerticalPan = true;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (SettingCategory = "Camera Rotate", SettingCategoryOrder = "10"))
 	float HorizontalLookSensitivity = 1.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (SettingCategory = "Camera Rotate", SettingCategoryOrder = "10"))

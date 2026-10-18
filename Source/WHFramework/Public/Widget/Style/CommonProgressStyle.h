@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Styling/SlateTypes.h"
+#include "Components/ProgressBar.h"
 #include "Widget/Style/CommonStyleTypes.h"
 #include "Materials/MaterialInterface.h"
 #include "CommonProgressStyle.generated.h"
@@ -16,6 +17,12 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FProgressBarStyle ProgressBarStyle;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TEnumAsByte<EProgressBarFillType::Type> FillType = EProgressBarFillType::LeftToRight;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TEnumAsByte<EProgressBarFillStyle::Type> FillStyle = EProgressBarFillStyle::Mask;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TObjectPtr<UMaterialInterface> RadialMaterial;

@@ -28,9 +28,6 @@ public:
 	void SetInheritedStyleTag(FGameplayTag InStyleTag);
 
 	UFUNCTION(BlueprintCallable)
-	void ClearStyleOverride();
-
-	UFUNCTION(BlueprintCallable)
 	void RefreshStyle();
 
 protected:
@@ -44,11 +41,8 @@ protected:
 	virtual void BindControlEvents();
 	virtual void UnbindControlEvents();
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (Categories = "Style"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (Categories = "Style", ToolTip = "填写时使用当前 Tag；留空时使用外层传入的 Tag，外层未提供时使用类型默认样式。"))
 	FGameplayTag StyleTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	bool bOverrideStyleTag = false;
 
 	UPROPERTY(Transient)
 	FGameplayTag InheritedStyleTag;

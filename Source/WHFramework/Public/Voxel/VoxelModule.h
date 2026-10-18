@@ -213,6 +213,8 @@ public:
 	TSharedPtr<const FVoxelTerrainStatistics, ESPMode::ThreadSafe> GetTerrainStatistics() const;
 	FVoxelPrimaryFineReadiness QueryFineReadiness(TConstArrayView<FIntVector> InKeys) const;
 	const FVoxelViewSettings& GetViewSettings() const { return ViewSettings; }
+	FIntPoint GetLocalFineRadiusLimits() const;
+	void SetLocalFineRadiusCells(int32 InRadiusCells);
 	bool EnqueueProjectBackgroundTask(FVoxelTaskRequest&& InRequest);
 	void CancelProjectTasksByOwner(const FGuid& InOwnerId, uint64 InOwnerIncarnation);
 	void DonateProjectTaskPriority(const FVoxelTaskStamp& InStamp, EVoxelWorkClass InClass,
@@ -452,6 +454,8 @@ private:
 	UAbilityInventoryBase* ResolveInventory(APlayerController* InController, AActor* InSource) const;
 
 private:
+	FVoxelStreamingSourceView ResolveSourceView(const FVoxelStreamingSource& InSource) const;
+
 	FVoxelRegistry Registry;
 	TSharedPtr<const FVoxelShapeRegistry, ESPMode::ThreadSafe> Shapes;
 	TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> GenerationConfig;
@@ -491,6 +495,7 @@ private:
 	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> CurrentInterest = MakeShared<FVoxelInterestSet, ESPMode::ThreadSafe>();
 	TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> DesiredInterest = CurrentInterest;
 	FVoxelViewSettings ViewSettings;
+	int32 LocalFineRadiusCells = INDEX_NONE;
 	FVoxelTerrainFrameContext TerrainFrameContext;
 	FVoxelWorldReadinessSnapshot ReadinessSnapshot;
 	FVoxelWorldReadinessRuntime ReadinessRuntime;

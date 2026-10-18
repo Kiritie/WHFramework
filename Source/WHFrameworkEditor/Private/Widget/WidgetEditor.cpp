@@ -7,6 +7,7 @@
 #include "Widget/Theme/WidgetThemeToolkit.h"
 #include "Widget/Theme/WidgetThemeDesignerIntegration.h"
 #include "Widget/Theme/WidgetThemeEditorSettings.h"
+#include "Widget/Theme/WidgetThemeResolver.h"
 
 #include "Widget/Customization/WidgetModuleCustomization.h"
 #include "Widget/Customization/WidgetStyleCustomization.h"
@@ -26,6 +27,7 @@ void FWidgetEditorModule::StartupModule()
 		return;
 	}
 	UWidgetThemeEditorSettings::ApplyFolderVisibility();
+	FCoreDelegates::GetOnPostEngineInit().AddRaw(this, &FWidgetEditorModule::InitializeDefaultTheme);
 	RegisterWidgetThemeAssetEditor();
 	RegisterWidgetThemeDesignerIntegration();
 	if (UToolsetRegistry::IsAvailable())
@@ -41,6 +43,7 @@ void FWidgetEditorModule::StartupModule()
 void FWidgetEditorModule::ShutdownModule()
 {
 	FCoreDelegates::OnAllModuleLoadingPhasesComplete.RemoveAll(this);
+	FCoreDelegates::GetOnPostEngineInit().RemoveAll(this);
 	UWidgetThemeEditorSettings::ClearFolderVisibility();
 	if (IsRunningCommandlet())
 	{
@@ -59,6 +62,12 @@ void FWidgetEditorModule::RegisterToolsets()
 	UToolsetRegistry::RegisterToolsetClass(UWidgetEditorToolset::StaticClass());
 }
 
+void FWidgetEditorModule::InitializeDefaultTheme()
+{
+	FWidgetThemeResolver::ResolveTheme(nullptr);
+	FWidgetThemeResolver::NotifyThemeChanged();
+}
+
 void FWidgetEditorModule::RegisterCustomization(FPropertyEditorModule& PropertyEditor)
 {
 	PropertyEditor.RegisterCustomClassLayout(FName("WidgetModule"), FOnGetDetailCustomizationInstance::CreateStatic(&FWidgetModuleCustomization::MakeInstance));
@@ -68,6 +77,14 @@ void FWidgetEditorModule::RegisterCustomization(FPropertyEditorModule& PropertyE
 											 FOnGetDetailCustomizationInstance::CreateStatic(&FWidgetStyleCustomization::MakeTextInstance));
 	PropertyEditor.RegisterCustomClassLayout(FName("CommonImageN"),
 											 FOnGetDetailCustomizationInstance::CreateStatic(&FWidgetStyleCustomization::MakeImageInstance));
+	PropertyEditor.RegisterCustomClassLayout(FName("CommonBorderN"),
+												 FOnGetDetailCustomizationInstance::CreateStatic(&FWidgetStyleCustomization::MakeBorderInstance));
+	PropertyEditor.RegisterCustomClassLayout(FName("CommonRichTextBlockN"),
+												 FOnGetDetailCustomizationInstance::CreateStatic(&FWidgetStyleCustomization::MakeRichTextInstance));
+	PropertyEditor.RegisterCustomClassLayout(FName("CommonScroll"),
+											 FOnGetDetailCustomizationInstance::CreateStatic(&FWidgetStyleCustomization::MakeScrollInstance));
+	PropertyEditor.RegisterCustomClassLayout(FName("CommonButtonStyleN"),
+												 FOnGetDetailCustomizationInstance::CreateStatic(&FWidgetStyleCustomization::MakeButtonStyleInstance));
 	PropertyEditor.RegisterCustomClassLayout(FName("WidgetTheme"), FOnGetDetailCustomizationInstance::CreateStatic(&FWidgetThemeCustomization::MakeInstance));
 }
 
@@ -77,5 +94,9 @@ void FWidgetEditorModule::UnRegisterCustomization(FPropertyEditorModule& Propert
 	PropertyEditor.UnregisterCustomClassLayout(FName("CommonButton"));
 	PropertyEditor.UnregisterCustomClassLayout(FName("CommonTextBlockN"));
 	PropertyEditor.UnregisterCustomClassLayout(FName("CommonImageN"));
+	PropertyEditor.UnregisterCustomClassLayout(FName("CommonBorderN"));
+	PropertyEditor.UnregisterCustomClassLayout(FName("CommonRichTextBlockN"));
+	PropertyEditor.UnregisterCustomClassLayout(FName("CommonScroll"));
+	PropertyEditor.UnregisterCustomClassLayout(FName("CommonButtonStyleN"));
 	PropertyEditor.UnregisterCustomClassLayout(FName("WidgetTheme"));
 }

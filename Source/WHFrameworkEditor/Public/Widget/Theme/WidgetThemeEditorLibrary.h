@@ -25,5 +25,20 @@ public:
 	static bool SaveTheme(UWidgetTheme* InTheme, FString& OutError);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModule")
+	static bool RemoveStyleBinding(UWidgetTheme* InTheme, const FString& InTag, FString& OutError);
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModule")
+	static bool RemoveDuplicateGlobalTagDefinition(const FString& InTag, const FString& InTargetOwnerPath, FString& OutError);
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModule")
+	static bool MigrateTag(const FString& InOldTag, const FString& InNewTag, FString& OutError);
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModule")
+	static bool MigrateTagReferences(const FString& InOldTagName, const FString& InNewTag, FString& OutError);
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModule")
+	static bool MigrateTagAlias(const FString& InOldAlias, const FString& InNewTag, FString& OutError);
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModule")
 	static bool SetProjectDefault(UWidgetTheme* InTheme, FString& OutError);
 };

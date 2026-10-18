@@ -4,6 +4,8 @@
 #include "IPropertyRowGenerator.h"
 #include "IDetailTreeNode.h"
 #include "PropertyHandle.h"
+#include "IDetailCustomization.h"
+#include "UObject/Class.h"
 
 class FWidgetStylePropertyEditing
 {
@@ -11,6 +13,13 @@ public:
 	explicit FWidgetStylePropertyEditing(UObject* Defaults)
 	{
 		Generator = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor").CreatePropertyRowGenerator(FPropertyRowGeneratorArgs());
+		for (UClass* StyleClass = Defaults->GetClass(); StyleClass; StyleClass = StyleClass->GetSuperClass())
+		{
+			Generator->RegisterInstancedCustomPropertyLayout(StyleClass, FOnGetDetailCustomizationInstance::CreateLambda([]
+			{
+				return MakeShared<FPropertyLayout>();
+			}));
+		}
 		Generator->OnRowsRefreshed().AddLambda([] {});
 		Generator->SetObjects({Defaults});
 	}
@@ -21,6 +30,14 @@ public:
 	}
 
 private:
+	class FPropertyLayout : public IDetailCustomization
+	{
+	public:
+		virtual void CustomizeDetails(IDetailLayoutBuilder& DetailLayoutBuilder) override
+		{
+		}
+	};
+
 	static TSharedPtr<IPropertyHandle> Find(const TArray<TSharedRef<IDetailTreeNode>>& Nodes, FProperty* Property)
 	{
 		for (const TSharedRef<IDetailTreeNode>& Node : Nodes)

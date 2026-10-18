@@ -336,7 +336,7 @@ bool UWidgetTheme::SetStyleClass(FGameplayTag Tag, EWidgetStyleKind Kind, UClass
 	switch (Kind)
 	{
 	case EWidgetStyleKind::Button:
-		if (!StyleClass->IsChildOf(UCommonButtonStyle::StaticClass()))
+		if (!StyleClass->IsChildOf(UCommonButtonStyleN::StaticClass()))
 		{
 			return false;
 		}
@@ -350,7 +350,7 @@ bool UWidgetTheme::SetStyleClass(FGameplayTag Tag, EWidgetStyleKind Kind, UClass
 		TextStyles.FindOrAdd(Tag).Style = StyleClass;
 		return true;
 	case EWidgetStyleKind::Brush:
-		if (!StyleClass->IsChildOf(UWidgetBrushStyle::StaticClass()))
+		if (!StyleClass->IsChildOf(UCommonBrushStyle::StaticClass()))
 		{
 			return false;
 		}

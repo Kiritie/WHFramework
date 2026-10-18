@@ -26,7 +26,7 @@ protected:
 	virtual void NativeDestruct() override;
 	virtual void NativeOnListItemObjectSet(UObject* InListItemObject) override;
 	virtual void NativeOnEntryReleased() override;
-	virtual void OnResolvedStyleChanged(const USubWidgetStyle* InStyle) override;
+	virtual void OnResolvedStyleChanged(const UCommonButtonStyleN* InStyle) override;
 	virtual UWidget* GetValueControl() const;
 	virtual FName GetRendererName() const;
 	virtual void BindValueControl();
@@ -40,6 +40,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void RefreshFromModel();
+	void RefreshModelState();
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)

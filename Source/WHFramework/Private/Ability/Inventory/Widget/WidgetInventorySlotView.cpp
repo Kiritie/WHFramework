@@ -5,61 +5,81 @@
 #include "Ability/Inventory/Widget/WidgetAbilityInventoryBase.h"
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
-#include "Components/Border.h"
-#include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
-#include "Components/ProgressBar.h"
 #include "Components/SizeBox.h"
-#include "Components/TextBlock.h"
+#include "Widget/Common/CommonImageN.h"
+#include "Widget/Common/CommonTextBlockN.h"
+#include "Widget/Common/CommonProgress.h"
+#include "Widget/Theme/WidgetStyleTags.h"
 #include "Engine/Texture2D.h"
 #include "Materials/MaterialInterface.h"
 #include "InputCoreTypes.h"
 
+UWidgetInventorySlotView::UWidgetInventorySlotView(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+{
+    SetIsFocusable(true);
+    FrameStyleTag = WidgetStyleTags::CommonDefault(EWidgetStyleKind::Brush);
+    LockedStyleTag = FrameStyleTag;
+}
+
 TSharedRef<SWidget> UWidgetInventorySlotView::RebuildWidget()
 {
-    if (WidgetTree && WidgetTree->RootWidget && Frame)
-    {
-        return Super::RebuildWidget();
-    }
     if (!WidgetTree)
     {
         WidgetTree = NewObject<UWidgetTree>(this, TEXT("WidgetTree"));
     }
-    USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("SlotSize"));
-    Size->SetWidthOverride(64.f);
-    Size->SetHeightOverride(64.f);
-    Frame = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("SlotFrame"));
-    Frame->SetPadding(FMargin(3.f));
-    UOverlay* Overlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("SlotLayers"));
-    Icon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("ItemIcon"));
-    Icon->SetVisibility(ESlateVisibility::HitTestInvisible);
-    Overlay->AddChildToOverlay(Icon);
-    Cooldown = WidgetTree->ConstructWidget<UProgressBar>(UProgressBar::StaticClass(), TEXT("Cooldown"));
-    Cooldown->SetFillColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.65f));
-    Cooldown->SetVisibility(ESlateVisibility::Collapsed);
-    Overlay->AddChildToOverlay(Cooldown);
-    Count = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ItemCount"));
-    UOverlaySlot* CountSlot = Overlay->AddChildToOverlay(Count);
-    CountSlot->SetHorizontalAlignment(HAlign_Right);
-    CountSlot->SetVerticalAlignment(VAlign_Bottom);
-    Count->SetVisibility(ESlateVisibility::HitTestInvisible);
-    Status = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ItemStatus"));
-    UOverlaySlot* StatusSlot = Overlay->AddChildToOverlay(Status);
-    StatusSlot->SetHorizontalAlignment(HAlign_Left);
-    StatusSlot->SetVerticalAlignment(VAlign_Top);
-    Status->SetVisibility(ESlateVisibility::HitTestInvisible);
-    Frame->SetContent(Overlay);
-    Size->SetContent(Frame);
-    WidgetTree->RootWidget = Size;
-    SetIsFocusable(true);
+    if (!WidgetTree->RootWidget)
+    {
+        USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("SlotSize"));
+        Size->SetWidthOverride(64.f);
+        Size->SetHeightOverride(64.f);
+        UOverlay* Layers = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("SlotLayers"));
+        Size->SetContent(Layers);
+        WidgetTree->RootWidget = Size;
+        const auto AddLayer = [Layers](UWidget* Widget)
+        {
+            Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
+            UOverlaySlot* LayerSlot = Layers->AddChildToOverlay(Widget);
+            LayerSlot->SetHorizontalAlignment(HAlign_Fill);
+            LayerSlot->SetVerticalAlignment(VAlign_Fill);
+            return LayerSlot;
+        };
+        Frame = WidgetTree->ConstructWidget<UCommonImageN>(UCommonImageN::StaticClass(), TEXT("Frame"));
+        AddLayer(Frame);
+        Icon = WidgetTree->ConstructWidget<UCommonImageN>(UCommonImageN::StaticClass(), TEXT("Icon"));
+        AddLayer(Icon)->SetPadding(FMargin(3.f));
+        Cooldown = WidgetTree->ConstructWidget<UCommonProgress>(UCommonProgress::StaticClass(), TEXT("Cooldown"));
+        AddLayer(Cooldown);
+        SelectionMarker = WidgetTree->ConstructWidget<UCommonImageN>(UCommonImageN::StaticClass(), TEXT("SelectionMarker"));
+        SelectionMarker->SetStyleTag(WidgetStyleTags::CommonDefault(EWidgetStyleKind::Brush));
+        AddLayer(SelectionMarker);
+        PendingMarker = WidgetTree->ConstructWidget<UCommonImageN>(UCommonImageN::StaticClass(), TEXT("PendingMarker"));
+        PendingMarker->SetStyleTag(WidgetStyleTags::CommonDefault(EWidgetStyleKind::Brush));
+        AddLayer(PendingMarker);
+        Count = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass(), TEXT("Count"));
+        UOverlaySlot* CountSlot = AddLayer(Count);
+        CountSlot->SetHorizontalAlignment(HAlign_Right);
+        CountSlot->SetVerticalAlignment(VAlign_Bottom);
+        Status = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass(), TEXT("Status"));
+        UOverlaySlot* StatusSlot = AddLayer(Status);
+        StatusSlot->SetHorizontalAlignment(HAlign_Left);
+        StatusSlot->SetVerticalAlignment(VAlign_Top);
+    }
+    TSharedRef<SWidget> Result = Super::RebuildWidget();
+    check(Frame && Icon && Count && Status && Cooldown && SelectionMarker && PendingMarker);
+    Icon->SetStyleTag(FGameplayTag());
+    if (!bHasDisplay)
+    {
+        Icon->SetVisibility(ESlateVisibility::Collapsed);
+    }
     RefreshFrame();
     if(bHasDisplay)
     {
         RefreshSlot(DisplayState, DisplayName, DisplayIcon.Get(), DisplayTooltip);
     }
     AdvanceCooldown();
-    return Super::RebuildWidget();
+    return Result;
 }
 
 void UWidgetInventorySlotView::BindSlot(UWidgetAbilityInventoryBase* InPanel, const FGuid& InInventoryId, const FInventorySlotKey& InSlot)
@@ -94,16 +114,22 @@ void UWidgetInventorySlotView::RefreshSlot(const FInventorySlotState& InState, c
         Icon->SetBrush(FSlateBrush());
     }
     Count->SetText(InState.Item.Count > 1 ? FText::AsNumber(InState.Item.Count) : FText::GetEmpty());
-    Status->SetText(InState.bLocked ? FText::FromString(TEXT("锁")) : (InState.bFavorite ? FText::FromString(TEXT("★")) : FText::GetEmpty()));
-    SetToolTipText(InState.Item.IsEmpty() ? FText::GetEmpty() : (InTooltip.IsEmpty() ? InName : InTooltip));
+    Status->SetText(InState.bLocked ? NSLOCTEXT("WH.Inventory", "Locked", "锁定")
+        : InState.bFavorite ? NSLOCTEXT("WH.Inventory", "Favorite", "收藏") : FText::GetEmpty());
+    RefreshFrame();
+    if (!GetToolTip())
+    {
+        SetToolTipText(InState.Item.IsEmpty() ? FText::GetEmpty() : (InTooltip.IsEmpty() ? InName : InTooltip));
+    }
 }
 
 void UWidgetInventorySlotView::RefreshFrame()
 {
     if (Frame)
     {
-        Frame->SetBrushColor(bSelected ? FLinearColor(0.8f, 0.65f, 0.15f, 1.f) : FLinearColor(0.12f, 0.13f, 0.16f, 1.f));
-        SetRenderOpacity(bPending ? 0.45f : 1.f);
+        Frame->SetStyleTag(DisplayState.bLocked ? LockedStyleTag : FrameStyleTag);
+        SelectionMarker->SetVisibility(bSelected ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+        PendingMarker->SetVisibility(bPending ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
     }
 }
 
@@ -146,6 +172,7 @@ void UWidgetInventorySlotView::NativeDestruct()
 {
     if(GetWorld()) GetWorld()->GetTimerManager().ClearTimer(CooldownTimer);
     SetToolTipText(FText::GetEmpty());
+    SetToolTip(nullptr);
     Super::NativeDestruct();
 }
 
@@ -157,6 +184,11 @@ FGuid UWidgetInventorySlotView::GetInventoryId() const
 FInventorySlotKey UWidgetInventorySlotView::GetSlotKey() const
 {
     return Slot;
+}
+
+UWidgetAbilityInventoryBase* UWidgetInventorySlotView::GetInventoryPanel() const
+{
+    return Panel.Get();
 }
 
 FReply UWidgetInventorySlotView::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)

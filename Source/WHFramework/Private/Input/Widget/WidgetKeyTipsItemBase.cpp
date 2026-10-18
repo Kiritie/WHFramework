@@ -8,7 +8,7 @@
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
-#include "Input/InputModuleStatics.h"
+#include "Input/InputModule.h"
 #include "Widget/Common/CommonTextBlockN.h"
 
 UWidgetKeyTipsItemBase::UWidgetKeyTipsItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -64,14 +64,26 @@ void UWidgetKeyTipsItemBase::RefreshData_Implementation()
 		InputType = InputSubsystem->GetCurrentInputType();
 		GamepadName = InputSubsystem->GetCurrentGamepadName();
 	}
+	const UInputModule* InputModule = nullptr;
+	if(IsDesignTime())
+	{
+		if(UInputModule::IsValid(true))
+		{
+			InputModule = UInputModule::GetPtr(true);
+		}
+	}
+	else
+	{
+		InputModule = UInputModule::GetPtr(GetWorld());
+	}
 	for(const FGameplayTag& ActionTag : ActionTags)
 	{
-		if(!ActionTag.IsValid())
+		if(!InputModule || !ActionTag.IsValid())
 		{
 			continue;
 		}
 
-		for(const FKey& Key : UInputModuleStatics::GetKeysByActionTag(ActionTag))
+		for(const FKey& Key : InputModule->GetKeysByActionTag(ActionTag))
 		{
 			FSlateBrush ImageBrush;
 			if(Settings->TryGetInputBrush(

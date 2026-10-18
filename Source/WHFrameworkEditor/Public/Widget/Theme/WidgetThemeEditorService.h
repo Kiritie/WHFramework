@@ -24,6 +24,10 @@ public:
 	static TArray<UWidgetTheme*> Themes();
 	static FString DescribeTag(const UWidgetTheme* Theme, FGameplayTag Tag);
 	static bool ValidateName(const FString& Name, FString& Report);
+	static bool MigrateTag(FGameplayTag OldTag, FGameplayTag NewTag, FString& Report);
+	static bool MigrateTagReferences(const FString& OldTagName, FGameplayTag NewTag, FString& Report);
+	static bool MigrateTagAlias(FName OldAlias, FGameplayTag NewTag, FString& Report);
+	static bool RemoveDuplicateGlobalTagDefinition(FGameplayTag Tag, const FString& TargetOwnerPath, FString& Report);
 	static bool RenameStyle(UWidgetTheme* Theme, FGameplayTag Tag, const FString& Name, FString& Report);
 	static bool RemoveBinding(UWidgetTheme* Theme, FGameplayTag Tag, FString& Report);
 	static bool CanRemove(UWidgetTheme* Theme, FGameplayTag Tag, FString& Report);
@@ -45,5 +49,5 @@ public:
 private:
 	static bool bBusy;
 	static bool RegisterTag(const FString& Name, const FString& OwnerPath, FString& Report);
-	static bool RenameTag(FGameplayTag OldTag, FGameplayTag NewTag, FString& Report);
+	static bool RenameTag(FGameplayTag OldTag, FGameplayTag NewTag, FString& Report, bool bCreateRedirect = false);
 };

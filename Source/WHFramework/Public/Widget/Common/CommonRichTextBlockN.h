@@ -46,10 +46,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Appearance)
 	bool bUseCommonRichStyle;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (Categories = "Style.Text"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (Categories = "UI.Style.Text"))
 	FGameplayTag StyleTag;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (Categories = "Style.TextScroll"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (Categories = "UI.Style.TextScroll"))
 	FGameplayTag TextScrollStyleTag;
 
 private:

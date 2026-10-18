@@ -5,7 +5,6 @@
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
-#include "Components/SizeBox.h"
 #include "Components/NativeWidgetHost.h"
 #include "Components/ComboBoxKey.h"
 #include "Widgets/Input/SComboBox.h"
@@ -16,7 +15,7 @@
 #include "Widget/Common/CommonImageN.h"
 #include "Widget/Style/CommonInputStyle.h"
 #include "Widget/Style/CommonScrollStyle.h"
-#include "Widget/Style/WidgetBrushStyle.h"
+#include "Widget/Style/CommonBrushStyle.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
 #include "Widget/WidgetModuleTypes.h"
 #include "CommonBorder.h"
@@ -31,14 +30,8 @@ UCommonOptionSelector::UCommonOptionSelector(const FObjectInitializer& ObjectIni
 
 void UCommonOptionSelector::BuildNativeLayout()
 {
-	UHorizontalBox* Root = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("OptionLayout"));
-	WidgetTree->RootWidget = Root;
-	NativeLabelBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("LabelSize"));
-	NativeLabel = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass(), TEXT("OptionLabel"));
-	NativeLabelBox->SetContent(NativeLabel);
-	Root->AddChildToHorizontalBox(NativeLabelBox)->SetVerticalAlignment(VAlign_Center);
 	UOverlay* ValueArea = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("ValueArea"));
-	Root->AddChildToHorizontalBox(ValueArea)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	WidgetTree->RootWidget = ValueArea;
 	NativeValueBackground = WidgetTree->ConstructWidget<UCommonImageN>(UCommonImageN::StaticClass(), TEXT("ValueBackground"));
 	UOverlaySlot* BackgroundSlot = ValueArea->AddChildToOverlay(NativeValueBackground);
 	BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
@@ -57,7 +50,6 @@ void UCommonOptionSelector::BuildNativeLayout()
 	Btn_Next = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_Next"));
 	Btn_Next->SetTitle(FText::FromString(TEXT("›")));
 	Controls->AddChildToHorizontalBox(Btn_Next);
-	RefreshLabel();
 	BuildDropdown();
 }
 
@@ -107,7 +99,6 @@ TSharedRef<SWidget> UCommonOptionSelector::GenerateOptionSlate(FName InKey)
 void UCommonOptionSelector::SynchronizeProperties()
 {
 	Super::SynchronizeProperties();
-	RefreshLabel();
 	BuildDropdown();
 	RefreshValue();
 }
@@ -118,7 +109,6 @@ void UCommonOptionSelector::OnSpawn_Implementation(const FParameter& InParam)
 	if (const FCommonOptionSelectorSpawnParameter* Parameter = InParam.GetPtr<FCommonOptionSelectorSpawnParameter>())
 	{
 		bEditable = Parameter->bEditable;
-		SetLabel(Parameter->Title);
 		SetOptionNames(Parameter->Options);
 	}
 	RefreshValue();
@@ -131,9 +121,6 @@ void UCommonOptionSelector::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	const UCommonOptionSelector* Defaults = CastChecked<UCommonOptionSelector>(GetArchetype());
 	bEditable = Defaults->bEditable;
 	bUseDropdown = Defaults->bUseDropdown;
-	Label = Defaults->Label;
-	LabelWidth = Defaults->LabelWidth;
-	RefreshLabel();
 	SetOptions(Defaults->Options);
 	SetOptionIndex(Defaults->OptionIndex);
 }
@@ -175,10 +162,6 @@ void UCommonOptionSelector::ApplyResolvedStyle(const UObject* InStyle)
 	{
 		return;
 	}
-	if (NativeLabel)
-	{
-		NativeLabel->SetStyleTag(Style->OptionStyles.LabelTextStyleTag);
-	}
 	if (NativeValueBackground)
 	{
 		NativeValueBackground->SetStyleTag(Style->OptionStyles.ValueBackgroundBrushStyleTag);
@@ -214,7 +197,7 @@ void UCommonOptionSelector::ApplyResolvedStyle(const UObject* InStyle)
 		Expand->GetButtonPadding(DropdownStyle.ComboButtonStyle.ContentPadding);
 	}
 	UClass* ArrowClass = FWidgetThemeResolver::ResolveClass(this, Style->OptionStyles.ArrowBrushStyleTag, EWidgetStyleKind::Brush);
-	if (const UWidgetBrushStyle* Arrow = ArrowClass ? ArrowClass->GetDefaultObject<UWidgetBrushStyle>() : nullptr;
+	if (const UCommonBrushStyle* Arrow = ArrowClass ? ArrowClass->GetDefaultObject<UCommonBrushStyle>() : nullptr;
 		Style->OptionStyles.ArrowBrushStyleTag.IsValid() && Arrow)
 	{
 		DropdownStyle.ComboButtonStyle.DownArrowImage = Arrow->Brush;
@@ -329,40 +312,6 @@ void UCommonOptionSelector::SetUseDropdown(bool bInUseDropdown)
 {
 	bUseDropdown = bInUseDropdown;
 	RefreshValue();
-}
-
-void UCommonOptionSelector::SetLabel(const FText& InLabel)
-{
-	Label = InLabel;
-	RefreshLabel();
-}
-
-void UCommonOptionSelector::SetLabelWidth(float InWidth)
-{
-	LabelWidth = FMath::IsFinite(InWidth) ? FMath::Max(0.f, InWidth) : 0.f;
-	RefreshLabel();
-}
-
-void UCommonOptionSelector::RefreshLabel()
-{
-	if (!NativeLabelBox || !NativeLabel)
-	{
-		return;
-	}
-	NativeLabel->SetText(Label);
-	NativeLabelBox->SetVisibility(Label.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
-	if (LabelWidth > 0.f)
-	{
-		NativeLabelBox->SetWidthOverride(LabelWidth);
-	}
-	else
-	{
-		NativeLabelBox->ClearWidthOverride();
-	}
-	if (UHorizontalBoxSlot* LabelSlot = Cast<UHorizontalBoxSlot>(NativeLabelBox->Slot))
-	{
-		LabelSlot->SetPadding(LabelWidth > 0.f ? FMargin(0.f) : FMargin(0.f, 0.f, 12.f, 0.f));
-	}
 }
 
 void UCommonOptionSelector::RefreshValue()

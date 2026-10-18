@@ -3,6 +3,9 @@
 
 #include "WHFrameworkCore.h"
 
+#include "GameplayTagsManager.h"
+#include "Interfaces/IPluginManager.h"
+#include "Misc/Paths.h"
 #include "Debug/DebugManager.h"
 #include "Input/InputManager.h"
 #include "Parameter/ParameterManager.h"
@@ -19,6 +22,14 @@
 
 void FWHFrameworkCoreModule::StartupModule()
 {
+	for (const TSharedRef<IPlugin>& Plugin : IPluginManager::Get().GetEnabledPlugins())
+	{
+		const FString TagDirectory = Plugin->GetBaseDir() / TEXT("Config/Tags");
+		if (Plugin->CanContainContent() && Plugin->GetLoadedFrom() == EPluginLoadedFrom::Project && FPaths::DirectoryExists(TagDirectory))
+		{
+			UGameplayTagsManager::Get().AddTagIniSearchPath(TagDirectory);
+		}
+	}
 	FDebugManager::Register();
 	FInputManager::Register();
 	FParameterManager::Register();

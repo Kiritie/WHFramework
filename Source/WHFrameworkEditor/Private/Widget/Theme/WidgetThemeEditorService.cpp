@@ -2,7 +2,7 @@
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/Theme/WidgetThemeSettings.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
-#include "Widget/Style/WidgetBrushStyle.h"
+#include "Widget/Style/CommonBrushStyle.h"
 #include "CommonButtonBase.h"
 #include "CommonTextBlock.h"
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -55,6 +55,7 @@ namespace WidgetThemeEdit
 	static TArray<FString> ProjectContentMounts();
 	static TArray<FAssetData> ProjectAssets(bool StylesOnly);
 	static FString MountRoot(const FString& Path);
+	static bool PackageCouldContainTag(const FAssetData& Asset, const FString& Name);
 	static TSet<UPackage*> ReferenceChangedPackages;
 	static TArray<UWidgetTheme*> AllThemes()
 	{
@@ -538,10 +539,10 @@ namespace WidgetThemeEdit
 		FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get().ScanModifiedAssetFiles(ChangedFiles);
 		return bSucceeded;
 	}
-	static bool RewriteTagText(FString& Text, FGameplayTag Old, FGameplayTag New)
+	static bool RewriteTagText(FString& Text, FName OldName, FGameplayTag New)
 	{
 		bool bChanged = false;
-		const FString Before = Old.ToString(), After = New.ToString();
+		const FString Before = OldName.ToString(), After = New.ToString();
 		int32 Offset = 0;
 		while ((Offset = Text.Find(Before, ESearchCase::CaseSensitive, ESearchDir::FromStart, Offset)) != INDEX_NONE)
 		{
@@ -560,7 +561,7 @@ namespace WidgetThemeEdit
 		}
 		return bChanged;
 	}
-	static bool RewriteTag(FProperty* P, void* Value, FGameplayTag Old, FGameplayTag New)
+	static bool RewriteTag(FProperty* P, void* Value, FName OldName, FGameplayTag New)
 	{
 		bool Changed = false;
 		if (auto* S = CastField<FStructProperty>(P))
@@ -568,7 +569,7 @@ namespace WidgetThemeEdit
 			if (S->Struct == FGameplayTag::StaticStruct())
 			{
 				auto* Tag = static_cast<FGameplayTag*>(Value);
-				if (*Tag == Old)
+				if (Tag->GetTagName() == OldName)
 				{
 					*Tag = New;
 					return true;
@@ -580,7 +581,7 @@ namespace WidgetThemeEdit
 				{
 					for (int32 I = 0; I < It->ArrayDim; ++I)
 					{
-						Changed |= RewriteTag(*It, It->ContainerPtrToValuePtr<void>(Value, I), Old, New);
+						Changed |= RewriteTag(*It, It->ContainerPtrToValuePtr<void>(Value, I), OldName, New);
 					}
 				}
 			}
@@ -590,7 +591,7 @@ namespace WidgetThemeEdit
 			FScriptArrayHelper H(A, Value);
 			for (int32 I = 0; I < H.Num(); ++I)
 			{
-				Changed |= RewriteTag(A->Inner, H.GetRawPtr(I), Old, New);
+				Changed |= RewriteTag(A->Inner, H.GetRawPtr(I), OldName, New);
 			}
 		}
 		else if (auto* M = CastField<FMapProperty>(P))
@@ -600,8 +601,8 @@ namespace WidgetThemeEdit
 			{
 				if (H.IsValidIndex(I))
 				{
-					Changed |= RewriteTag(M->KeyProp, H.GetKeyPtr(I), Old, New);
-					Changed |= RewriteTag(M->ValueProp, H.GetValuePtr(I), Old, New);
+					Changed |= RewriteTag(M->KeyProp, H.GetKeyPtr(I), OldName, New);
+					Changed |= RewriteTag(M->ValueProp, H.GetValuePtr(I), OldName, New);
 				}
 			}
 			if (Changed)
@@ -616,7 +617,7 @@ namespace WidgetThemeEdit
 			{
 				if (H.IsValidIndex(I))
 				{
-					Changed |= RewriteTag(SetProperty->ElementProp, H.GetElementPtr(I), Old, New);
+					Changed |= RewriteTag(SetProperty->ElementProp, H.GetElementPtr(I), OldName, New);
 				}
 			}
 			if (Changed)
@@ -627,13 +628,13 @@ namespace WidgetThemeEdit
 		else if (auto* String = CastField<FStrProperty>(P))
 		{
 			FString Text = String->GetPropertyValue(Value);
-			Changed = RewriteTagText(Text, Old, New);
+			Changed = RewriteTagText(Text, OldName, New);
 			if (Changed)
 			{
 				String->SetPropertyValue(Value, Text);
 			}
 		}
-		else if (auto* Name = CastField<FNameProperty>(P); Name && Name->GetPropertyValue(Value) == Old.GetTagName())
+		else if (auto* Name = CastField<FNameProperty>(P); Name && Name->GetPropertyValue(Value) == OldName)
 		{
 			Name->SetPropertyValue(Value, New.GetTagName());
 			Changed = true;
@@ -710,7 +711,7 @@ namespace WidgetThemeEdit
 		}
 		return false;
 	}
-	static bool RenameKeysSafe(UObject* Object, FGameplayTag Old, FGameplayTag New, FString& Report)
+	static bool RenameKeysSafe(UObject* Object, FName OldName, FGameplayTag New, FString& Report)
 	{
 		for (TFieldIterator<FProperty> P(Object->GetClass()); P; ++P)
 		{
@@ -725,7 +726,7 @@ namespace WidgetThemeEdit
 			for (int32 I = 0; I < P->ArrayDim; ++I)
 			{
 				void* Element = static_cast<uint8*>(Temp) + I * P->GetElementSize();
-				RewriteTag(*P, Element, Old, New);
+				RewriteTag(*P, Element, OldName, New);
 				Collision |= DuplicateKeys(*P, Element);
 			}
 			P->DestroyValue(Temp);
@@ -1259,12 +1260,146 @@ bool FWidgetThemeEditorService::RenameStyle(UWidgetTheme* Theme, FGameplayTag Ta
 		Report = TEXT("Choose a different unused name.");
 		return false;
 	}
+	TArray<const FGameplayTagSource*> Sources;
+	UGameplayTagsManager::Get().FindTagSourcesWithType(EGameplayTagSourceType::DefaultTagList, Sources);
+	UGameplayTagsManager::Get().FindTagSourcesWithType(EGameplayTagSourceType::TagList, Sources);
+	for (const FGameplayTagSource* Source : Sources)
+	{
+		if (Source && Source->SourceTagList && Source->SourceTagList->GameplayTagRedirects.ContainsByPredicate(
+			[&](const FGameplayTagRedirect& Redirect) { return Redirect.OldTagName == FName(*FullName); }))
+		{
+			Report = TEXT("The new name is reserved by an existing Tag redirect. Choose an unused name.");
+			return false;
+		}
+	}
 	UBlueprint* Style = Blueprint(Theme, Tag);
-	if (!Style || !RegisterTag(FullName, Style->GetOutermost()->GetName(), Report) || !RenameTag(Tag, FGameplayTag::RequestGameplayTag(FName(*FullName)), Report))
+	if (!Style || !RegisterTag(FullName, Style->GetOutermost()->GetName(), Report) ||
+		!RenameTag(Tag, FGameplayTag::RequestGameplayTag(FName(*FullName)), Report, true))
 	{
 		return false;
 	}
 	return PersistReferenceChanges(Report);
+}
+
+bool FWidgetThemeEditorService::MigrateTag(FGameplayTag OldTag, FGameplayTag NewTag, FString& Report)
+{
+	if (!RenameTag(OldTag, NewTag, Report))
+	{
+		return false;
+	}
+	return PersistReferenceChanges(Report);
+}
+
+bool FWidgetThemeEditorService::MigrateTagReferences(const FString& OldTagName, FGameplayTag NewTag, FString& Report)
+{
+	const FName OldName(*OldTagName);
+	EWidgetStyleKind Type;
+	if (OldName.IsNone() || !Kind(NewTag, Type) || WidgetStyleTags::IsRoot(NewTag) || OldName == NewTag.GetTagName())
+	{
+		Report = TEXT("Select a registered non-root replacement Tag and a different old Tag name.");
+		return false;
+	}
+	const FString OldNameString = OldName.ToString();
+	const FString StyleRoot = WidgetStyleTags::Root(Type).ToString() + TEXT(".");
+	if (!OldNameString.StartsWith(StyleRoot))
+	{
+		Report = TEXT("The old and replacement Tags must use the same style type root.");
+		return false;
+	}
+	if (const FGameplayTag RegisteredOldTag = FGameplayTag::RequestGameplayTag(OldName, false); RegisteredOldTag.IsValid())
+	{
+		return MigrateTag(RegisteredOldTag, NewTag, Report);
+	}
+
+	auto& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
+	Registry.SearchAllAssets(true);
+	const TArray<FAssetData> Assets = ProjectAssets(false);
+	for (const FAssetData& Asset : Assets)
+	{
+		if (WidgetThemeEdit::PackageCouldContainTag(Asset, OldNameString) && !Asset.GetAsset())
+		{
+			Report = TEXT("Cannot prove Tag reference migration safe; unloadable asset: ") + Asset.GetObjectPathString();
+			return false;
+		}
+	}
+
+	TArray<UObject*> Objects;
+	for (TObjectIterator<UObject> It; It; ++It)
+	{
+		UObject* Object = *It;
+		if (!ProjectContentMounts().Contains(MountRoot(Object->GetOutermost()->GetName())) || Object->HasAnyFlags(RF_Transient) || Object->IsA<UPackage>())
+		{
+			continue;
+		}
+		if (!Writable(Object->GetOutermost(), Report) || !RenameKeysSafe(Object, OldName, NewTag, Report))
+		{
+			return false;
+		}
+		Objects.Add(Object);
+	}
+
+	TGuardValue<bool> Busy(bBusy, true);
+	FScopedTransaction Transaction(NSLOCTEXT("WidgetTheme", "MigrateTagReferences", "Migrate theme Tag references"));
+	TSet<UPackage*> ChangedPackages;
+	for (UObject* Object : Objects)
+	{
+		Object->Modify(false);
+		bool bChanged = false;
+		for (TFieldIterator<FProperty> Property(Object->GetClass()); Property; ++Property)
+		{
+			if (Property->HasAnyPropertyFlags(CPF_Transient))
+			{
+				continue;
+			}
+			for (int32 Index = 0; Index < Property->ArrayDim; ++Index)
+			{
+				bChanged |= RewriteTag(*Property, Property->ContainerPtrToValuePtr<void>(Object, Index), OldName, NewTag);
+			}
+		}
+		if (UEdGraphNode* Node = Cast<UEdGraphNode>(Object))
+		{
+			for (UEdGraphPin* Pin : Node->Pins)
+			{
+				if (Pin)
+				{
+					bChanged |= RewriteTagText(Pin->DefaultValue, OldName, NewTag);
+				}
+			}
+		}
+		if (bChanged)
+		{
+			Object->PostEditChange();
+			Object->MarkPackageDirty();
+			ChangedPackages.Add(Object->GetOutermost());
+			ReferenceChangedPackages.Add(Object->GetOutermost());
+		}
+	}
+
+	bool bCompiled = true;
+	for (const FAssetData& Asset : Assets)
+	{
+		UPackage* Package = FindPackage(nullptr, *Asset.PackageName.ToString());
+		if (ChangedPackages.Contains(Package))
+		{
+			if (UBlueprint* BlueprintAsset = Cast<UBlueprint>(Asset.GetAsset()))
+			{
+				FBlueprintEditorUtils::MarkBlueprintAsModified(BlueprintAsset);
+				bCompiled &= Compile(BlueprintAsset, Report);
+			}
+		}
+	}
+	if (!bCompiled)
+	{
+		Report += TEXT("Tag references are pending in memory; fix compile errors or Undo. No redirects were written.\n");
+		return false;
+	}
+	if (!PersistReferenceChanges(Report))
+	{
+		return false;
+	}
+	UGameplayTagsManager::Get().EditorRefreshGameplayTagTree();
+	Report += FString::Printf(TEXT("Directly rewrote Tag references in %d packages without creating redirects.\n"), ChangedPackages.Num());
+	return true;
 }
 
 namespace WidgetThemeEdit
@@ -1670,7 +1805,7 @@ namespace WidgetThemeEdit
 	static bool ContainsTagText(const FString& Text, const FString& Tag)
 	{
 		FString Trial = Text;
-		return RewriteTagText(Trial, FGameplayTag::RequestGameplayTag(FName(*Tag), false), WidgetStyleTags::Root(EWidgetStyleKind::Brush));
+		return RewriteTagText(Trial, FName(*Tag), WidgetStyleTags::Root(EWidgetStyleKind::Brush));
 	}
 	static bool HasTagUsage(FGameplayTag Tag, const TSet<FName>& DeletedPackages)
 	{
@@ -1825,6 +1960,345 @@ namespace WidgetThemeEdit
 			}
 		} while (Added);
 	}
+}
+
+bool FWidgetThemeEditorService::MigrateTagAlias(FName OldAlias, FGameplayTag NewTag, FString& Report)
+{
+	Report.Reset();
+	if (OldAlias.IsNone() || !NewTag.IsValid())
+	{
+		Report = TEXT("A non-empty old alias and a registered replacement Tag are required.");
+		return false;
+	}
+	const FString OldName = OldAlias.ToString();
+	EWidgetStyleKind AliasKind = EWidgetStyleKind::None;
+	for (EWidgetStyleKind Type : WidgetStyleTags::Kinds())
+	{
+		const FGameplayTag Root = WidgetStyleTags::Root(Type);
+		if (OldName.StartsWith(Root.ToString() + TEXT("."), ESearchCase::CaseSensitive))
+		{
+			AliasKind = Type;
+			break;
+		}
+	}
+	EWidgetStyleKind NewKind;
+	if (AliasKind == EWidgetStyleKind::None || !Kind(NewTag, NewKind) || AliasKind != NewKind || WidgetStyleTags::IsRoot(NewTag) ||
+		OldAlias == WidgetStyleTags::CommonDefault(AliasKind).GetTagName() || NewTag == WidgetStyleTags::CommonDefault(NewKind))
+	{
+		Report = TEXT("The alias and replacement must be leaf Tags under the same style type root.");
+		return false;
+	}
+
+	UGameplayTagsManager& Manager = UGameplayTagsManager::Get();
+	TArray<const FGameplayTagSource*> Sources;
+	Manager.FindTagSourcesWithType(EGameplayTagSourceType::DefaultTagList, Sources);
+	Manager.FindTagSourcesWithType(EGameplayTagSourceType::TagList, Sources);
+	TArray<UGameplayTagsList*> RedirectLists;
+	for (const FGameplayTagSource* Source : Sources)
+	{
+		UGameplayTagsList* List = Source ? Source->SourceTagList.Get() : nullptr;
+		if (!List)
+		{
+			continue;
+		}
+		if (List->GameplayTagList.ContainsByPredicate([&](const FGameplayTagTableRow& Row) { return Row.Tag == OldAlias; }))
+		{
+			Report = TEXT("The old name has a direct Tag definition. Use MigrateTag for a defined Tag, not MigrateTagAlias.");
+			return false;
+		}
+		if (List->GameplayTagRedirects.ContainsByPredicate([&](const FGameplayTagRedirect& Redirect)
+			{
+				return Redirect.NewTagName == OldAlias && Redirect.OldTagName != OldAlias;
+			}))
+		{
+			Report = TEXT("Another old alias redirects through this alias. Migrate the upstream alias first.");
+			return false;
+		}
+		if (List->GameplayTagRedirects.ContainsByPredicate([&](const FGameplayTagRedirect& Redirect) { return Redirect.OldTagName == OldAlias; }))
+		{
+			if (IFileManager::Get().IsReadOnly(*List->ConfigFileName))
+			{
+				Report = TEXT("Alias redirect config is read-only: ") + List->ConfigFileName;
+				return false;
+			}
+			RedirectLists.AddUnique(List);
+		}
+	}
+	if (RedirectLists.IsEmpty())
+	{
+		Report = TEXT("No editable Gameplay Tag redirect defines the requested alias.");
+		return false;
+	}
+	for (const FString& Directory : WidgetThemeEdit::ReferenceTextDirectories())
+	{
+		TArray<FString> Files;
+		IFileManager::Get().FindFilesRecursive(Files, *Directory, TEXT("*"), true, false);
+		for (const FString& File : Files)
+		{
+			const FString Extension = FPaths::GetExtension(File).ToLower();
+			if (Extension != TEXT("h") && Extension != TEXT("cpp"))
+			{
+				continue;
+			}
+			FString Text;
+			if (!FFileHelper::LoadFileToString(Text, *File))
+			{
+				Report += TEXT("Could not scan native alias definitions: ") + File + TEXT("\n");
+				return false;
+			}
+			TArray<FString> Lines;
+			Text.ParseIntoArrayLines(Lines, false);
+			for (const FString& Line : Lines)
+			{
+				if (Line.Contains(TEXT("UE_DEFINE_GAMEPLAY_TAG")) && Line.Contains(TEXT("\"") + OldName + TEXT("\"")))
+				{
+					Report = TEXT("The alias has a native C++ registration. Change its native definition directly before migrating serialized references: ") + File;
+					return false;
+				}
+			}
+		}
+	}
+
+	TArray<FAssetData> Assets = WidgetThemeEdit::ProjectAssets(false);
+	for (const FAssetData& Asset : Assets)
+	{
+		if (WidgetThemeEdit::PackageCouldContainTag(Asset, OldName) && !Asset.GetAsset())
+		{
+			Report += TEXT("Cannot prove alias migration safe; unloadable asset: ") + Asset.GetObjectPathString() + TEXT("\n");
+			return false;
+		}
+	}
+
+	TArray<UObject*> Objects;
+	const TArray<FString> ProjectMounts = WidgetThemeEdit::ProjectContentMounts();
+	for (TObjectIterator<UObject> It; It; ++It)
+	{
+		UObject* Object = *It;
+		if (!ProjectMounts.Contains(WidgetThemeEdit::MountRoot(Object->GetOutermost()->GetName())) ||
+			Object->HasAnyFlags(RF_Transient) || Object->IsA<UPackage>())
+		{
+			continue;
+		}
+		if (!WidgetThemeEdit::Writable(Object->GetOutermost(), Report) ||
+			!WidgetThemeEdit::RenameKeysSafe(Object, OldAlias, NewTag, Report))
+		{
+			return false;
+		}
+		Objects.Add(Object);
+	}
+
+	TMap<FString, FString> TextChanges;
+	for (const FString& Directory : WidgetThemeEdit::ReferenceTextDirectories())
+	{
+		TArray<FString> Files;
+		IFileManager::Get().FindFilesRecursive(Files, *Directory, TEXT("*"), true, false);
+		for (const FString& File : Files)
+		{
+			const FString Extension = FPaths::GetExtension(File).ToLower();
+			if (Extension != TEXT("h") && Extension != TEXT("cpp") && Extension != TEXT("inl") && Extension != TEXT("ini") && Extension != TEXT("cs"))
+			{
+				continue;
+			}
+			FString Text;
+			if (!FFileHelper::LoadFileToString(Text, *File))
+			{
+				Report += TEXT("Could not scan alias reference file: ") + File + TEXT("\n");
+				return false;
+			}
+			TArray<FString> Lines;
+			Text.ParseIntoArrayLines(Lines, false);
+			bool bChanged = false;
+			for (FString& Line : Lines)
+			{
+				if (Line.Contains(TEXT("GameplayTagList=")) || Line.Contains(TEXT("GameplayTagRedirects=")))
+				{
+					continue;
+				}
+				if ((Extension == TEXT("cpp") || Extension == TEXT("h")) && Line.Contains(TEXT("UE_DEFINE_GAMEPLAY_TAG")) &&
+					Line.Contains(TEXT("\"") + OldName + TEXT("\"")))
+				{
+					Report = TEXT("The alias has a native C++ registration. Change its native definition directly before migrating serialized references: ") + File;
+					return false;
+				}
+				bChanged |= WidgetThemeEdit::RewriteTagText(Line, OldAlias, NewTag);
+			}
+			if (bChanged)
+			{
+				if (IFileManager::Get().IsReadOnly(*File))
+				{
+					Report += TEXT("Alias reference file is read-only: ") + File + TEXT("\n");
+					return false;
+				}
+				TextChanges.Add(File, FString::Join(Lines, Text.Contains(TEXT("\r\n")) ? TEXT("\r\n") : TEXT("\n")) + TEXT("\n"));
+			}
+		}
+	}
+
+	FScopedTransaction Transaction(NSLOCTEXT("WidgetTheme", "MigrateTagAlias", "Migrate Gameplay Tag alias without redirect"));
+	TSet<UPackage*> ChangedPackages;
+	for (UObject* Object : Objects)
+	{
+		Object->Modify(false);
+		bool bChanged = false;
+		for (TFieldIterator<FProperty> Property(Object->GetClass()); Property; ++Property)
+		{
+			if (Property->HasAnyPropertyFlags(CPF_Transient))
+			{
+				continue;
+			}
+			for (int32 Index = 0; Index < Property->ArrayDim; ++Index)
+			{
+				bChanged |= WidgetThemeEdit::RewriteTag(*Property, Property->ContainerPtrToValuePtr<void>(Object, Index), OldAlias, NewTag);
+			}
+		}
+		if (UEdGraphNode* Node = Cast<UEdGraphNode>(Object))
+		{
+			for (UEdGraphPin* Pin : Node->Pins)
+			{
+				if (Pin)
+				{
+					bChanged |= WidgetThemeEdit::RewriteTagText(Pin->DefaultValue, OldAlias, NewTag);
+				}
+			}
+		}
+		if (bChanged)
+		{
+			Object->PostEditChange();
+			Object->MarkPackageDirty();
+			ChangedPackages.Add(Object->GetOutermost());
+			ReferenceChangedPackages.Add(Object->GetOutermost());
+		}
+	}
+
+	bool bBlueprintsGood = true;
+	for (const FAssetData& Asset : Assets)
+	{
+		if (ChangedPackages.Contains(FindPackage(nullptr, *Asset.PackageName.ToString())))
+		{
+			if (UBlueprint* Blueprint = Cast<UBlueprint>(Asset.GetAsset()))
+			{
+				FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+				bBlueprintsGood &= WidgetThemeEdit::Compile(Blueprint, Report);
+			}
+		}
+	}
+	if (!bBlueprintsGood)
+	{
+		Report += TEXT("Alias references are pending in memory because Blueprint compilation failed. No redirect was removed.\n");
+		return false;
+	}
+	for (const auto& Change : TextChanges)
+	{
+		if (!FFileHelper::SaveStringToFile(Change.Value, *Change.Key, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+		{
+			Report += TEXT("Could not save alias reference file: ") + Change.Key + TEXT(". Changes may remain pending.\n");
+			return false;
+		}
+		Report += TEXT("Alias reference file updated: ") + Change.Key + TEXT("\n");
+	}
+	for (UGameplayTagsList* List : RedirectLists)
+	{
+		List->Modify();
+		List->GameplayTagRedirects.RemoveAll([&](const FGameplayTagRedirect& Redirect) { return Redirect.OldTagName == OldAlias; });
+		if (!List->TryUpdateDefaultConfigFile(List->ConfigFileName))
+		{
+			Report += TEXT("Could not remove alias redirect from: ") + List->ConfigFileName + TEXT(". Package changes may remain pending.\n");
+			return false;
+		}
+		Report += TEXT("Alias redirect removed from: ") + List->ConfigFileName + TEXT("\n");
+	}
+	Manager.EditorRefreshGameplayTagTree();
+	FWidgetThemeResolver::NotifyThemeChanged();
+	return PersistReferenceChanges(Report);
+}
+
+bool FWidgetThemeEditorService::RemoveDuplicateGlobalTagDefinition(FGameplayTag Tag, const FString& TargetOwnerPath, FString& Report)
+{
+	Report.Reset();
+	EWidgetStyleKind Kind;
+	if (!Tag.IsValid() || !WidgetStyleTags::Kind(Tag, Kind) || WidgetStyleTags::IsRoot(Tag) || Tag == WidgetStyleTags::CommonDefault(Kind))
+	{
+		Report = TEXT("Only a registered non-root, non-default style Tag can be removed from the global duplicate list.");
+		return false;
+	}
+	FString OwnerFilename;
+	if (!GetTagSourceFilename(TargetOwnerPath, OwnerFilename, Report))
+	{
+		return false;
+	}
+	UGameplayTagsManager& Manager = UGameplayTagsManager::Get();
+	TArray<const FGameplayTagSource*> ModuleSources;
+	Manager.FindTagSourcesWithType(EGameplayTagSourceType::TagList, ModuleSources);
+	int32 OwnerDefinitionCount = 0;
+	for (const FGameplayTagSource* Source : ModuleSources)
+	{
+		UGameplayTagsList* List = Source ? Source->SourceTagList.Get() : nullptr;
+		if (!List || !List->GameplayTagList.ContainsByPredicate([&](const FGameplayTagTableRow& Row) { return Row.Tag == Tag.GetTagName(); }))
+		{
+			continue;
+		}
+		const FString SourceFilename = FPaths::ConvertRelativePathToFull(List->ConfigFileName);
+		if (SourceFilename == OwnerFilename)
+		{
+			++OwnerDefinitionCount;
+		}
+		else
+		{
+			Report = TEXT("The Tag is also defined by another module source; resolve ownership before removing the global duplicate: ") + SourceFilename;
+			return false;
+		}
+	}
+	if (OwnerDefinitionCount != 1)
+	{
+		Report = TEXT("The target owner config must contain exactly one definition of the Tag: ") + OwnerFilename;
+		return false;
+	}
+	TArray<const FGameplayTagSource*> ConfigSources;
+	Manager.FindTagSourcesWithType(EGameplayTagSourceType::DefaultTagList, ConfigSources);
+	Manager.FindTagSourcesWithType(EGameplayTagSourceType::TagList, ConfigSources);
+	for (const FGameplayTagSource* Source : ConfigSources)
+	{
+		const UGameplayTagsList* List = Source ? Source->SourceTagList.Get() : nullptr;
+		if (List && List->GameplayTagRedirects.ContainsByPredicate([&](const FGameplayTagRedirect& Redirect)
+			{
+				return Redirect.OldTagName == Tag.GetTagName() || Redirect.NewTagName == Tag.GetTagName();
+			}))
+		{
+			Report = TEXT("Remove Style redirects referencing this Tag before removing its global duplicate definition.");
+			return false;
+		}
+	}
+	UGameplayTagsSettings* Settings = GetMutableDefault<UGameplayTagsSettings>();
+	if (!Settings->GameplayTagList.ContainsByPredicate([&](const FGameplayTagTableRow& Row) { return Row.Tag == Tag.GetTagName(); }))
+	{
+		Report = TEXT("The global default list does not contain this duplicate Tag definition.");
+		return false;
+	}
+	if (IFileManager::Get().IsReadOnly(*Settings->GetDefaultConfigFilename()))
+	{
+		Report = TEXT("DefaultGameplayTags.ini is read-only.");
+		return false;
+	}
+	const TArray<FGameplayTagTableRow> PreviousRows = Settings->GameplayTagList;
+	Settings->Modify();
+	Settings->GameplayTagList.RemoveAll([&](const FGameplayTagTableRow& Row) { return Row.Tag == Tag.GetTagName(); });
+	if (!Settings->TryUpdateDefaultConfigFile())
+	{
+		Settings->GameplayTagList = PreviousRows;
+		Report = TEXT("Could not remove the duplicate global Tag definition; the in-memory list was restored.");
+		return false;
+	}
+	Manager.EditorRefreshGameplayTagTree();
+	if (!FGameplayTag::RequestGameplayTag(Tag.GetTagName(), false).IsValid())
+	{
+		Settings->GameplayTagList = PreviousRows;
+		Settings->TryUpdateDefaultConfigFile();
+		Manager.EditorRefreshGameplayTagTree();
+		Report = TEXT("The owning module did not preserve the Tag after global cleanup; the global definition was restored.");
+		return false;
+	}
+	Report = TEXT("Removed duplicate global definition; module-owned Tag retained: ") + Tag.ToString();
+	return true;
 }
 
 bool FWidgetThemeEditorService::CanDeleteAssets(const TArray<UObject*>& Assets, FString& Report)
@@ -2100,13 +2574,76 @@ bool FWidgetThemeEditorService::RemoveBinding(UWidgetTheme* Theme, FGameplayTag 
 	return true;
 }
 
-bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FString& Report)
+bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FString& Report, bool bCreateRedirect)
 {
+	UGameplayTagsManager& Manager = UGameplayTagsManager::Get();
 	EWidgetStyleKind OldKind;
 	EWidgetStyleKind NewKind;
 	if (!Kind(Old, OldKind) || !Kind(New, NewKind) || OldKind != NewKind || Old == New)
 	{
 		Report = TEXT("New Tag must be registered and retain the original style type root.");
+		return false;
+	}
+	if (WidgetStyleTags::IsRoot(Old) || WidgetStyleTags::IsRoot(New) || Old == WidgetStyleTags::CommonDefault(OldKind) ||
+		New == WidgetStyleTags::CommonDefault(NewKind))
+	{
+		Report = TEXT("Native style roots and neutral default Tags are fixed framework registrations and cannot be renamed as assets.");
+		return false;
+	}
+	if (!Manager.RequestGameplayTag(New.GetTagName(), false).IsValid())
+	{
+		Report = TEXT("The replacement Tag must already be registered before its references are migrated.");
+		return false;
+	}
+	if (TSharedPtr<FGameplayTagNode> OldNode = Manager.FindTagNode(Old))
+	{
+		for (FName SourceName : OldNode->GetAllSourceNames())
+		{
+			const FGameplayTagSource* Source = Manager.FindTagSource(SourceName);
+			if (Source && Source->SourceType == EGameplayTagSourceType::Native)
+			{
+				Report = TEXT("The old Tag has a native C++ registration. Change its native definition before migrating asset references.");
+				return false;
+			}
+		}
+	}
+	TArray<const FGameplayTagSource*> TagSources;
+	Manager.FindTagSourcesWithType(EGameplayTagSourceType::DefaultTagList, TagSources);
+	Manager.FindTagSourcesWithType(EGameplayTagSourceType::TagList, TagSources);
+	TArray<UGameplayTagsList*> TagListsToUpdate;
+	bool bFoundOldDefinition = false;
+	for (const FGameplayTagSource* Source : TagSources)
+	{
+		UGameplayTagsList* TagList = Source ? Source->SourceTagList.Get() : nullptr;
+		if (!TagList)
+		{
+			continue;
+		}
+		const bool bDefinesOldTag = TagList->GameplayTagList.ContainsByPredicate(
+			[&](const FGameplayTagTableRow& Row) { return Row.Tag == Old.GetTagName(); });
+		const bool bHasIncomingRedirect = TagList->GameplayTagRedirects.ContainsByPredicate(
+			[&](const FGameplayTagRedirect& Redirect) { return Redirect.NewTagName == Old.GetTagName() && Redirect.OldTagName != Old.GetTagName(); });
+		if (bHasIncomingRedirect && !bCreateRedirect)
+		{
+			Report = TEXT("An older Tag redirects to this Tag. Rewrite that alias's references and remove its redirect before migrating this Tag.");
+			return false;
+		}
+		const bool bRedirectsOldTag = TagList->GameplayTagRedirects.ContainsByPredicate(
+			[&](const FGameplayTagRedirect& Redirect) { return Redirect.OldTagName == Old.GetTagName(); });
+		bFoundOldDefinition |= bDefinesOldTag;
+		if (bDefinesOldTag || bRedirectsOldTag || (bCreateRedirect && bHasIncomingRedirect))
+		{
+			if (IFileManager::Get().IsReadOnly(*TagList->ConfigFileName))
+			{
+				Report = TEXT("Tag definition or redirect config is read-only: ") + TagList->ConfigFileName;
+				return false;
+			}
+			TagListsToUpdate.AddUnique(TagList);
+		}
+	}
+	if (!bFoundOldDefinition)
+	{
+		Report = TEXT("The old Tag is not defined in an editable Gameplay Tag config. Native Tags must be changed at their source.");
 		return false;
 	}
 	auto& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
@@ -2138,25 +2675,11 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 		{
 			return false;
 		}
-		if (!RenameKeysSafe(O, Old, New, Report))
+		if (!RenameKeysSafe(O, Old.GetTagName(), New, Report))
 		{
 			return false;
 		}
 		Objects.Add(O);
-	}
-	UGameplayTagsSettings* Settings = GetMutableDefault<UGameplayTagsSettings>();
-	if (IFileManager::Get().IsReadOnly(*Settings->GetDefaultConfigFilename()))
-	{
-		Report = TEXT("Gameplay tag config is read-only.");
-		return false;
-	}
-	for (const FGameplayTagRedirect& R : Settings->GameplayTagRedirects)
-	{
-		if (R.OldTagName == Old.GetTagName() && R.NewTagName != New.GetTagName())
-		{
-			Report = TEXT("Old Tag already has a different redirect. Resolve the conflict first.");
-			return false;
-		}
 	}
 	TMap<FString, FString> TextChanges;
 	for (const FString& Directory : ReferenceTextDirectories())
@@ -2185,7 +2708,7 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 				{
 					continue;
 				}
-				Changed |= RewriteTagText(Line, Old, New);
+				Changed |= RewriteTagText(Line, Old.GetTagName(), New);
 			}
 			if (Changed)
 			{
@@ -2198,7 +2721,7 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 			}
 		}
 	}
-	FScopedTransaction Transaction(NSLOCTEXT("WidgetTheme", "RenameTag", "Rename theme Tag with redirect"));
+	FScopedTransaction Transaction(NSLOCTEXT("WidgetTheme", "RenameTag", "Rename theme Tag"));
 	for (UObject* O : Objects)
 	{
 		O->Modify();
@@ -2209,7 +2732,7 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 			{
 				for (int32 I = 0; I < P->ArrayDim; ++I)
 				{
-					Changed |= RewriteTag(*P, P->ContainerPtrToValuePtr<void>(O, I), Old, New);
+					Changed |= RewriteTag(*P, P->ContainerPtrToValuePtr<void>(O, I), Old.GetTagName(), New);
 				}
 			}
 		}
@@ -2219,7 +2742,7 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 			{
 				if (Pin)
 				{
-					Changed |= RewriteTagText(Pin->DefaultValue, Old, New);
+					Changed |= RewriteTagText(Pin->DefaultValue, Old.GetTagName(), New);
 				}
 			}
 		}
@@ -2257,35 +2780,43 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 		}
 		Report += TEXT("Reference file updated: ") + Change.Key + TEXT("\n");
 	}
-	FString RedirectFilename = Settings->GetDefaultConfigFilename();
-	if (TSharedPtr<FGameplayTagNode> Node = UGameplayTagsManager::Get().FindTagNode(Old))
+	bool bRedirectWritten = false;
+	for (UGameplayTagsList* TagList : TagListsToUpdate)
 	{
-		for (FName SourceName : Node->GetAllSourceNames())
+		TagList->Modify();
+		const bool bDefinesOldTag = TagList->GameplayTagList.ContainsByPredicate(
+			[&](const FGameplayTagTableRow& Row) { return Row.Tag == Old.GetTagName(); });
+		TagList->GameplayTagList.RemoveAll([&](const FGameplayTagTableRow& Row) { return Row.Tag == Old.GetTagName(); });
+		TagList->GameplayTagRedirects.RemoveAll([&](const FGameplayTagRedirect& Redirect) { return Redirect.OldTagName == Old.GetTagName(); });
+		if (bCreateRedirect)
 		{
-			const FGameplayTagSource* Source = UGameplayTagsManager::Get().FindTagSource(SourceName);
-			if (Source && Source->SourceTagList)
+			for (FGameplayTagRedirect& Redirect : TagList->GameplayTagRedirects)
 			{
-				RedirectFilename = Source->SourceTagList->ConfigFileName;
-				break;
+				if (Redirect.NewTagName == Old.GetTagName())
+				{
+					Redirect.NewTagName = New.GetTagName();
+				}
+			}
+			if (bDefinesOldTag && !bRedirectWritten)
+			{
+				FGameplayTagRedirect Redirect;
+				Redirect.OldTagName = Old.GetTagName();
+				Redirect.NewTagName = New.GetTagName();
+				TagList->GameplayTagRedirects.Add(Redirect);
+				bRedirectWritten = true;
 			}
 		}
+		if (!TagList->TryUpdateDefaultConfigFile(TagList->ConfigFileName))
+		{
+			Report += TEXT("Could not save the direct Tag definition update: ") + TagList->ConfigFileName + TEXT(". Package changes may remain pending.\n");
+			return false;
+		}
+		Report += TEXT("Updated Tag definition and redirect config: ") + TagList->ConfigFileName + TEXT("\n");
 	}
-	if (!IGameplayTagsEditorModule::Get().RenameTagInINI(Old.ToString(), New.ToString(), false))
-	{
-		Report += TEXT("Gameplay Tag definition and redirect could not be saved.\n");
-		return false;
-	}
-	FString WrittenConfig;
-	const FString ExpectedRedirect = TEXT("OldTagName=\"") + Old.ToString() + TEXT("\",NewTagName=\"") + New.ToString() + TEXT("\"");
-	if (!FFileHelper::LoadFileToString(WrittenConfig, *RedirectFilename) || !WrittenConfig.Contains(ExpectedRedirect))
-	{
-		Report += TEXT("Redirect config could not be written; asset changes remain pending in memory.\n");
-		return false;
-	}
-	UGameplayTagsManager::Get().EditorRefreshGameplayTagTree();
-	Report += FString::Printf(TEXT("Renamed reflected references in %d packages. GUID names unchanged. Redirect config "
-								   "is saved and must remain for old configs/saves; config writes are not undone by Ctrl+Z.\n"),
-							  Packages.Num());
+	Manager.EditorRefreshGameplayTagTree();
+	Report += FString::Printf(TEXT("Migrated reflected references in %d packages. GUID names are unchanged. Config writes are not undone by Ctrl+Z.\n"), Packages.Num());
+	Report += bCreateRedirect ? TEXT("The previous Tag name redirects to the new name; older aliases target the new name directly.\n")
+		: TEXT("The old definition and redirects were removed.\n");
 	FWidgetThemeResolver::NotifyThemeChanged();
 	return true;
 }

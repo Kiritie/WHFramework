@@ -33,10 +33,10 @@ public:
 	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
 
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Text"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Text"))
 	FGameplayTag StyleTag;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.TextScroll"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.TextScroll"))
 	FGameplayTag TextScrollStyleTag;
 
 private:

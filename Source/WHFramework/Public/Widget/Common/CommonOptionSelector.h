@@ -7,7 +7,6 @@ class UCommonButton;
 class UCommonTextBlockN;
 class UCommonOptionSelector;
 class UNativeWidgetHost;
-class USizeBox;
 class UCommonImageN;
 class SScrollBar;
 class SBox;
@@ -52,18 +51,6 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetUseDropdown(bool bInUseDropdown);
 
-	UFUNCTION(BlueprintCallable)
-	void SetLabel(const FText& InLabel);
-
-	UFUNCTION(BlueprintCallable)
-	void SetLabelWidth(float InWidth);
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = "true"))
-	FText Label;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ExposeOnSpawn = "true", ClampMin = "0.0"))
-	float LabelWidth = 0.f;
-
 protected:
 	virtual void BuildNativeLayout() override;
 	virtual void ApplyResolvedStyle(const UObject* InStyle) override;
@@ -83,7 +70,6 @@ protected:
 	void OnPreviousClicked();
 	void OnNextClicked();
 	void RefreshValue();
-	void RefreshLabel();
 	void BuildDropdown();
 	void RefreshSelectedLabel();
 	TSharedRef<SWidget> GenerateOptionSlate(FName InKey);
@@ -130,12 +116,6 @@ private:
 
 	TArray<FName> OptionKeys;
 	FGameplayTag OptionTextStyleTag;
-
-	UPROPERTY(Transient)
-	TObjectPtr<USizeBox> NativeLabelBox;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UCommonTextBlockN> NativeLabel;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UCommonImageN> NativeValueBackground;

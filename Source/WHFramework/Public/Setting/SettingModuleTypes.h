@@ -12,6 +12,7 @@
 #include "SettingModuleTypes.generated.h"
 
 class UEnum;
+class UWidgetCustomSettingValueBase;
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSettingId
@@ -221,6 +222,9 @@ public:
 	ESettingRendererType Renderer = ESettingRendererType::Auto;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UWidgetCustomSettingValueBase> CustomWidgetClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ESettingApplyPolicy ApplyPolicy = ESettingApplyPolicy::Deferred;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -301,6 +305,12 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideRenderer"))
 	ESettingRendererType Renderer = ESettingRendererType::Auto;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideCustomWidgetClass = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "bOverrideCustomWidgetClass"))
+	TSubclassOf<UWidgetCustomSettingValueBase> CustomWidgetClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bOverrideApplyPolicy = false;

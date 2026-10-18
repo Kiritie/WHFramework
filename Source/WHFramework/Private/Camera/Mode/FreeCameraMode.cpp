@@ -12,7 +12,7 @@ void UFreeCameraMode::Update(float DeltaTime, FCameraRigState& State)
 {
 	const FRotationMatrix Yaw(FRotator(0.f, State.PivotRotation.Yaw, 0.f));
 	FVector Direction = Yaw.GetUnitAxis(EAxis::X) * MoveInput.X + Yaw.GetUnitAxis(EAxis::Y) * MoveInput.Y + FVector::UpVector * MoveInput.Z;
-	State.PivotLocation += Direction.GetClampedToMaxSize(1.f) * DeltaTime;
+	State.PivotLocation += Direction * DeltaTime;
 	State.PivotLocation += (Yaw.GetUnitAxis(EAxis::Y) * PanInput.X + FVector::UpVector * PanInput.Y) * DeltaTime;
 	State.PivotRotation.Yaw += LookInput.X * DeltaTime;
 	State.PivotRotation.Pitch = FMath::Clamp(State.PivotRotation.Pitch + LookInput.Y * DeltaTime, -89.f, 89.f);

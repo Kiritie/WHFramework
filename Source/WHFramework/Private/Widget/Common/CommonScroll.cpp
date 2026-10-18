@@ -27,7 +27,7 @@ void UCommonScroll::BeginDestroy()
 
 FGameplayTag UCommonScroll::GetStyleTag() const
 {
-	if (bOverrideStyleTag && StyleTag.IsValid())
+	if (StyleTag.IsValid())
 	{
 		return StyleTag;
 	}
@@ -35,26 +35,18 @@ FGameplayTag UCommonScroll::GetStyleTag() const
 	{
 		return InheritedStyleTag;
 	}
-	return StyleTag.IsValid() ? StyleTag : WidgetStyleTags::CommonDefault(EWidgetStyleKind::Scroll);
+	return WidgetStyleTags::CommonDefault(EWidgetStyleKind::Scroll);
 }
 
 void UCommonScroll::SetStyleTag(FGameplayTag InStyleTag)
 {
 	StyleTag = InStyleTag;
-	bOverrideStyleTag = InStyleTag.IsValid();
 	ApplyStyleTag();
 }
 
 void UCommonScroll::SetInheritedStyleTag(FGameplayTag InStyleTag)
 {
 	InheritedStyleTag = InStyleTag;
-	ApplyStyleTag();
-}
-
-void UCommonScroll::ClearStyleOverride()
-{
-	StyleTag = FGameplayTag();
-	bOverrideStyleTag = false;
 	ApplyStyleTag();
 }
 

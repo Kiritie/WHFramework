@@ -167,7 +167,7 @@ FCameraInputIntent ACameraManagerBase::ResolveInput(const FCameraInputIntent& In
 {
 	const FCameraConfig& Config = UCameraModule::Get().GetCameraConfig();
 	FCameraInputIntent Result = InRawInput;
-	Result.Move *= Config.Movement.MoveSpeed;
+	Result.Move = Result.Move.GetClampedToMaxSize(1.f) * Config.Movement.MoveSpeed * UserSettings.MovementSensitivity;
 	Result.Look.X *= Config.Rotation.HorizontalSpeed * UserSettings.HorizontalLookSensitivity;
 	Result.Look.Y *= Config.Rotation.VerticalSpeed * UserSettings.VerticalLookSensitivity;
 	Result.Pan.X *= Config.Movement.HorizontalPanSpeed * UserSettings.HorizontalPanSensitivity;
@@ -190,7 +190,7 @@ FCameraInputIntent ACameraManagerBase::ResolveInput(const FCameraInputIntent& In
 	{
 		Result.Pan.Y *= -1.f;
 	}
-	if(!Config.Movement.bEnableVerticalPan)
+	if(!Config.Movement.bEnableVerticalPan || !UserSettings.bEnableVerticalPan)
 	{
 		Result.Pan.Y = 0.f;
 	}
@@ -408,7 +408,7 @@ void ACameraManagerBase::ApplyRig(float DeltaTime)
 	RuntimeRig->SetActorLocationAndRotation(State.PivotLocation, State.PivotRotation);
 	UCameraSpringArmComponent* Boom = RuntimeRig->GetCameraBoom();
 	const FCameraConfig& Config = UCameraModule::Get().GetCameraConfig();
-	const bool bUseZoomSmoothing = Config.Zoom.bSmoothZoom && UserSettings.bSmoothZoom && UserSettings.ZoomSmoothing > KINDA_SMALL_NUMBER && !bTransitionActive;
+	const bool bUseZoomSmoothing = Config.Zoom.bSmoothZoom && UserSettings.bSmoothZoom && !bTransitionActive;
 	if(!bUseZoomSmoothing)
 	{
 		CurrentArmLength = State.ArmLength;
@@ -420,8 +420,8 @@ void ACameraManagerBase::ApplyRig(float DeltaTime)
 	Boom->TargetArmLength = CurrentArmLength;
 	Boom->SocketOffset = State.SocketOffset;
 	Boom->bDoCollisionTest = State.bEnableCollision;
-	const bool bUseMovementSmoothing = Config.Movement.bSmoothMovement && UserSettings.bSmoothMovement && UserSettings.MovementSmoothing > KINDA_SMALL_NUMBER;
-	const bool bUseRotationSmoothing = Config.Rotation.bSmoothRotation && UserSettings.bSmoothRotation && UserSettings.RotationSmoothing > KINDA_SMALL_NUMBER;
+	const bool bUseMovementSmoothing = Config.Movement.bSmoothMovement && UserSettings.bSmoothMovement;
+	const bool bUseRotationSmoothing = Config.Rotation.bSmoothRotation && UserSettings.bSmoothRotation;
 	Boom->CameraLagSpeed = ResolveSmoothSpeed(UserSettings.MovementSmoothing, Config.Movement.MinSmoothSpeed, Config.Movement.MaxSmoothSpeed);
 	Boom->CameraRotationLagSpeed = ResolveSmoothSpeed(UserSettings.RotationSmoothing, Config.Rotation.MinSmoothSpeed, Config.Rotation.MaxSmoothSpeed);
 	Boom->RefreshArm(

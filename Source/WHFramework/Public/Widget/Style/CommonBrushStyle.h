@@ -1,10 +1,10 @@
 #pragma once
 #include "UObject/Object.h"
 #include "Styling/SlateBrush.h"
-#include "WidgetBrushStyle.generated.h"
+#include "CommonBrushStyle.generated.h"
 
-UCLASS(BlueprintType, Blueprintable)
-class WHFRAMEWORK_API UWidgetBrushStyle : public UObject
+UCLASS(BlueprintType, Blueprintable, meta = (DisplayName = "Common Brush Style"))
+class WHFRAMEWORK_API UCommonBrushStyle : public UObject
 {
 	GENERATED_BODY()
 public:

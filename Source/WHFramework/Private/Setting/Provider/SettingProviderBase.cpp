@@ -40,7 +40,7 @@ bool USettingProviderBase::SetPendingValue(const FSettingDefinition& InDefinitio
 
 bool USettingProviderBase::Preview(const FSettingDefinition& InDefinition, const FParameter& InValue)
 {
-	return false;
+	return Apply(InDefinition, InValue);
 }
 
 bool USettingProviderBase::Apply(const FSettingDefinition& InDefinition, const FParameter& InValue)

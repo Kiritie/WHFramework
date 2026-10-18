@@ -14,13 +14,13 @@ public:
 	TSoftObjectPtr<UWidgetTheme> DefaultTheme;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
-	TSubclassOf<UCommonButtonStyle> ButtonStyleBase;
+	TSubclassOf<UCommonButtonStyleN> ButtonStyleBase;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
 	TSubclassOf<UCommonTextStyle> TextStyleBase;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
-	TSubclassOf<UWidgetBrushStyle> BrushStyleBase;
+	TSubclassOf<UCommonBrushStyle> BrushStyleBase;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
 	TSubclassOf<UCommonInputStyle> InputStyleBase;

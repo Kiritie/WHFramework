@@ -7,7 +7,7 @@
 #include "Widget/Common/CommonToggle.h"
 #include "Widget/Common/CommonRange.h"
 #include "Widget/Common/CommonTextBlockN.h"
-#include "Widget/Style/SubWidgetStyle.h"
+#include "Widget/Style/CommonButtonStyleN.h"
 
 UWidgetSettingEntryBase::UWidgetSettingEntryBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -48,6 +48,7 @@ void UWidgetSettingEntryBase::NativeOnListItemObjectSet(UObject* InListItemObjec
 
 void UWidgetSettingEntryBase::SetSettingEntry(USettingEntry* InEntry)
 {
+	if (SettingEntry == InEntry) return;
 	UnbindValueControl();
 	SettingEntry = InEntry;
 	if(SettingEntry)
@@ -59,7 +60,7 @@ void UWidgetSettingEntryBase::SetSettingEntry(USettingEntry* InEntry)
 	else
 	{
 		SetTitle(FText::GetEmpty());
-		SetIsEnabled(false);
+		SetIsEnabledN(false);
 		SetVisibility(ESlateVisibility::Collapsed);
 		if (Txt_Reason)
 		{
@@ -71,13 +72,23 @@ void UWidgetSettingEntryBase::SetSettingEntry(USettingEntry* InEntry)
 
 void UWidgetSettingEntryBase::RefreshFromModel()
 {
+	RefreshModelState();
+	if (SettingEntry)
+	{
+		TGuardValue<bool> Guard(bRefreshingFromModel, true);
+		ApplyValueToControl(SettingEntry->GetPendingValue());
+	}
+}
+
+void UWidgetSettingEntryBase::RefreshModelState()
+{
 	if(!SettingEntry)
 	{
 		return;
 	}
 
 	TGuardValue<bool> Guard(bRefreshingFromModel, true);
-	SetIsEnabled(SettingEntry->IsEnabled());
+	SetIsEnabledN(SettingEntry->IsEnabled());
 	SetVisibility(SettingEntry->IsVisible() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	const FSettingValidationResult Validation = SettingEntry->GetValidationResult();
 	SetToolTipText(Validation.bValid ? SettingEntry->GetDefinition().Description : Validation.Error);
@@ -87,7 +98,6 @@ void UWidgetSettingEntryBase::RefreshFromModel()
 		Txt_Reason->SetVisibility(Validation.bValid ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
 	OnModelStateChanged();
-	ApplyValueToControl(SettingEntry->GetPendingValue());
 }
 
 void UWidgetSettingEntryBase::ApplyValueToControl_Implementation(const FParameter& InValue)
@@ -110,7 +120,7 @@ bool UWidgetSettingEntryBase::CommitUserValue(const FParameter& InValue)
 	return bResult;
 }
 
-void UWidgetSettingEntryBase::OnResolvedStyleChanged(const USubWidgetStyle* InStyle)
+void UWidgetSettingEntryBase::OnResolvedStyleChanged(const UCommonButtonStyleN* InStyle)
 {
 	Super::OnResolvedStyleChanged(InStyle);
 	if (!InStyle)

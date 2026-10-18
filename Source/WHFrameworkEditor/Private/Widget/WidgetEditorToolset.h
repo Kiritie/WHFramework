@@ -6,6 +6,7 @@
 class UBlueprint;
 class UWidget;
 class UWidgetTheme;
+class UTexture2D;
 class UPanelWidget;
 
 // MCP复用控件模板与托管主题正式接口，不开放任意脚本执行。
@@ -44,6 +45,24 @@ public:
 
 	UFUNCTION(meta = (AICallable))
 	static bool SetStyleProperty(UWidgetTheme* Theme, const FString& Tag, FName Property, const FString& Value);
+
+	UFUNCTION(meta = (AICallable))
+	static bool ReimportTextureSource(UTexture2D* Texture, const FString& SourceFile);
+
+	UFUNCTION(meta = (AICallable))
+	static bool MigrateStyleTag(const FString& OldTag, const FString& NewTag);
+
+	UFUNCTION(meta = (AICallable))
+	static bool MigrateStyleTagReferences(const FString& OldTagName, const FString& NewTag);
+
+	UFUNCTION(meta = (AICallable))
+	static bool MigrateStyleTagAlias(const FString& OldAlias, const FString& NewTag);
+
+	UFUNCTION(meta = (AICallable))
+	static bool RemoveStyleBinding(UWidgetTheme* Theme, const FString& Tag);
+
+	UFUNCTION(meta = (AICallable))
+	static bool RemoveDuplicateGlobalStyleTag(const FString& Tag, const FString& TargetOwnerPath);
 
 	UFUNCTION(meta = (AICallable))
 	static bool SaveTheme(UWidgetTheme* Theme);

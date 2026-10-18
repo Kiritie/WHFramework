@@ -1,12 +1,12 @@
 #include "Widget/Theme/WidgetThemeSettings.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
-#include "Widget/Style/SubWidgetStyle.h"
+#include "Widget/Style/CommonButtonStyleN.h"
 
 UWidgetThemeSettings::UWidgetThemeSettings()
 {
-	ButtonStyleBase = USubWidgetStyle::StaticClass();
+	ButtonStyleBase = UCommonButtonStyleN::StaticClass();
 	TextStyleBase = UCommonTextStyle::StaticClass();
-	BrushStyleBase = UWidgetBrushStyle::StaticClass();
+	BrushStyleBase = UCommonBrushStyle::StaticClass();
 	InputStyleBase = UCommonInputStyle::StaticClass();
 	ToggleStyleBase = UCommonToggleStyle::StaticClass();
 	RangeStyleBase = UCommonRangeStyle::StaticClass();

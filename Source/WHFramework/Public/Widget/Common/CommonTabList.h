@@ -43,7 +43,7 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Components", meta = (BindWidgetOptional))
 	TObjectPtr<UPanelWidget> TabContent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "Style.Button"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Button"))
 	FGameplayTag ButtonStyleTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Layout")

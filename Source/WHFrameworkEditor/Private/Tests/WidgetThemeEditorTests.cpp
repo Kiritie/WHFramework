@@ -9,7 +9,8 @@
 #include "Widget/Theme/WidgetThemeSettings.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
 #include "Widget/Theme/WidgetThemeEditorSettings.h"
-#include "Widget/Style/WidgetBrushStyle.h"
+#include "Widget/Style/CommonBrushStyle.h"
+#include "Widget/Style/CommonButtonStyleN.h"
 #include "AssetToolsModule.h"
 #include "IAssetTools.h"
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -193,16 +194,16 @@ namespace WidgetThemeEditorTests
 			return FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Brush, TEXT("ThemeEditorParentA"), EWidgetStyleKind::Brush, TEXT("/Game/__ExternalAsset__/Styles"),
 													 false, Error);
 		}
-		UWidgetBrushStyle* Brush(UWidgetTheme* Theme, FGameplayTag Tag = TAG_ThemeEditorParentA)
+		UCommonBrushStyle* Brush(UWidgetTheme* Theme, FGameplayTag Tag = TAG_ThemeEditorParentA)
 		{
 			UBlueprint* BP = FWidgetThemeEditorService::Blueprint(Theme, Tag);
-			return BP ? BP->GeneratedClass->GetDefaultObject<UWidgetBrushStyle>() : nullptr;
+			return BP ? BP->GeneratedClass->GetDefaultObject<UCommonBrushStyle>() : nullptr;
 		}
 		bool Tint(UWidgetTheme* Theme, FGameplayTag Tag, FLinearColor Color, FString& Error)
 		{
-			UWidgetBrushStyle* Defaults = Brush(Theme, Tag);
+			UCommonBrushStyle* Defaults = Brush(Theme, Tag);
 			FWidgetStylePropertyEditing Properties(Defaults);
-			FProperty* Property = Defaults->GetClass()->FindPropertyByName(GET_MEMBER_NAME_CHECKED(UWidgetBrushStyle, Brush));
+			FProperty* Property = Defaults->GetClass()->FindPropertyByName(GET_MEMBER_NAME_CHECKED(UCommonBrushStyle, Brush));
 			TSharedPtr<IPropertyHandle> Handle = Properties.Find(Property);
 			FSlateBrush Value = Defaults->Brush;
 			Value.TintColor = FSlateColor(Color);
@@ -269,7 +270,7 @@ bool FThemeAllTypesAndParentChainTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Cycle rejected"), FWidgetThemeResolver::Validate(Game, Error));
 	Framework->ParentTheme = nullptr;
 	TestTrue(TEXT("Old directory cannot create styles"), !FWidgetThemeEditorService::CreateForTag(Game,
-		TEXT("Style.Brush.ThemeRejectedDirectory"), FWidgetThemeEditorService::CreationBase(EWidgetStyleKind::Brush), TEXT("/Game/Themes"), Error));
+		TEXT("UI.Style.Brush.ThemeRejectedDirectory"), FWidgetThemeEditorService::CreationBase(EWidgetStyleKind::Brush), TEXT("/Game/Themes"), Error));
 	return true;
 }
 
@@ -295,12 +296,12 @@ bool FThemeNativeInheritanceTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Initial inherited value"), Fixture.Brush(Theme, TAG_ThemeEditorChild)->Brush.TintColor.GetSpecifiedColor(), FLinearColor::Red);
 	Fixture.Tint(Theme, TAG_ThemeEditorParentA, FLinearColor::Green, Error);
 	FKismetEditorUtilities::CompileBlueprint(Child);
-	TestEqual(TEXT("Native inheritance follows parent"), Child->GeneratedClass->GetDefaultObject<UWidgetBrushStyle>()->Brush.TintColor.GetSpecifiedColor(),
+	TestEqual(TEXT("Native inheritance follows parent"), Child->GeneratedClass->GetDefaultObject<UCommonBrushStyle>()->Brush.TintColor.GetSpecifiedColor(),
 			  FLinearColor::Green);
 	Fixture.Tint(Theme, TAG_ThemeEditorChild, FLinearColor::Blue, Error);
 	Fixture.Tint(Theme, TAG_ThemeEditorParentA, FLinearColor::Red, Error);
 	FKismetEditorUtilities::CompileBlueprint(Child);
-	TestEqual(TEXT("Native child override remains"), Child->GeneratedClass->GetDefaultObject<UWidgetBrushStyle>()->Brush.TintColor.GetSpecifiedColor(),
+	TestEqual(TEXT("Native child override remains"), Child->GeneratedClass->GetDefaultObject<UCommonBrushStyle>()->Brush.TintColor.GetSpecifiedColor(),
 			  FLinearColor::Blue);
 	return true;
 }
@@ -418,6 +419,26 @@ bool FThemeClipboardTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Complete brush tint"), Fixture.Brush(Target)->Brush.TintColor.GetSpecifiedColor(), FLinearColor::Blue);
 	TestEqual(TEXT("Asset identity retained"), FWidgetThemeEditorService::Blueprint(Target, TAG_ThemeEditorParentA), Original);
 	TestEqual(TEXT("Parent retained"), Original->ParentClass.Get(), Parent);
+	const FString IconName = TEXT("TestClipboardIcon_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	if (!FWidgetThemeEditorService::Create(Source, WidgetStyleTags::Button, IconName, EWidgetStyleKind::Button, TEXT("/Game/__ExternalAsset__/Styles"), false, Error) ||
+		!FWidgetThemeEditorService::Create(Target, WidgetStyleTags::Button, IconName, EWidgetStyleKind::Button, TEXT("/Game/__ExternalAsset__/Styles"), false, Error))
+	{
+		AddError(Error);
+		return false;
+	}
+	const FGameplayTag IconTag = FGameplayTag::RequestGameplayTag(FName(*(TEXT("UI.Style.Button.") + IconName)));
+	UBlueprint* TargetIcon = FWidgetThemeEditorService::Blueprint(Target, IconTag);
+	if (!UWidgetThemeEditorLibrary::SetStyleProperty(Source, IconTag, TEXT("bIconOnly"), TEXT("True"), Error) ||
+		!UWidgetThemeEditorLibrary::SetStyleProperty(Source, IconTag, TEXT("NormalBase"), TEXT("(TintColor=(SpecifiedColor=(R=0.2,G=0.4,B=0.8,A=1)))"), Error) ||
+		!FWidgetThemeEditorService::CopyProperties(Source, IconTag, Error) || !FWidgetThemeEditorService::PasteProperties(Target, IconTag, Error))
+	{
+		AddError(Error);
+		return false;
+	}
+	const UCommonButtonStyleN* IconDefaults = TargetIcon->GeneratedClass->GetDefaultObject<UCommonButtonStyleN>();
+	TestTrue(TEXT("Icon-only presentation can be copied through native property handles"), IconDefaults->bIconOnly);
+	TestTrue(TEXT("Hidden complete state brushes remain writable by managed property operations"), IconDefaults->NormalBase.TintColor.GetSpecifiedColor().Equals(FLinearColor(0.2f, 0.4f, 0.8f, 1.f)));
+	TestEqual(TEXT("Pasting icon-only properties preserves the destination asset"), FWidgetThemeEditorService::Blueprint(Target, IconTag), TargetIcon);
 	return true;
 }
 
@@ -439,7 +460,7 @@ bool FThemePropertyRoundTripTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	TStrongObjectPtr<UTexture2D> Texture(NewObject<UTexture2D>());
-	UWidgetBrushStyle* Defaults = Fixture.Brush(Theme);
+	UCommonBrushStyle* Defaults = Fixture.Brush(Theme);
 	Defaults->Brush.SetResourceObject(Texture.Get());
 	Defaults->Brush.DrawAs = ESlateBrushDrawType::Image;
 	Defaults->Brush.ImageSize = FVector2D(80, 40);
@@ -569,8 +590,12 @@ bool FThemeRootTest::RunTest(const FString& Parameters)
 	for (EWidgetStyleKind Type : WidgetStyleTags::Kinds())
 	{
 		EWidgetStyleKind Actual;
-		TestTrue(TEXT("Static root registered"), WidgetStyleTags::Root(Type).IsValid());
-		TestTrue(TEXT("Root recognized"), WidgetStyleTags::Kind(WidgetStyleTags::Root(Type), Actual));
+		const FGameplayTag Root = WidgetStyleTags::Root(Type);
+		const FGameplayTag Default = WidgetStyleTags::CommonDefault(Type);
+		TestTrue(TEXT("Static root registered"), Root.IsValid());
+		TestTrue(TEXT("Root uses the UI.Style namespace"), Root.ToString().StartsWith(TEXT("UI.Style.")));
+		TestTrue(TEXT("Default uses the UI.Style namespace"), Default.ToString().StartsWith(TEXT("UI.Style.")));
+		TestTrue(TEXT("Root recognized"), WidgetStyleTags::Kind(Root, Actual));
 		TestEqual(TEXT("Root kind"), Actual, Type);
 	}
 	const TArray<FString> Roots = FWidgetThemeEditorService::GetCreationRoots();
@@ -668,7 +693,7 @@ bool FThemeReferencedTagRemoveTest::RunTest(const FString& Parameters)
 	const FString Name = TEXT("TestReferenced_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
 	if (!FWidgetThemeEditorService::Create(Owner, WidgetStyleTags::Brush, Name, EWidgetStyleKind::Brush, TEXT("/Game/__ExternalAsset__/Styles"), false, Error))
 		return false;
-	const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*(TEXT("Style.Brush.") + Name)));
+	const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*(TEXT("UI.Style.Brush.") + Name)));
 	const FSoftObjectPath StylePath(FWidgetThemeEditorService::Blueprint(Owner, Tag));
 	Consumer->SetStyleClass(Tag, EWidgetStyleKind::Brush, FWidgetThemeEditorService::CreationBase(EWidgetStyleKind::Brush));
 	TestTrue(TEXT("Another asset's tag usage does not disable removal"), FWidgetThemeEditorService::CanRemove(Owner, Tag, Error));
@@ -834,7 +859,7 @@ bool FThemeTagSourceTest::RunTest(const FString& Parameters)
 			AddError(Error);
 			return false;
 		}
-		const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*(TEXT("Style.Brush.") + Name)));
+		const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*(TEXT("UI.Style.Brush.") + Name)));
 		const TSharedPtr<FGameplayTagNode> Node = UGameplayTagsManager::Get().FindTagNode(Tag);
 		TestTrue(TEXT("Registered Tag identifies its owning module source"), Node && Node->GetAllSourceNames().Contains(FName(*FPaths::GetCleanFilename(Filename))));
 		FString Written;
@@ -851,6 +876,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeTreeAndLayoutTest, "WHFramework.WidgetThe
 bool FThemeTreeAndLayoutTest::RunTest(const FString& Parameters)
 {
 	using namespace WidgetThemeEditorTests;
+	TGuardValue<bool> PrefixDisplayGuard(GetMutableDefault<UWidgetThemeEditorSettings>()->bShowStyleTagPrefix, false);
+	TestEqual(TEXT("Type root labels hide the shared UI.Style prefix"), UWidgetThemeEditorSettings::GetStyleTagDisplayName(WidgetStyleTags::Button).ToString(), FString(TEXT("Button")));
+	TestTrue(TEXT("Hidden display prefixes leave the actual Tag identity intact"), WidgetStyleTags::Button.GetTag().ToString().StartsWith(TEXT("UI.Style.")));
+	GetMutableDefault<UWidgetThemeEditorSettings>()->bShowStyleTagPrefix = true;
+	TestEqual(TEXT("The display preference can reveal the complete Tag"), UWidgetThemeEditorSettings::GetStyleTagDisplayName(WidgetStyleTags::Button).ToString(), WidgetStyleTags::Button.GetTag().ToString());
+	GetMutableDefault<UWidgetThemeEditorSettings>()->bShowStyleTagPrefix = false;
 	FFixture Fixture;
 	FString Error;
 	UWidgetTheme* Owner = Fixture.Theme(TEXT("DA_TreeOwner"));
@@ -939,7 +970,7 @@ bool FThemeExistingUIPreviewTest::RunTest(const FString& Parameters)
 			{
 				Image->SetStyleTag(Tag);
 				TestEqual(TEXT("Existing brush applied"), Image->GetBrush().GetResourceObject(),
-						  StyleClass->GetDefaultObject<UWidgetBrushStyle>()->Brush.GetResourceObject());
+						  StyleClass->GetDefaultObject<UCommonBrushStyle>()->Brush.GetResourceObject());
 			}
 			++Previewed;
 		}
@@ -1036,13 +1067,13 @@ bool FThemeUnusedTagTest::RunTest(const FString& Parameters)
 		AddError(Error);
 		return false;
 	}
-	const FString FullName = TEXT("Style.Brush.") + Name;
+	const FString FullName = TEXT("UI.Style.Brush.") + Name;
 	const FGameplayTag StyleTag = FGameplayTag::RequestGameplayTag(FName(*FullName));
 	TestTrue(TEXT("Remove owned style"), FWidgetThemeEditorService::RemoveBinding(Theme, StyleTag, Error));
 	TestFalse(TEXT("Unused ordinary Tag deleted"), FGameplayTag::RequestGameplayTag(FName(*FullName), false).IsValid());
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeRenameReferenceTest, "WHFramework.WidgetTheme.Editor.RenameReferencesAndRedirect",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeRenameReferenceTest, "WHFramework.WidgetTheme.Editor.RenameReferencesWithRedirect",
 								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FThemeRenameReferenceTest::RunTest(const FString& Parameters)
 {
@@ -1056,7 +1087,7 @@ bool FThemeRenameReferenceTest::RunTest(const FString& Parameters)
 		AddError(Error);
 		return false;
 	}
-	const FString OldName = TEXT("Style.Brush.") + Name;
+	const FString OldName = TEXT("UI.Style.Brush.") + Name;
 	const FString NewName = OldName + TEXT("Renamed");
 	const FGameplayTag OldTag = FGameplayTag::RequestGameplayTag(FName(*OldName));
 	UBlueprint* Style = FWidgetThemeEditorService::Blueprint(Theme, OldTag);
@@ -1087,9 +1118,142 @@ bool FThemeRenameReferenceTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Source and config reference rewritten"), Text.Contains(NewName));
 		TestFalse(TEXT("Old reference replaced exactly"), Text.Contains(OldName + TEXT("\n")));
 	}
-	TestTrue(TEXT("Old serialized name redirects"),
-			 GetDefault<UGameplayTagsSettings>()->GameplayTagRedirects.ContainsByPredicate(
-				 [&](const FGameplayTagRedirect& Redirect) { return Redirect.OldTagName == FName(*OldName) && Redirect.NewTagName == FName(*NewName); }));
+	TestFalse(TEXT("The old Tag definition is removed"), FGameplayTag::RequestGameplayTag(FName(*OldName), false).IsValid());
+	FGameplayTag RedirectedTag = OldTag;
+	UGameplayTagsManager::Get().RedirectSingleGameplayTag(RedirectedTag, nullptr);
+	TestEqual(TEXT("Old serialized Tags resolve through the native redirect"), RedirectedTag, NewTag);
+	FString TagConfigFilename;
+	FString TagConfigReport;
+	TestTrue(TEXT("Owning Tag config is identified"), FWidgetThemeEditorService::GetTagSourceFilename(Style->GetOutermost()->GetName(), TagConfigFilename, TagConfigReport));
+	FString TagConfigText;
+	TestTrue(TEXT("Owning Tag config can be read back"), FFileHelper::LoadFileToString(TagConfigText, *TagConfigFilename));
+	TestFalse(TEXT("Owning Tag config contains no old definition"), TagConfigText.Contains(TEXT("Tag=\"") + OldName + TEXT("\"")));
+	TestTrue(TEXT("Owning Tag config records the previous name"), TagConfigText.Contains(TEXT("OldTagName=\"") + OldName + TEXT("\"")));
+	TestTrue(TEXT("Owning Tag config records the redirect destination"), TagConfigText.Contains(TEXT("NewTagName=\"") + NewName + TEXT("\"")));
+	TestFalse(TEXT("A redirect alias cannot be reused as the new Tag name"), FWidgetThemeEditorService::RenameStyle(Theme, NewTag, Name, Error));
+	TestEqual(TEXT("Rejected alias reuse preserves the existing mapping"), FWidgetThemeEditorService::Blueprint(Theme, NewTag), Style);
+	Error.Reset();
+	if (!TestTrue(TEXT("A renamed style can be redirected again"), FWidgetThemeEditorService::RenameStyle(Theme, NewTag, Name + TEXT("Again"), Error)))
+	{
+		AddError(Error);
+		return false;
+	}
+	const FGameplayTag FinalTag = FGameplayTag::RequestGameplayTag(FName(*(TEXT("UI.Style.Brush.") + Name + TEXT("Again"))));
+	RedirectedTag = OldTag;
+	UGameplayTagsManager::Get().RedirectSingleGameplayTag(RedirectedTag, nullptr);
+	TestEqual(TEXT("Earlier aliases directly resolve to the latest name"), RedirectedTag, FinalTag);
+	RedirectedTag = NewTag;
+	UGameplayTagsManager::Get().RedirectSingleGameplayTag(RedirectedTag, nullptr);
+	TestEqual(TEXT("The previous name also resolves to the latest name"), RedirectedTag, FinalTag);
+	TestEqual(TEXT("Repeated redirects retain the original Blueprint identity"), FWidgetThemeEditorService::Blueprint(Theme, FinalTag), Style);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeTagCollisionMigrationTest, "WHFramework.WidgetTheme.Editor.DirectTagMigrationRejectsBindingCollision",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FThemeTagCollisionMigrationTest::RunTest(const FString& Parameters)
+{
+	using namespace WidgetThemeEditorTests;
+	FFixture Fixture;
+	FString Error;
+	UWidgetTheme* Theme = Fixture.Theme(TEXT("DA_DirectTagCollision"));
+	const FString Suffix = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	const FString OldName = TEXT("Collision_") + Suffix;
+	const FString TargetName = TEXT("Target_") + Suffix;
+	if (!TestTrue(TEXT("Old style created"), FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Brush, OldName, EWidgetStyleKind::Brush,
+											  TEXT("/Game/__ExternalAsset__/Styles"), false, Error)) ||
+		!TestTrue(TEXT("Replacement style created"), FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Brush, TargetName, EWidgetStyleKind::Brush,
+												TEXT("/Game/__ExternalAsset__/Styles"), false, Error)))
+	{
+		AddError(Error);
+		return false;
+	}
+	const FGameplayTag OldTag = FGameplayTag::RequestGameplayTag(FName(*(TEXT("UI.Style.Brush.") + OldName)));
+	const FGameplayTag TargetTag = FGameplayTag::RequestGameplayTag(FName(*(TEXT("UI.Style.Brush.") + TargetName)));
+	TestFalse(TEXT("Merging two local map bindings is rejected before mutation"), FWidgetThemeEditorService::MigrateTag(OldTag, TargetTag, Error));
+	TestTrue(TEXT("Original local binding remains"), Theme->HasLocalStyle(OldTag, EWidgetStyleKind::Brush));
+	TestTrue(TEXT("Replacement local binding remains"), Theme->HasLocalStyle(TargetTag, EWidgetStyleKind::Brush));
+	TestTrue(TEXT("Old Tag remains registered after rejection"), FGameplayTag::RequestGameplayTag(OldTag.GetTagName(), false).IsValid());
+	TestFalse(TEXT("Rejected migration creates no redirect"), GetDefault<UGameplayTagsSettings>()->GameplayTagRedirects.ContainsByPredicate(
+			  [&](const FGameplayTagRedirect& Redirect) { return Redirect.OldTagName == OldTag.GetTagName(); }));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeTagAliasMigrationTest, "WHFramework.WidgetTheme.Editor.MigrateRedirectAliasWithoutCompatibility",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FThemeTagAliasMigrationTest::RunTest(const FString& Parameters)
+{
+	using namespace WidgetThemeEditorTests;
+	FFixture Fixture;
+	const FString Suffix = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	const FString AliasName = TEXT("UI.Style.Brush.LegacyAlias_") + Suffix;
+	const FGameplayTag TargetTag = TAG_ThemeEditorParentA;
+	FString Error;
+	const FString TargetName = TargetTag.ToString();
+	FGameplayTagRedirect Redirect;
+	Redirect.OldTagName = FName(*AliasName);
+	Redirect.NewTagName = TargetTag.GetTagName();
+	UGameplayTagsSettings* Settings = GetMutableDefault<UGameplayTagsSettings>();
+	Settings->GameplayTagRedirects.Add(Redirect);
+	TestTrue(TEXT("Alias redirect fixture is saved"), Settings->TryUpdateDefaultConfigFile());
+	UGameplayTagsManager::Get().EditorRefreshGameplayTagTree();
+	Fixture.TextFiles = {FPaths::ProjectDir() / TEXT("Source") / (Suffix + TEXT(".cpp")), FPaths::ProjectConfigDir() / (Suffix + TEXT(".ini"))};
+	for (const FString& File : Fixture.TextFiles)
+	{
+		FFileHelper::SaveStringToFile(TEXT("// ") + AliasName + TEXT("\n"), *File);
+	}
+	if (!TestTrue(TEXT("Redirect alias references migrate directly"), FWidgetThemeEditorService::MigrateTagAlias(FName(*AliasName), TargetTag, Error)))
+	{
+		AddError(Error);
+		return false;
+	}
+	TestFalse(TEXT("Migrated alias is no longer registered"), FGameplayTag::RequestGameplayTag(FName(*AliasName), false).IsValid());
+	TestFalse(TEXT("Alias redirect is deleted"), Settings->GameplayTagRedirects.ContainsByPredicate(
+			  [&](const FGameplayTagRedirect& Item) { return Item.OldTagName == FName(*AliasName) || Item.NewTagName == FName(*AliasName); }));
+	for (const FString& File : Fixture.TextFiles)
+	{
+		FString Text;
+		FFileHelper::LoadFileToString(Text, *File);
+		TestTrue(TEXT("Alias reference is rewritten"), Text.Contains(TargetName));
+		TestFalse(TEXT("Alias reference is removed"), Text.Contains(AliasName));
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FThemeDuplicateGlobalTagCleanupTest, "WHFramework.WidgetTheme.Editor.RemoveDuplicateGlobalTagDefinition",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FThemeDuplicateGlobalTagCleanupTest::RunTest(const FString& Parameters)
+{
+	using namespace WidgetThemeEditorTests;
+	FFixture Fixture;
+	FString Error;
+	UWidgetTheme* Theme = Fixture.Theme(TEXT("DA_DuplicateGlobalTag"));
+	const FString TagLeaf = TEXT("GlobalDuplicate_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	if (!FWidgetThemeEditorService::Create(Theme, WidgetStyleTags::Brush, TagLeaf, EWidgetStyleKind::Brush,
+											  TEXT("/WHFrameworkUtilities/__ExternalAsset__/Styles"), false, Error))
+	{
+		AddError(Error);
+		return false;
+	}
+	const FName TagName(*(WidgetStyleTags::Root(EWidgetStyleKind::Brush).ToString() + TEXT(".") + TagLeaf));
+	const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(TagName, false);
+	UGameplayTagsSettings* Settings = GetMutableDefault<UGameplayTagsSettings>();
+	Settings->GameplayTagList.Add(FGameplayTagTableRow(TagName, TEXT("Duplicate global test definition.")));
+	TestTrue(TEXT("Duplicate default definition is saved"), Settings->TryUpdateDefaultConfigFile());
+	UGameplayTagsManager::Get().EditorRefreshGameplayTagTree();
+	if (!TestTrue(TEXT("Only the global duplicate definition is removed"),
+			  FWidgetThemeEditorService::RemoveDuplicateGlobalTagDefinition(Tag, TEXT("/WHFrameworkUtilities"), Error)))
+	{
+		AddError(Error);
+		return false;
+	}
+	TestTrue(TEXT("Module-owned Tag remains registered"), FGameplayTag::RequestGameplayTag(TagName, false).IsValid());
+	TestFalse(TEXT("Global default definition is removed"), Settings->GameplayTagList.ContainsByPredicate([&](const FGameplayTagTableRow& Row) { return Row.Tag == TagName; }));
+	FString OwnerFilename;
+	TestTrue(TEXT("Module-owned tag config is identified"), FWidgetThemeEditorService::GetTagSourceFilename(TEXT("/WHFrameworkUtilities"), OwnerFilename, Error));
+	FString OwnerConfig;
+	TestTrue(TEXT("Module-owned tag config is readable"), FFileHelper::LoadFileToString(OwnerConfig, *OwnerFilename));
+	TestTrue(TEXT("Module-owned definition is retained"), OwnerConfig.Contains(TEXT("Tag=\"") + TagName.ToString() + TEXT("\"")));
 	return true;
 }
 

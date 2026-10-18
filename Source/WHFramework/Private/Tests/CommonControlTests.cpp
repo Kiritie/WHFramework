@@ -18,8 +18,8 @@
 #include "Widget/Style/CommonRangeStyle.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Widget/Style/CommonScrollStyle.h"
-#include "Widget/Style/SubWidgetStyle.h"
-#include "Widget/Style/WidgetBrushStyle.h"
+#include "Widget/Style/CommonButtonStyleN.h"
+#include "Widget/Style/CommonBrushStyle.h"
 #include "Widget/Theme/WidgetStyleTags.h"
 #include "Components/Image.h"
 #include "Engine/Texture2D.h"
@@ -29,6 +29,8 @@
 #include "Widgets/Input/SComboBox.h"
 #include "Widgets/Layout/SScrollBar.h"
 #include "Widgets/Layout/SBorder.h"
+#include "Input/Events.h"
+#include "InputCoreTypes.h"
 #include "UObject/UnrealType.h"
 #include "Components/StackBox.h"
 #include "Engine/LocalPlayer.h"
@@ -39,12 +41,11 @@
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
 
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ControlTestBorder, "Style.Border.ControlTest");
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ControlTestScroll, "Style.Scroll.ControlTest");
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ControlTestButton, "Style.Button.ControlTest");
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ControlTestMarker, "Style.Brush.ControlTestMarker");
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ControlTestLabel, "Style.Text.ControlTestLabel");
-UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ControlTestInput, "Style.Input.ControlTest");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ControlTestBorder, "UI.Style.Border.ControlTest");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ControlTestScroll, "UI.Style.Scroll.ControlTest");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ControlTestButton, "UI.Style.Button.ControlTest");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ControlTestMarker, "UI.Style.Brush.ControlTestMarker");
+UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_ControlTestInput, "UI.Style.Input.ControlTest");
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCommonBorderSynchronizationTest, "WHFramework.WidgetTheme.Controls.BorderSynchronization",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -54,6 +55,8 @@ bool FCommonBorderSynchronizationTest::RunTest(const FString& Parameters)
 	Theme->SetStyleClass(TAG_ControlTestBorder, EWidgetStyleKind::Border, UCommonBorderStyle::StaticClass());
 	TStrongObjectPtr<UCommonBorderN> Border(NewObject<UCommonBorderN>(Theme.Get()));
 	FWidgetThemeResolver::SetPreviewOverride(Theme.Get(), Theme.Get());
+	Border->SetInheritedStyleTag(TAG_ControlTestBorder);
+	TestEqual(TEXT("An unconfigured border follows its enclosing control without an override switch"), Border->GetStyleTag(), FGameplayTag(TAG_ControlTestBorder));
 	Border->SetStyleTag(TAG_ControlTestBorder);
 	const TSharedRef<SWidget> BorderWidget = Border->TakeWidget();
 	Border->SynchronizeProperties();
@@ -61,7 +64,7 @@ bool FCommonBorderSynchronizationTest::RunTest(const FString& Parameters)
 	FWidgetThemeResolver::NotifyThemeChanged();
 	Border->SetStyle(UCommonBorderStyle::StaticClass());
 	Border->SetInheritedStyleTag(TAG_ControlTestBorder);
-	Border->ClearStyleOverride();
+	Border->SetStyleTag(FGameplayTag());
 	TestEqual(TEXT("Native style updates and theme notifications preserve the resolved style"), Border->Style.Get(), UCommonBorderStyle::StaticClass());
 	FWidgetThemeResolver::ClearPreviewOverride(Theme.Get());
 	static_cast<UWidget*>(Border.Get())->ReleaseSlateResources(true);
@@ -73,11 +76,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCommonButtonStyleStateTest, "WHFramework.Widge
 bool FCommonButtonStyleStateTest::RunTest(const FString& Parameters)
 {
 	TStrongObjectPtr<UWidgetTheme> Theme(NewObject<UWidgetTheme>());
-	Theme->SetStyleClass(TAG_ControlTestButton, EWidgetStyleKind::Button, USubWidgetStyle::StaticClass());
-	Theme->SetStyleClass(WidgetStyleTags::CommonDefault(EWidgetStyleKind::Button), EWidgetStyleKind::Button, USubWidgetStyle::StaticClass());
-	Theme->SetStyleClass(TAG_ControlTestMarker, EWidgetStyleKind::Brush, UWidgetBrushStyle::StaticClass());
-	USubWidgetStyle* ButtonStyle = GetMutableDefault<USubWidgetStyle>();
-	UWidgetBrushStyle* BrushStyle = GetMutableDefault<UWidgetBrushStyle>();
+	Theme->SetStyleClass(TAG_ControlTestButton, EWidgetStyleKind::Button, UCommonButtonStyleN::StaticClass());
+	Theme->SetStyleClass(WidgetStyleTags::CommonDefault(EWidgetStyleKind::Button), EWidgetStyleKind::Button, UCommonButtonStyleN::StaticClass());
+	Theme->SetStyleClass(TAG_ControlTestMarker, EWidgetStyleKind::Brush, UCommonBrushStyle::StaticClass());
+	UCommonButtonStyleN* ButtonStyle = GetMutableDefault<UCommonButtonStyleN>();
+	UCommonBrushStyle* BrushStyle = GetMutableDefault<UCommonBrushStyle>();
 	TGuardValue<FGameplayTag> MarkerGuard(ButtonStyle->SelectionMarkerStyleTag, TAG_ControlTestMarker);
 	TGuardValue<FGameplayTag> IconGuard(ButtonStyle->IconStyleTag, TAG_ControlTestMarker);
 	TGuardValue<FSlateBrush> BrushGuard(BrushStyle->Brush, BrushStyle->Brush);
@@ -138,10 +141,145 @@ bool FCommonButtonStyleStateTest::RunTest(const FString& Parameters)
 	Button->SetInheritedStyleTag(TAG_ControlTestButton);
 	Button->SetStyleTag(WidgetStyleTags::CommonDefault(EWidgetStyleKind::Button));
 	TestEqual(TEXT("Explicit style overrides its inherited slot style"), Button->GetStyleTag(), WidgetStyleTags::CommonDefault(EWidgetStyleKind::Button));
-	Button->ClearStyleOverride();
+	Button->SetStyleTag(FGameplayTag());
 	TestEqual(TEXT("Clearing explicit style restores its inherited slot style"), Button->GetStyleTag(), FGameplayTag(TAG_ControlTestButton));
 	Button->SetInheritedStyleTag(FGameplayTag());
 	TestEqual(TEXT("A button without a configured Tag resolves the framework default"), Button->GetStyleTag(), WidgetStyleTags::CommonDefault(EWidgetStyleKind::Button));
+	Button->SetInheritedStyleTag(TAG_ControlTestButton);
+	TestEqual(TEXT("An empty local Tag follows later enclosing style changes"), Button->GetStyleTag(), FGameplayTag(TAG_ControlTestButton));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCommonIconButtonStateTest, "WHFramework.WidgetTheme.Controls.IconButtonStates",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FCommonIconButtonStateTest::RunTest(const FString& Parameters)
+{
+	TStrongObjectPtr<UWidgetTheme> Theme(NewObject<UWidgetTheme>());
+	TStrongObjectPtr<UTexture2D> Texture(NewObject<UTexture2D>());
+	Theme->SetStyleClass(TAG_ControlTestButton, EWidgetStyleKind::Button, UCommonButtonStyleN::StaticClass());
+	Theme->SetStyleClass(TAG_ControlTestMarker, EWidgetStyleKind::Brush, UCommonBrushStyle::StaticClass());
+	UCommonButtonStyleN* ButtonStyle = GetMutableDefault<UCommonButtonStyleN>();
+	TGuardValue<bool> IconOnlyGuard(ButtonStyle->bIconOnly, true);
+	TGuardValue<bool> MaterialGuard(ButtonStyle->bSingleMaterial, false);
+	TGuardValue<FGameplayTag> IconTagGuard(ButtonStyle->IconStyleTag, TAG_ControlTestMarker);
+	TGuardValue<FSlateBrush> NormalGuard(ButtonStyle->NormalBase, ButtonStyle->NormalBase);
+	TGuardValue<FSlateBrush> HoveredGuard(ButtonStyle->NormalHovered, ButtonStyle->NormalHovered);
+	TGuardValue<FSlateBrush> PressedGuard(ButtonStyle->NormalPressed, ButtonStyle->NormalPressed);
+	TGuardValue<FSlateBrush> SelectedGuard(ButtonStyle->SelectedBase, ButtonStyle->SelectedBase);
+	TGuardValue<FSlateBrush> SelectedHoveredGuard(ButtonStyle->SelectedHovered, ButtonStyle->SelectedHovered);
+	TGuardValue<FSlateBrush> SelectedPressedGuard(ButtonStyle->SelectedPressed, ButtonStyle->SelectedPressed);
+	TGuardValue<FSlateBrush> DisabledGuard(ButtonStyle->Disabled, ButtonStyle->Disabled);
+	for (FSlateBrush* State : {&ButtonStyle->NormalBase, &ButtonStyle->NormalHovered, &ButtonStyle->NormalPressed,
+		&ButtonStyle->SelectedBase, &ButtonStyle->SelectedHovered, &ButtonStyle->SelectedPressed, &ButtonStyle->Disabled})
+	{
+		State->DrawAs = ESlateBrushDrawType::Image;
+		State->SetResourceObject(Texture.Get());
+	}
+	ButtonStyle->NormalBase.TintColor = FSlateColor(FLinearColor::Red);
+	ButtonStyle->NormalHovered.TintColor = FSlateColor(FLinearColor::Green);
+	ButtonStyle->NormalPressed.TintColor = FSlateColor(FLinearColor::Blue);
+	ButtonStyle->SelectedBase.TintColor = FSlateColor(FLinearColor::Yellow);
+	ButtonStyle->SelectedHovered.TintColor = FSlateColor(FLinearColor(0.f, 1.f, 1.f));
+	ButtonStyle->SelectedPressed.TintColor = FSlateColor(FLinearColor(1.f, 0.f, 1.f));
+	ButtonStyle->Disabled.TintColor = FSlateColor(FLinearColor(0.2f, 0.3f, 0.4f, 0.5f));
+	UCommonBrushStyle* GlyphStyle = GetMutableDefault<UCommonBrushStyle>();
+	TGuardValue<FSlateBrush> GlyphGuard(GlyphStyle->Brush, GlyphStyle->Brush);
+	GlyphStyle->Brush.SetResourceObject(Texture.Get());
+	GlyphStyle->Brush.DrawAs = ESlateBrushDrawType::Image;
+	GlyphStyle->Brush.ImageSize = FVector2D(17.f, 23.f);
+	GlyphStyle->Brush.TintColor = FSlateColor(FLinearColor(0.25f, 0.5f, 0.75f));
+	FWidgetThemeResolver::SetPreviewOverride(Theme.Get(), Theme.Get());
+	ON_SCOPE_EXIT
+	{
+		FWidgetThemeResolver::ClearPreviewOverride(Theme.Get());
+	};
+	TStrongObjectPtr<UCommonButton> Button(NewObject<UCommonButton>(Theme.Get()));
+	Button->SetStyleTag(TAG_ControlTestButton);
+	Button->SetTitle(FText::FromString(TEXT("Caption")));
+	Button->SetIsSelectable(true);
+	Button->SetIsToggleable(true);
+	Button->Initialize();
+	const TSharedRef<SWidget> ButtonWidget = Button->TakeWidget();
+	UCommonButtonInternalBase* Internal = Cast<UCommonButtonInternalBase>(Button->GetRootWidget());
+	UImage* Icon = Cast<UImage>(Button->WidgetTree->FindWidget(TEXT("Img_Icon")));
+	UCommonTextBlockN* Caption = Cast<UCommonTextBlockN>(Button->WidgetTree->FindWidget(TEXT("Txt_Title")));
+	if (!TestNotNull(TEXT("Icon button retains the CommonUI input root"), Internal) ||
+		!TestNotNull(TEXT("Icon button has its glyph"), Icon) || !TestNotNull(TEXT("Icon button retains its caption binding"), Caption))
+	{
+		return false;
+	}
+	TFunction<TSharedPtr<SWidget>(const TSharedRef<SWidget>&)> FindSlateButton = [&](const TSharedRef<SWidget>& Widget) -> TSharedPtr<SWidget>
+	{
+		if (Widget->GetType() == FName(TEXT("SCommonButton")))
+		{
+			return Widget;
+		}
+		FChildren* Children = Widget->GetChildren();
+		for (int32 Index = 0; Index < Children->Num(); ++Index)
+		{
+			if (TSharedPtr<SWidget> Found = FindSlateButton(Children->GetChildAt(Index)))
+			{
+				return Found;
+			}
+		}
+		return nullptr;
+	};
+	const TSharedPtr<SWidget> SlateButton = FindSlateButton(Internal->GetCachedWidget().ToSharedRef());
+	if (!TestTrue(TEXT("Icon button has a live Slate input control"), SlateButton.IsValid()))
+	{
+		return false;
+	}
+	const TSet<FKey> NoButtons;
+	const TSet<FKey> PressedButtons = {EKeys::LeftMouseButton};
+	const FVector2D Position(5.f, 5.f);
+	const FPointerEvent HoverEvent(0, Position, Position, NoButtons, FKey(), 0.f, FModifierKeysState());
+	const FPointerEvent PressEvent(0, Position, Position, PressedButtons, EKeys::LeftMouseButton, 0.f, FModifierKeysState());
+	const FPointerEvent ReleaseEvent(0, Position, Position, NoButtons, EKeys::LeftMouseButton, 0.f, FModifierKeysState());
+	const FGeometry Geometry = FGeometry::MakeRoot(FVector2D(100.f, 40.f), FSlateLayoutTransform());
+	TestEqual(TEXT("Normal tint replaces the glyph's base tint"), Icon->GetBrush().TintColor.GetSpecifiedColor(), FLinearColor::Red);
+	TestEqual(TEXT("Icon-only mode hides the caption"), Caption->GetVisibility(), ESlateVisibility::Collapsed);
+	SlateButton->OnMouseEnter(Geometry, HoverEvent);
+	Button->NativeOnMouseEnter(Geometry, HoverEvent);
+	TestEqual(TEXT("Hover tints the glyph"), Icon->GetBrush().TintColor.GetSpecifiedColor(), FLinearColor::Green);
+	SlateButton->OnMouseButtonDown(Geometry, PressEvent);
+	TestEqual(TEXT("Press tints the glyph"), Icon->GetBrush().TintColor.GetSpecifiedColor(), FLinearColor::Blue);
+	SlateButton->OnMouseButtonUp(Geometry, ReleaseEvent);
+	Button->SetIsSelected(true, false);
+	TestEqual(TEXT("Selected hover has its own glyph tint"), Icon->GetBrush().TintColor.GetSpecifiedColor(), FLinearColor(0.f, 1.f, 1.f));
+	SlateButton->OnMouseButtonDown(Geometry, PressEvent);
+	TestEqual(TEXT("Selected press has its own glyph tint"), Icon->GetBrush().TintColor.GetSpecifiedColor(), FLinearColor(1.f, 0.f, 1.f));
+	SlateButton->OnMouseButtonUp(Geometry, ReleaseEvent);
+	SlateButton->OnMouseLeave(HoverEvent);
+	Button->NativeOnMouseLeave(HoverEvent);
+	TestEqual(TEXT("Selected base has its own glyph tint"), Icon->GetBrush().TintColor.GetSpecifiedColor(), FLinearColor::Yellow);
+	Button->SetIsEnabled(false);
+	TestEqual(TEXT("Disabled tint applies to the glyph"), Icon->GetBrush().TintColor.GetSpecifiedColor(), FLinearColor(0.2f, 0.3f, 0.4f, 0.5f));
+	for (const FSlateBrush* State : {&Internal->GetStyle().Normal, &Internal->GetStyle().Hovered, &Internal->GetStyle().Pressed, &Internal->GetStyle().Disabled})
+	{
+		TestEqual(TEXT("Icon-only mode suppresses every native background"), State->DrawAs.GetValue(), ESlateBrushDrawType::NoDrawType);
+	}
+	TestTrue(TEXT("State changes preserve the glyph resource"), Icon->GetBrush().GetResourceObject() == Texture.Get());
+	TestEqual(TEXT("State changes preserve glyph geometry"), FVector2D(Icon->GetBrush().ImageSize), FVector2D(17.f, 23.f));
+	TestEqual(TEXT("Native background suppression does not mutate the style asset"), ButtonStyle->NormalBase.DrawAs.GetValue(), ESlateBrushDrawType::Image);
+	Button->SetIsEnabled(true);
+	Button->SetIsSelected(false, false);
+	ButtonStyle->bSingleMaterial = true;
+	FWidgetThemeResolver::NotifyThemeChanged();
+	TestEqual(TEXT("Icon-only state colors do not use the single-material background"), Icon->GetBrush().TintColor.GetSpecifiedColor(), FLinearColor::Red);
+	ButtonStyle->bSingleMaterial = false;
+	ButtonStyle->bIconOnly = false;
+	FWidgetThemeResolver::NotifyThemeChanged();
+	TestEqual(TEXT("Unchecking icon-only on the same style restores its background"), Internal->GetStyle().Normal.DrawAs.GetValue(), ESlateBrushDrawType::Image);
+	TestTrue(TEXT("The restored background keeps its resource"), Internal->GetStyle().Normal.GetResourceObject() == Texture.Get());
+	TestEqual(TEXT("Background mode restores the original glyph tint"), Icon->GetBrush().TintColor.GetSpecifiedColor(), GlyphStyle->Brush.TintColor.GetSpecifiedColor());
+	TestEqual(TEXT("Background mode permits the caption"), Caption->GetVisibility(), ESlateVisibility::SelfHitTestInvisible);
+	SlateButton->OnMouseEnter(Geometry, HoverEvent);
+	Button->NativeOnMouseEnter(Geometry, HoverEvent);
+	TestEqual(TEXT("Background hover leaves the glyph tint unchanged"), Icon->GetBrush().TintColor.GetSpecifiedColor(), GlyphStyle->Brush.TintColor.GetSpecifiedColor());
+	TestEqual(TEXT("Background hover retains the configured background color"), Internal->GetStyle().Hovered.TintColor.GetSpecifiedColor(), FLinearColor::Green);
+	SlateButton->OnMouseLeave(HoverEvent);
+	Button->NativeOnMouseLeave(HoverEvent);
+	IObjectPoolInterface::Execute_OnDespawn(Button.Get(), EObjectDespawnMode::Recovery);
 	return true;
 }
 
@@ -217,7 +355,7 @@ bool FCommonRangeStyleRefreshTest::RunTest(const FString& Parameters)
 	const TSharedRef<SWidget> RangeSlate = Range->TakeWidget();
 	TStrongObjectPtr<UWidgetTheme> Theme(NewObject<UWidgetTheme>());
 	Theme->SetStyleClass(TAG_ControlTestInput, EWidgetStyleKind::Input, UCommonInputStyle::StaticClass());
-	Theme->SetStyleClass(TAG_ControlTestMarker, EWidgetStyleKind::Brush, UWidgetBrushStyle::StaticClass());
+	Theme->SetStyleClass(TAG_ControlTestMarker, EWidgetStyleKind::Brush, UCommonBrushStyle::StaticClass());
 	FWidgetThemeResolver::SetPreviewOverride(Range.Get(), Theme.Get());
 	ON_SCOPE_EXIT
 	{
@@ -226,7 +364,7 @@ bool FCommonRangeStyleRefreshTest::RunTest(const FString& Parameters)
 	UCommonInputStyle* InputStyle = GetMutableDefault<UCommonInputStyle>();
 	TGuardValue<FEditableTextBoxStyle> InputGuard(InputStyle->InputStyle, InputStyle->InputStyle);
 	InputStyle->InputStyle.BackgroundImageNormal.DrawAs = ESlateBrushDrawType::Box;
-	UWidgetBrushStyle* BackgroundStyle = GetMutableDefault<UWidgetBrushStyle>();
+	UCommonBrushStyle* BackgroundStyle = GetMutableDefault<UCommonBrushStyle>();
 	TGuardValue<FSlateBrush> BrushGuard(BackgroundStyle->Brush, BackgroundStyle->Brush);
 	BackgroundStyle->Brush.DrawAs = ESlateBrushDrawType::RoundedBox;
 	TStrongObjectPtr<UCommonRangeStyle> Style(NewObject<UCommonRangeStyle>());
@@ -357,8 +495,6 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCommonOptionStyleRefreshTest, "WHFramework.Wid
 bool FCommonOptionStyleRefreshTest::RunTest(const FString& Parameters)
 {
 	TStrongObjectPtr<UCommonOptionSelector> Selector(NewObject<UCommonOptionSelector>());
-	Selector->SetLabel(FText::FromString(TEXT("Skin")));
-	Selector->SetLabelWidth(138.f);
 	Selector->SetOptionNames({TEXT("First"), TEXT("Second")});
 	Selector->SetOptionIndex(1);
 	Selector->Initialize();
@@ -367,12 +503,11 @@ bool FCommonOptionStyleRefreshTest::RunTest(const FString& Parameters)
 	const TSharedPtr<SScrollBar> OriginalScrollbar = Selector->DropdownScrollbar;
 	TStrongObjectPtr<UWidgetTheme> Theme(NewObject<UWidgetTheme>());
 	Theme->SetStyleClass(TAG_ControlTestScroll, EWidgetStyleKind::Scroll, UCommonScrollStyle::StaticClass());
-	Theme->SetStyleClass(TAG_ControlTestLabel, EWidgetStyleKind::Text, UCommonTextStyle::StaticClass());
-	Theme->SetStyleClass(TAG_ControlTestMarker, EWidgetStyleKind::Brush, UWidgetBrushStyle::StaticClass());
+	Theme->SetStyleClass(TAG_ControlTestMarker, EWidgetStyleKind::Brush, UCommonBrushStyle::StaticClass());
 	FWidgetThemeResolver::SetPreviewOverride(Selector.Get(), Theme.Get());
 	UCommonScrollStyle* ScrollStyle = GetMutableDefault<UCommonScrollStyle>();
 	TGuardValue<FScrollBarStyle> ScrollStyleGuard(ScrollStyle->ScrollBarStyle, ScrollStyle->ScrollBarStyle);
-	UWidgetBrushStyle* BackgroundStyle = GetMutableDefault<UWidgetBrushStyle>();
+	UCommonBrushStyle* BackgroundStyle = GetMutableDefault<UCommonBrushStyle>();
 	TGuardValue<FSlateBrush> BackgroundGuard(BackgroundStyle->Brush, BackgroundStyle->Brush);
 	BackgroundStyle->Brush.DrawAs = ESlateBrushDrawType::RoundedBox;
 	BackgroundStyle->Brush.TintColor = FSlateColor(FLinearColor::Green);
@@ -383,15 +518,12 @@ bool FCommonOptionStyleRefreshTest::RunTest(const FString& Parameters)
 	TStrongObjectPtr<UCommonInputStyle> Style(NewObject<UCommonInputStyle>());
 	Style->ComboItemStyle.TextColor = FSlateColor(FLinearColor::Yellow);
 	Style->OptionStyles.PopupScrollStyleTag = TAG_ControlTestScroll;
-	Style->OptionStyles.LabelTextStyleTag = TAG_ControlTestLabel;
 	Style->OptionStyles.ValueBackgroundBrushStyleTag = TAG_ControlTestMarker;
 	Style->InputStyle.BackgroundImageNormal.DrawAs = ESlateBrushDrawType::Box;
 	ScrollStyle->ScrollBarStyle.NormalThumbImage.TintColor = FSlateColor(FLinearColor::Red);
 	ScrollStyle->ScrollBarStyle.HoveredThumbImage.TintColor = FSlateColor(FLinearColor::Red);
 	ScrollStyle->ScrollBarStyle.DraggedThumbImage.TintColor = FSlateColor(FLinearColor::Red);
 	Selector->ApplyResolvedStyle(Style.Get());
-	TestEqual(TEXT("Selector caption displays its field label"), Selector->NativeLabel->GetText().ToString(), FString(TEXT("Skin")));
-	TestEqual(TEXT("Selector caption resolves its own text style"), Selector->NativeLabel->GetStyleTag(), TAG_ControlTestLabel.GetTag());
 	TestEqual(TEXT("Grouped selector background uses the themed brush"), Selector->NativeValueBackground->GetBrush().DrawAs.GetValue(), ESlateBrushDrawType::RoundedBox);
 	TestEqual(TEXT("Grouped background does not intercept input"), Selector->NativeValueBackground->GetVisibility(), ESlateVisibility::HitTestInvisible);
 	TestEqual(TEXT("A shared background removes the duplicate input frame"), Selector->TxtBox_Value->GetWidgetStyle().BackgroundImageNormal.DrawAs.GetValue(), ESlateBrushDrawType::NoDrawType);
@@ -469,14 +601,18 @@ bool FCommonControlPoolResetTest::RunTest(const FString& Parameters)
 	TStrongObjectPtr<UCommonOptionSelector> Selector(NewObject<UCommonOptionSelector>());
 	Selector->Initialize();
 	const TSharedRef<SWidget> SelectorWidget = Selector->TakeWidget();
-	FCommonOptionSelectorSpawnParameter SelectorParameters(FText::FromString(TEXT("Pool skin")), {TEXT("First"), TEXT("Second")}, false);
+	FCommonOptionSelectorSpawnParameter SelectorParameters({TEXT("First"), TEXT("Second")}, true);
 	IObjectPoolInterface::Execute_OnSpawn(Selector.Get(), FParameter(SelectorParameters));
-	Selector->SetLabelWidth(138.f);
-	TestEqual(TEXT("Spawn parameters produce a visible selector caption"), Selector->NativeLabel->GetText().ToString(), FString(TEXT("Pool skin")));
+	TestTrue(TEXT("Spawn parameters provide selector options"), Selector->GetOptionNames() == SelectorParameters.Options);
+	TestTrue(TEXT("Spawn parameters configure editable options"), Selector->bEditable);
+	Selector->SetOptionIndex(1);
+	Selector->SetUseDropdown(true);
 	IObjectPoolInterface::Execute_OnDespawn(Selector.Get(), EObjectDespawnMode::Recovery);
-	TestTrue(TEXT("Pool restores the template selector caption"), Selector->Label.EqualTo(CastChecked<UCommonOptionSelector>(Selector->GetArchetype())->Label));
-	TestEqual(TEXT("Pool restores the template caption width"), Selector->LabelWidth, CastChecked<UCommonOptionSelector>(Selector->GetArchetype())->LabelWidth);
-	TestEqual(TEXT("An empty caption releases its layout space"), static_cast<UWidget*>(Selector->NativeLabel.Get())->GetParent()->GetVisibility(), ESlateVisibility::Collapsed);
+	const UCommonOptionSelector* SelectorDefaults = CastChecked<UCommonOptionSelector>(Selector->GetArchetype());
+	TestTrue(TEXT("Pool restores the template selector options"), Selector->GetOptionNames() == SelectorDefaults->GetOptionNames());
+	TestEqual(TEXT("Pool restores the template selection"), Selector->GetOptionIndex(), SelectorDefaults->OptionIndex);
+	TestEqual(TEXT("Pool restores the template edit mode"), Selector->bEditable, SelectorDefaults->bEditable);
+	TestEqual(TEXT("Pool restores the template dropdown mode"), Selector->bUseDropdown, SelectorDefaults->bUseDropdown);
 	TStrongObjectPtr<UCommonInput> Input(NewObject<UCommonInput>());
 	Input->SetIsPassword(true);
 	Input->SetIsReadOnly(true);

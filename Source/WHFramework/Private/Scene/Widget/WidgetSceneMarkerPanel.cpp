@@ -54,7 +54,7 @@ void UWidgetSceneMarkerPanel::OnRefresh()
 		MapBackground->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
 	const bool bShouldHavePlayerMarker = bShowPlayerMarker &&
-		(MarkerChannel == ESceneMarkerChannel::Map || MarkerChannel == ESceneMarkerChannel::MiniMap) && UCommonModuleStatics::GetPlayerPawn() != nullptr;
+		(MarkerChannel == ESceneMarkerChannel::Map || MarkerChannel == ESceneMarkerChannel::MiniMap) && GetOwningPlayerPawn() != nullptr;
 	if(bShouldHavePlayerMarker != bPlayerMarkerPresent) RefreshMarkerMembership();
 	UpdateMarkerStates();
 }
@@ -68,11 +68,11 @@ void UWidgetSceneMarkerPanel::OnDestroy(EObjectDespawnMode InMode)
 
 FVector UWidgetSceneMarkerPanel::GetMarkerViewLocation() const
 {
-	if(MarkerChannel == ESceneMarkerChannel::Map || MarkerChannel == ESceneMarkerChannel::MiniMap)
+	if(MarkerChannel == ESceneMarkerChannel::Map || MarkerChannel == ESceneMarkerChannel::MiniMap || MarkerChannel == ESceneMarkerChannel::Compass)
 	{
 		return FVector(MapView.Center, 0.f);
 	}
-	if(const APlayerController* PlayerController = UCommonModuleStatics::GetPlayerController())
+	if(const APlayerController* PlayerController = GetOwningPlayer())
 	{
 		if(const AActor* ViewTarget = PlayerController->GetViewTarget()) return ViewTarget->GetActorLocation();
 	}
@@ -81,8 +81,8 @@ FVector UWidgetSceneMarkerPanel::GetMarkerViewLocation() const
 
 float UWidgetSceneMarkerPanel::GetMarkerViewYaw() const
 {
-	if(MarkerChannel == ESceneMarkerChannel::Map || MarkerChannel == ESceneMarkerChannel::MiniMap) return MapView.Yaw;
-	if(const APlayerController* PlayerController = UCommonModuleStatics::GetPlayerController())
+	if(MarkerChannel == ESceneMarkerChannel::Map || MarkerChannel == ESceneMarkerChannel::MiniMap || MarkerChannel == ESceneMarkerChannel::Compass) return MapView.Yaw;
+	if(const APlayerController* PlayerController = GetOwningPlayer())
 	{
 		return PlayerController->GetControlRotation().Yaw;
 	}
@@ -123,7 +123,7 @@ void UWidgetSceneMarkerPanel::RefreshMarkerMembership()
 	Markers = USceneModule::Get().GetMarkerViews(MarkerChannel, GetMarkerViewLocation(), GetMarkerViewYaw(), false);
 	AddPlayerMarker();
 	bPlayerMarkerPresent = bShowPlayerMarker &&
-		(MarkerChannel == ESceneMarkerChannel::Map || MarkerChannel == ESceneMarkerChannel::MiniMap) && UCommonModuleStatics::GetPlayerPawn() != nullptr;
+		(MarkerChannel == ESceneMarkerChannel::Map || MarkerChannel == ESceneMarkerChannel::MiniMap) && GetOwningPlayerPawn() != nullptr;
 	K2_OnMarkersUpdated(Markers);
 	RebuildMarkerItems();
 }
@@ -170,7 +170,7 @@ void UWidgetSceneMarkerPanel::UpdateMarkerStates()
 	const FVector ViewLocation = GetMarkerViewLocation();
 	const float ViewYaw = GetMarkerViewYaw();
 	const FVector2D PanelSize = MarkerCanvas->GetCachedGeometry().GetLocalSize();
-	const APawn* Player = UCommonModuleStatics::GetPlayerPawn();
+	const APawn* Player = GetOwningPlayerPawn();
 	for(FSceneMarkerView& Marker : Markers)
 	{
 		if(Marker.Marker.MarkerID == FGuid(0x504C4159u, 0x45524D41u, 0x504D4152u, 0x4B455231u))
@@ -236,7 +236,7 @@ void UWidgetSceneMarkerPanel::ResolveMapBackground()
 void UWidgetSceneMarkerPanel::AddPlayerMarker()
 {
 	if(!bShowPlayerMarker || (MarkerChannel != ESceneMarkerChannel::Map && MarkerChannel != ESceneMarkerChannel::MiniMap)) return;
-	const APawn* Player = UCommonModuleStatics::GetPlayerPawn();
+	const APawn* Player = GetOwningPlayerPawn();
 	if(!Player) return;
 
 	FSceneMarkerView View;

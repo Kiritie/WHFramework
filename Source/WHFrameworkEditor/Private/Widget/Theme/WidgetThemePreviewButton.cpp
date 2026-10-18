@@ -1,5 +1,6 @@
 #include "Widget/Theme/WidgetThemePreviewButton.h"
 #include "Widget/Common/CommonTextBlockN.h"
+#include "Widget/Style/CommonButtonStyleN.h"
 
 bool UWidgetThemePreviewButton::Initialize()
 {
@@ -8,5 +9,7 @@ bool UWidgetThemePreviewButton::Initialize()
 
 void UWidgetThemePreviewButton::SetPreviewTextVisible(bool bVisible)
 {
-	Txt_Title->SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	const UCommonButtonStyleN* ButtonStyle = Cast<UCommonButtonStyleN>(GetStyle());
+	Txt_Title->SetVisibility(bVisible && (!ButtonStyle || !ButtonStyle->bIconOnly)
+		? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 }

@@ -39,6 +39,8 @@ public:
 	bool IsFloating() const;
 	bool IsSprinting() const;
 	bool IsWaitingForTerrain() const;
+	bool IsHeadUnderWater() const;
+	FSimpleMulticastDelegate OnWaterStateChanged;
 	const FCharacterMovementConstraint& GetMovementConstraint() const;
 	FOnCharacterMovementLanded OnMovementLanded;
 
@@ -85,6 +87,7 @@ private:
 	FCharacterMovementConstraint GetSimulationConstraint() const;
 	ICharacterMovementEnvironmentInterface* GetEnvironmentProvider() const;
 	void RefreshEnvironment();
+	void SetMovementEnvironment(const FCharacterMovementEnvironment& InEnvironment);
 	void SelectEnvironmentMovement();
 	void PhysClimbing(float InDeltaSeconds, int32 InIterations);
 	void PhysWater(float InDeltaSeconds, int32 InIterations, bool bInFloat);

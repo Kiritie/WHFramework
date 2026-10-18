@@ -49,11 +49,11 @@ UClass* FWidgetThemeResolver::NativeBase(EWidgetStyleKind Kind)
 	switch (Kind)
 	{
 	case EWidgetStyleKind::Button:
-		return UCommonButtonStyle::StaticClass();
+		return UCommonButtonStyleN::StaticClass();
 	case EWidgetStyleKind::Text:
 		return UCommonTextStyle::StaticClass();
 	case EWidgetStyleKind::Brush:
-		return UWidgetBrushStyle::StaticClass();
+		return UCommonBrushStyle::StaticClass();
 	case EWidgetStyleKind::Input:
 		return UCommonInputStyle::StaticClass();
 	case EWidgetStyleKind::Toggle:

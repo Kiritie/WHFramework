@@ -74,6 +74,7 @@ public:
 		PostProcessingQuality = EVideoQuality::Epic;
 		FoliageQuality = EVideoQuality::Epic;
 		ShadingQuality = EVideoQuality::Epic;
+		AmbientOcclusionQuality = EVideoQuality::Epic;
 	}
 
 public:
@@ -121,4 +122,7 @@ public:
 
 	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "140"))
 	EVideoQuality ShadingQuality;
+
+	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "150", DisplayName = "环境光遮蔽（SSAO）"))
+	EVideoQuality AmbientOcclusionQuality;
 };

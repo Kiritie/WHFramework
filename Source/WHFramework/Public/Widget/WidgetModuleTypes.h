@@ -73,17 +73,12 @@ public:
 	FCommonOptionSelectorSpawnParameter() = default;
 
 	FCommonOptionSelectorSpawnParameter(
-		const FText& InTitle,
 		const TArray<FString>& InOptions,
 		bool bInEditable)
-		: Title(InTitle)
-		, Options(InOptions)
+		: Options(InOptions)
 		, bEditable(bInEditable)
 	{
 	}
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FText Title;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FString> Options;

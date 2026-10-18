@@ -2,8 +2,12 @@
 
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
+#include "Widget/Theme/WidgetStyleTags.h"
 
-UCommonImageN::UCommonImageN(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
+UCommonImageN::UCommonImageN(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+{
+	StyleTag = WidgetStyleTags::CommonDefault(EWidgetStyleKind::Brush);
+}
 
 void UCommonImageN::SynchronizeProperties()
 {
@@ -34,7 +38,7 @@ void UCommonImageN::ApplyStyleTag()
 	}
 	EnsureThemeSubscription();
 	UClass* Class = FWidgetThemeResolver::ResolveClass(this, StyleTag, EWidgetStyleKind::Brush);
-	const UWidgetBrushStyle* Style = Class ? Class->GetDefaultObject<UWidgetBrushStyle>() : nullptr;
+	const UCommonBrushStyle* Style = Class ? Class->GetDefaultObject<UCommonBrushStyle>() : nullptr;
 	SetBrush(Style ? Style->Brush : FSlateBrush());
 }
 

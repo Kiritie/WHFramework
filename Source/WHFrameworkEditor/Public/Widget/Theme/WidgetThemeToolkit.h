@@ -18,7 +18,6 @@ class UCommonImageN;
 class IDetailsView;
 class UWidget;
 class SEditableTextBox;
-enum class EWidgetStyleOperation : uint8;
 
 class WHFRAMEWORKEDITOR_API FWidgetThemeToolkit final : public FAssetEditorToolkit, public FGCObject, public FEditorUndoClient, public FNotifyHook
 {
@@ -89,7 +88,8 @@ private:
 	TSharedRef<SDockTab> SpawnDetails(const FSpawnTabArgs& Args);
 	TSharedRef<SDockTab> SpawnContext(const FSpawnTabArgs& Args);
 	void ExtendToolbar(FToolBarBuilder& Builder);
-	FReply OpenStyleDialog(EWidgetStyleOperation Operation);
+	FReply OpenStyleDialog();
+	TSharedPtr<SWidget> BuildContextMenu();
 	FReply OpenRenameDialog();
 	void Refresh();
 	void RequestRefresh();

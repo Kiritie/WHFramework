@@ -6,6 +6,20 @@
 #include "Misc/Paths.h"
 #include "Widget/Theme/WidgetThemeEditorService.h"
 
+FText UWidgetThemeEditorSettings::GetStyleTagDisplayName(FGameplayTag Tag)
+{
+	if (!Tag.IsValid())
+	{
+		return FText::GetEmpty();
+	}
+	FString Name = Tag.ToString();
+	if (!GetDefault<UWidgetThemeEditorSettings>()->bShowStyleTagPrefix)
+	{
+		Name.RemoveFromStart(TEXT("UI.Style."), ESearchCase::CaseSensitive);
+	}
+	return FText::FromString(Name);
+}
+
 void UWidgetThemeEditorSettings::PostEditChangeProperty(FPropertyChangedEvent& Event)
 {
 	Super::PostEditChangeProperty(Event);

@@ -1,9 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "WHFramework.h"
-#include "GameplayTagsManager.h"
-#include "Interfaces/IPluginManager.h"
-#include "Misc/Paths.h"
 #include "Ability/AbilityModuleTypes.h"
 #include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Item/AbilityItemBase.h"
@@ -24,14 +21,6 @@
 
 void FWHFrameworkModule::StartupModule()
 {
-	for (const TSharedRef<IPlugin>& Plugin : IPluginManager::Get().GetEnabledPlugins())
-	{
-		const FString TagDirectory = Plugin->GetBaseDir() / TEXT("Config/Tags");
-		if (Plugin->CanContainContent() && Plugin->GetLoadedFrom() == EPluginLoadedFrom::Project && FPaths::DirectoryExists(TagDirectory))
-		{
-			UGameplayTagsManager::Get().AddTagIniSearchPath(TagDirectory);
-		}
-	}
 	if (!FInventoryVoxelEntityCodec::Register())
 	{
 		UE_LOG(LogTemp, Fatal, TEXT("WHFramework inventory entity codec registration failed"));

@@ -7,8 +7,10 @@
 
 class UVerticalBox;
 class UTextBlock;
-class USpinBox;
 class UHorizontalBox;
+class UCommonButton;
+class UCommonRange;
+class UCommonTextBlockN;
 class UWidgetInventorySlotView;
 class UInventoryDragOperation;
 
@@ -64,6 +66,38 @@ public:
 
 protected:
     virtual TSharedRef<SWidget> RebuildWidget() override;
+    virtual void NativeConstruct() override;
+    void RebuildViews();
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    bool bStackInventoriesVertically = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    bool bShowInventoryTitles = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    bool bShowGroupTitles = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TMap<FGameplayTag, FName> GroupPanelNames;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TMap<FGameplayTag, FName> SlotHostPrefixes;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TMap<FGameplayTag, int32> GroupColumns;
+
+    UPROPERTY(EditDefaultsOnly, meta = (Categories = "UI.Style.Text"))
+    FGameplayTag InventoryTitleStyleTag;
+
+    UPROPERTY(EditDefaultsOnly, meta = (Categories = "UI.Style.Text"))
+    FGameplayTag GroupTitleStyleTag;
+
+    UPROPERTY(EditDefaultsOnly, meta = (Categories = "UI.Style.Button"))
+    FGameplayTag SecondaryButtonStyleTag;
+
+    UPROPERTY(EditDefaultsOnly, meta = (Categories = "UI.Style.Button"))
+    FGameplayTag ConfirmButtonStyleTag;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TSubclassOf<UWidgetInventorySlotView> SlotWidgetClass;
@@ -83,19 +117,31 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TMap<FGameplayTag, FText> GroupNames;
 
-private:
-    UPROPERTY(Transient)
+    UPROPERTY(meta = (BindWidget))
     TObjectPtr<UVerticalBox> InventoryContent;
 
-    UPROPERTY(Transient)
-    TObjectPtr<UTextBlock> ResultText;
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<UCommonTextBlockN> ResultText;
 
-    UPROPERTY(Transient)
+    UPROPERTY(meta = (BindWidget))
     TObjectPtr<UHorizontalBox> SplitControls;
 
-    UPROPERTY(Transient)
-    TObjectPtr<USpinBox> SplitCount;
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<UCommonRange> SplitCount;
 
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<UCommonButton> Btn_ConfirmSplit;
+
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<UCommonButton> Btn_CancelSplit;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UCommonButton> Btn_Sort;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UCommonButton> Btn_QuickStack;
+
+private:
     TWeakObjectPtr<UInventoryNetworkComponent> Network;
     TArray<FGuid> InventoryIds;
     TMap<FString, TWeakObjectPtr<UWidgetInventorySlotView>> Slots;
@@ -115,7 +161,7 @@ private:
     FDelegateHandle ClosedHandle;
 
     static FString SlotId(const FGuid& InInventoryId, const FInventorySlotKey& InSlot);
-    void RebuildViews();
+    void ClearViews();
     void RefreshSlot(const FGuid& InInventoryId, const FInventorySlotState& InSlot);
     void HandleSnapshot(const FInventorySnapshot& InSnapshot);
     void HandleDelta(const FInventoryDelta& InDelta);
@@ -123,6 +169,8 @@ private:
     void HandleClosed(const FGuid& InInventoryId, EInventoryResultCode InReason);
     bool Submit(FInventoryClientRequest InRequest);
     void RefreshPending();
+    void BindControls();
+    void UnbindControls();
 
     UFUNCTION()
     void ConfirmSplit();

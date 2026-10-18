@@ -107,6 +107,88 @@ bool UWidgetThemeEditorLibrary::SaveTheme(UWidgetTheme* InTheme, FString& OutErr
 	return FWidgetThemeEditorService::Save(InTheme, OutError);
 }
 
+bool UWidgetThemeEditorLibrary::RemoveStyleBinding(UWidgetTheme* InTheme, const FString& InTag, FString& OutError)
+{
+	OutError.Reset();
+	const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*InTag), false);
+	if (!InTheme || !Tag.IsValid())
+	{
+		OutError = TEXT("A theme and a registered style Tag are required.");
+		return false;
+	}
+	return FWidgetThemeEditorService::RemoveBinding(InTheme, Tag, OutError);
+}
+
+bool UWidgetThemeEditorLibrary::RemoveDuplicateGlobalTagDefinition(const FString& InTag, const FString& InTargetOwnerPath, FString& OutError)
+{
+	OutError.Reset();
+	const FGameplayTag Tag = FGameplayTag::RequestGameplayTag(FName(*InTag), false);
+	if (!Tag.IsValid() || InTargetOwnerPath.IsEmpty())
+	{
+		OutError = TEXT("A registered Tag and its owning module path are required.");
+		return false;
+	}
+	if (!FSlateApplication::IsInitialized())
+	{
+		OutError = TEXT("Global duplicate Tag cleanup requires a running Unreal Editor with Slate.");
+		return false;
+	}
+	return FWidgetThemeEditorService::RemoveDuplicateGlobalTagDefinition(Tag, InTargetOwnerPath, OutError);
+}
+
+bool UWidgetThemeEditorLibrary::MigrateTag(const FString& InOldTag, const FString& InNewTag, FString& OutError)
+{
+	OutError.Reset();
+	const FGameplayTag OldTag = FGameplayTag::RequestGameplayTag(FName(*InOldTag), false);
+	const FGameplayTag NewTag = FGameplayTag::RequestGameplayTag(FName(*InNewTag), false);
+	if (!OldTag.IsValid() || !NewTag.IsValid())
+	{
+		OutError = TEXT("Both the old and replacement Gameplay Tags must be registered before migration.");
+		return false;
+	}
+	if (!FSlateApplication::IsInitialized())
+	{
+		OutError = TEXT("Direct Tag migration requires a running Unreal Editor with Slate.");
+		return false;
+	}
+	return FWidgetThemeEditorService::MigrateTag(OldTag, NewTag, OutError);
+}
+
+bool UWidgetThemeEditorLibrary::MigrateTagReferences(const FString& InOldTagName, const FString& InNewTag, FString& OutError)
+{
+	OutError.Reset();
+	const FGameplayTag NewTag = FGameplayTag::RequestGameplayTag(FName(*InNewTag), false);
+	if (!NewTag.IsValid())
+	{
+		OutError = TEXT("The replacement Gameplay Tag must be registered before references are migrated.");
+		return false;
+	}
+	if (!FSlateApplication::IsInitialized())
+	{
+		OutError = TEXT("Tag reference migration requires a running Unreal Editor with Slate.");
+		return false;
+	}
+	return FWidgetThemeEditorService::MigrateTagReferences(InOldTagName, NewTag, OutError);
+}
+
+bool UWidgetThemeEditorLibrary::MigrateTagAlias(const FString& InOldAlias, const FString& InNewTag, FString& OutError)
+{
+	OutError.Reset();
+	const FGameplayTag NewTag = FGameplayTag::RequestGameplayTag(FName(*InNewTag), false);
+	const FName OldAlias(*InOldAlias);
+	if (OldAlias.IsNone() || !NewTag.IsValid())
+	{
+		OutError = TEXT("A non-empty old alias and a registered replacement Gameplay Tag are required.");
+		return false;
+	}
+	if (!FSlateApplication::IsInitialized())
+	{
+		OutError = TEXT("Direct alias migration requires a running Unreal Editor with Slate.");
+		return false;
+	}
+	return FWidgetThemeEditorService::MigrateTagAlias(OldAlias, NewTag, OutError);
+}
+
 bool UWidgetThemeEditorLibrary::SetProjectDefault(UWidgetTheme* InTheme, FString& OutError)
 {
 	OutError.Reset();

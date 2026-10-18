@@ -109,7 +109,6 @@ UWidgetModule::UWidgetModule()
 	LanguageTypes = TArray<FLanguageType>();
 	LanguageType = 0;
 	GlobalScale = 1.f;
-	DefaultWidgetTheme = nullptr;
 
 
 	WorldWidgetConfigs = TArray<FWorldWidgetConfig>();
@@ -358,7 +357,7 @@ bool UWidgetModule::ValidateWorldWidgetConfigs(TArray<FText>& OutErrors, TArray<
 
 bool UWidgetModule::ValidateWidgetTheme(TArray<FText>& OutErrors, TArray<FText>& OutWarnings) const
 {
-	const UWidgetTheme* ResolvedTheme = GetDefaultWidgetTheme();
+	const UWidgetTheme* ResolvedTheme = FWidgetThemeResolver::ResolveTheme(this);
 	if(!ResolvedTheme)
 	{
 		OutErrors.Add(NSLOCTEXT(
@@ -403,22 +402,21 @@ bool UWidgetModule::ValidateWidgetTheme(TArray<FText>& OutErrors, TArray<FText>&
 		}
 	}
 
-	const FSettingRendererClasses& RendererClasses = ResolvedTheme->GetSettingRendererClasses();
-	auto ValidateRendererClass = [&OutWarnings](const TCHAR* InName, TSubclassOf<UWidgetSettingEntryBase> InClass)
+	auto ValidateRendererClass = [&OutWarnings, ResolvedTheme](const TCHAR* InName, ESettingRendererType InType)
 	{
-		if(!InClass)
+		if(!ResolvedTheme->FindSettingRendererClass(InType))
 		{
 			OutWarnings.Add(FText::Format(
 				NSLOCTEXT("WH.WidgetModule", "MissingSettingRenderer", "Widget theme has no renderer class for {0} settings."),
 				FText::FromString(InName)));
 		}
 	};
-	ValidateRendererClass(TEXT("Bool"), RendererClasses.BoolClass);
-	ValidateRendererClass(TEXT("Number"), RendererClasses.NumberClass);
-	ValidateRendererClass(TEXT("Enum"), RendererClasses.EnumClass);
-	ValidateRendererClass(TEXT("Text"), RendererClasses.TextClass);
-	ValidateRendererClass(TEXT("Option"), RendererClasses.OptionClass);
-	ValidateRendererClass(TEXT("Key"), RendererClasses.KeyClass);
+	ValidateRendererClass(TEXT("Bool"), ESettingRendererType::Bool);
+	ValidateRendererClass(TEXT("Number"), ESettingRendererType::Number);
+	ValidateRendererClass(TEXT("Enum"), ESettingRendererType::Enum);
+	ValidateRendererClass(TEXT("Text"), ESettingRendererType::Text);
+	ValidateRendererClass(TEXT("Option"), ESettingRendererType::Option);
+	ValidateRendererClass(TEXT("Key"), ESettingRendererType::Key);
 
 	return OutErrors.IsEmpty();
 }
@@ -1411,26 +1409,4 @@ void UWidgetModule::ClearAllWorldWidget(EObjectDespawnMode InMode)
 			Widget->OnDestroy(InMode);
 		}
 	}
-}
-
-
-UWidgetTheme* UWidgetModule::GetDefaultWidgetTheme() const
-{
-    return const_cast<UWidgetTheme*>(FWidgetThemeResolver::ResolveTheme(this));
-}
-void UWidgetModule::SetDefaultWidgetTheme(UWidgetTheme* InTheme)
-{
-    UWorld* World = GetWorld();
-    UGameInstance* GI = World && World->IsGameWorld() ? World->GetGameInstance() : nullptr;
-    if (GI)
-    {
-        FString Error;
-        if(UWidgetThemeSubsystem* Themes=GI->GetSubsystem<UWidgetThemeSubsystem>())
-        {
-            if(!Themes->ApplyLoadedTheme(InTheme,Error))
-                UE_LOG(LogTemp, Error, TEXT("Legacy SetDefaultWidgetTheme rejected: %s"), *Error);
-        }
-        else UE_LOG(LogTemp, Warning, TEXT("Widget Theme UI subsystem is unavailable (e.g. dedicated server); no UI theme loaded."));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("SetDefaultWidgetTheme requires a game instance. Edit project settings explicitly in the editor."));
 }

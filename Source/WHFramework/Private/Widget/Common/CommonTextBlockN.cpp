@@ -4,10 +4,13 @@
 
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
+#include "Widget/Theme/WidgetStyleTags.h"
 #include "CommonTextScrollStyleBinding.h"
 
 UCommonTextBlockN::UCommonTextBlockN(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	StyleTag = WidgetStyleTags::CommonDefault(EWidgetStyleKind::Text);
+	TextScrollStyleTag = WidgetStyleTags::CommonDefault(EWidgetStyleKind::TextScroll);
 }
 
 TSharedRef<SWidget> UCommonTextBlockN::RebuildWidget()

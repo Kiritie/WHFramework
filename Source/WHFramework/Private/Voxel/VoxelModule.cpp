@@ -1961,6 +1961,43 @@ int32 UVoxelModule::ResolveDefaultWorldSeed() const
 		FMath::Max(1, static_cast<int32>(FGuid::NewGuid().A & 0x7fffffffu)) : DefaultWorldSeed;
 }
 
+FIntPoint UVoxelModule::GetLocalFineRadiusLimits() const
+{
+	const FVoxelStreamingSourceView& SourceView = ViewSettings.DefaultSourceView;
+	const int32 Minimum = FMath::Max(16, SourceView.FineLevel0RadiusCells);
+	return FIntPoint(Minimum, FMath::Max(Minimum, SourceView.VoxelProxyRadiusCells));
+}
+
+void UVoxelModule::SetLocalFineRadiusCells(int32 InRadiusCells)
+{
+	check(InRadiusCells >= INDEX_NONE);
+	if (LocalFineRadiusCells == InRadiusCells)
+	{
+		return;
+	}
+	LocalFineRadiusCells = InRadiusCells;
+	for (const auto& Pair : Sources)
+	{
+		const FVoxelStreamingSource Source = Pair.Value.Value;
+		if (Source.bInheritWorldView && Source.bLocalView && Source.Has(EVoxelStreamingCapability::FineVisual))
+		{
+			UpdateSource(Pair.Key, Source);
+		}
+	}
+}
+
+FVoxelStreamingSourceView UVoxelModule::ResolveSourceView(const FVoxelStreamingSource& InSource) const
+{
+	FVoxelStreamingSourceView Result = InSource.bInheritWorldView ? ViewSettings.DefaultSourceView : InSource.View;
+	if (LocalFineRadiusCells >= 0 && InSource.bInheritWorldView && InSource.bLocalView &&
+		InSource.Has(EVoxelStreamingCapability::FineVisual))
+	{
+		const FIntPoint Limits = GetLocalFineRadiusLimits();
+		Result.FineRadiusCells = FMath::Clamp(LocalFineRadiusCells, Limits.X, Limits.Y);
+	}
+	return Result;
+}
+
 FGuid UVoxelModule::RegisterSource(UObject* InOwner, const FVoxelStreamingSource& InSource)
 {
 	if (!InOwner || !IsReady())
@@ -1976,10 +2013,7 @@ FGuid UVoxelModule::RegisterSource(UObject* InOwner, const FVoxelStreamingSource
 			EVoxelStreamingCapability::WorldVisual | EVoxelStreamingCapability::LocalRefinement);
 	}
 	Source.Value.Normalize();
-	if (Source.Value.bInheritWorldView)
-	{
-		Source.Value.View = ViewSettings.DefaultSourceView;
-	}
+	Source.Value.View = ResolveSourceView(Source.Value);
 	FString Error;
 	if (!VoxelStreamingGeometry::ValidateInitialSide(Source.Value.View.InitialChunkSideCells,
 		ViewSettings.Lod.MaximumFineLevel, Error))
@@ -2014,10 +2048,7 @@ bool UVoxelModule::UpdateSource(const FGuid& InId, const FVoxelStreamingSource& 
 			EVoxelStreamingCapability::WorldVisual | EVoxelStreamingCapability::LocalRefinement);
 	}
 	Updated.Normalize();
-	if (Updated.bInheritWorldView)
-	{
-		Updated.View = ViewSettings.DefaultSourceView;
-	}
+	Updated.View = ResolveSourceView(Updated);
 	FString Error;
 	if (!VoxelStreamingGeometry::ValidateInitialSide(Updated.View.InitialChunkSideCells,
 		ViewSettings.Lod.MaximumFineLevel, Error))

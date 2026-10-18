@@ -11,6 +11,7 @@
 #include "Asset/AssetModuleStatics.h"
 #include "Common/CommonModuleStatics.h"
 #include "GameFramework/GameUserSettings.h"
+#include "HAL/IConsoleManager.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveGameModuleStatics.h"
@@ -46,6 +47,7 @@ UVideoModule::UVideoModule()
 	PostProcessingQuality = EVideoQuality::Epic;
 	FoliageQuality = EVideoQuality::Epic;
 	ShadingQuality = EVideoQuality::Epic;
+	AmbientOcclusionQuality = EVideoQuality::Epic;
 }
 
 UVideoModule::~UVideoModule()
@@ -103,6 +105,7 @@ void UVideoModule::OnPreparatory(EPhase InPhase)
 		SetPostProcessingQuality(PostProcessingQuality, false);
 		SetFoliageQuality(FoliageQuality, false);
 		SetShadingQuality(ShadingQuality, false);
+		SetAmbientOcclusionQuality(AmbientOcclusionQuality, false);
 
 		ApplyVideoSettings();
 	}
@@ -149,6 +152,7 @@ void UVideoModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 		SetPostProcessingQuality(SaveData.PostProcessingQuality, false);
 		SetFoliageQuality(SaveData.FoliageQuality, false);
 		SetShadingQuality(SaveData.ShadingQuality, false);
+		SetAmbientOcclusionQuality(SaveData.AmbientOcclusionQuality, false);
 
 		ApplyVideoSettings();
 	}
@@ -178,6 +182,7 @@ FParameter UVideoModule::ToData()
 	SaveData.PostProcessingQuality = GetPostProcessingQuality();
 	SaveData.FoliageQuality = GetFoliageQuality();
 	SaveData.ShadingQuality = GetShadingQuality();
+	SaveData.AmbientOcclusionQuality = GetAmbientOcclusionQuality();
 
 	return FParameter(MoveTemp(SaveData));
 }
@@ -287,9 +292,11 @@ void UVideoModule::ApplyVideoSettings()
 	if(GetWorld() && GetWorld()->IsPlayInEditor())
 	{
 		GetGameUserSettings()->ApplyNonResolutionSettings();
+		ApplyAmbientOcclusionSettings();
 		return;
 	}
 	GetGameUserSettings()->ApplySettings(true);
+	ApplyAmbientOcclusionSettings();
 }
 
 #if WITH_EDITOR
@@ -327,6 +334,7 @@ void UVideoModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 					PostProcessingQuality = Quality;
 					FoliageQuality = Quality;
 					ShadingQuality = Quality;
+					AmbientOcclusionQuality = Quality;
 				}
 			}
 			else if(Quality != GlobalVideoQuality)
@@ -393,7 +401,8 @@ void UVideoModule::SetGlobalVideoQuality(EVideoQuality InQuality, bool bApply)
 		SetPostProcessingQuality(InQuality, false);
 		SetFoliageQuality(InQuality, false);
 		SetShadingQuality(InQuality, false);
-		if(bApply) GetGameUserSettings()->ApplySettings(false);
+		SetAmbientOcclusionQuality(InQuality, false);
+		if(bApply) ApplyVideoSettings();
 	}
 }
 
@@ -480,6 +489,34 @@ void UVideoModule::SetShadingQuality(EVideoQuality InQuality, bool bApply)
 UGameUserSettings* UVideoModule::GetGameUserSettings() const
 {
 	return GEngine->GetGameUserSettings();
+}
+
+void UVideoModule::SetAmbientOcclusionQuality(EVideoQuality InQuality, bool bApply)
+{
+	if (InQuality > EVideoQuality::Cinematic) return;
+	AmbientOcclusionQuality = InQuality;
+	if (InQuality != GlobalVideoQuality) GlobalVideoQuality = EVideoQuality::Custom;
+	if (bApply) ApplyVideoSettings();
+}
+
+void UVideoModule::ApplyAmbientOcclusionSettings()
+{
+	const int32 Quality = FMath::Clamp(static_cast<int32>(AmbientOcclusionQuality), 0, 4);
+	const float MaxQuality[] = {0.f, 60.f, 100.f, 100.f, 100.f};
+	const float MipFactor[] = {1.f, 1.f, 0.6f, 0.4f, 0.4f};
+	const float RadiusScale[] = {1.2f, 1.5f, 1.5f, 1.f, 1.f};
+	auto SetVariable = [](const TCHAR* Name, float Value)
+	{
+		if (IConsoleVariable* Variable = IConsoleManager::Get().FindConsoleVariable(Name))
+		{
+			Variable->Set(Value, ECVF_SetByGameSetting);
+		}
+	};
+	SetVariable(TEXT("r.AmbientOcclusionLevels"), Quality == 0 ? 0.f : -1.f);
+	SetVariable(TEXT("r.AmbientOcclusionMaxQuality"), MaxQuality[Quality]);
+	SetVariable(TEXT("r.AmbientOcclusionMipLevelFactor"), MipFactor[Quality]);
+	SetVariable(TEXT("r.AmbientOcclusionRadiusScale"), RadiusScale[Quality]);
+	SetVariable(TEXT("r.GTAO.NumAngles"), Quality == 4 ? 4.f : 2.f);
 }
 
 void UVideoModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

@@ -50,6 +50,8 @@ void UCommonProgress::ApplyResolvedStyle(const UObject* InStyle)
 	if (Bar_Value)
 	{
 		Bar_Value->SetWidgetStyle(Style->ProgressBarStyle);
+		Bar_Value->SetBarFillType(Style->FillType);
+		Bar_Value->SetBarFillStyle(Style->FillStyle);
 		Bar_Value->SetFillColorAndOpacity(Style->FillColor);
 		Bar_Value->SetVisibility(bRadial ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
@@ -81,7 +83,7 @@ void UCommonProgress::SynchronizeProperties()
 
 void UCommonProgress::SetPercent(float InPercent)
 {
-	Percent = FMath::Clamp(InPercent, 0.f, 1.f);
+	Percent = FMath::IsFinite(InPercent) ? FMath::Clamp(InPercent, 0.f, 1.f) : 0.f;
 	if (Bar_Value)
 	{
 		Bar_Value->SetPercent(Percent);

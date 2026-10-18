@@ -14,6 +14,7 @@
 #include "Setting/Provider/LanguageSettingProvider.h"
 #include "Setting/Provider/ResolutionSettingProvider.h"
 #include "Setting/Provider/AudioSettingProvider.h"
+#include "Setting/Provider/CameraSettingProvider.h"
 #include "Setting/Provider/ParameterSettingProvider.h"
 #include "Setting/Provider/SettingProviderBase.h"
 #include "Video/VideoModule.h"
@@ -160,6 +161,7 @@ USettingModule::USettingModule()
 	Providers.Add(CreateDefaultSubobject<UResolutionSettingProvider>(TEXT("ResolutionSettingProvider")));
 	Providers.Add(CreateDefaultSubobject<ULanguageSettingProvider>(TEXT("LanguageSettingProvider")));
 	Providers.Add(CreateDefaultSubobject<UAudioSettingProvider>(TEXT("AudioSettingProvider")));
+	Providers.Add(CreateDefaultSubobject<UCameraSettingProvider>(TEXT("CameraSettingProvider")));
 }
 
 USettingModule::~USettingModule()
@@ -432,6 +434,7 @@ ESettingRendererType USettingModule::InferRenderer(const FProperty* InProperty) 
 
 void USettingModule::EnsureBuiltinProviders()
 {
+	EnsureSettingProvider<UCameraSettingProvider>(this, Providers);
 	EnsureSettingProvider<UAudioSettingProvider>(this, Providers);
 	EnsureSettingProvider<UParameterSettingProvider>(this, Providers);
 	EnsureSettingProvider<UInputSettingProvider>(this, Providers);
@@ -494,6 +497,8 @@ void USettingModule::BuildSettingDefinitions()
 			Definition.Order = Override->Order;
 		if (Override->bOverrideRenderer)
 			Definition.Renderer = Override->Renderer;
+		if (Override->bOverrideCustomWidgetClass)
+			Definition.CustomWidgetClass = Override->CustomWidgetClass;
 		if (Override->bOverrideApplyPolicy)
 			Definition.ApplyPolicy = Override->ApplyPolicy;
 		if (Override->bOverrideVisible)
@@ -762,6 +767,10 @@ FSettingValidationResult USettingModule::ValidateSettingValue(const FSettingDefi
 	double NumericValue = 0.0;
 	if (TryGetNumericValue(InValue, NumericValue))
 	{
+		if (!FMath::IsFinite(NumericValue))
+		{
+			return FSettingValidationResult::Invalid(NSLOCTEXT("WH.SettingModule", "NonFinite", "设置值必须为有限数值。"));
+		}
 		if (InDefinition.NumberDisplay.bHasMin && NumericValue < InDefinition.NumberDisplay.Min)
 		{
 			return FSettingValidationResult::Invalid(
@@ -851,11 +860,7 @@ FSettingModuleSaveData USettingModule::GetDefaultCombinedSettings() const
 void USettingModule::ApplyCombinedSettings(FSettingModuleSaveData& InData)
 {
 	UWidgetModule::Get().LoadSaveData(FParameter(InData.WidgetData), EPhase::All);
-	UAudioModule::Get().LoadSaveData(FParameter(InData.AudioData), EPhase::All);
 	UVideoModule::Get().LoadSaveData(FParameter(InData.VideoData), EPhase::All);
-	UCameraModule::Get().LoadSaveData(FParameter(InData.CameraData), EPhase::All);
-	UInputModule::Get().LoadSaveData(FParameter(InData.InputData), EPhase::All);
-	UParameterModule::Get().LoadSaveData(FParameter(InData.ParameterData), EPhase::All);
 }
 
 void USettingModule::SaveSettings()
@@ -912,10 +917,7 @@ void USettingModule::EndEdit()
 	{
 		return;
 	}
-	if (ConfirmationTransaction.bActive)
-	{
-		RejectPendingSettings();
-	}
+	CancelEditSession();
 	for (USettingProviderBase* Provider : Providers)
 	{
 		if (Provider)
@@ -1022,6 +1024,7 @@ void USettingModule::CancelEditSession()
 		RejectPendingSettings();
 		return;
 	}
+	ApplyCombinedSettings(EditSession.AppliedData);
 
 	for (USettingProviderBase* Provider : Providers)
 	{
@@ -1249,18 +1252,50 @@ bool USettingModule::SetPendingValue(FSettingId InSettingId, const FParameter& I
 
 	if (USettingProviderBase* Provider = FindSettingProvider(*Definition))
 	{
+		const FParameter PreviousValue = Provider->GetPendingValue(*Definition);
 		if (!Provider->SetPendingValue(*Definition, InValue))
 		{
 			return false;
+		}
+		if (Definition->ApplyPolicy != ESettingApplyPolicy::Deferred)
+		{
+			const bool bApplied = Definition->ApplyPolicy == ESettingApplyPolicy::Preview ?
+				Provider->Preview(*Definition, InValue) : Provider->Apply(*Definition, InValue);
+			if (!bApplied)
+			{
+				Provider->SetPendingValue(*Definition, PreviousValue);
+				Provider->Apply(*Definition, PreviousValue);
+				ValidationResults.Add(InSettingId, FSettingValidationResult::Invalid(NSLOCTEXT("WH.SettingModule", "PreviewFailed", "设置预览失败，已恢复原值。")));
+				BroadcastEditStateChanged();
+				return false;
+			}
 		}
 		OnSettingValueChanged.Broadcast(InSettingId);
 		BroadcastEditStateChanged();
 		return true;
 	}
 
+	if (Definition->ApplyPolicy != ESettingApplyPolicy::Deferred && !Definition->SourcePath.StartsWith(TEXT("WidgetData.")))
+	{
+		ValidationResults.Add(InSettingId, FSettingValidationResult::Invalid(NSLOCTEXT("WH.SettingModule", "MissingPreviewProvider", "此设置尚未配置预览接口。")));
+		BroadcastEditStateChanged();
+		return false;
+	}
 	if (!WriteSessionValue(EditSession.PendingData, InSettingId, InValue))
 	{
 		return false;
+	}
+	if (Definition->ApplyPolicy != ESettingApplyPolicy::Deferred)
+	{
+		if (Definition->SourcePath.StartsWith(TEXT("WidgetData.")))
+		{
+			FWidgetModuleSaveData Preview = UWidgetModule::Get().GetSaveData(true).GetRef<FWidgetModuleSaveData>();
+			FResolvedSettingProperty Resolved;
+			if (ResolvePropertyPath(FWidgetModuleSaveData::StaticStruct(), &Preview, Definition->SourcePath.RightChop(11), Resolved) && WritePropertyValue(Resolved, InValue))
+			{
+				UWidgetModule::Get().LoadSaveData(FParameter(Preview), EPhase::All);
+			}
+		}
 	}
 	OnSettingValueChanged.Broadcast(InSettingId);
 	BroadcastEditStateChanged();
@@ -1330,17 +1365,6 @@ TArray<USettingEntry*> USettingModule::GetSettingEntriesByPage(FName InPage) con
 TArray<FSettingPageDefinition> USettingModule::GetSettingPages() const
 {
 	TArray<FSettingPageDefinition> Result = SettingConfig.Pages;
-	if (!Result.ContainsByPredicate(
-	        [](const FSettingPageDefinition& Page)
-	        {
-		        return Page.Page == FName(TEXT("Parameter"));
-	        }))
-	{
-		FSettingPageDefinition& ParameterPage = Result.AddDefaulted_GetRef();
-		ParameterPage.Page = FName(TEXT("Parameter"));
-		ParameterPage.DisplayName = FText::FromName(ParameterPage.Page);
-		ParameterPage.Order = GetDefaultSettingPageOrder(ParameterPage.Page);
-	}
 	for (const FSettingDefinition& Definition : FinalDefinitions)
 	{
 		if (Definition.Page.IsNone() || Result.ContainsByPredicate(
