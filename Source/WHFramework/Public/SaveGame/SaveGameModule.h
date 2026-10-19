@@ -2,6 +2,7 @@
 
 #include "Main/Base/ModuleBase.h"
 #include "SaveGame/SaveGameModuleTypes.h"
+#include "SaveGame/SaveGameLoadSnapshot.h"
 #include "SaveGame/SaveGameStorage.h"
 #include "SaveGame/SaveGameAsyncExecutor.h"
 
@@ -101,6 +102,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
 	FSaveOperationResult LoadSlot(FGuid SaveId, EPhase InPhase = EPhase::All);
 
+	FSaveOperationResult RequestLoadSlot(FGuid SaveId, EPhase InPhase, const FGuid& InOperationId);
+	FSaveOperationResult GetLoadOperationResult(const FGuid& InOperationId) const;
+	const FSaveOperationResult& GetLastLoadOperationResult() const { return LoadOperationResult; }
+	void CancelLoadOperation(const FGuid& InOperationId);
+
 	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
 	FSaveOperationResult DeleteSaveSlot(FGuid SaveId);
 
@@ -160,7 +166,7 @@ private:
 	void CompleteUserQuit(const FSaveOperationResult& InResult);
 	void RestoreLastActiveSave();
 	FSaveOperationResult LoadModulesFromGeneration(const FGuid& SaveId, int32 Generation, EPhase InPhase);
-	FSaveOperationResult RestoreSlotGeneration(const FPendingSaveLoadContext& Context, EPhase InPhase);
+	FSaveOperationResult RestoreLoadSnapshot(EPhase InPhase);
 	TArray<UModuleBase*> GetSaveModules(
 		ESaveScope Scope,
 		bool bRequireSaveEnabled = true) const;
@@ -182,8 +188,9 @@ private:
 	UPROPERTY(Transient)
 	FCreateSaveSlotParams PendingSaveSlotParams;
 
-	UPROPERTY(Transient)
-	FPendingSaveLoadContext PendingLoadContext;
+	FSaveGameLoadSnapshot LoadSnapshot;
+
+	FSaveOperationResult LoadOperationResult;
 
 	TUniquePtr<FSaveGameStorage> Storage;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> AsyncExecutorLease;

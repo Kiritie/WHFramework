@@ -27,6 +27,11 @@ void UCommonProgress::BuildNativeLayout()
 {
 	UOverlay* Root = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("ProgressLayout"));
 	WidgetTree->RootWidget = Root;
+	Img_Background = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Img_Background"));
+	UOverlaySlot* BackgroundSlot = Root->AddChildToOverlay(Img_Background);
+	BackgroundSlot->SetHorizontalAlignment(HAlign_Fill);
+	BackgroundSlot->SetVerticalAlignment(VAlign_Fill);
+	Img_Background->SetVisibility(ESlateVisibility::Collapsed);
 	Bar_Value = WidgetTree->ConstructWidget<UProgressBar>(UProgressBar::StaticClass(), TEXT("Bar_Value"));
 	UOverlaySlot* BarSlot = Root->AddChildToOverlay(Bar_Value);
 	BarSlot->SetHorizontalAlignment(HAlign_Fill);
@@ -47,6 +52,11 @@ void UCommonProgress::ApplyResolvedStyle(const UObject* InStyle)
 	}
 	const bool bRadial = Style->RadialMaterial != nullptr;
 	ProgressParameter = Style->ProgressParameter;
+	if (Img_Background)
+	{
+		Img_Background->SetBrush(Style->RadialBackground);
+		Img_Background->SetVisibility(bRadial && Style->RadialBackground.DrawAs != ESlateBrushDrawType::NoDrawType ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	}
 	if (Bar_Value)
 	{
 		Bar_Value->SetWidgetStyle(Style->ProgressBarStyle);
@@ -57,6 +67,7 @@ void UCommonProgress::ApplyResolvedStyle(const UObject* InStyle)
 	}
 	if (Img_Radial)
 	{
+		if (UOverlaySlot* RadialSlot = Cast<UOverlaySlot>(Img_Radial->Slot)) RadialSlot->SetPadding(Style->RadialPadding);
 		Img_Radial->SetVisibility(bRadial ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 		if (bRadial)
 		{
@@ -70,6 +81,7 @@ void UCommonProgress::ApplyResolvedStyle(const UObject* InStyle)
 		else
 		{
 			RadialMaterial = nullptr;
+			Img_Radial->SetBrush(FSlateBrush());
 		}
 	}
 	SetPercent(Percent);

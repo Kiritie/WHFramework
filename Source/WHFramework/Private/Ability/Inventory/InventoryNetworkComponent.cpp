@@ -525,8 +525,25 @@ uint64 UInventoryNetworkComponent::SubmitRequest(FInventoryClientRequest InReque
     Entry.Request = MoveTemp(InRequest);
     Entry.Attempts = 0;
     const uint64 RequestId = Entry.Request.RequestId;
+    const FInventoryClientRequest Queued = Entry.Request;
     Pending.Add(RequestId, MoveTemp(Entry));
-    return RequestId;
+    OnRequestQueued.Broadcast(Queued);
+    return ConnectionId == Queued.ConnectionId && ConnectionStoreId == Queued.StoreId && WorldEpoch == Queued.WorldEpoch ? RequestId : 0;
+}
+
+TArray<FInventoryClientRequest> UInventoryNetworkComponent::GetPendingRequests() const
+{
+    TArray<FInventoryClientRequest> Requests;
+    Requests.Reserve(Pending.Num());
+    for (const TPair<uint64, FPendingRequest>& Entry : Pending)
+    {
+        Requests.Add(Entry.Value.Request);
+    }
+    Requests.Sort([](const FInventoryClientRequest& First, const FInventoryClientRequest& Second)
+    {
+        return First.RequestId < Second.RequestId;
+    });
+    return Requests;
 }
 
 void UInventoryNetworkComponent::OpenInventory(const FGuid& InInventoryId, uint32 InGeneration)
@@ -546,6 +563,7 @@ void UInventoryNetworkComponent::CloseInventory(const FGuid& InInventoryId)
     const FGuid SessionId = GetSessionId(InInventoryId);
     if(SessionId.IsValid())
     {
+        LocallyClosedSessions.Add(SessionId);
         ServerClose(SessionId);
     }
 }
@@ -562,7 +580,7 @@ void UInventoryNetworkComponent::ResyncInventory(const FGuid& InInventoryId)
 const FInventorySnapshot* UInventoryNetworkComponent::FindView(const FGuid& InInventoryId) const
 {
     const FClientView* View = Views.Find(InInventoryId);
-    return View ? &View->Snapshot : nullptr;
+    return View && !LocallyClosedSessions.Contains(View->SessionId) ? &View->Snapshot : nullptr;
 }
 
 FGuid UInventoryNetworkComponent::GetOwnerInventoryId() const
@@ -588,7 +606,7 @@ FGuid UInventoryNetworkComponent::GetStoreId() const
 FGuid UInventoryNetworkComponent::GetSessionId(const FGuid& InInventoryId) const
 {
     const FClientView* View = Views.Find(InInventoryId);
-    return View ? View->SessionId : FGuid();
+    return View && !LocallyClosedSessions.Contains(View->SessionId) ? View->SessionId : FGuid();
 }
 
 bool UInventoryNetworkComponent::ConsumeBudget(double InCost)
@@ -1073,11 +1091,15 @@ void UInventoryNetworkComponent::ClientReset_Implementation(FGuid InConnectionId
     {
         return;
     }
+    const FGuid PreviousStore = ConnectionStoreId;
+    const FGuid PreviousEpoch = WorldEpoch;
+    const uint64 Revision = ++ClientContextRevision;
     TArray<FGuid> Existing;
     Views.GetKeys(Existing);
     TMap<uint64, FPendingRequest> Cancelled = MoveTemp(Pending);
     Pending.Reset();
     Views.Reset();
+    LocallyClosedSessions.Reset();
     Assemblies.Reset();
     ConnectionId.Invalidate();
     ConnectionWorldId.Invalidate();
@@ -1085,22 +1107,29 @@ void UInventoryNetworkComponent::ClientReset_Implementation(FGuid InConnectionId
     WorldEpoch.Invalidate();
     OwnerInventoryId.Invalidate();
     NextRequestId = 1;
+    OnConnectionReset.Broadcast(PreviousStore, PreviousEpoch, InReason);
+    if (Revision != ClientContextRevision) return;
     for(const TPair<uint64, FPendingRequest>& Pair : Cancelled)
     {
         FInventoryCommandResult Result;
         Result.RequestId = Pair.Key;
         Result.Code = Pair.Value.Attempts > 0 ? EInventoryResultCode::ConfirmationPending : InReason;
         OnResult.Broadcast(Result);
+        if (Revision != ClientContextRevision) return;
     }
     for(const FGuid& InventoryId : Existing)
     {
         OnSessionClosed.Broadcast(InventoryId, InReason);
+        if (Revision != ClientContextRevision) return;
     }
 }
 
 void UInventoryNetworkComponent::ClientBegin_Implementation(FGuid InConnectionId, FGuid InWorldId, FGuid InStoreId, FGuid InWorldEpoch, FGuid InOwnerInventoryId)
 {
+    const uint64 PreviousRevision = ClientContextRevision;
     ClientReset_Implementation(ConnectionId, EInventoryResultCode::GenerationChanged);
+    if (ClientContextRevision != PreviousRevision + 1) return;
+    ++ClientContextRevision;
     ConnectionId = InConnectionId;
     ConnectionWorldId = InWorldId;
     ConnectionStoreId = InStoreId;
@@ -1113,7 +1142,7 @@ void UInventoryNetworkComponent::ClientSnapshot_Implementation(const FInventoryS
 {
     UInventoryWorldSubsystem* World = WorldSubsystem.Get();
     if(!World || !ConnectionId.IsValid() || InChunk.ConnectionId != ConnectionId || InChunk.StoreId != ConnectionStoreId ||
-       InChunk.WorldEpoch != WorldEpoch || !InChunk.SessionId.IsValid() || !InChunk.TransferId.IsValid() ||
+       InChunk.WorldEpoch != WorldEpoch || !InChunk.SessionId.IsValid() || LocallyClosedSessions.Contains(InChunk.SessionId) || !InChunk.TransferId.IsValid() ||
        InChunk.TotalBytes < 1 || InChunk.TotalBytes > FInventorySnapshotCodec::MaximumBytes || InChunk.Count < 1 ||
        InChunk.Count != FMath::DivideAndRoundUp(InChunk.TotalBytes, InventoryNetworkFormat::ChunkBytes) ||
        InChunk.Index < 0 || InChunk.Index >= InChunk.Count)
@@ -1190,17 +1219,48 @@ void UInventoryNetworkComponent::ClientSnapshot_Implementation(const FInventoryS
         ClientClosed_Implementation(InChunk.ConnectionId, InChunk.InventoryId, InChunk.SessionId, EInventoryResultCode::InvalidItem);
         return;
     }
+    FInventoryDelta AppliedView;
+    FInventoryChangeSet AppliedChanges;
+    if(const FClientView* Previous = Views.Find(InChunk.InventoryId); Previous && Previous->SessionId == InChunk.SessionId &&
+       Previous->Snapshot.Generation == Snapshot.Generation && Previous->Snapshot.ProfileId == Snapshot.ProfileId &&
+       Snapshot.Revision > Previous->Snapshot.Revision)
+    {
+        AppliedView.ConnectionId = InChunk.ConnectionId;
+        AppliedView.StoreId = InChunk.StoreId;
+        AppliedView.WorldEpoch = InChunk.WorldEpoch;
+        AppliedView.SessionId = InChunk.SessionId;
+        AppliedView.InventoryId = InChunk.InventoryId;
+        AppliedView.Generation = Snapshot.Generation;
+        AppliedView.FromRevision = Previous->Snapshot.Revision;
+        AppliedView.ToRevision = Snapshot.Revision;
+        AppliedChanges.Revisions.Add({InChunk.InventoryId, Previous->Snapshot.Revision, Snapshot.Revision});
+        for(const FInventorySlotState& After : Snapshot.Slots)
+        {
+            const FInventorySlotState* Before = Previous->Snapshot.FindSlot(After.Key);
+            if(!Before || *Before == After) continue;
+            FInventoryChangedSlot& Change = AppliedChanges.ChangedSlots.AddDefaulted_GetRef();
+            Change.InventoryId = Snapshot.InventoryId;
+            Change.Key = After.Key;
+            Change.Before = *Before;
+            Change.After = After;
+        }
+    }
     FClientView View;
     View.SessionId = InChunk.SessionId;
     View.Snapshot = MoveTemp(Snapshot);
     Views.Add(InChunk.InventoryId, MoveTemp(View));
     const FInventorySnapshot Published = Views.FindChecked(InChunk.InventoryId).Snapshot;
     OnSnapshot.Broadcast(Published);
+    if(AppliedView.ConnectionId.IsValid() && ConnectionId == AppliedView.ConnectionId && ConnectionStoreId == AppliedView.StoreId &&
+       WorldEpoch == AppliedView.WorldEpoch && GetSessionId(AppliedView.InventoryId) == AppliedView.SessionId)
+    {
+        OnAppliedChanges.Broadcast(AppliedView, AppliedChanges);
+    }
 }
 
 void UInventoryNetworkComponent::ClientDelta_Implementation(const FInventoryDelta& InDelta)
 {
-    if(!ConnectionId.IsValid() || InDelta.ConnectionId != ConnectionId || InDelta.StoreId != ConnectionStoreId || InDelta.WorldEpoch != WorldEpoch)
+    if(!ConnectionId.IsValid() || InDelta.ConnectionId != ConnectionId || InDelta.StoreId != ConnectionStoreId || InDelta.WorldEpoch != WorldEpoch || LocallyClosedSessions.Contains(InDelta.SessionId))
     {
         return;
     }
@@ -1222,6 +1282,9 @@ void UInventoryNetworkComponent::ClientDelta_Implementation(const FInventoryDelt
         return;
     }
     FInventorySnapshot Snapshot = View->Snapshot;
+    FInventoryChangeSet AppliedChanges;
+    AppliedChanges.TransactionId = InDelta.TransactionId;
+    AppliedChanges.Revisions.Add({InDelta.InventoryId, InDelta.FromRevision, InDelta.ToRevision});
     TSet<FInventorySlotKey> Keys;
     for(const FInventorySlotState& Changed : InDelta.Slots)
     {
@@ -1235,6 +1298,11 @@ void UInventoryNetworkComponent::ClientDelta_Implementation(const FInventoryDelt
             return;
         }
         Keys.Add(Changed.Key);
+        FInventoryChangedSlot& Applied = AppliedChanges.ChangedSlots.AddDefaulted_GetRef();
+        Applied.InventoryId = InDelta.InventoryId;
+        Applied.Key = Changed.Key;
+        Applied.Before = *Target;
+        Applied.After = Changed;
         *Target = Changed;
     }
     Snapshot.Revision = InDelta.ToRevision;
@@ -1247,6 +1315,11 @@ void UInventoryNetworkComponent::ClientDelta_Implementation(const FInventoryDelt
     }
     View->Snapshot = MoveTemp(Snapshot);
     OnDelta.Broadcast(InDelta);
+    if(ConnectionId == InDelta.ConnectionId && ConnectionStoreId == InDelta.StoreId && WorldEpoch == InDelta.WorldEpoch &&
+       GetSessionId(InDelta.InventoryId) == InDelta.SessionId)
+    {
+        OnAppliedChanges.Broadcast(InDelta, AppliedChanges);
+    }
 }
 
 void UInventoryNetworkComponent::ClientResult_Implementation(FGuid InConnectionId, const FInventoryCommandResult& InResult)
@@ -1260,6 +1333,7 @@ void UInventoryNetworkComponent::ClientResult_Implementation(FGuid InConnectionI
 void UInventoryNetworkComponent::ClientClosed_Implementation(FGuid InConnectionId, FGuid InInventoryId, FGuid InSessionId, EInventoryResultCode InReason)
 {
     if(!ConnectionId.IsValid() || InConnectionId != ConnectionId) return;
+    const bool bLocallyClosed = LocallyClosedSessions.Remove(InSessionId) > 0;
     const FClientView* View = Views.Find(InInventoryId);
     if(View && (!InSessionId.IsValid() || View->SessionId != InSessionId))
     {
@@ -1299,5 +1373,5 @@ void UInventoryNetworkComponent::ClientClosed_Implementation(FGuid InConnectionI
         Result.Code = bSent ? EInventoryResultCode::ConfirmationPending : InReason;
         OnResult.Broadcast(Result);
     }
-    OnSessionClosed.Broadcast(InInventoryId, InReason);
+    if (!bLocallyClosed) OnSessionClosed.Broadcast(InInventoryId, InReason);
 }

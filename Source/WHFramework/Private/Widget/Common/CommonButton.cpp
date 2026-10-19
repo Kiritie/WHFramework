@@ -8,6 +8,8 @@
 #include "Components/StackBoxSlot.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/SizeBox.h"
+#include "Components/SizeBoxSlot.h"
 #include "Input/Base/InputActionBase.h"
 #include "Input/InputModule.h"
 #include "Widget/Common/CommonTextBlockN.h"
@@ -43,6 +45,8 @@ void UCommonButton::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	ContentOrientation = Defaults->ContentOrientation;
 	ContentHorizontalAlignment = Defaults->ContentHorizontalAlignment;
 	ContentSpacing = Defaults->ContentSpacing;
+	TitleMinWidth = Defaults->TitleMinWidth;
+	ContentMinSize = Defaults->ContentMinSize;
 	ApplyContentLayout();
 	IconOverride = FSlateBrush();
 	bHasIconOverride = false;
@@ -108,10 +112,14 @@ void UCommonButton::BuildNativeLayout()
 {
 	UOverlay* Layers = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("ButtonLayers"));
 	WidgetTree->RootWidget = Layers;
-	NativeContent = WidgetTree->ConstructWidget<UStackBox>(UStackBox::StaticClass(), TEXT("ButtonLayout"));
-	UOverlaySlot* ContentSlot = Layers->AddChildToOverlay(NativeContent);
+	NativeContentSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("ContentSize"));
+	UOverlaySlot* ContentSlot = Layers->AddChildToOverlay(NativeContentSize);
 	ContentSlot->SetHorizontalAlignment(HAlign_Center);
 	ContentSlot->SetVerticalAlignment(VAlign_Center);
+	NativeContent = WidgetTree->ConstructWidget<UStackBox>(UStackBox::StaticClass(), TEXT("ButtonLayout"));
+	USizeBoxSlot* LayoutSlot = CastChecked<USizeBoxSlot>(NativeContentSize->AddChild(NativeContent));
+	LayoutSlot->SetHorizontalAlignment(HAlign_Center);
+	LayoutSlot->SetVerticalAlignment(VAlign_Center);
 	Img_Icon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Img_Icon"));
 	UStackBoxSlot* IconSlot = NativeContent->AddChildToStackBox(Img_Icon);
 	IconSlot->SetHorizontalAlignment(HAlign_Center);
@@ -178,6 +186,11 @@ void UCommonButton::NativeOnClicked()
 	Super::NativeOnClicked();
 }
 
+void UCommonButton::SetTriggerClickedAfterSelection(bool bInTriggerClickedAfterSelection)
+{
+	bTriggerClickedAfterSelection = bInTriggerClickedAfterSelection;
+}
+
 void UCommonButton::NativeOnPressed()
 {
 	Super::NativeOnPressed();
@@ -207,9 +220,11 @@ void UCommonButton::SetTitle(const FText InTitle)
 	Title = InTitle;
 	if (Txt_Title)
 	{
-		Txt_Title->SetText(Title);
 		const UCommonButtonStyleN* ButtonStyle = Cast<UCommonButtonStyleN>(GetStyle());
 		const bool bIconOnly = ButtonStyle && ButtonStyle->bIconOnly;
+		const UCommonTextBlockN* TitleDefaults = CastChecked<UCommonTextBlockN>(Txt_Title->GetArchetype());
+		Txt_Title->SetMinDesiredWidth(bIconOnly ? 0.f : FMath::Max(TitleMinWidth, TitleDefaults->GetMinDesiredWidth()));
+		Txt_Title->SetText(bIconOnly ? FText::GetEmpty() : Title);
 		Txt_Title->SetVisibility(Title.IsEmpty() || bIconOnly ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
 }
@@ -245,12 +260,20 @@ void UCommonButton::SetContentOrientation(EOrientation InOrientation)
 	ApplyContentLayout();
 }
 
+void UCommonButton::SetContentSpacing(float InSpacing)
+{
+	ContentSpacing = FMath::Max(0.f, InSpacing);
+	ApplyContentLayout();
+}
+
 void UCommonButton::ApplyContentLayout()
 {
 	if (NativeContent)
 	{
 		NativeContent->SetOrientation(ContentOrientation);
-		if (UOverlaySlot* ContentSlot = Cast<UOverlaySlot>(NativeContent->Slot))
+		NativeContentSize->SetMinDesiredWidth(ContentMinSize.X);
+		NativeContentSize->SetMinDesiredHeight(ContentMinSize.Y);
+		if (UOverlaySlot* ContentSlot = Cast<UOverlaySlot>(NativeContentSize->Slot))
 		{
 			ContentSlot->SetHorizontalAlignment(ContentHorizontalAlignment);
 		}
@@ -258,10 +281,24 @@ void UCommonButton::ApplyContentLayout()
 		{
 			if (UStackBoxSlot* IconSlot = Cast<UStackBoxSlot>(Img_Icon->Slot))
 			{
+				IconSlot->SetHorizontalAlignment(ContentOrientation == Orient_Horizontal ? HAlign_Left : HAlign_Center);
+				IconSlot->SetVerticalAlignment(ContentOrientation == Orient_Vertical ? VAlign_Top : VAlign_Center);
 				IconSlot->SetPadding(ContentOrientation == Orient_Vertical ? FMargin(0.f, 0.f, 0.f, ContentSpacing) : FMargin(0.f, 0.f, ContentSpacing, 0.f));
 			}
 		}
 	}
+}
+
+void UCommonButton::SetTitleMinWidth(float InWidth)
+{
+	TitleMinWidth = FMath::Max(0.f, InWidth);
+	SetTitle(Title);
+}
+
+void UCommonButton::SetContentMinSize(const FVector2D& InSize)
+{
+	ContentMinSize = FVector2D(FMath::Max(0.0, InSize.X), FMath::Max(0.0, InSize.Y));
+	ApplyContentLayout();
 }
 
 void UCommonButton::SetMinWidth(int32 InValue)

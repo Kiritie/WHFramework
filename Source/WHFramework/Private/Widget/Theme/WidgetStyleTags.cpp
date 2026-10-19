@@ -23,6 +23,9 @@ namespace WidgetStyleTags
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(BorderDefault, "UI.Style.Border.Default", "Fallback border style.");
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(TextScrollDefault, "UI.Style.TextScroll.Default", "Fallback scrolling text style.");
 
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Window, "UI.Style.Window", "基础窗口样式。");
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(WindowDefault, "UI.Style.Window.Default", "基础窗口默认纯色样式。");
+
 	TConstArrayView<EWidgetStyleKind> Kinds()
 	{
 		static constexpr EWidgetStyleKind Values[] =
@@ -37,6 +40,7 @@ namespace WidgetStyleTags
 			EWidgetStyleKind::Scroll,
 			EWidgetStyleKind::Border,
 			EWidgetStyleKind::TextScroll,
+			EWidgetStyleKind::Window,
 		};
 		return MakeArrayView(Values);
 	}
@@ -70,6 +74,8 @@ namespace WidgetStyleTags
 			return Border.GetTag();
 		case EWidgetStyleKind::TextScroll:
 			return TextScroll.GetTag();
+		case EWidgetStyleKind::Window:
+			return Window.GetTag();
 		default:
 			return FGameplayTag();
 		}
@@ -99,6 +105,8 @@ namespace WidgetStyleTags
 			return BorderDefault.GetTag();
 		case EWidgetStyleKind::TextScroll:
 			return TextScrollDefault.GetTag();
+		case EWidgetStyleKind::Window:
+			return WindowDefault.GetTag();
 		default:
 			return FGameplayTag();
 		}

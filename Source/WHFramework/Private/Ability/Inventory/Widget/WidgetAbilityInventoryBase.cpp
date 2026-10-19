@@ -2,9 +2,11 @@
 
 #include "Ability/Inventory/InventoryItemAssetCatalog.h"
 #include "Ability/Inventory/InventoryWorldSubsystem.h"
-#include "Ability/Inventory/Widget/WidgetInventorySlotView.h"
+#include "Ability/Inventory/Widget/WidgetAbilityInventorySlotBase.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Blueprint/WidgetTree.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/PanelWidget.h"
@@ -20,15 +22,18 @@
 
 UWidgetAbilityInventoryBase::UWidgetAbilityInventoryBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
-    SlotWidgetClass = UWidgetInventorySlotView::StaticClass();
+    SlotWidgetClass = UWidgetAbilityInventorySlotBase::StaticClass();
     InventoryTitleStyleTag = WidgetStyleTags::CommonDefault(EWidgetStyleKind::Text);
     GroupTitleStyleTag = InventoryTitleStyleTag;
     SecondaryButtonStyleTag = WidgetStyleTags::CommonDefault(EWidgetStyleKind::Button);
-    ConfirmButtonStyleTag = SecondaryButtonStyleTag;
 }
 
 TSharedRef<SWidget> UWidgetAbilityInventoryBase::RebuildWidget()
 {
+    if (IsDesignTime() && WidgetTree && WidgetTree->RootWidget)
+    {
+        return Super::RebuildWidget();
+    }
     if (!WidgetTree)
     {
         WidgetTree = NewObject<UWidgetTree>(this, TEXT("WidgetTree"));
@@ -50,23 +55,10 @@ TSharedRef<SWidget> UWidgetAbilityInventoryBase::RebuildWidget()
         InventoryContent = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventoryContent"));
         Scroll->AddChild(InventoryContent);
         Root->AddChildToVerticalBox(Scroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-        SplitControls = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("SplitControls"));
-        SplitCount = WidgetTree->ConstructWidget<UCommonRange>(UCommonRange::StaticClass(), TEXT("SplitCount"));
-        SplitControls->AddChildToHorizontalBox(SplitCount)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-        Btn_ConfirmSplit = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_ConfirmSplit"));
-        Btn_ConfirmSplit->SetTitle(NSLOCTEXT("WH.Inventory", "ConfirmSplit", "确认拆分"));
-        SplitControls->AddChildToHorizontalBox(Btn_ConfirmSplit);
-        Btn_CancelSplit = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_CancelSplit"));
-        Btn_CancelSplit->SetTitle(NSLOCTEXT("WH.Inventory", "Cancel", "取消"));
-        SplitControls->AddChildToHorizontalBox(Btn_CancelSplit);
-        SplitControls->SetVisibility(ESlateVisibility::Collapsed);
-        Root->AddChildToVerticalBox(SplitControls);
         WidgetTree->RootWidget = Root;
     }
     TSharedRef<SWidget> Result = Super::RebuildWidget();
-    check(InventoryContent && ResultText && SplitControls && SplitCount && Btn_ConfirmSplit && Btn_CancelSplit);
-    Btn_ConfirmSplit->SetInheritedStyleTag(ConfirmButtonStyleTag);
-    Btn_CancelSplit->SetInheritedStyleTag(SecondaryButtonStyleTag);
+    check(InventoryContent && ResultText);
     if (Btn_Sort)
     {
         Btn_Sort->SetInheritedStyleTag(SecondaryButtonStyleTag);
@@ -89,17 +81,25 @@ void UWidgetAbilityInventoryBase::OnRefresh()
     Super::OnRefresh();
 }
 
-void UWidgetAbilityInventoryBase::OnClose(bool bInstant)
+void UWidgetAbilityInventoryBase::OnReset(bool bForce)
 {
     UnbindInventories();
-    Super::OnClose(bInstant);
+    Super::OnReset(bForce);
 }
 
 void UWidgetAbilityInventoryBase::NativeDestruct()
 {
+    CancelSplit();
+    UnbindControls();
+
+    Super::NativeDestruct();
+}
+
+void UWidgetAbilityInventoryBase::OnDestroy(EObjectDespawnMode InMode)
+{
     UnbindControls();
     UnbindInventories();
-    Super::NativeDestruct();
+    Super::OnDestroy(InMode);
 }
 
 void UWidgetAbilityInventoryBase::NativeConstruct()
@@ -111,8 +111,6 @@ void UWidgetAbilityInventoryBase::NativeConstruct()
 void UWidgetAbilityInventoryBase::BindControls()
 {
     UnbindControls();
-    Btn_ConfirmSplit->OnClicked().AddUObject(this, &ThisClass::ConfirmSplit);
-    Btn_CancelSplit->OnClicked().AddUObject(this, &ThisClass::CancelSplit);
     if (Btn_Sort)
     {
         Btn_Sort->OnClicked().AddUObject(this, &ThisClass::SortSelected);
@@ -121,18 +119,23 @@ void UWidgetAbilityInventoryBase::BindControls()
     {
         Btn_QuickStack->OnClicked().AddUObject(this, &ThisClass::QuickStackSelected);
     }
+    RefreshControls();
+}
+
+void UWidgetAbilityInventoryBase::RefreshControls()
+{
+    if (Btn_Sort)
+    {
+        Btn_Sort->SetIsEnabled(FindSlot(SelectedInventoryId, SelectedSlot) != nullptr);
+    }
+    if (Btn_QuickStack)
+    {
+        Btn_QuickStack->SetIsEnabled(Network.IsValid() && Network->FindView(Network->GetOwnerInventoryId()) != nullptr);
+    }
 }
 
 void UWidgetAbilityInventoryBase::UnbindControls()
 {
-    if (Btn_ConfirmSplit)
-    {
-        Btn_ConfirmSplit->OnClicked().RemoveAll(this);
-    }
-    if (Btn_CancelSplit)
-    {
-        Btn_CancelSplit->OnClicked().RemoveAll(this);
-    }
     if (Btn_Sort)
     {
         Btn_Sort->OnClicked().RemoveAll(this);
@@ -146,7 +149,7 @@ void UWidgetAbilityInventoryBase::UnbindControls()
 void UWidgetAbilityInventoryBase::BindInventories(UInventoryNetworkComponent* InNetwork, const TArray<FGuid>& InInventoryIds, bool bInFollowOwner)
 {
     UnbindInventories();
-    if (!IsValid(InNetwork))
+    if (!IsValid(InNetwork) || InNetwork->GetWorld() != GetWorld())
     {
         return;
     }
@@ -167,14 +170,24 @@ void UWidgetAbilityInventoryBase::BindInventories(UInventoryNetworkComponent* In
     SnapshotHandle = InNetwork->OnSnapshot.AddUObject(this, &UWidgetAbilityInventoryBase::HandleSnapshot);
     DeltaHandle = InNetwork->OnDelta.AddUObject(this, &UWidgetAbilityInventoryBase::HandleDelta);
     ResultHandle = InNetwork->OnResult.AddUObject(this, &UWidgetAbilityInventoryBase::HandleResult);
+    QueuedHandle = InNetwork->OnRequestQueued.AddUObject(this, &UWidgetAbilityInventoryBase::HandleRequestQueued);
     ClosedHandle = InNetwork->OnSessionClosed.AddUObject(this, &UWidgetAbilityInventoryBase::HandleClosed);
-    for (const FGuid& InventoryId : InventoryIds)
+    const TArray<FGuid> RequestedInventories = InventoryIds;
+    for (const FGuid& InventoryId : RequestedInventories)
     {
+        if (Network.Get() != InNetwork) return;
         if (!InNetwork->FindView(InventoryId))
         {
             InNetwork->OpenInventory(InventoryId);
         }
     }
+    if (Network.Get() != InNetwork) return;
+    for (const FInventoryClientRequest& Request : InNetwork->GetPendingRequests())
+    {
+        if (Network.Get() != InNetwork) return;
+        HandleRequestQueued(Request);
+    }
+    if (Network.Get() != InNetwork) return;
     RebuildViews();
 }
 
@@ -185,6 +198,7 @@ void UWidgetAbilityInventoryBase::UnbindInventories()
         Network->OnSnapshot.Remove(SnapshotHandle);
         Network->OnDelta.Remove(DeltaHandle);
         Network->OnResult.Remove(ResultHandle);
+        Network->OnRequestQueued.Remove(QueuedHandle);
         Network->OnSessionClosed.Remove(ClosedHandle);
         for (const FGuid& InventoryId : InventoryIds)
         {
@@ -198,6 +212,7 @@ void UWidgetAbilityInventoryBase::UnbindInventories()
     bFollowOwner = false;
     FollowedOwnerId.Invalidate();
     InventoryIds.Reset();
+    TransferInventoryId.Invalidate();
     ClearViews();
     PendingSlots.Reset();
     SelectedInventoryId.Invalidate();
@@ -213,11 +228,18 @@ FString UWidgetAbilityInventoryBase::SlotId(const FGuid& InInventoryId, const FI
 
 void UWidgetAbilityInventoryBase::RebuildViews()
 {
-    if (!InventoryContent || !Network.IsValid())
+    if (!InventoryContent)
     {
         return;
     }
-    ClearViews();
+    const uint64 Revision = ClearViews();
+    const UInventoryNetworkComponent* SourceNetwork = Network.Get();
+    if (!SourceNetwork || Revision != ViewRevision)
+    {
+        return;
+    }
+    const bool bFixedSize = !GridSlotSize.IsNearlyZero();
+    checkf(!bFixedSize || (FMath::IsFinite(GridSlotSize.X) && FMath::IsFinite(GridSlotSize.Y) && GridSlotSize.X > 0.f && GridSlotSize.Y > 0.f), TEXT("Fixed inventory cells require a positive finite size."));
     checkf(SlotHostPrefixes.IsEmpty() || InventoryIds.Num() <= 1, TEXT("Fixed inventory slot hosts require one bound inventory."));
     TMap<FGameplayTag, UPanelWidget*> GroupPanels;
     for (const TPair<FGameplayTag, FName>& Mapping : GroupPanelNames)
@@ -227,37 +249,51 @@ void UWidgetAbilityInventoryBase::RebuildViews()
         GroupPanels.Add(Mapping.Key, Host);
     }
     UPanelWidget* Inventories = nullptr;
-    if (GroupPanelNames.IsEmpty() && SlotHostPrefixes.IsEmpty())
+    const TArray<FGuid> BoundInventories = InventoryIds;
+    for (const FGuid& InventoryId : BoundInventories)
     {
-        Inventories = bStackInventoriesVertically
-            ? static_cast<UPanelWidget*>(WidgetTree->ConstructWidget<UVerticalBox>())
-            : static_cast<UPanelWidget*>(WidgetTree->ConstructWidget<UHorizontalBox>());
-        InventoryContent->AddChildToVerticalBox(Inventories);
-    }
-    for (const FGuid& InventoryId : InventoryIds)
-    {
-        const FInventorySnapshot* View = Network->FindView(InventoryId);
+        if (Revision != ViewRevision || Network.Get() != SourceNetwork)
+        {
+            return;
+        }
+        const FInventorySnapshot* View = SourceNetwork->FindView(InventoryId);
         if (!View)
         {
             continue;
         }
-        UVerticalBox* Column = Inventories ? WidgetTree->ConstructWidget<UVerticalBox>() : nullptr;
-        if (Inventories)
+        const TArray<FInventorySlotState> SnapshotSlots = View->Slots;
+        UPanelWidget* InventoryHost = GetInventoryHost(InventoryId);
+        if (!InventoryHost && GroupPanelNames.IsEmpty() && SlotHostPrefixes.IsEmpty() && !Inventories)
+        {
+            Inventories = bStackInventoriesVertically
+                ? static_cast<UPanelWidget*>(WidgetTree->ConstructWidget<UVerticalBox>())
+                : static_cast<UPanelWidget*>(WidgetTree->ConstructWidget<UHorizontalBox>());
+            GeneratedViewRoots.Add(Inventories);
+            InventoryContent->AddChildToVerticalBox(Inventories);
+        }
+        UVerticalBox* Column = !InventoryHost && Inventories ? WidgetTree->ConstructWidget<UVerticalBox>() : nullptr;
+        if (Column)
         {
             Inventories->AddChild(Column);
         }
-        if (bShowInventoryTitles && Inventories)
+        UPanelWidget* InventoryDestination = InventoryHost ? InventoryHost : Column ? static_cast<UPanelWidget*>(Column) : InventoryContent.Get();
+        if (bShowInventoryTitles && (InventoryHost || Column))
         {
             UCommonTextBlockN* InventoryTitle = WidgetTree->ConstructWidget<UCommonTextBlockN>();
             InventoryTitle->SetStyleTag(InventoryTitleStyleTag);
-            InventoryTitle->SetText(InventoryId == Network->GetOwnerInventoryId() ? NSLOCTEXT("WH.Inventory", "Owner", "背包") : NSLOCTEXT("WH.Inventory", "Container", "容器"));
-            Column->AddChildToVerticalBox(InventoryTitle);
+            InventoryTitle->SetText(InventoryId == SourceNetwork->GetOwnerInventoryId() ? NSLOCTEXT("WH.Inventory", "Owner", "背包") : NSLOCTEXT("WH.Inventory", "Container", "容器"));
+            GeneratedViewRoots.Add(InventoryTitle);
+            InventoryDestination->AddChild(InventoryTitle);
         }
         FGameplayTag LastGroup;
-        UUniformGridPanel* Grid = nullptr;
+        UPanelWidget* Grid = nullptr;
         int32 Position = 0;
-        for (const FInventorySlotState& SlotState : View->Slots)
+        for (const FInventorySlotState& SlotState : SnapshotSlots)
         {
+            if (Revision != ViewRevision || Network.Get() != SourceNetwork)
+            {
+                return;
+            }
             if (!VisibleGroups.IsEmpty() && !VisibleGroups.Contains(SlotState.Key.Group))
             {
                 continue;
@@ -277,69 +313,122 @@ void UWidgetAbilityInventoryBase::RebuildViews()
                 UPanelWidget* Destination = GroupPanels.FindRef(LastGroup);
                 if (!Destination)
                 {
-                    Destination = Inventories ? static_cast<UPanelWidget*>(Column) : static_cast<UPanelWidget*>(InventoryContent);
+                    Destination = InventoryDestination;
                 }
                 if (bShowGroupTitles)
                 {
                     UCommonTextBlockN* Title = WidgetTree->ConstructWidget<UCommonTextBlockN>();
                     Title->SetStyleTag(GroupTitleStyleTag);
                     Title->SetText(GroupNames.Contains(LastGroup) ? GroupNames.FindChecked(LastGroup) : FText::FromString(LastGroup.ToString()));
+                    GeneratedViewRoots.Add(Title);
                     Destination->AddChild(Title);
                 }
-                Grid = WidgetTree->ConstructWidget<UUniformGridPanel>();
-                Grid->SetSlotPadding(FMargin(2.f));
+                if (bFixedSize)
+                {
+                    Grid = WidgetTree->ConstructWidget<UCanvasPanel>();
+                }
+                else
+                {
+                    UUniformGridPanel* UniformGrid = WidgetTree->ConstructWidget<UUniformGridPanel>();
+                    UniformGrid->SetSlotPadding(GridSlotPadding);
+                    UniformGrid->SetMinDesiredSlotWidth(64.f);
+                    UniformGrid->SetMinDesiredSlotHeight(64.f);
+                    Grid = UniformGrid;
+                }
+                GeneratedViewRoots.Add(Grid);
                 Destination->AddChild(Grid);
             }
-            UWidgetInventorySlotView* Widget = CreateWidget<UWidgetInventorySlotView>(GetOwningPlayer(), SlotWidgetClass);
+            if (Revision != ViewRevision || Network.Get() != SourceNetwork)
+            {
+                return;
+            }
+            UWidgetAbilityInventorySlotBase* Widget = CreateWidget<UWidgetAbilityInventorySlotBase>(GetOwningPlayer(), SlotWidgetClass);
+            if (Revision != ViewRevision || Network.Get() != SourceNetwork)
+            {
+                return;
+            }
             if(!Widget) continue;
             Widget->BindSlot(this, InventoryId, SlotState.Key);
+            ConfigureSlot(Widget, SlotState.Key);
+            if (Revision != ViewRevision || Network.Get() != SourceNetwork)
+            {
+                return;
+            }
+            Slots.Add(SlotId(InventoryId, SlotState.Key), Widget);
             if (FixedHost)
             {
                 FixedHost->AddChild(Widget);
             }
             else
             {
-                const int32 GroupColumnCount = FMath::Max(1, GroupColumns.Contains(SlotState.Key.Group) ? GroupColumns.FindChecked(SlotState.Key.Group) : Columns);
-                Grid->AddChildToUniformGrid(Widget, Position / GroupColumnCount, Position % GroupColumnCount);
+                const int32 GroupColumnCount = FMath::Max(1, GetInventoryColumns(InventoryId, SlotState.Key.Group));
+                if (UCanvasPanel* FixedGrid = Cast<UCanvasPanel>(Grid))
+                {
+                    UCanvasPanelSlot* CellSlot = FixedGrid->AddChildToCanvas(Widget);
+                    CellSlot->SetPosition(FVector2D(
+                        Position % GroupColumnCount * (GridSlotSize.X + GridSlotPadding.Left + GridSlotPadding.Right) + GridSlotPadding.Left,
+                        Position / GroupColumnCount * (GridSlotSize.Y + GridSlotPadding.Top + GridSlotPadding.Bottom) + GridSlotPadding.Top));
+                    CellSlot->SetSize(GridSlotSize);
+                }
+                else
+                {
+                    CastChecked<UUniformGridPanel>(Grid)->AddChildToUniformGrid(Widget, Position / GroupColumnCount, Position % GroupColumnCount);
+                }
                 ++Position;
             }
-            Slots.Add(SlotId(InventoryId, SlotState.Key), Widget);
+            if (Revision != ViewRevision || Network.Get() != SourceNetwork)
+            {
+                return;
+            }
             RefreshSlot(InventoryId, SlotState);
         }
     }
-    RefreshPending();
+    if (Revision == ViewRevision && Network.Get() == SourceNetwork)
+    {
+        RefreshPending();
+    }
 }
 
-void UWidgetAbilityInventoryBase::ClearViews()
+void UWidgetAbilityInventoryBase::ConfigureSlot(UWidgetAbilityInventorySlotBase* InWidget, const FInventorySlotKey& InSlot) const
 {
-    for (const TPair<FString, TWeakObjectPtr<UWidgetInventorySlotView>>& Entry : Slots)
+}
+
+int32 UWidgetAbilityInventoryBase::GetInventoryColumns(const FGuid& InInventoryId, const FGameplayTag& InGroup) const
+{
+    return FMath::Max(1, GroupColumns.Contains(InGroup) ? GroupColumns.FindChecked(InGroup) : Columns);
+}
+
+UPanelWidget* UWidgetAbilityInventoryBase::GetInventoryHost(const FGuid& InInventoryId) const
+{
+    return nullptr;
+}
+
+uint64 UWidgetAbilityInventoryBase::ClearViews()
+{
+    const uint64 Revision = ++ViewRevision;
+    const TMap<FString, TWeakObjectPtr<UWidgetAbilityInventorySlotBase>> PreviousSlots = MoveTemp(Slots);
+    const TArray<TWeakObjectPtr<UWidget>> PreviousRoots = MoveTemp(GeneratedViewRoots);
+    for (const TPair<FString, TWeakObjectPtr<UWidgetAbilityInventorySlotBase>>& Entry : PreviousSlots)
     {
         if (Entry.Value.IsValid())
         {
             Entry.Value->RemoveFromParent();
         }
     }
-    Slots.Reset();
-    if (InventoryContent)
+    for (const TWeakObjectPtr<UWidget>& Root : PreviousRoots)
     {
-        InventoryContent->ClearChildren();
-    }
-    if (WidgetTree)
-    {
-        for (const TPair<FGameplayTag, FName>& Mapping : GroupPanelNames)
+        if (Root.IsValid())
         {
-            UPanelWidget* Host = Cast<UPanelWidget>(WidgetTree->FindWidget(Mapping.Value));
-            if (Host && Host != InventoryContent)
-            {
-                Host->ClearChildren();
-            }
+            Root->RemoveFromParent();
         }
     }
+    RefreshControls();
+    return Revision;
 }
 
 void UWidgetAbilityInventoryBase::RefreshSlot(const FGuid& InInventoryId, const FInventorySlotState& InSlot)
 {
-    const TWeakObjectPtr<UWidgetInventorySlotView>* Found = Slots.Find(SlotId(InInventoryId, InSlot.Key));
+    const TWeakObjectPtr<UWidgetAbilityInventorySlotBase>* Found = Slots.Find(SlotId(InInventoryId, InSlot.Key));
     if (!Found || !Found->IsValid())
     {
         return;
@@ -460,38 +549,45 @@ void UWidgetAbilityInventoryBase::SelectSlot(FGuid InInventoryId, FInventorySlot
     {
         return;
     }
-    const TWeakObjectPtr<UWidgetInventorySlotView>* Previous = Slots.Find(SlotId(SelectedInventoryId, SelectedSlot));
+    ApplySelection(InInventoryId, InSlot);
+    OnSelection.Broadcast(InInventoryId, InSlot);
+}
+
+void UWidgetAbilityInventoryBase::ApplySelection(const FGuid& InInventoryId, const FInventorySlotKey& InSlot)
+{
+    const TWeakObjectPtr<UWidgetAbilityInventorySlotBase>* Previous = Slots.Find(SlotId(SelectedInventoryId, SelectedSlot));
     if (Previous && Previous->IsValid())
     {
         Previous->Get()->SetSelected(false);
     }
     SelectedInventoryId = InInventoryId;
     SelectedSlot = InSlot;
-    const TWeakObjectPtr<UWidgetInventorySlotView>* Current = Slots.Find(SlotId(InInventoryId, InSlot));
+    const TWeakObjectPtr<UWidgetAbilityInventorySlotBase>* Current = Slots.Find(SlotId(InInventoryId, InSlot));
     if (Current && Current->IsValid())
     {
         Current->Get()->SetSelected(true);
     }
-    OnSelection.Broadcast(InInventoryId, InSlot);
+    RefreshControls();
 }
 
-bool UWidgetAbilityInventoryBase::Submit(FInventoryClientRequest InRequest)
+TArray<FString> UWidgetAbilityInventoryBase::CollectRequestSlots(const FInventoryClientRequest& InRequest) const
 {
     if (!Network.IsValid())
     {
-        return false;
+        return {};
     }
     TArray<FString> Affected;
-    if (InRequest.SourceSlot.IsValid())
+    if (InRequest.SourceSlot.IsValid() && InventoryIds.Contains(InRequest.SourceInventoryId))
     {
         Affected.Add(SlotId(InRequest.SourceInventoryId, InRequest.SourceSlot));
     }
-    if (InRequest.TargetSlot.IsValid())
+    if (InRequest.TargetSlot.IsValid() && InventoryIds.Contains(InRequest.TargetInventoryId))
     {
         Affected.AddUnique(SlotId(InRequest.TargetInventoryId, InRequest.TargetSlot));
     }
     const auto AddInventorySlots = [&](const FGuid& InventoryId, const FGameplayTag& Group)
     {
+        if (!InventoryIds.Contains(InventoryId)) return;
         const FInventorySnapshot* View = Network->FindView(InventoryId);
         if (!View)
         {
@@ -517,6 +613,28 @@ bool UWidgetAbilityInventoryBase::Submit(FInventoryClientRequest InRequest)
     {
         AddInventorySlots(InventoryId, InRequest.TargetGroup);
     }
+    return Affected;
+}
+
+void UWidgetAbilityInventoryBase::HandleRequestQueued(const FInventoryClientRequest& InRequest)
+{
+    if (!Network.IsValid() || InRequest.RequestId == 0 || InRequest.WorldEpoch != Network->GetWorldEpoch() || InRequest.StoreId != Network->GetStoreId()) return;
+    for (const FInventoryClientParticipant& Participant : InRequest.Participants)
+    {
+        if (!InventoryIds.Contains(Participant.InventoryId)) continue;
+        const FInventorySnapshot* View = Network->FindView(Participant.InventoryId);
+        if (!View || View->Generation != Participant.Generation || Participant.SessionId != Network->GetSessionId(Participant.InventoryId)) return;
+    }
+    TArray<FString> Affected = CollectRequestSlots(InRequest);
+    if (Affected.IsEmpty()) return;
+    PendingSlots.Add(InRequest.RequestId, MoveTemp(Affected));
+    RefreshPending();
+}
+
+bool UWidgetAbilityInventoryBase::Submit(FInventoryClientRequest InRequest)
+{
+    if (!Network.IsValid()) return false;
+    const TArray<FString> Affected = CollectRequestSlots(InRequest);
     for (const TPair<uint64, TArray<FString>>& Pair : PendingSlots)
     {
         for (const FString& Key : Affected)
@@ -527,14 +645,9 @@ bool UWidgetAbilityInventoryBase::Submit(FInventoryClientRequest InRequest)
             }
         }
     }
-    const uint64 RequestId = Network->SubmitRequest(InRequest);
-    if (RequestId == 0)
-    {
-        return false;
-    }
-    PendingSlots.Add(RequestId, MoveTemp(Affected));
-    RefreshPending();
-    return true;
+    const TWeakObjectPtr<UInventoryNetworkComponent> SubmittedNetwork = Network;
+    const uint64 RequestId = SubmittedNetwork->SubmitRequest(MoveTemp(InRequest));
+    return RequestId != 0 && Network == SubmittedNetwork;
 }
 
 void UWidgetAbilityInventoryBase::RefreshPending()
@@ -547,7 +660,7 @@ void UWidgetAbilityInventoryBase::RefreshPending()
             PendingKeys.Add(Key);
         }
     }
-    for (const TPair<FString, TWeakObjectPtr<UWidgetInventorySlotView>>& Pair : Slots)
+    for (const TPair<FString, TWeakObjectPtr<UWidgetAbilityInventorySlotBase>>& Pair : Slots)
     {
         if (Pair.Value.IsValid())
         {
@@ -584,7 +697,9 @@ bool UWidgetAbilityInventoryBase::RequestDrop(FGuid InInventoryId, FInventorySlo
 
 bool UWidgetAbilityInventoryBase::RequestTransfer(FGuid InInventoryId, FInventorySlotKey InSlot, int32 InQuantity)
 {
-    const FGuid* Target = InventoryIds.FindByPredicate([&](const FGuid& Candidate) { return Candidate != InInventoryId; });
+    const FGuid* Target = TransferInventoryId.IsValid() && TransferInventoryId != InInventoryId
+        ? &TransferInventoryId
+        : InventoryIds.FindByPredicate([&](const FGuid& Candidate) { return Candidate != InInventoryId; });
     if (!Target)
     {
         return false;
@@ -658,57 +773,104 @@ bool UWidgetAbilityInventoryBase::AcceptDrop(const UInventoryDragOperation& InDr
     }
     if (InDrag.bChooseQuantity)
     {
-        if (!Target->Item.IsEmpty() || Source->Item.Count <= 1 || Source->Item.InstanceId.IsValid() || !SplitControls || !SplitCount)
-        {
-            return false;
-        }
-        SplitRequest = Request;
-        SplitSignature = Source->Item.Signature();
-        SplitWorldEpoch = Network->GetWorldEpoch();
-        SplitSourceSessionId = Network->GetSessionId(InDrag.InventoryId);
-        SplitTargetSessionId = Network->GetSessionId(InTargetInventoryId);
-        SplitRequest.Operation = EInventoryOperationType::Split;
-        SplitRequest.bAllowPartial = false;
-        FCommonRangeConfig Config;
-        Config.DecimalPlaces = 0;
-        Config.bHasMin = true;
-        Config.bHasMax = true;
-        Config.Min = 1;
-        Config.Max = Source->Item.Count - 1;
-        Config.Step = 1;
-        Config.bShowStepButtons = true;
-        SplitCount->Configure(Config);
-        SplitCount->SetValue(FParameter(Source->Item.Count / 2));
-        SplitControls->SetVisibility(ESlateVisibility::Visible);
-        SplitCount->SetInputFocus();
-        return true;
+        return OpenSplit(Request);
     }
     return Submit(Request);
 }
 
-void UWidgetAbilityInventoryBase::ConfirmSplit()
+bool UWidgetAbilityInventoryBase::CanSplit(FGuid InInventoryId, FInventorySlotKey InSlot) const
 {
-    if (SplitControls && SplitControls->GetVisibility() == ESlateVisibility::Visible)
+    const FInventorySnapshot* View = Network.IsValid() ? Network->FindView(InInventoryId) : nullptr;
+    const FInventorySlotState* Source = View ? View->FindSlot(InSlot) : nullptr;
+    if (!Source || Source->bLocked || Source->Item.Count <= 1 || Source->Item.InstanceId.IsValid())
     {
-        FInventoryClientRequest Request = SplitRequest;
-        Request.Quantity = SplitCount->GetValue().Get<int32>();
-        const FInventorySlotState* Source = FindSlot(Request.SourceInventoryId, Request.SourceSlot);
-        const FInventorySlotState* Target = FindSlot(Request.TargetInventoryId, Request.TargetSlot);
-        const bool bMatches = Network.IsValid() && SplitWorldEpoch == Network->GetWorldEpoch() &&
-            SplitSourceSessionId.IsValid() && SplitSourceSessionId == Network->GetSessionId(Request.SourceInventoryId) &&
-            SplitTargetSessionId.IsValid() && SplitTargetSessionId == Network->GetSessionId(Request.TargetInventoryId) &&
-            Source && Target && Source->Item.Signature() == SplitSignature &&
-            Request.Quantity > 0 && Request.Quantity < Source->Item.Count && Target->Item.IsEmpty();
-        CancelSplit();
-        if (bMatches)
-        {
-            Submit(Request);
-        }
-        else if (ResultText)
-        {
-            ResultText->SetText(NSLOCTEXT("WH.Inventory", "SplitChanged", "拆分期间物品已变化，请重新选择。"));
-        }
+        return false;
     }
+    return View->Slots.ContainsByPredicate([&InSlot](const FInventorySlotState& Candidate)
+    {
+        return Candidate.Key.Group == InSlot.Group && Candidate.Key != InSlot && !Candidate.bLocked && Candidate.Item.IsEmpty();
+    });
+}
+
+bool UWidgetAbilityInventoryBase::RequestSplit(FGuid InInventoryId, FInventorySlotKey InSlot)
+{
+    if (!CanSplit(InInventoryId, InSlot))
+    {
+        return false;
+    }
+    const FInventorySnapshot* View = Network->FindView(InInventoryId);
+    const FInventorySlotState* Target = View->Slots.FindByPredicate([&InSlot](const FInventorySlotState& Candidate)
+    {
+        return Candidate.Key.Group == InSlot.Group && Candidate.Key != InSlot && !Candidate.bLocked && Candidate.Item.IsEmpty();
+    });
+    FInventoryClientRequest Request;
+    Request.SourceInventoryId = InInventoryId;
+    Request.TargetInventoryId = InInventoryId;
+    Request.SourceSlot = InSlot;
+    Request.TargetSlot = Target->Key;
+    return OpenSplit(Request);
+}
+
+bool UWidgetAbilityInventoryBase::OpenSplit(const FInventoryClientRequest& InRequest)
+{
+    const FInventorySlotState* Source = FindSlot(InRequest.SourceInventoryId, InRequest.SourceSlot);
+    const FInventorySlotState* Target = FindSlot(InRequest.TargetInventoryId, InRequest.TargetSlot);
+    if (!Network.IsValid() || !Source || !Target || Source->bLocked || Target->bLocked || !Target->Item.IsEmpty() ||
+        Source->Item.Count <= 1 || Source->Item.InstanceId.IsValid())
+    {
+        return false;
+    }
+    const int32 StackCount = Source->Item.Count;
+    const FInventoryStackSignature Signature = Source->Item.Signature();
+    CancelSplit();
+    SplitRequest = InRequest;
+    SplitRequest.Operation = EInventoryOperationType::Split;
+    SplitRequest.bAllowPartial = false;
+    SplitSignature = Signature;
+    SplitWorldEpoch = Network->GetWorldEpoch();
+    SplitSourceSessionId = Network->GetSessionId(InRequest.SourceInventoryId);
+    SplitTargetSessionId = Network->GetSessionId(InRequest.TargetInventoryId);
+    if (!ShowSplitQuantity(StackCount))
+    {
+        CancelSplit();
+        return false;
+    }
+    return true;
+}
+
+void UWidgetAbilityInventoryBase::ConfirmSplitQuantity(int32 InQuantity)
+{
+    if (SplitRequest.Operation != EInventoryOperationType::Split)
+    {
+        return;
+    }
+    FInventoryClientRequest Request = SplitRequest;
+    Request.Quantity = InQuantity;
+    const FInventorySlotState* Source = FindSlot(Request.SourceInventoryId, Request.SourceSlot);
+    const FInventorySlotState* Target = FindSlot(Request.TargetInventoryId, Request.TargetSlot);
+    const bool bMatches = Network.IsValid() && SplitWorldEpoch == Network->GetWorldEpoch() &&
+        SplitSourceSessionId.IsValid() && SplitSourceSessionId == Network->GetSessionId(Request.SourceInventoryId) &&
+        SplitTargetSessionId.IsValid() && SplitTargetSessionId == Network->GetSessionId(Request.TargetInventoryId) &&
+        Source && Target && !Source->bLocked && !Target->bLocked && Source->Item.Signature() == SplitSignature &&
+        Request.Quantity > 0 && Request.Quantity < Source->Item.Count && Target->Item.IsEmpty();
+    CancelSplit();
+    if (bMatches)
+    {
+        Submit(Request);
+    }
+    else if (ResultText)
+    {
+        ResultText->SetText(NSLOCTEXT("WH.Inventory", "SplitChanged", "拆分期间物品已变化，请重新选择。"));
+    }
+}
+
+bool UWidgetAbilityInventoryBase::ShowSplitQuantity(int32 InStackCount)
+{
+    return false;
+}
+
+void UWidgetAbilityInventoryBase::CloseSplitQuantity()
+{
 }
 
 void UWidgetAbilityInventoryBase::CancelSplit()
@@ -718,27 +880,74 @@ void UWidgetAbilityInventoryBase::CancelSplit()
     SplitWorldEpoch.Invalidate();
     SplitSourceSessionId.Invalidate();
     SplitTargetSessionId.Invalidate();
-    if (SplitControls)
-    {
-        SplitControls->SetVisibility(ESlateVisibility::Collapsed);
-    }
+    CloseSplitQuantity();
 }
 
 void UWidgetAbilityInventoryBase::Navigate(const FGuid& InInventoryId, const FInventorySlotKey& InSlot, int32 InOffset)
 {
     FInventorySlotKey Target = InSlot;
-    Target.Index += InOffset == -10 ? -Columns : (InOffset == 10 ? Columns : InOffset);
-    const TWeakObjectPtr<UWidgetInventorySlotView>* Widget = Slots.Find(SlotId(InInventoryId, Target));
+    const TWeakObjectPtr<UWidgetAbilityInventorySlotBase>* Source = Slots.Find(SlotId(InInventoryId, InSlot));
+    const bool bDirectional = InOffset == -1 || InOffset == 1 || InOffset == -10 || InOffset == 10;
+    if (bDirectional && SlotHostPrefixes.Contains(InSlot.Group) && Source && Source->IsValid() &&
+        Source->Get()->GetCachedGeometry().GetLocalSize().X > 0.f && Source->Get()->GetCachedGeometry().GetLocalSize().Y > 0.f)
+    {
+        const FGeometry& Geometry = Source->Get()->GetCachedGeometry();
+        const FVector2D Origin = Geometry.LocalToAbsolute(Geometry.GetLocalSize() * 0.5);
+        const FVector2D Direction = FMath::Abs(InOffset) == 10 ? FVector2D(0.f, FMath::Sign(InOffset)) : FVector2D(FMath::Sign(InOffset), 0.f);
+        double BestScore = TNumericLimits<double>::Max();
+        bool bFound = false;
+        for (const TPair<FString, TWeakObjectPtr<UWidgetAbilityInventorySlotBase>>& Entry : Slots)
+        {
+            const UWidgetAbilityInventorySlotBase* Candidate = Entry.Value.Get();
+            if (!Candidate || !Candidate->IsVisible() || !Candidate->GetIsEnabled() || Candidate->GetInventoryId() != InInventoryId)
+            {
+                continue;
+            }
+            const FInventorySlotKey CandidateSlot = Candidate->GetSlotKey();
+            const FGeometry& CandidateGeometry = Candidate->GetCachedGeometry();
+            if (CandidateSlot.Group != InSlot.Group || CandidateSlot == InSlot ||
+                CandidateGeometry.GetLocalSize().X <= 0.f || CandidateGeometry.GetLocalSize().Y <= 0.f)
+            {
+                continue;
+            }
+            const FVector2D Difference = CandidateGeometry.LocalToAbsolute(CandidateGeometry.GetLocalSize() * 0.5) - Origin;
+            const double Forward = FVector2D::DotProduct(Difference, Direction);
+            const double Lateral = FMath::Abs(Difference.X * Direction.Y - Difference.Y * Direction.X);
+            const double Score = Forward + Lateral * 3.0;
+            if (Forward > UE_SMALL_NUMBER && FMath::IsFinite(Score) &&
+                (Score < BestScore || (Score == BestScore && CandidateSlot.Index < Target.Index)))
+            {
+                BestScore = Score;
+                Target = CandidateSlot;
+                bFound = true;
+            }
+        }
+        if (!bFound)
+        {
+            return;
+        }
+    }
+    else
+    {
+        const int32 GroupColumnCount = FMath::Max(1, GetInventoryColumns(InInventoryId, InSlot.Group));
+        Target.Index += InOffset == -10 ? -GroupColumnCount : (InOffset == 10 ? GroupColumnCount : InOffset);
+    }
+    const TWeakObjectPtr<UWidgetAbilityInventorySlotBase>* Widget = Slots.Find(SlotId(InInventoryId, Target));
     if (Widget && Widget->IsValid())
     {
+        const TWeakObjectPtr<UWidgetAbilityInventorySlotBase> FocusTarget = *Widget;
         SelectSlot(InInventoryId, Target);
-        Widget->Get()->SetKeyboardFocus();
+        const TWeakObjectPtr<UWidgetAbilityInventorySlotBase>* Current = Slots.Find(SlotId(InInventoryId, Target));
+        if (Current && *Current == FocusTarget && FocusTarget.IsValid())
+        {
+            FocusTarget->SetUserFocus(GetOwningPlayer());
+        }
     }
 }
 
 void UWidgetAbilityInventoryBase::UpdateCooldown(const FGuid& InInventoryId, const FInventorySlotKey& InSlot, float InRemaining, float InDuration)
 {
-    const TWeakObjectPtr<UWidgetInventorySlotView>* Widget = Slots.Find(SlotId(InInventoryId, InSlot));
+    const TWeakObjectPtr<UWidgetAbilityInventorySlotBase>* Widget = Slots.Find(SlotId(InInventoryId, InSlot));
     if (Widget && Widget->IsValid())
     {
         Widget->Get()->SetCooldown(InRemaining, InDuration);
@@ -766,4 +975,27 @@ void UWidgetAbilityInventoryBase::SortSelected()
 void UWidgetAbilityInventoryBase::QuickStackSelected()
 {
     if(Network.IsValid()) RequestQuickStack(Network->GetOwnerInventoryId());
+}
+
+void UWidgetAbilityInventoryBase::SetTransferInventoryId(FGuid InInventoryId)
+{
+    TransferInventoryId = InInventoryId;
+}
+
+void UWidgetAbilityInventoryBase::SyncSelection(FGuid InInventoryId, FInventorySlotKey InSlot)
+{
+    ApplySelection(InInventoryId, InSlot);
+}
+
+bool UWidgetAbilityInventoryBase::SubmitRequest(FInventoryClientRequest InRequest)
+{
+    return Submit(MoveTemp(InRequest));
+}
+
+void UWidgetAbilityInventoryBase::SetResultText(const FText& InText)
+{
+    if (ResultText)
+    {
+        ResultText->SetText(InText);
+    }
 }

@@ -20,6 +20,12 @@
 #include "WidgetBlueprint.h"
 #include "WidgetBlueprintEditorUtils.h"
 #include "WidgetBlueprintOperationUtils.h"
+#include "WidgetBlueprintEditor.h"
+#include "Subsystems/AssetEditorSubsystem.h"
+#include "Editor.h"
+#include "Components/Image.h"
+#include "Components/TextBlock.h"
+#include "Widget/Common/CommonTextBlockN.h"
 
 UWidgetTree* UWidgetBlueprintEditorLibrary::GetWidgetTree(UBlueprint* InBlueprint)
 {
@@ -79,6 +85,110 @@ FString UWidgetBlueprintEditorLibrary::ExportGraphData(UBlueprint* InBlueprint)
 	TSharedRef<FJsonObject> Data = MakeShared<FJsonObject>();
 	Data->SetStringField(TEXT("blueprint"), InBlueprint->GetPathName());
 	Data->SetArrayField(TEXT("graphs"), GraphData);
+	TArray<TSharedPtr<FJsonValue>> AnimationData;
+	if (const UWidgetBlueprint* WidgetBlueprint = Cast<UWidgetBlueprint>(InBlueprint))
+	{
+		for (const UWidgetAnimation* Animation : WidgetBlueprint->Animations)
+		{
+			if (!Animation)
+			{
+				continue;
+			}
+			TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+			Record->SetStringField(TEXT("path"), Animation->GetPathName());
+			Record->SetStringField(TEXT("name"), Animation->GetName());
+			Record->SetNumberField(TEXT("start"), Animation->GetStartTime());
+			Record->SetNumberField(TEXT("end"), Animation->GetEndTime());
+			TArray<TSharedPtr<FJsonValue>> Bindings;
+			for (const FWidgetAnimationBinding& Binding : Animation->GetBindings())
+			{
+				TSharedRef<FJsonObject> BindingData = MakeShared<FJsonObject>();
+				BindingData->SetStringField(TEXT("widget"), Binding.WidgetName.ToString());
+				BindingData->SetStringField(TEXT("slotWidget"), Binding.SlotWidgetName.ToString());
+				BindingData->SetStringField(TEXT("guid"), Binding.AnimationGuid.ToString());
+				BindingData->SetBoolField(TEXT("root"), Binding.bIsRootWidget);
+				Bindings.Add(MakeShared<FJsonValueObject>(BindingData));
+			}
+			Record->SetArrayField(TEXT("bindings"), Bindings);
+			AnimationData.Add(MakeShared<FJsonValueObject>(Record));
+		}
+	}
+	Data->SetArrayField(TEXT("animations"), AnimationData);
+	FString Result;
+	FJsonSerializer::Serialize(Data, TJsonWriterFactory<>::Create(&Result));
+	return Result;
+}
+
+FString UWidgetBlueprintEditorLibrary::GetPreviewData(UBlueprint* InBlueprint, FString& OutError)
+{
+	OutError.Reset();
+	if (!InBlueprint || !GEditor)
+	{
+		OutError = TEXT("A Widget Blueprint and a running editor are required.");
+		return FString();
+	}
+	UAssetEditorSubsystem* Editors = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
+	IAssetEditorInstance* Editor = Editors ? Editors->FindEditorForAsset(InBlueprint, false) : nullptr;
+	if (!Editor || Editor->GetEditorName() != FName(TEXT("WidgetBlueprintEditor")))
+	{
+		OutError = TEXT("Open this Widget Blueprint in its Designer before reading preview geometry.");
+		return FString();
+	}
+	UUserWidget* Preview = static_cast<FWidgetBlueprintEditor*>(Editor)->GetPreview();
+	if (!Preview || !Preview->WidgetTree)
+	{
+		OutError = TEXT("The Designer has no current preview widget.");
+		return FString();
+	}
+	const FGeometry& RootGeometry = Preview->GetCachedGeometry();
+	const FVector2D RootSize = RootGeometry.GetLocalSize();
+	if (RootSize.X <= 0.f || RootSize.Y <= 0.f)
+	{
+		OutError = TEXT("The Designer preview has not completed layout yet.");
+		return FString();
+	}
+	auto VectorData = [](const FVector2D& Value)
+	{
+		TSharedRef<FJsonObject> Data = MakeShared<FJsonObject>();
+		Data->SetNumberField(TEXT("x"), Value.X);
+		Data->SetNumberField(TEXT("y"), Value.Y);
+		return Data;
+	};
+	TArray<TSharedPtr<FJsonValue>> WidgetData;
+	Preview->WidgetTree->ForEachWidgetAndDescendants([&](UWidget* Widget)
+	{
+		const FGeometry& Geometry = Widget->GetCachedGeometry();
+		const FVector2D Position = RootGeometry.AbsoluteToLocal(Geometry.LocalToAbsolute(FVector2D::ZeroVector));
+		const FVector2D End = RootGeometry.AbsoluteToLocal(Geometry.LocalToAbsolute(Geometry.GetLocalSize()));
+		TSharedRef<FJsonObject> Record = MakeShared<FJsonObject>();
+		Record->SetStringField(TEXT("path"), Widget->GetPathName());
+		Record->SetStringField(TEXT("name"), Widget->GetName());
+		Record->SetStringField(TEXT("class"), Widget->GetClass()->GetPathName());
+		Record->SetStringField(TEXT("visibility"), StaticEnum<ESlateVisibility>()->GetNameStringByValue(static_cast<int64>(Widget->GetVisibility())));
+		Record->SetObjectField(TEXT("position"), VectorData(Position));
+		Record->SetObjectField(TEXT("size"), VectorData(End - Position));
+		Record->SetObjectField(TEXT("desiredSize"), VectorData(Widget->GetDesiredSize()));
+		Record->SetNumberField(TEXT("renderOpacity"), Widget->GetRenderOpacity());
+		if (const UTextBlock* Text = Cast<UTextBlock>(Widget))
+		{
+			Record->SetStringField(TEXT("text"), Text->GetText().ToString());
+			Record->SetNumberField(TEXT("fontSize"), Text->GetFont().Size);
+		}
+		if (const UCommonTextBlockN* Text = Cast<UCommonTextBlockN>(Widget))
+		{
+			Record->SetStringField(TEXT("styleTag"), Text->GetStyleTag().ToString());
+		}
+		if (const UImage* Image = Cast<UImage>(Widget))
+		{
+			Record->SetStringField(TEXT("brushResource"), GetPathNameSafe(Image->GetBrush().GetResourceObject()));
+		}
+		WidgetData.Add(MakeShared<FJsonValueObject>(Record));
+	});
+	TSharedRef<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("blueprint"), InBlueprint->GetPathName());
+	Data->SetStringField(TEXT("previewPath"), Preview->GetPathName());
+	Data->SetObjectField(TEXT("rootSize"), VectorData(RootSize));
+	Data->SetArrayField(TEXT("widgets"), WidgetData);
 	FString Result;
 	FJsonSerializer::Serialize(Data, TJsonWriterFactory<>::Create(&Result));
 	return Result;

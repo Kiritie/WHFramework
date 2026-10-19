@@ -8,7 +8,7 @@ class UWidget;
 class UWidgetTree;
 class UPanelWidget;
 
-// 仅编辑源控件模板，不创建运行时实例或进入子控件树。
+// 编辑源控件模板，并只读检查已存在的 Designer 预览；不创建运行时实例。
 UCLASS()
 class WHFRAMEWORKEDITOR_API UWidgetBlueprintEditorLibrary : public UBlueprintFunctionLibrary
 {
@@ -30,6 +30,9 @@ public:
 	// 导出源图及节点原文，保留引脚类型、默认值和连线；不创建运行时控件。
 	UFUNCTION(BlueprintPure, Category = "WidgetModule")
 	static FString ExportGraphData(UBlueprint* InBlueprint);
+
+	UFUNCTION(BlueprintPure, Category = "WidgetModule")
+	static FString GetPreviewData(UBlueprint* InBlueprint, FString& OutError);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModule")
 	static UWidget* CreateWidgetTemplate(UBlueprint* InBlueprint, TSubclassOf<UWidget> InClass, FName InName, FString& OutError);

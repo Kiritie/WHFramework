@@ -43,8 +43,6 @@ void UWidgetSettingPanelBase::OnCreate(const FParameter& InParam)
 	BindButton(Btn_Apply, &ThisClass::OnApplyButtonClicked);
 	BindButton(Btn_Reset, &ThisClass::OnResetButtonClicked);
 	BindButton(Btn_Close, &ThisClass::OnCloseButtonClicked);
-	BindButton(Btn_Confirm, &ThisClass::OnConfirmButtonClicked);
-	BindButton(Btn_Revert, &ThisClass::OnRevertButtonClicked);
 	USettingModule::Get().OnSettingEditStateChanged.AddUniqueDynamic(this, &ThisClass::OnSettingEditStateChanged);
 
 	PageItemGroup = NewObject<UCommonButtonGroup>(this);
@@ -102,7 +100,7 @@ void UWidgetSettingPanelBase::OnDestroy(EObjectDespawnMode InMode)
 	ReleaseEditSession();
 	USettingModule::Get().OnSettingEditStateChanged.RemoveDynamic(this, &ThisClass::OnSettingEditStateChanged);
 	GetWorld()->GetTimerManager().ClearTimer(ConfirmationRefreshTimer);
-	for (UCommonButton* Button : {Btn_Apply, Btn_Reset, Btn_Close.Get(), Btn_Confirm.Get(), Btn_Revert.Get()})
+	for (UCommonButton* Button : {Btn_Apply, Btn_Reset, Btn_Close.Get()})
 	{
 		if (Button)
 		{
@@ -245,38 +243,17 @@ void UWidgetSettingPanelBase::OnSettingEditStateChanged(const FSettingEditState&
 
 void UWidgetSettingPanelBase::RefreshConfirmation()
 {
-	const bool bPending = USettingModule::Get().HasPendingConfirmation();
-	const bool bWasShown = ConfirmationContent && ConfirmationContent->GetVisibility() == ESlateVisibility::Visible;
-	if (ConfirmationContent)
+	const bool bPending = bOwnsEditSession && USettingModule::Get().HasPendingConfirmation();
+	if (bPending)
 	{
-		ConfirmationContent->SetVisibility(bPending ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-	}
-	if (bPending && ConfirmationContent)
-	{
-		if (Txt_Confirmation)
-		{
-			Txt_Confirmation->SetText(FText::Format(NSLOCTEXT("WH.Setting", "ConfirmSettings", "是否保留这些设置？{0} 秒后自动还原。"),
-				FText::AsNumber(FMath::CeilToInt(USettingModule::Get().GetConfirmationTimeRemaining()))));
-		}
 		if (!GetWorld()->GetTimerManager().IsTimerActive(ConfirmationRefreshTimer))
 		{
 			GetWorld()->GetTimerManager().SetTimer(ConfirmationRefreshTimer, this, &ThisClass::RefreshConfirmation, .25f, true);
-		}
-		if (!bWasShown && Btn_Confirm)
-		{
-			Btn_Confirm->SetFocus();
 		}
 	}
 	else
 	{
 		GetWorld()->GetTimerManager().ClearTimer(ConfirmationRefreshTimer);
-		if (bWasShown && PageItemGroup && IsWidgetOpened())
-		{
-			if (UCommonButtonBase* PageButton = PageItemGroup->GetButtonBaseAtIndex(GetCurrentPageIndex()))
-			{
-				PageButton->SetFocus();
-			}
-		}
 	}
 }
 

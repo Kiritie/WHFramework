@@ -4,11 +4,12 @@
 #include "Blueprint/DragDropOperation.h"
 #include "Blueprint/UserWidget.h"
 #include "Ability/Inventory/InventoryTypes.h"
-#include "WidgetInventorySlotView.generated.h"
+#include "WidgetAbilityInventorySlotBase.generated.h"
 
 class UCommonImageN;
 class UCommonTextBlockN;
 class UCommonProgress;
+class USizeBox;
 class UWidgetAbilityInventoryBase;
 
 UCLASS()
@@ -40,23 +41,26 @@ public:
 };
 
 UCLASS()
-class WHFRAMEWORK_API UWidgetInventorySlotView : public UUserWidget
+class WHFRAMEWORK_API UWidgetAbilityInventorySlotBase : public UUserWidget
 {
     GENERATED_BODY()
 
 public:
-    UWidgetInventorySlotView(const FObjectInitializer& ObjectInitializer);
+    UWidgetAbilityInventorySlotBase(const FObjectInitializer& ObjectInitializer);
     void BindSlot(UWidgetAbilityInventoryBase* InPanel, const FGuid& InInventoryId, const FInventorySlotKey& InSlot);
     virtual void RefreshSlot(const FInventorySlotState& InState, const FText& InName, UObject* InIcon, const FText& InTooltip);
     void SetPending(bool bInPending);
+    bool IsPending() const { return bPending; }
     void SetSelected(bool bInSelected);
     void SetCooldown(float InRemaining, float InDuration);
+    void SetPresentation(FGameplayTag InFrameStyle, FGameplayTag InLockedStyle, FVector2D InIconExtent);
     FGuid GetInventoryId() const;
     FInventorySlotKey GetSlotKey() const;
     UWidgetAbilityInventoryBase* GetInventoryPanel() const;
 
 protected:
     virtual TSharedRef<SWidget> RebuildWidget() override;
+    virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
     virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
     virtual FReply NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
@@ -71,6 +75,11 @@ protected:
     FGameplayTag LockedStyleTag;
 
 private:
+    UPROPERTY(meta = (BindWidget))
+    TObjectPtr<USizeBox> IconSize;
+
+    FVector2D IconExtent = FVector2D(48.f);
+
     UPROPERTY(meta = (BindWidget))
     TObjectPtr<UCommonImageN> Frame;
 
@@ -107,5 +116,6 @@ private:
     float CooldownDuration = 0.f;
     FTimerHandle CooldownTimer;
     void AdvanceCooldown();
+    void RestoreCooldownTimer();
     void RefreshFrame();
 };

@@ -43,6 +43,9 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
 	TSubclassOf<UCommonTextScrollStyle> TextScrollStyleBase;
 
+	UPROPERTY(Config, EditAnywhere, Category = "Style Bases", meta = (AllowAbstract = "true"))
+	TSubclassOf<UCommonWindowStyle> WindowStyleBase;
+
 	UClass* GetStyleBase(EWidgetStyleKind Kind) const;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Themes")

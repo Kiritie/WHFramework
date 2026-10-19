@@ -5,10 +5,83 @@
 #include "HAL/FileManager.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/Paths.h"
+#include "Misc/PackageName.h"
+#include "ObjectTools.h"
+#include "AssetToolsModule.h"
+#include "IAssetTools.h"
 #include "Engine/Texture2D.h"
 #include "UObject/Package.h"
+#include "UObject/ObjectRedirector.h"
 #include "Widget/Common/WidgetBlueprintEditorLibrary.h"
 #include "Widget/Theme/WidgetThemeEditorLibrary.h"
+
+bool UWidgetEditorToolset::FixupWidgetRedirectors(const TArray<FString>& PackageNames)
+{
+	if (PackageNames.IsEmpty())
+	{
+		UKismetSystemLibrary::RaiseScriptError(TEXT("An explicit widget package list is required."));
+		return false;
+	}
+	TArray<UPackage*> Packages;
+	TArray<UObjectRedirector*> Redirectors;
+	for (const FString& PackageName : PackageNames)
+	{
+		if (!FPackageName::IsValidLongPackageName(PackageName) ||
+			(!PackageName.StartsWith(TEXT("/Game/Blueprints/Widget/")) &&
+			 !PackageName.StartsWith(TEXT("/WHFramework/Blueprints/Widget/")) &&
+			 !PackageName.StartsWith(TEXT("/WHFrameworkUtilities/Blueprints/Widget/"))))
+		{
+			UKismetSystemLibrary::RaiseScriptError(TEXT("Only explicit widget asset packages can be cleaned."));
+			return false;
+		}
+		UPackage* Package = FindPackage(nullptr, *PackageName);
+		if (!Package && FPackageName::DoesPackageExist(PackageName))
+		{
+			Package = LoadPackage(nullptr, *PackageName, LOAD_None);
+		}
+		if (Package)
+		{
+			Package->FullyLoad();
+			FString UnexpectedAsset;
+			ForEachObjectWithPackage(Package, [&Redirectors, &UnexpectedAsset](UObject* Object)
+			{
+				if (Object->IsAsset())
+				{
+					if (UObjectRedirector* Redirector = Cast<UObjectRedirector>(Object))
+					{
+						Redirectors.AddUnique(Redirector);
+					}
+					else
+					{
+						UnexpectedAsset = Object->GetPathName();
+						return false;
+					}
+				}
+				return true;
+			}, EGetObjectsFlags::None, RF_Transient | RF_ClassDefaultObject, EInternalObjectFlags::Garbage);
+			if (!UnexpectedAsset.IsEmpty())
+			{
+				UKismetSystemLibrary::RaiseScriptError(FString::Printf(TEXT("Package contains a non-redirector asset: %s"), *UnexpectedAsset));
+				return false;
+			}
+			Packages.AddUnique(Package);
+		}
+	}
+	if (!Redirectors.IsEmpty())
+	{
+		FAssetToolsModule::GetModule().Get().FixupReferencers(Redirectors, false, ERedirectFixupMode::DeleteFixedUpRedirectors);
+		return !FAssetToolsModule::GetModule().Get().IsFixupReferencersInProgress();
+	}
+	ObjectTools::CleanupAfterSuccessfulDelete(Packages, false);
+	for (const FString& PackageName : PackageNames)
+	{
+		if (FPackageName::DoesPackageExist(PackageName))
+		{
+			return false;
+		}
+	}
+	return true;
+}
 
 FString UWidgetEditorToolset::GetBlueprintGraphData(UBlueprint* Blueprint)
 {
@@ -18,6 +91,17 @@ FString UWidgetEditorToolset::GetBlueprintGraphData(UBlueprint* Blueprint)
 		return FString();
 	}
 	return UWidgetBlueprintEditorLibrary::ExportGraphData(Blueprint);
+}
+
+FString UWidgetEditorToolset::GetWidgetPreviewData(UBlueprint* Blueprint)
+{
+	FString Error;
+	FString Result = UWidgetBlueprintEditorLibrary::GetPreviewData(Blueprint, Error);
+	if (!Error.IsEmpty())
+	{
+		UKismetSystemLibrary::RaiseScriptError(Error);
+	}
+	return Result;
 }
 
 UWidget* UWidgetEditorToolset::CreateWidgetTemplate(UBlueprint* Blueprint, TSubclassOf<UWidget> WidgetClass, FName WidgetName)
@@ -118,6 +202,17 @@ bool UWidgetEditorToolset::SetStyleProperty(UWidgetTheme* Theme, const FString& 
 	}
 	FString Error;
 	const bool bSuccess = UWidgetThemeEditorLibrary::SetStyleProperty(Theme, StyleTag, Property, Value, Error);
+	if (!bSuccess)
+	{
+		UKismetSystemLibrary::RaiseScriptError(Error);
+	}
+	return bSuccess;
+}
+
+bool UWidgetEditorToolset::RemapThemeTextStyleTag(UWidgetTheme* Theme, const FString& OldTag, const FString& NewTag)
+{
+	FString Error;
+	const bool bSuccess = UWidgetThemeEditorLibrary::RemapThemeTextStyleTag(Theme, OldTag, NewTag, Error);
 	if (!bSuccess)
 	{
 		UKismetSystemLibrary::RaiseScriptError(Error);

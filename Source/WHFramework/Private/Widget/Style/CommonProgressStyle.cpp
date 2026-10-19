@@ -4,4 +4,5 @@
 UCommonProgressStyle::UCommonProgressStyle()
 {
 	ProgressBarStyle = GetDefault<UProgressBar>()->GetWidgetStyle();
+	RadialBackground.DrawAs = ESlateBrushDrawType::NoDrawType;
 }

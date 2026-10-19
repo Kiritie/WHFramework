@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Event/EventModuleTypes.h"
+#include "GameplayTagContainer.h"
 
 #include "Event_CloseUserWidget.generated.h"
 

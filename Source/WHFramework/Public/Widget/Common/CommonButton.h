@@ -12,6 +12,7 @@ class UImage;
 class UCommonTextBlockN;
 class UCommonButtonStyleN;
 class UStackBox;
+class USizeBox;
 
 UCLASS(BlueprintType, Blueprintable, ClassGroup = UI, meta = (Category = "Common UI", DisplayName = "Common Button", DisableNativeTick))
 class WHFRAMEWORK_API UCommonButton : public UCommonButtonBase, public IObjectPoolInterface
@@ -81,6 +82,12 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Content", meta = (ClampMin = "0"))
 	float ContentSpacing = 0.f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Content", meta = (ClampMin = "0.0"))
+	float TitleMinWidth = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Content", meta = (ClampMin = "0.0"))
+	FVector2D ContentMinSize = FVector2D::ZeroVector;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Brush"))
 	FGameplayTag IconStyleTag;
 
@@ -111,6 +118,8 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UStackBox> NativeContent;
 	UPROPERTY(Transient)
+	TObjectPtr<USizeBox> NativeContentSize;
+	UPROPERTY(Transient)
 	FSlateBrush IconOverride;
 
 	bool bHasIconOverride = false;
@@ -134,6 +143,9 @@ public:
 
 	void SetTitle(const FText InTitle);
 
+	UFUNCTION(BlueprintCallable)
+	void SetTriggerClickedAfterSelection(bool bInTriggerClickedAfterSelection);
+
 	UFUNCTION(BlueprintPure)
 
 	bool IsStandalone() const
@@ -153,6 +165,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Content")
 	void SetContentOrientation(EOrientation InOrientation);
+
+	UFUNCTION(BlueprintCallable, Category = "Content")
+	void SetContentSpacing(float InSpacing);
+
+	UFUNCTION(BlueprintCallable, Category = "Content")
+	void SetTitleMinWidth(float InWidth);
+
+	UFUNCTION(BlueprintCallable, Category = "Content")
+	void SetContentMinSize(const FVector2D& InSize);
 
 	UFUNCTION(BlueprintCallable)
 

@@ -1,23 +1,24 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Widget/Screen/UserWidgetBase.h"
+#include "Widget/Sub/SubWidgetBase.h"
 #include "Ability/Inventory/InventoryNetworkComponent.h"
 #include "WidgetAbilityInventoryBase.generated.h"
 
 class UVerticalBox;
 class UTextBlock;
 class UHorizontalBox;
+class UPanelWidget;
 class UCommonButton;
 class UCommonRange;
 class UCommonTextBlockN;
-class UWidgetInventorySlotView;
+class UWidgetAbilityInventorySlotBase;
 class UInventoryDragOperation;
 
 DECLARE_MULTICAST_DELEGATE_TwoParams(FInventoryUISelection, const FGuid&, const FInventorySlotKey&);
 
 UCLASS()
-class WHFRAMEWORK_API UWidgetAbilityInventoryBase : public UUserWidgetBase
+class WHFRAMEWORK_API UWidgetAbilityInventoryBase : public USubWidgetBase
 {
     GENERATED_BODY()
 
@@ -25,7 +26,8 @@ public:
     UWidgetAbilityInventoryBase(const FObjectInitializer& ObjectInitializer);
     virtual void OnInitialize(const FParameter& InParams) override;
     virtual void OnRefresh() override;
-    virtual void OnClose(bool bInstant) override;
+    virtual void OnReset(bool bForce = false) override;
+    virtual void OnDestroy(EObjectDespawnMode InMode) override;
     virtual void NativeDestruct() override;
 
     UFUNCTION(BlueprintCallable)
@@ -55,6 +57,12 @@ public:
     UFUNCTION(BlueprintCallable)
     bool RequestQuickStack(FGuid InInventoryId);
 
+    UFUNCTION(BlueprintPure)
+    bool CanSplit(FGuid InInventoryId, FInventorySlotKey InSlot) const;
+
+    UFUNCTION(BlueprintCallable)
+    bool RequestSplit(FGuid InInventoryId, FInventorySlotKey InSlot);
+
     bool AcceptDrop(const UInventoryDragOperation& InDrag, const FGuid& InTargetInventoryId, const FInventorySlotKey& InTargetSlot);
     const FInventorySlotState* FindSlot(const FGuid& InInventoryId, const FInventorySlotKey& InSlot) const;
     UInventoryNetworkComponent* GetNetwork() const;
@@ -64,10 +72,24 @@ public:
     void UpdateCooldown(const FGuid& InInventoryId, const FInventorySlotKey& InSlot, float InRemaining, float InDuration);
     FInventoryUISelection OnSelection;
 
+    void SetTransferInventoryId(FGuid InInventoryId);
+    void SyncSelection(FGuid InInventoryId, FInventorySlotKey InSlot);
+    bool SubmitRequest(FInventoryClientRequest InRequest);
+    void SetResultText(const FText& InText);
+
 protected:
     virtual TSharedRef<SWidget> RebuildWidget() override;
     virtual void NativeConstruct() override;
-    void RebuildViews();
+    virtual void RebuildViews();
+    virtual void ConfigureSlot(UWidgetAbilityInventorySlotBase* InWidget, const FInventorySlotKey& InSlot) const;
+    virtual int32 GetInventoryColumns(const FGuid& InInventoryId, const FGameplayTag& InGroup) const;
+    virtual UPanelWidget* GetInventoryHost(const FGuid& InInventoryId) const;
+    void ApplySelection(const FGuid& InInventoryId, const FInventorySlotKey& InSlot);
+    bool Submit(FInventoryClientRequest InRequest);
+	virtual bool ShowSplitQuantity(int32 InStackCount);
+	virtual void CloseSplitQuantity();
+	void ConfirmSplitQuantity(int32 InQuantity);
+	void CancelSplit();
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     bool bStackInventoriesVertically = false;
@@ -96,11 +118,8 @@ protected:
     UPROPERTY(EditDefaultsOnly, meta = (Categories = "UI.Style.Button"))
     FGameplayTag SecondaryButtonStyleTag;
 
-    UPROPERTY(EditDefaultsOnly, meta = (Categories = "UI.Style.Button"))
-    FGameplayTag ConfirmButtonStyleTag;
-
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    TSubclassOf<UWidgetInventorySlotView> SlotWidgetClass;
+    TSubclassOf<UWidgetAbilityInventorySlotBase> SlotWidgetClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FName UseAction;
@@ -110,6 +129,12 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     int32 Columns = 10;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0"))
+    FVector2D GridSlotSize = FVector2D::ZeroVector;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FMargin GridSlotPadding = FMargin(2.f);
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TArray<FGameplayTag> VisibleGroups;
@@ -123,18 +148,6 @@ protected:
     UPROPERTY(meta = (BindWidget))
     TObjectPtr<UCommonTextBlockN> ResultText;
 
-    UPROPERTY(meta = (BindWidget))
-    TObjectPtr<UHorizontalBox> SplitControls;
-
-    UPROPERTY(meta = (BindWidget))
-    TObjectPtr<UCommonRange> SplitCount;
-
-    UPROPERTY(meta = (BindWidget))
-    TObjectPtr<UCommonButton> Btn_ConfirmSplit;
-
-    UPROPERTY(meta = (BindWidget))
-    TObjectPtr<UCommonButton> Btn_CancelSplit;
-
     UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UCommonButton> Btn_Sort;
 
@@ -144,7 +157,8 @@ protected:
 private:
     TWeakObjectPtr<UInventoryNetworkComponent> Network;
     TArray<FGuid> InventoryIds;
-    TMap<FString, TWeakObjectPtr<UWidgetInventorySlotView>> Slots;
+    FGuid TransferInventoryId;
+    TMap<FString, TWeakObjectPtr<UWidgetAbilityInventorySlotBase>> Slots;
     TMap<uint64, TArray<FString>> PendingSlots;
     FInventoryClientRequest SplitRequest;
     FInventoryStackSignature SplitSignature;
@@ -158,22 +172,26 @@ private:
     FDelegateHandle SnapshotHandle;
     FDelegateHandle DeltaHandle;
     FDelegateHandle ResultHandle;
+    FDelegateHandle QueuedHandle;
     FDelegateHandle ClosedHandle;
 
     static FString SlotId(const FGuid& InInventoryId, const FInventorySlotKey& InSlot);
-    void ClearViews();
+    uint64 ClearViews();
+    TArray<TWeakObjectPtr<UWidget>> GeneratedViewRoots;
+    uint64 ViewRevision = 0;
     void RefreshSlot(const FGuid& InInventoryId, const FInventorySlotState& InSlot);
     void HandleSnapshot(const FInventorySnapshot& InSnapshot);
     void HandleDelta(const FInventoryDelta& InDelta);
     void HandleResult(const FInventoryCommandResult& InResult);
+    void HandleRequestQueued(const FInventoryClientRequest& InRequest);
+    TArray<FString> CollectRequestSlots(const FInventoryClientRequest& InRequest) const;
     void HandleClosed(const FGuid& InInventoryId, EInventoryResultCode InReason);
-    bool Submit(FInventoryClientRequest InRequest);
     void RefreshPending();
     void BindControls();
     void UnbindControls();
+    void RefreshControls();
 
-    UFUNCTION()
-    void ConfirmSplit();
+    bool OpenSplit(const FInventoryClientRequest& InRequest);
 
     UFUNCTION()
     void SortSelected();
@@ -181,6 +199,4 @@ private:
     UFUNCTION()
     void QuickStackSelected();
 
-    UFUNCTION()
-    void CancelSplit();
 };

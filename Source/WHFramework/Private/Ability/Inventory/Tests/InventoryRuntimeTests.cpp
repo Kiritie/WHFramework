@@ -1165,6 +1165,15 @@ bool FInventoryNetworkReplicaTest::RunTest(const FString& Parameters)
     Chunk.TotalBytes = Bytes.Num();
     Chunk.Checksum = FCrc::MemCrc32(Bytes.GetData(), Bytes.Num());
     int32 SnapshotEvents = 0;
+    int32 AppliedEvents = 0;
+    FInventoryChangeSet LastApplied;
+    FInventoryDelta LastAppliedView;
+    Network->OnAppliedChanges.AddLambda([&AppliedEvents, &LastApplied, &LastAppliedView](const FInventoryDelta& InView, const FInventoryChangeSet& InChanges)
+    {
+        ++AppliedEvents;
+        LastApplied = InChanges;
+        LastAppliedView = InView;
+    });
     Network->OnSnapshot.AddLambda([&SnapshotEvents](const FInventorySnapshot&)
     {
         ++SnapshotEvents;
@@ -1183,6 +1192,7 @@ bool FInventoryNetworkReplicaTest::RunTest(const FString& Parameters)
         }
     }
     TestEqual(TEXT("完整快照仅发布一次"), SnapshotEvents, 1);
+    TestEqual(TEXT("首份快照不伪造获得事件"), AppliedEvents, 0);
     if(!TestTrue(TEXT("乱序分片装配完整一致"), Network->FindView(Snapshot.InventoryId) && *Network->FindView(Snapshot.InventoryId) == Snapshot))
     {
         return false;
@@ -1201,18 +1211,67 @@ bool FInventoryNetworkReplicaTest::RunTest(const FString& Parameters)
     Delta.Slots[0].bFavorite = true;
     Network->ClientDelta_Implementation(Delta);
     TestEqual(TEXT("连续Delta推进一次版本"), Network->FindView(Snapshot.InventoryId)->Revision, uint64(8));
+    TestEqual(TEXT("实际应用的差异发布一次"), AppliedEvents, 1);
+    TestTrue(TEXT("差异带有修改前后和原事务身份"), LastApplied.TransactionId == Delta.TransactionId && LastApplied.ChangedSlots.Num() == 1 &&
+        !LastApplied.ChangedSlots[0].Before.bFavorite && LastApplied.ChangedSlots[0].After.bFavorite && LastAppliedView.SessionId == Delta.SessionId);
     Network->ClientDelta_Implementation(Delta);
     TestEqual(TEXT("重复Delta幂等"), Network->FindView(Snapshot.InventoryId)->Revision, uint64(8));
+    TestEqual(TEXT("重复Delta不重复发布获得来源"), AppliedEvents, 1);
     Delta.FromRevision = 9;
     Delta.ToRevision = 10;
     Network->ClientDelta_Implementation(Delta);
     TestEqual(TEXT("版本缺口保持最后已确认状态"), Network->FindView(Snapshot.InventoryId)->Revision, uint64(8));
+    TestEqual(TEXT("未应用版本缺口不发布差异"), AppliedEvents, 1);
+    FInventorySnapshot Refreshed = *Network->FindView(Snapshot.InventoryId);
+    Refreshed.Revision = 9;
+    Refreshed.Slots[0].Item.Count = 2;
+    TArray<uint8> RefreshedBytes;
+    if(!TestTrue(TEXT("重同步快照编码"), FInventorySnapshotCodec::Encode(Refreshed, Data.Registry, Data.Profiles, RefreshedBytes, Error))) return false;
+    FInventorySnapshotChunk RefreshedChunk = Chunk;
+    RefreshedChunk.TransferId = FGuid::NewGuid();
+    RefreshedChunk.Revision = Refreshed.Revision;
+    RefreshedChunk.TotalBytes = RefreshedBytes.Num();
+    RefreshedChunk.Count = FMath::DivideAndRoundUp(RefreshedBytes.Num(), 8192);
+    RefreshedChunk.Checksum = FCrc::MemCrc32(RefreshedBytes.GetData(), RefreshedBytes.Num());
+    for(int32 Index = 0; Index < RefreshedChunk.Count; ++Index)
+    {
+        RefreshedChunk.Index = Index;
+        const int32 Offset = Index * 8192;
+        RefreshedChunk.Bytes.Reset();
+        RefreshedChunk.Bytes.Append(RefreshedBytes.GetData() + Offset, FMath::Min(8192, RefreshedBytes.Num() - Offset));
+        Network->ClientSnapshot_Implementation(RefreshedChunk);
+    }
+    TestEqual(TEXT("同会话重同步发布净变化"), AppliedEvents, 2);
+    TestTrue(TEXT("重同步保留真实前后数量且不编造事务ID"), !LastApplied.TransactionId.IsValid() && LastAppliedView.FromRevision == 8 &&
+        LastAppliedView.ToRevision == 9 && LastApplied.ChangedSlots.Num() == 1 && LastApplied.ChangedSlots[0].Before.Item.Count == 1 &&
+        LastApplied.ChangedSlots[0].After.Item.Count == 2);
     FInventoryClientRequest Request;
     Request.Operation = EInventoryOperationType::SetFavorite;
     Request.SourceInventoryId = Snapshot.InventoryId;
     Request.SourceSlot = Snapshot.Slots[0].Key;
+    int32 QueuedEvents = 0;
+    bool bQueuedVisibleDuringCallback = true;
+    FInventoryClientRequest LastQueued;
+    Network->OnRequestQueued.AddLambda([&Network, &QueuedEvents, &bQueuedVisibleDuringCallback, &LastQueued](const FInventoryClientRequest& InRequest)
+    {
+        ++QueuedEvents;
+        LastQueued = InRequest;
+        bQueuedVisibleDuringCallback &= Network->GetPendingRequests().ContainsByPredicate([&InRequest](const FInventoryClientRequest& Candidate)
+        {
+            return Candidate.RequestId == InRequest.RequestId;
+        });
+    });
     const uint64 RequestId = Network->SubmitRequest(Request);
     TestTrue(TEXT("Submit立即返回稳定ID但尚未发送RPC"), RequestId != 0 && Network->Pending.FindChecked(RequestId).Attempts == 0);
+    TestEqual(TEXT("统一提交入口发布一次实际入队通知"), QueuedEvents, 1);
+    TestTrue(TEXT("入队通知已具有当前身份会话与签名"), LastQueued.RequestId == RequestId && LastQueued.ConnectionId == Connection &&
+        LastQueued.StoreId == Data.StoreId && LastQueued.WorldEpoch == Epoch && LastQueued.Participants.Num() == 1 &&
+        LastQueued.Participants[0].SessionId == Chunk.SessionId && LastQueued.ExpectedSignature == Network->FindView(Snapshot.InventoryId)->Slots[0].Item.Signature());
+    TestTrue(TEXT("入队观察者回调中可查询到该请求"), bQueuedVisibleDuringCallback);
+    TArray<FInventoryClientRequest> PendingCopy = Network->GetPendingRequests();
+    if (!TestEqual(TEXT("打开UI可读取已经排队的请求"), PendingCopy.Num(), 1)) return false;
+    PendingCopy[0].Quantity += 1;
+    TestEqual(TEXT("只读查询副本不能修改网络原请求"), Network->GetPendingRequests()[0].Quantity, Request.Quantity);
     int32 ResultEvents = 0;
     Network->OnResult.AddLambda([&ResultEvents](const FInventoryCommandResult&)
     {
@@ -1225,8 +1284,19 @@ bool FInventoryNetworkReplicaTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("旧连接ACK不能结算新请求"), ResultEvents, 0);
     Network->ClientResult_Implementation(Connection, Result);
     TestEqual(TEXT("原连接ACK结算一次"), ResultEvents, 1);
+    TestTrue(TEXT("已结算请求不再进入待处理查询"), Network->GetPendingRequests().IsEmpty());
     Network->ClientResult_Implementation(Connection, Result);
     TestEqual(TEXT("重复ACK不重复通知UI"), ResultEvents, 1);
+    const FDelegateHandle ImmediateAckHandle = Network->OnRequestQueued.AddLambda([&Network, Connection](const FInventoryClientRequest& InRequest)
+    {
+        FInventoryCommandResult ImmediateResult;
+        ImmediateResult.RequestId = InRequest.RequestId;
+        ImmediateResult.Code = EInventoryResultCode::Success;
+        Network->ClientResult_Implementation(Connection, ImmediateResult);
+    });
+    TestTrue(TEXT("观察期间已结算仍返回实际入队ID"), Network->SubmitRequest(Request) != 0);
+    TestTrue(TEXT("观察期间结算没有遗留Pending"), Network->GetPendingRequests().IsEmpty());
+    Network->OnRequestQueued.Remove(ImmediateAckHandle);
     Network->ClientClosed_Implementation(Connection, Snapshot.InventoryId, Chunk.SessionId, EInventoryResultCode::Success);
     TestNull(TEXT("关闭会话立即移除私有视图"), Network->FindView(Snapshot.InventoryId));
     TestTrue(TEXT("关闭会话清理装配缓冲"), Network->Assemblies.IsEmpty());
@@ -1241,6 +1311,8 @@ bool FInventoryNetworkReplicaTest::RunTest(const FString& Parameters)
         return false;
     }
     Network->Pending.FindChecked(SentId).Attempts = 1;
+    const TArray<FInventoryClientRequest> ReopenedPending = Network->GetPendingRequests();
+    TestTrue(TEXT("恢复UI读取请求顺序稳定且保留实际身份"), ReopenedPending.Num() == 2 && ReopenedPending[0].RequestId == UnsentId && ReopenedPending[1].RequestId == SentId);
     TMap<uint64, EInventoryResultCode> CloseResults;
     Network->OnResult.AddLambda([&CloseResults](const FInventoryCommandResult& InResult)
     {
@@ -1254,7 +1326,9 @@ bool FInventoryNetworkReplicaTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("未发送请求明确未执行"), CloseResults.FindRef(UnsentId) == EInventoryResultCode::WorldNotReady);
     TestTrue(TEXT("已发送请求保留提交结果待确认语义"), CloseResults.FindRef(SentId) == EInventoryResultCode::ConfirmationPending);
     TestFalse(TEXT("解绑清除owner和epoch"), Network->GetOwnerInventoryId().IsValid() || Network->GetWorldEpoch().IsValid() || Network->GetStoreId().IsValid());
+    const int32 QueuedBeforeRejected = QueuedEvents;
     TestEqual(TEXT("解绑后不能排队新请求"), Network->SubmitRequest(Request), uint64(0));
+    TestEqual(TEXT("拒绝入队不发布请求通知"), QueuedEvents, QueuedBeforeRejected);
     Network->ClientSnapshot_Implementation(Chunk);
     TestTrue(TEXT("旧世界分片不能在解绑后重建视图"), Network->Assemblies.IsEmpty() && Network->Views.IsEmpty());
     const FGuid NewConnection = FGuid::NewGuid();
@@ -1291,6 +1365,19 @@ bool FInventoryNetworkReplicaTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("UI请求自动绑定当前分支身份"), BranchRequestId != 0 && Network->Pending.FindChecked(BranchRequestId).Request.ConnectionId == BranchConnection &&
         Network->Pending.FindChecked(BranchRequestId).Request.StoreId == NewStoreId);
     Network->UnbindOwner();
+    const FGuid ReentrantConnection = FGuid::NewGuid();
+    Network->ClientBegin_Implementation(ReentrantConnection, Data.WorldId, Data.StoreId, Epoch, Snapshot.InventoryId);
+    UInventoryNetworkComponent::FClientView ReentrantView;
+    ReentrantView.SessionId = FGuid::NewGuid();
+    ReentrantView.Snapshot = Snapshot;
+    Network->Views.Add(Snapshot.InventoryId, MoveTemp(ReentrantView));
+    const FDelegateHandle ResetQueuedHandle = Network->OnRequestQueued.AddLambda([&Network, ReentrantConnection](const FInventoryClientRequest&)
+    {
+        Network->ClientReset_Implementation(ReentrantConnection, EInventoryResultCode::WorldNotReady);
+    });
+    TestEqual(TEXT("入队观察重入清连接后不返回失效请求ID"), Network->SubmitRequest(Request), uint64(0));
+    TestTrue(TEXT("重入清理后没有遗留请求"), Network->GetPendingRequests().IsEmpty());
+    Network->OnRequestQueued.Remove(ResetQueuedHandle);
     return true;
 }
 

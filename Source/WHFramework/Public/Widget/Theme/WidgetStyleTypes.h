@@ -17,4 +17,5 @@ enum class EWidgetStyleKind : uint8
 	Scroll,
 	Border,
 	TextScroll,
+	Window,
 };

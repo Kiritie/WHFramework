@@ -68,6 +68,8 @@ UClass* FWidgetThemeResolver::NativeBase(EWidgetStyleKind Kind)
 		return UCommonBorderStyle::StaticClass();
 	case EWidgetStyleKind::TextScroll:
 		return UCommonTextScrollStyle::StaticClass();
+	case EWidgetStyleKind::Window:
+		return UCommonWindowStyle::StaticClass();
 
 	}
 	return nullptr;

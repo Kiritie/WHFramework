@@ -1,4 +1,4 @@
-#include "Ability/Inventory/Widget/WidgetInventorySlotView.h"
+#include "Ability/Inventory/Widget/WidgetAbilityInventorySlotBase.h"
 
 #include "TimerManager.h"
 
@@ -8,6 +8,7 @@
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/SizeBox.h"
+#include "Components/ScaleBox.h"
 #include "Widget/Common/CommonImageN.h"
 #include "Widget/Common/CommonTextBlockN.h"
 #include "Widget/Common/CommonProgress.h"
@@ -16,27 +17,29 @@
 #include "Materials/MaterialInterface.h"
 #include "InputCoreTypes.h"
 
-UWidgetInventorySlotView::UWidgetInventorySlotView(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+UWidgetAbilityInventorySlotBase::UWidgetAbilityInventorySlotBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
     SetIsFocusable(true);
+    SetVisibility(ESlateVisibility::Visible);
     FrameStyleTag = WidgetStyleTags::CommonDefault(EWidgetStyleKind::Brush);
     LockedStyleTag = FrameStyleTag;
 }
 
-TSharedRef<SWidget> UWidgetInventorySlotView::RebuildWidget()
+TSharedRef<SWidget> UWidgetAbilityInventorySlotBase::RebuildWidget()
 {
+    if (IsDesignTime() && WidgetTree && WidgetTree->RootWidget)
+    {
+        return Super::RebuildWidget();
+    }
     if (!WidgetTree)
     {
         WidgetTree = NewObject<UWidgetTree>(this, TEXT("WidgetTree"));
     }
     if (!WidgetTree->RootWidget)
     {
-        USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("SlotSize"));
-        Size->SetWidthOverride(64.f);
-        Size->SetHeightOverride(64.f);
         UOverlay* Layers = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("SlotLayers"));
-        Size->SetContent(Layers);
-        WidgetTree->RootWidget = Size;
+        Layers->SetVisibility(ESlateVisibility::Visible);
+        WidgetTree->RootWidget = Layers;
         const auto AddLayer = [Layers](UWidget* Widget)
         {
             Widget->SetVisibility(ESlateVisibility::HitTestInvisible);
@@ -48,7 +51,14 @@ TSharedRef<SWidget> UWidgetInventorySlotView::RebuildWidget()
         Frame = WidgetTree->ConstructWidget<UCommonImageN>(UCommonImageN::StaticClass(), TEXT("Frame"));
         AddLayer(Frame);
         Icon = WidgetTree->ConstructWidget<UCommonImageN>(UCommonImageN::StaticClass(), TEXT("Icon"));
-        AddLayer(Icon)->SetPadding(FMargin(3.f));
+        IconSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("IconSize"));
+        UScaleBox* IconScale = WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass(), TEXT("IconScale"));
+        IconScale->SetStretch(EStretch::ScaleToFit);
+        IconScale->SetContent(Icon);
+        IconSize->SetContent(IconScale);
+        UOverlaySlot* IconSlot = AddLayer(IconSize);
+        IconSlot->SetHorizontalAlignment(HAlign_Center);
+        IconSlot->SetVerticalAlignment(VAlign_Center);
         Cooldown = WidgetTree->ConstructWidget<UCommonProgress>(UCommonProgress::StaticClass(), TEXT("Cooldown"));
         AddLayer(Cooldown);
         SelectionMarker = WidgetTree->ConstructWidget<UCommonImageN>(UCommonImageN::StaticClass(), TEXT("SelectionMarker"));
@@ -67,7 +77,9 @@ TSharedRef<SWidget> UWidgetInventorySlotView::RebuildWidget()
         StatusSlot->SetVerticalAlignment(VAlign_Top);
     }
     TSharedRef<SWidget> Result = Super::RebuildWidget();
-    check(Frame && Icon && Count && Status && Cooldown && SelectionMarker && PendingMarker);
+    check(Frame && Icon && IconSize && Count && Status && Cooldown && SelectionMarker && PendingMarker);
+    IconSize->SetWidthOverride(IconExtent.X);
+    IconSize->SetHeightOverride(IconExtent.Y);
     Icon->SetStyleTag(FGameplayTag());
     if (!bHasDisplay)
     {
@@ -82,14 +94,27 @@ TSharedRef<SWidget> UWidgetInventorySlotView::RebuildWidget()
     return Result;
 }
 
-void UWidgetInventorySlotView::BindSlot(UWidgetAbilityInventoryBase* InPanel, const FGuid& InInventoryId, const FInventorySlotKey& InSlot)
+void UWidgetAbilityInventorySlotBase::BindSlot(UWidgetAbilityInventoryBase* InPanel, const FGuid& InInventoryId, const FInventorySlotKey& InSlot)
 {
     Panel = InPanel;
     InventoryId = InInventoryId;
     Slot = InSlot;
 }
 
-void UWidgetInventorySlotView::RefreshSlot(const FInventorySlotState& InState, const FText& InName, UObject* InIcon, const FText& InTooltip)
+void UWidgetAbilityInventorySlotBase::SetPresentation(FGameplayTag InFrameStyle, FGameplayTag InLockedStyle, FVector2D InIconExtent)
+{
+    FrameStyleTag = InFrameStyle;
+    LockedStyleTag = InLockedStyle;
+    IconExtent = InIconExtent;
+    if (IconSize)
+    {
+        IconSize->SetWidthOverride(IconExtent.X);
+        IconSize->SetHeightOverride(IconExtent.Y);
+    }
+    RefreshFrame();
+}
+
+void UWidgetAbilityInventorySlotBase::RefreshSlot(const FInventorySlotState& InState, const FText& InName, UObject* InIcon, const FText& InTooltip)
 {
     DisplayState = InState;
     DisplayName = InName;
@@ -123,7 +148,7 @@ void UWidgetInventorySlotView::RefreshSlot(const FInventorySlotState& InState, c
     }
 }
 
-void UWidgetInventorySlotView::RefreshFrame()
+void UWidgetAbilityInventorySlotBase::RefreshFrame()
 {
     if (Frame)
     {
@@ -133,30 +158,44 @@ void UWidgetInventorySlotView::RefreshFrame()
     }
 }
 
-void UWidgetInventorySlotView::SetPending(bool bInPending)
+void UWidgetAbilityInventorySlotBase::SetPending(bool bInPending)
 {
     bPending = bInPending;
     RefreshFrame();
 }
 
-void UWidgetInventorySlotView::SetSelected(bool bInSelected)
+void UWidgetAbilityInventorySlotBase::SetSelected(bool bInSelected)
 {
     bSelected = bInSelected;
     RefreshFrame();
 }
 
-void UWidgetInventorySlotView::SetCooldown(float InRemaining, float InDuration)
+void UWidgetAbilityInventorySlotBase::SetCooldown(float InRemaining, float InDuration)
 {
-    CooldownDuration = FMath::Max(0.f, InDuration);
-    CooldownEnd = FPlatformTime::Seconds() + FMath::Max(0.f, InRemaining);
+    const bool bValid = FMath::IsFinite(InRemaining) && FMath::IsFinite(InDuration) && InRemaining > 0.f && InDuration > 0.f;
+    CooldownDuration = bValid ? InDuration : 0.f;
+    CooldownEnd = FPlatformTime::Seconds() + (bValid ? InRemaining : 0.f);
+    RestoreCooldownTimer();
+}
+
+void UWidgetAbilityInventorySlotBase::RestoreCooldownTimer()
+{
+    if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(CooldownTimer);
     AdvanceCooldown();
-    if(GetWorld() && InRemaining > 0.f && InDuration > 0.f)
+    if(GetWorld() && CooldownEnd > FPlatformTime::Seconds() && CooldownDuration > 0.f)
     {
-        GetWorld()->GetTimerManager().SetTimer(CooldownTimer, this, &UWidgetInventorySlotView::AdvanceCooldown, 0.05f, true);
+        GetWorld()->GetTimerManager().SetTimer(CooldownTimer, this, &UWidgetAbilityInventorySlotBase::AdvanceCooldown, 0.05f, true);
     }
 }
 
-void UWidgetInventorySlotView::AdvanceCooldown()
+void UWidgetAbilityInventorySlotBase::NativeConstruct()
+{
+    Super::NativeConstruct();
+    if (bHasDisplay) RefreshSlot(DisplayState, DisplayName, DisplayIcon.Get(), DisplayTooltip);
+    RestoreCooldownTimer();
+}
+
+void UWidgetAbilityInventorySlotBase::AdvanceCooldown()
 {
     const double Remaining = FMath::Max(0.0, CooldownEnd - FPlatformTime::Seconds());
     const bool bActive = Remaining > 0.0 && CooldownDuration > 0.f;
@@ -168,7 +207,7 @@ void UWidgetInventorySlotView::AdvanceCooldown()
     if(!bActive && GetWorld()) GetWorld()->GetTimerManager().ClearTimer(CooldownTimer);
 }
 
-void UWidgetInventorySlotView::NativeDestruct()
+void UWidgetAbilityInventorySlotBase::NativeDestruct()
 {
     if(GetWorld()) GetWorld()->GetTimerManager().ClearTimer(CooldownTimer);
     SetToolTipText(FText::GetEmpty());
@@ -176,22 +215,22 @@ void UWidgetInventorySlotView::NativeDestruct()
     Super::NativeDestruct();
 }
 
-FGuid UWidgetInventorySlotView::GetInventoryId() const
+FGuid UWidgetAbilityInventorySlotBase::GetInventoryId() const
 {
     return InventoryId;
 }
 
-FInventorySlotKey UWidgetInventorySlotView::GetSlotKey() const
+FInventorySlotKey UWidgetAbilityInventorySlotBase::GetSlotKey() const
 {
     return Slot;
 }
 
-UWidgetAbilityInventoryBase* UWidgetInventorySlotView::GetInventoryPanel() const
+UWidgetAbilityInventoryBase* UWidgetAbilityInventorySlotBase::GetInventoryPanel() const
 {
     return Panel.Get();
 }
 
-FReply UWidgetInventorySlotView::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FReply UWidgetAbilityInventorySlotBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
     if (!Panel.IsValid() || bPending)
     {
@@ -227,7 +266,7 @@ FReply UWidgetInventorySlotView::NativeOnMouseButtonDown(const FGeometry& InGeom
     return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
-FReply UWidgetInventorySlotView::NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FReply UWidgetAbilityInventorySlotBase::NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
     if (Panel.IsValid() && !bPending)
     {
@@ -237,7 +276,7 @@ FReply UWidgetInventorySlotView::NativeOnMouseButtonDoubleClick(const FGeometry&
     return Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
 }
 
-void UWidgetInventorySlotView::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
+void UWidgetAbilityInventorySlotBase::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
 {
     OutOperation = nullptr;
     const FInventorySlotState* View = Panel.IsValid() ? Panel->FindSlot(InventoryId, Slot) : nullptr;
@@ -260,13 +299,13 @@ void UWidgetInventorySlotView::NativeOnDragDetected(const FGeometry& InGeometry,
     OutOperation = Drag;
 }
 
-bool UWidgetInventorySlotView::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+bool UWidgetAbilityInventorySlotBase::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
 {
     const UInventoryDragOperation* Drag = Cast<UInventoryDragOperation>(InOperation);
     return Drag && Panel.IsValid() && !bPending && Panel->AcceptDrop(*Drag, InventoryId, Slot);
 }
 
-FReply UWidgetInventorySlotView::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+FReply UWidgetAbilityInventorySlotBase::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
     if (!Panel.IsValid() || bPending)
     {

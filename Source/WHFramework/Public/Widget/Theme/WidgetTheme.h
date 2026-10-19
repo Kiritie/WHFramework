@@ -8,6 +8,7 @@
 #include "Widget/Style/CommonToggleStyle.h"
 #include "Widget/Style/CommonRangeStyle.h"
 #include "Widget/Style/CommonProgressStyle.h"
+#include "Widget/Style/CommonWindowStyle.h"
 #include "Widget/Style/CommonScrollStyle.h"
 #include "Widget/Style/CommonButtonStyleN.h"
 
@@ -158,6 +159,16 @@ public:
 	TSubclassOf<UCommonTextScrollStyle> Style;
 };
 
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWidgetWindowStyleData
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style")
+	TSubclassOf<UCommonWindowStyle> Style;
+};
+
 USTRUCT()
 struct WHFRAMEWORK_API FWidgetStyleBinding
 {
@@ -241,6 +252,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.TextScroll"))
 	TMap<FGameplayTag, FWidgetTextScrollStyleData> TextScrollStyles;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Style", meta = (Categories = "UI.Style.Window"))
+	TMap<FGameplayTag, FWidgetWindowStyleData> WindowStyles;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Setting")
 	FSettingRendererClasses SettingRendererClasses;
 
@@ -297,6 +311,11 @@ public:
 	const TMap<FGameplayTag, FWidgetTextScrollStyleData>& GetTextScrollStyles() const
 	{
 		return TextScrollStyles;
+	}
+
+	const TMap<FGameplayTag, FWidgetWindowStyleData>& GetWindowStyles() const
+	{
+		return WindowStyles;
 	}
 
 	const FSettingRendererClasses& GetSettingRendererClasses() const

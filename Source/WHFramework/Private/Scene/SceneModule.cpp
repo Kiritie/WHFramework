@@ -605,9 +605,17 @@ void USceneModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 		const FName PropertyName = Property->GetFName();
 
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapSource) ||
-			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapTexture))
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapTexture) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapMode))
 		{
 			RefreshMiniMapCapture();
+		}
+		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapSource) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapTexture) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MapBackgroundWidgetClass) ||
+			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapMode))
+		{
+			OnMapPresentationChanged.Broadcast();
 		}
 	}
 
@@ -661,24 +669,37 @@ void USceneModule::RefreshMiniMapCapture()
 
 void USceneModule::SetMiniMapSource(EWorldMiniMapSource InMiniMapSource)
 {
+	const bool bChanged = MiniMapSource != InMiniMapSource;
 	MiniMapSource = InMiniMapSource;
 	RefreshMiniMapCapture();
+	if (bChanged) OnMapPresentationChanged.Broadcast();
+}
+
+void USceneModule::SetMapBackgroundWidgetClass(TSubclassOf<UWidgetSceneMapBase> InClass)
+{
+	if (MapBackgroundWidgetClass == InClass) return;
+	MapBackgroundWidgetClass = InClass;
+	OnMapPresentationChanged.Broadcast();
 }
 
 void USceneModule::SetMiniMapMode(EWorldMiniMapMode InMiniMapMode)
 {
+	const bool bChanged = MiniMapMode != InMiniMapMode;
 	MiniMapMode = InMiniMapMode;
 	if(MiniMapCapture)
 	{
 		MiniMapCapture->GetCapture()->SetActive(MiniMapSource == EWorldMiniMapSource::SceneCapture && MiniMapMode != EWorldMiniMapMode::None, true);
 	}
+	if (bChanged) OnMapPresentationChanged.Broadcast();
 }
 
 void USceneModule::SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture)
 {
+	const bool bChanged = MiniMapTexture != InMiniMapTexture;
 	MiniMapTexture = InMiniMapTexture;
 
 	if(MiniMapCapture) MiniMapCapture->GetCapture()->TextureTarget = MiniMapTexture;
+	if (bChanged) OnMapPresentationChanged.Broadcast();
 }
 
 FSceneMapView USceneModule::GetMapView(ESceneMarkerChannel InChannel) const
@@ -696,7 +717,7 @@ FSceneMapView USceneModule::GetMapView(ESceneMarkerChannel InChannel) const
 		View.Range = WorldMapRange;
 		return View;
 	}
-	if(InChannel != ESceneMarkerChannel::MiniMap) return View;
+	if(InChannel != ESceneMarkerChannel::MiniMap || MiniMapSource == EWorldMiniMapSource::None || MiniMapMode == EWorldMiniMapMode::None) return View;
 
 	FVector Location = MiniMapPoint.GetLocation();
 	float Yaw = MiniMapPoint.Rotator().Yaw;

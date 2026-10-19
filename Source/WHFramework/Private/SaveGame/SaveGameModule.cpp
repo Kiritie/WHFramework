@@ -9,6 +9,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Main/MainModule.h"
 #include "Misc/Paths.h"
+#include "Misc/PackageName.h"
 #include "Misc/ScopeExit.h"
 #include "SaveGame/SaveDataSerializer.h"
 #include "SaveGame/SaveGameStorage.h"
@@ -139,7 +140,11 @@ void USaveGameModule::OnInitialize()
 	RestoreLastActiveSave();
 	if (UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
 	{
-		PendingLoadContext = GameInstance->ConsumePendingSaveLoad();
+		LoadSnapshot = GameInstance->ConsumePendingSaveLoad();
+		if (LoadSnapshot.IsValid())
+		{
+			LoadOperationResult = FSaveOperationResult::Accepted(LoadSnapshot.Context.OperationId);
+		}
 	}
 	UEventModuleStatics::SubscribeEvent<FEventGameExited>(this, &ThisClass::OnGameExited);
 }
@@ -147,11 +152,12 @@ void USaveGameModule::OnInitialize()
 void USaveGameModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
-	if (PHASEC(InPhase, EPhase::Final) && PendingLoadContext.IsValid())
+	if (PHASEC(InPhase, EPhase::Final) && LoadSnapshot.IsValid() && LoadSnapshot.AppliedPhases == EPhase::None)
 	{
-		const FPendingSaveLoadContext Context = PendingLoadContext;
-		PendingLoadContext = FPendingSaveLoadContext();
-		RestoreSlotGeneration(Context, Context.LoadPhase);
+		const FPendingSaveLoadContext Context = LoadSnapshot.Context;
+		LoadOperationResult = RestoreLoadSnapshot(Context.LoadPhase);
+		LoadOperationResult.OperationId = Context.OperationId;
+		FlushDeferredSaveTermination();
 	}
 }
 
@@ -190,6 +196,7 @@ void USaveGameModule::OnTermination(EPhase InPhase)
 		{
 			AsyncSave.Reset();
 			AsyncExecutorLease.Reset();
+			LoadSnapshot = FSaveGameLoadSnapshot();
 			Storage.Reset();
 		}
 		DeferredSaveTermination = EPhase(uint8(DeferredSaveTermination) & ~uint8(InPhase));
@@ -992,6 +999,7 @@ FSaveOperationResult USaveGameModule::SaveCurrentSlot()
 void USaveGameModule::DetachActiveSave()
 {
 	if (IsSaveOperationRunning()) return;
+	LoadSnapshot = FSaveGameLoadSnapshot();
 	ActiveSaveId.Invalidate();
 	if (UVoxelModule* Voxel = UVoxelModule::GetPtr(GetWorld()))
 	{
@@ -1011,25 +1019,90 @@ void USaveGameModule::ClearActiveSave()
 
 FSaveOperationResult USaveGameModule::LoadSlot(FGuid SaveId, EPhase InPhase)
 {
+	const FGuid OperationId = !PHASEC(InPhase, EPhase::Primary) && LoadSnapshot.IsValid() && LoadSnapshot.Context.SaveId == SaveId
+		? LoadSnapshot.Context.OperationId : FGuid::NewGuid();
+	return RequestLoadSlot(SaveId, InPhase, OperationId);
+}
+
+FSaveOperationResult USaveGameModule::GetLoadOperationResult(const FGuid& InOperationId) const
+{
+	if (InOperationId.IsValid() && LoadOperationResult.OperationId == InOperationId)
+	{
+		return LoadOperationResult;
+	}
+	FSaveOperationResult Result;
+	Result.Code = ESaveResultCode::None;
+	return Result;
+}
+
+void USaveGameModule::CancelLoadOperation(const FGuid& InOperationId)
+{
+	if (!InOperationId.IsValid())
+	{
+		return;
+	}
+	if (UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
+	{
+		GameInstance->CancelPendingSaveLoad(InOperationId);
+	}
+	const bool bOwnsSnapshot = LoadSnapshot.Context.OperationId == InOperationId;
+	if (bOwnsSnapshot)
+	{
+		LoadSnapshot = FSaveGameLoadSnapshot();
+	}
+	if (bOwnsSnapshot || (LoadOperationResult.OperationId == InOperationId && LoadOperationResult.Code == ESaveResultCode::Accepted))
+	{
+		LoadOperationResult = FSaveOperationResult::Failed(ESaveResultCode::Cancelled, NSLOCTEXT("WH.SaveGame", "LoadCancelled", "存档加载请求已取消。"));
+		LoadOperationResult.OperationId = InOperationId;
+	}
+}
+
+FSaveOperationResult USaveGameModule::RequestLoadSlot(FGuid SaveId, EPhase InPhase, const FGuid& InOperationId)
+{
+	ON_SCOPE_EXIT { FlushDeferredSaveTermination(); };
+	if (!InOperationId.IsValid())
+	{
+		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, NSLOCTEXT("WH.SaveGame", "InvalidLoadOperation", "存档加载请求缺少有效操作身份。"));
+	}
+	const auto Reject = [&InOperationId](ESaveResultCode InCode, const FText& InMessage)
+	{
+		FSaveOperationResult Result = FSaveOperationResult::Failed(InCode, InMessage);
+		Result.OperationId = InOperationId;
+		return Result;
+	};
+	if (LoadOperationResult.Code == ESaveResultCode::Accepted)
+	{
+		return Reject(ESaveResultCode::Busy, NSLOCTEXT("WH.SaveGame", "LoadAlreadyPending", "已有存档切图请求等待完成。"));
+	}
 	if (GetWorld() && GetWorld()->GetNetMode() == NM_Client)
 	{
-		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument,
+		return Reject(ESaveResultCode::InvalidArgument,
 		                                    FText::FromString(TEXT("A guest cannot load a local world into the server session")));
 	}
 	if (!SaveId.IsValid())
 	{
-		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("Invalid save id.")));
+		return Reject(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("Invalid save id.")));
 	}
 	if (!Storage || IsSaveOperationRunning())
 	{
-		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save system is busy.")));
+		return Reject(ESaveResultCode::Busy, FText::FromString(TEXT("Save system is busy.")));
+	}
+	if (!PHASEC(InPhase, EPhase::Primary))
+	{
+		if (!LoadSnapshot.IsValid() || LoadSnapshot.Context.SaveId != SaveId || LoadSnapshot.Context.OperationId != InOperationId)
+		{
+			return Reject(ESaveResultCode::InvalidArgument, NSLOCTEXT("WH.SaveGame", "MissingLoadSnapshot", "存档后续阶段缺少匹配的加载快照。"));
+		}
+		LoadOperationResult = RestoreLoadSnapshot(InPhase);
+		LoadOperationResult.OperationId = InOperationId;
+		return LoadOperationResult;
 	}
     if (Storage->HasPendingWorld(SaveId))
     {
         TArray<FString> Errors;
         Storage->RecoverPendingWorlds(Errors);
         if (Storage->HasPendingWorld(SaveId))
-            return FSaveOperationResult::Failed(ESaveResultCode::ConfirmationPending,
+            return Reject(ESaveResultCode::ConfirmationPending,
                 FText::FromString(TEXT("此槽的分支发布仍待确认，当前禁止加载。")));
     }
 	TGuardValue<bool> Guard(bSaveOperationRunning, true);
@@ -1037,35 +1110,65 @@ FSaveOperationResult USaveGameModule::LoadSlot(FGuid SaveId, EPhase InPhase)
 	if (!Storage->ReadManifest(SaveId, Manifest) || Manifest.CurrentGeneration <= 0 ||
 	    !Storage->IsGenerationComplete(SaveId, Manifest.CurrentGeneration, Manifest))
 	{
-		return FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("Committed save slot not found.")));
+		return Reject(ESaveResultCode::NotFound, FText::FromString(TEXT("Committed save slot not found.")));
 	}
 	const FName CurrentMap(*UGameplayStatics::GetCurrentLevelName(GetWorld(), true));
-	if (!Manifest.CurrentMap.IsNone() && Manifest.CurrentMap != CurrentMap)
+	FSaveGameLoadSnapshot Snapshot;
+	Snapshot.Context.OperationId = InOperationId;
+	Snapshot.Context.SaveId = SaveId;
+	Snapshot.Context.Generation = Manifest.CurrentGeneration;
+	Snapshot.Context.TargetMap = Manifest.CurrentMap.IsNone() ? CurrentMap : Manifest.CurrentMap;
+	Snapshot.Context.LoadPhase = InPhase;
+	Snapshot.ReadLease = FSaveGameGenerationReadLease::Acquire(Storage->GetGenerationDir(SaveId, Manifest.CurrentGeneration));
+	if (!Snapshot.CanApply(InPhase) || !Storage->IsGenerationComplete(SaveId, Manifest.CurrentGeneration, Manifest))
 	{
-		PendingLoadContext.SaveId = SaveId;
-		PendingLoadContext.Generation = Manifest.CurrentGeneration;
-		PendingLoadContext.TargetMap = Manifest.CurrentMap;
-		PendingLoadContext.LoadPhase = InPhase;
-		if (UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
-		{
-			GameInstance->SetPendingSaveLoad(PendingLoadContext);
-		}
-		UGameplayStatics::OpenLevel(this, Manifest.CurrentMap);
-		return FSaveOperationResult::Success();
+		return Reject(ESaveResultCode::ReadFailed, NSLOCTEXT("WH.SaveGame", "LoadSnapshotUnavailable", "无法锁定完整的存档文件代。"));
 	}
-	FPendingSaveLoadContext Context;
-	Context.SaveId = SaveId;
-	Context.Generation = Manifest.CurrentGeneration;
-	Context.TargetMap = Manifest.CurrentMap.IsNone() ? CurrentMap : Manifest.CurrentMap;
-	Context.LoadPhase = InPhase;
-	return RestoreSlotGeneration(Context, InPhase);
+	if (!Manifest.CurrentMap.IsNone() && FName(*FPackageName::GetShortName(Manifest.CurrentMap.ToString())) != CurrentMap)
+	{
+		UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr;
+		if (!GameInstance)
+		{
+			return Reject(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.SaveGame", "LoadGameInstanceUnavailable", "跨地图存档加载所需的游戏实例不可用。"));
+		}
+		if (!GameInstance->SetPendingSaveLoad(MoveTemp(Snapshot), this))
+		{
+			return Reject(ESaveResultCode::Busy, NSLOCTEXT("WH.SaveGame", "PendingLoadOccupied", "游戏实例已有等待接手的存档请求。"));
+		}
+		LoadOperationResult = FSaveOperationResult::Accepted(InOperationId);
+		UGameplayStatics::OpenLevel(this, Manifest.CurrentMap);
+		return LoadOperationResult;
+	}
+	LoadSnapshot = MoveTemp(Snapshot);
+	LoadOperationResult = RestoreLoadSnapshot(InPhase);
+	LoadOperationResult.OperationId = InOperationId;
+	return LoadOperationResult;
 }
 
-FSaveOperationResult USaveGameModule::RestoreSlotGeneration(const FPendingSaveLoadContext& Context, EPhase InPhase)
+FSaveOperationResult USaveGameModule::RestoreLoadSnapshot(EPhase InPhase)
 {
+	const FSaveGameLoadSnapshot Snapshot = LoadSnapshot;
+	const FPendingSaveLoadContext& Context = Snapshot.Context;
+	const FName CurrentMap(*UGameplayStatics::GetCurrentLevelName(GetWorld(), true));
+	if (!Storage || !Snapshot.CanApply(InPhase) ||
+		FName(*FPackageName::GetShortName(Context.TargetMap.ToString())) != CurrentMap ||
+		!Snapshot.ReadLease->Matches(Storage->GetGenerationDir(Context.SaveId, Context.Generation)))
+	{
+		LoadSnapshot = FSaveGameLoadSnapshot();
+		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument,
+			NSLOCTEXT("WH.SaveGame", "InvalidLoadSnapshot", "存档加载快照、目标地图或阶段不匹配。"));
+	}
+	TGuardValue<bool> Guard(bSaveOperationRunning, true);
+	TGuardValue<bool> Applying(bApplyingSaveCallbacks, true);
 	FSaveOperationResult Result = LoadModulesFromGeneration(Context.SaveId, Context.Generation, InPhase);
+	if (LoadSnapshot.Context.OperationId != Context.OperationId || DeferredSaveTermination != EPhase::None)
+	{
+		LoadSnapshot = FSaveGameLoadSnapshot();
+		return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, NSLOCTEXT("WH.SaveGame", "LoadCancelled", "存档加载请求已取消。"));
+	}
 	if (Result)
 	{
+		LoadSnapshot.AppliedPhases = EPhase(uint8(LoadSnapshot.AppliedPhases) | uint8(InPhase));
 		ActiveSaveId = Context.SaveId;
 		if(Storage && !Storage->WriteLastActiveSave(Context.SaveId))
 		{
@@ -1073,11 +1176,25 @@ FSaveOperationResult USaveGameModule::RestoreSlotGeneration(const FPendingSaveLo
 		}
 		CancelPendingSaveSlot();
 	}
+	if (!Result || PHASEC(InPhase, EPhase::Final))
+	{
+		LoadSnapshot = FSaveGameLoadSnapshot();
+	}
 	return Result;
 }
 
 FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& SaveId, int32 Generation, EPhase InPhase)
 {
+	const FGuid OperationId = LoadSnapshot.Context.OperationId;
+	const auto IsCancelled = [this, OperationId]()
+	{
+		return LoadSnapshot.Context.OperationId != OperationId || DeferredSaveTermination != EPhase::None;
+	};
+	const auto Cancelled = []()
+	{
+		return FSaveOperationResult::Failed(ESaveResultCode::Cancelled,
+			NSLOCTEXT("WH.SaveGame", "LoadCancelled", "存档加载请求已取消。"));
+	};
     if (!Storage || Storage->HasPendingWorld(SaveId))
         return FSaveOperationResult::Failed(ESaveResultCode::ConfirmationPending,
             FText::FromString(TEXT("世界文件代尚未完成分支确认，不能应用其模块。")));
@@ -1107,6 +1224,7 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		{
 			return FSaveOperationResult::Failed(ESaveResultCode::VersionMismatch, FText::FromName(Module->GetModuleName()));
 		}
+		if (IsCancelled()) return Cancelled();
 		Loaded.Add(MoveTemp(Item));
 	}
 	for (const FLoadedModuleSaveData& Item : Loaded)
@@ -1127,6 +1245,7 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
     {
         return FSaveOperationResult::Failed(ESaveResultCode::LoadFailed, FText::FromString(GuardError));
     }
+	if (IsCancelled()) return Cancelled();
 	if (PHASEC(InPhase, EPhase::Primary))
 	{
 		if (UVoxelModule* Voxel = UVoxelModule::GetPtr(GetWorld()))
@@ -1136,11 +1255,14 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->OnBeforeLoadData();
+			if (IsCancelled()) return Cancelled();
 		}
 		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->LoadSaveData(Item.Data, EPhase::Primary);
+			if (IsCancelled()) return Cancelled();
 			RestoreSceneEnvironment(Item.Module, Item.Data, EPhase::Primary);
+			if (IsCancelled()) return Cancelled();
 		}
 	}
 	if (PHASEC(InPhase, EPhase::Lesser))
@@ -1148,7 +1270,9 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->LoadSaveData(Item.Data, EPhase::Lesser);
+			if (IsCancelled()) return Cancelled();
 			RestoreSceneEnvironment(Item.Module, Item.Data, EPhase::Lesser);
+			if (IsCancelled()) return Cancelled();
 		}
 	}
 	if (PHASEC(InPhase, EPhase::Final))
@@ -1156,7 +1280,9 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->LoadSaveData(Item.Data, EPhase::Final);
+			if (IsCancelled()) return Cancelled();
 			RestoreSceneEnvironment(Item.Module, Item.Data, EPhase::Final);
+			if (IsCancelled()) return Cancelled();
 		}
 	}
     if(!RunWorldLoadGuards(SaveId, GuardModules, InPhase, true, GuardError))
@@ -1169,7 +1295,11 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
     }
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		for(FLoadedModuleSaveData& Item : Loaded) Item.Module->OnAfterLoadData(true);
+		for(FLoadedModuleSaveData& Item : Loaded)
+		{
+			if (IsCancelled()) return Cancelled();
+			Item.Module->OnAfterLoadData(true);
+		}
 	}
 	return FSaveOperationResult::Success();
 }

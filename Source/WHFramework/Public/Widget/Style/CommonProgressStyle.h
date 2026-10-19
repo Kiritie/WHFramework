@@ -28,6 +28,12 @@ public:
 	TObjectPtr<UMaterialInterface> RadialMaterial;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FSlateBrush RadialBackground;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FMargin RadialPadding;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FName ProgressParameter = TEXT("Progress");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)

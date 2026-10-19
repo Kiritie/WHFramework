@@ -22,6 +22,9 @@ public:
 	static bool SetStyleProperty(UWidgetTheme* InTheme, FGameplayTag InTag, FName InProperty, const FString& InValue, FString& OutError);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModule")
+	static bool RemapThemeTextStyleTag(UWidgetTheme* InTheme, const FString& InOldTag, const FString& InNewTag, FString& OutError);
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModule")
 	static bool SaveTheme(UWidgetTheme* InTheme, FString& OutError);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModule")

@@ -14,6 +14,7 @@ UWidgetThemeSettings::UWidgetThemeSettings()
 	ScrollStyleBase = UCommonScrollStyle::StaticClass();
 	BorderStyleBase = UCommonBorderStyle::StaticClass();
 	TextScrollStyleBase = UCommonTextScrollStyle::StaticClass();
+	WindowStyleBase = UCommonWindowStyle::StaticClass();
 
 }
 
@@ -41,6 +42,8 @@ UClass* UWidgetThemeSettings::GetStyleBase(EWidgetStyleKind Kind) const
 		return BorderStyleBase.Get();
 	case EWidgetStyleKind::TextScroll:
 		return TextScrollStyleBase.Get();
+	case EWidgetStyleKind::Window:
+		return WindowStyleBase.Get();
 	default:
 		return nullptr;
 	}

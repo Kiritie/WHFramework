@@ -2,6 +2,7 @@
 
 #include "Parameter/ParameterModuleTypes.h"
 #include "Event/EventModuleTypes.h"
+#include "GameplayTagContainer.h"
 
 #include "Event_OpenUserWidget.generated.h"
 

@@ -2,14 +2,17 @@
 
 #include "AssetToolsModule.h"
 #include "Engine/Blueprint.h"
+#include "HAL/FileManager.h"
 #include "Widget/Theme/WidgetThemeFactory.h"
 #include "WidgetStylePropertyEditing.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Misc/PackageName.h"
 #include "ScopedTransaction.h"
+#include "UObject/Package.h"
 #include "UObject/UnrealType.h"
 #include "Widget/Theme/WidgetThemeEditorService.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
+#include "Widget/Theme/WidgetStyleTags.h"
 #include "Framework/Application/SlateApplication.h"
 
 UWidgetTheme* UWidgetThemeEditorLibrary::CreateTheme(const FString& InAssetPath, UWidgetTheme* InParentTheme, bool bRuntimeTheme, FString& OutError)
@@ -99,6 +102,59 @@ bool UWidgetThemeEditorLibrary::SetStyleProperty(UWidgetTheme* InTheme, FGamepla
 		OutError = TEXT("Style property text could not be applied through the property editor.");
 	}
 	return bApplied;
+}
+
+bool UWidgetThemeEditorLibrary::RemapThemeTextStyleTag(UWidgetTheme* InTheme, const FString& InOldTag, const FString& InNewTag, FString& OutError)
+{
+	OutError.Reset();
+	const FGameplayTag OldTag = FGameplayTag::RequestGameplayTag(FName(*InOldTag), false);
+	const FGameplayTag NewTag = FGameplayTag::RequestGameplayTag(FName(*InNewTag), false);
+	if (!InTheme || InTheme->bDuplicateFailed || FWidgetThemeEditorService::IsBusy() || !OldTag.IsValid() || !NewTag.IsValid() || OldTag == NewTag ||
+		!OldTag.MatchesTag(WidgetStyleTags::Text) || !NewTag.MatchesTag(WidgetStyleTags::Text) ||
+		WidgetStyleTags::IsRoot(OldTag) || WidgetStyleTags::IsRoot(NewTag) ||
+		OldTag == WidgetStyleTags::CommonDefault(EWidgetStyleKind::Text) || NewTag == WidgetStyleTags::CommonDefault(EWidgetStyleKind::Text))
+	{
+		OutError = TEXT("Select a theme and two different registered non-default Text style Tags.");
+		return false;
+	}
+	const FWidgetTextStyleData* Original = InTheme->GetTextStyles().Find(OldTag);
+	const FWidgetStyleBinding* Binding = InTheme->Bindings.Find(OldTag);
+	if (!Original || !Original->Style || !Binding)
+	{
+		OutError = TEXT("The selected theme must contain the old local Text mapping and its ownership record.");
+		return false;
+	}
+	if (InTheme->GetTextStyles().Contains(NewTag) || InTheme->Bindings.Contains(NewTag))
+	{
+		OutError = TEXT("The selected theme already contains the replacement Tag.");
+		return false;
+	}
+	const FString Filename = FPackageName::LongPackageNameToFilename(InTheme->GetOutermost()->GetName(), FPackageName::GetAssetPackageExtension());
+	if (IFileManager::Get().IsReadOnly(*Filename))
+	{
+		OutError = TEXT("The selected theme package is read-only.");
+		return false;
+	}
+	TMap<FGameplayTag, FWidgetTextStyleData> UpdatedStyles = InTheme->GetTextStyles();
+	UpdatedStyles.Add(NewTag, *Original);
+	UpdatedStyles.Remove(OldTag);
+	TMap<FGameplayTag, FWidgetStyleBinding> UpdatedBindings = InTheme->Bindings;
+	UpdatedBindings.Add(NewTag, *Binding);
+	UpdatedBindings.Remove(OldTag);
+	for (auto& Entry : UpdatedBindings)
+	{
+		if (Entry.Value.SourceTheme == InTheme && Entry.Value.SourceTag == OldTag)
+		{
+			Entry.Value.SourceTag = NewTag;
+		}
+	}
+	FScopedTransaction Transaction(NSLOCTEXT("WidgetTheme", "RemapThemeTextStyleTag", "Remap theme Text style Tag"));
+	InTheme->Modify();
+	InTheme->SetTextStyles(UpdatedStyles);
+	InTheme->Bindings = MoveTemp(UpdatedBindings);
+	InTheme->MarkPackageDirty();
+	FWidgetThemeResolver::NotifyThemeChanged();
+	return true;
 }
 
 bool UWidgetThemeEditorLibrary::SaveTheme(UWidgetTheme* InTheme, FString& OutError)

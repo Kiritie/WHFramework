@@ -123,7 +123,7 @@ bool UWidgetTheme::AreStylesSorted() const
 		return true;
 	};
 
-	return IsSorted(ButtonStyles) && IsSorted(TextStyles) && IsSorted(BrushStyles) && IsSorted(InputStyles) && IsSorted(ToggleStyles) && IsSorted(RangeStyles) && IsSorted(ProgressStyles) && IsSorted(ScrollStyles) && IsSorted(BorderStyles) && IsSorted(TextScrollStyles);
+	return IsSorted(ButtonStyles) && IsSorted(TextStyles) && IsSorted(BrushStyles) && IsSorted(InputStyles) && IsSorted(ToggleStyles) && IsSorted(RangeStyles) && IsSorted(ProgressStyles) && IsSorted(ScrollStyles) && IsSorted(BorderStyles) && IsSorted(TextScrollStyles) && IsSorted(WindowStyles);
 }
 
 void UWidgetTheme::SortStyles()
@@ -140,6 +140,7 @@ void UWidgetTheme::SortStyles()
 	ScrollStyles.KeySort(CompareTags);
 	BorderStyles.KeySort(CompareTags);
 	TextScrollStyles.KeySort(CompareTags);
+	WindowStyles.KeySort(CompareTags);
 
 }
 #endif
@@ -198,6 +199,11 @@ UClass* UWidgetTheme::GetStyleClass(FGameplayTag Tag, EWidgetStyleKind Kind) con
 		const auto* Data = TextScrollStyles.Find(Tag);
 		return Data ? Data->Style.Get() : nullptr;
 	}
+	case EWidgetStyleKind::Window:
+	{
+		const auto* Data = WindowStyles.Find(Tag);
+		return Data ? Data->Style.Get() : nullptr;
+	}
 	default:
 		return nullptr;
 	}
@@ -227,6 +233,8 @@ bool UWidgetTheme::HasLocalStyle(FGameplayTag Tag, EWidgetStyleKind Kind) const
 		return BorderStyles.Contains(Tag);
 	case EWidgetStyleKind::TextScroll:
 		return TextScrollStyles.Contains(Tag);
+	case EWidgetStyleKind::Window:
+		return WindowStyles.Contains(Tag);
 	default:
 		return false;
 	}
@@ -311,6 +319,12 @@ TArray<FGameplayTag> UWidgetTheme::GetStyleTags(EWidgetStyleKind Kind, bool bInc
 			break;
 		case EWidgetStyleKind::TextScroll:
 			for (const auto& Entry : Theme->TextScrollStyles)
+			{
+				Tags.Add(Entry.Key);
+			}
+			break;
+		case EWidgetStyleKind::Window:
+			for (const auto& Entry : Theme->WindowStyles)
 			{
 				Tags.Add(Entry.Key);
 			}
@@ -405,6 +419,13 @@ bool UWidgetTheme::SetStyleClass(FGameplayTag Tag, EWidgetStyleKind Kind, UClass
 		}
 		TextScrollStyles.FindOrAdd(Tag).Style = StyleClass;
 		return true;
+	case EWidgetStyleKind::Window:
+		if (!StyleClass->IsChildOf(UCommonWindowStyle::StaticClass()))
+		{
+			return false;
+		}
+		WindowStyles.FindOrAdd(Tag).Style = StyleClass;
+		return true;
 	default:
 		return false;
 	}
@@ -443,6 +464,9 @@ void UWidgetTheme::RemoveStyle(FGameplayTag Tag, EWidgetStyleKind Kind)
 		break;
 	case EWidgetStyleKind::TextScroll:
 		TextScrollStyles.Remove(Tag);
+		break;
+	case EWidgetStyleKind::Window:
+		WindowStyles.Remove(Tag);
 		break;
 	default:
 		return;

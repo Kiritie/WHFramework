@@ -202,7 +202,7 @@ void UUserWidgetBase::OnCreate(const FParameter& InParam)
 			FParameter(FWidgetSpawnParameter(this)));
 	}
 
-	if(WidgetCloseAnimator)
+	if(WidgetCloseAnimator && WidgetCloseAnimator != WidgetOpenAnimator)
 	{
 		IObjectPoolInterface::Execute_OnSpawn(
 			WidgetCloseAnimator,
@@ -466,7 +466,7 @@ void UUserWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 	{
 		IObjectPoolInterface::Execute_OnDespawn(WidgetOpenAnimator, InMode);
 	}
-	if(WidgetCloseAnimator)
+	if(WidgetCloseAnimator && WidgetCloseAnimator != WidgetOpenAnimator)
 	{
 		IObjectPoolInterface::Execute_OnDespawn(WidgetCloseAnimator, InMode);
 	}

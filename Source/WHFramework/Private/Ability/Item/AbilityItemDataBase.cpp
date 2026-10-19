@@ -4,6 +4,7 @@
 #include "Ability/AbilityModule.h"
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/ItemAbilityBase.h"
+#include "Ability/Effects/EffectBase.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Common/CommonModuleStatics.h"
 
@@ -130,4 +131,78 @@ FInventoryItemDefinition UAbilityItemDataBase::BuildInventoryDefinition() const
         Definition.PassiveEffects.Add(FSoftClassPath(Effect.Get()));
     }
     return Definition;
+}
+
+bool UAbilityItemDataBase::GetEquipmentAttributeValues(const FInventoryItemDefinition& InDefinition, int32 InLevel, TArray<FAbilityItemAttributeValue>& OutValues)
+{
+    OutValues.Reset();
+    if (InDefinition.UsePolicy != EInventoryUsePolicy::Equip)
+    {
+        return false;
+    }
+    TArray<TSubclassOf<UEffectBase>> Effects;
+    if (!InDefinition.AbilityClass.IsNull())
+    {
+        const UClass* AbilityType = InDefinition.AbilityClass.ResolveClass();
+        const UItemAbilityBase* Ability = AbilityType ? Cast<UItemAbilityBase>(AbilityType->GetDefaultObject()) : nullptr;
+        if (!Ability)
+        {
+            return false;
+        }
+        for (TSubclassOf<UEffectBase> Effect : Ability->GetEffectClasses())
+        {
+            Effects.AddUnique(Effect);
+        }
+    }
+    for (const FSoftClassPath& Path : InDefinition.PassiveEffects)
+    {
+        UClass* EffectType = Path.ResolveClass();
+        if (!EffectType || !EffectType->IsChildOf(UEffectBase::StaticClass()))
+        {
+            return false;
+        }
+        Effects.AddUnique(EffectType);
+    }
+    const float Level = FMath::Max(1, InLevel);
+    TArray<FAbilityItemAttributeValue> Values;
+    for (TSubclassOf<UEffectBase> EffectType : Effects)
+    {
+        const UEffectBase* Effect = EffectType.GetDefaultObject();
+        if (!Effect || !Effect->SupportsAttributeGrant(Level))
+        {
+            return false;
+        }
+        const FGameplayEffectSpec Spec(Effect, FGameplayEffectContextHandle(), Level);
+        for (const FGameplayModifierInfo& Modifier : Effect->Modifiers)
+        {
+            FAbilityItemAttributeValue Value;
+            Value.Attribute = Modifier.Attribute;
+            Value.ModifierOp = Modifier.ModifierOp;
+            Value.Channel = Modifier.EvaluationChannelSettings.GetEvaluationChannel();
+            Value.bConditional = !Modifier.SourceTags.IsEmpty() || !Modifier.TargetTags.IsEmpty();
+            if (!Modifier.ModifierMagnitude.AttemptCalculateMagnitude(Spec, Value.Value, false, 0.f) || !FMath::IsFinite(Value.Value))
+            {
+                return false;
+            }
+            FAbilityItemAttributeValue* Existing = !Value.bConditional && Value.ModifierOp == EGameplayModOp::Additive
+                ? Values.FindByPredicate([&Value](const FAbilityItemAttributeValue& Entry)
+                {
+                    return !Entry.bConditional && Entry.Attribute == Value.Attribute && Entry.ModifierOp == Value.ModifierOp && Entry.Channel == Value.Channel;
+                }) : nullptr;
+            if (Existing)
+            {
+                Existing->Value += Value.Value;
+                if (!FMath::IsFinite(Existing->Value))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                Values.Add(Value);
+            }
+        }
+    }
+    OutValues = MoveTemp(Values);
+    return true;
 }

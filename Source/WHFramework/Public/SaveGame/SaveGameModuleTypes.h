@@ -84,7 +84,8 @@ enum class ESaveResultCode : uint8
 	Accepted,
 	CapacityBlocked,
 	SlotBusy,
-	ConfirmationPending
+	ConfirmationPending,
+	Cancelled
 };
 
 USTRUCT(BlueprintType)
@@ -258,6 +259,9 @@ struct WHFRAMEWORK_API FPendingSaveLoadContext
 	GENERATED_BODY()
 
 	UPROPERTY()
+	FGuid OperationId;
+
+	UPROPERTY()
 	FGuid SaveId;
 
 	UPROPERTY()
@@ -271,7 +275,7 @@ struct WHFRAMEWORK_API FPendingSaveLoadContext
 
 	bool IsValid() const
 	{
-		return SaveId.IsValid() && Generation > 0 && !TargetMap.IsNone();
+		return OperationId.IsValid() && SaveId.IsValid() && Generation > 0 && !TargetMap.IsNone();
 	}
 };
 

@@ -12,6 +12,8 @@
 #include "Engine/Texture2D.h"
 #include "Blueprint/WidgetTree.h"
 #include "Styling/CoreStyle.h"
+#include "Widget/Style/CommonBrushStyle.h"
+#include "Widget/Theme/WidgetThemeResolver.h"
 
 UWidgetSceneMarkerItem::UWidgetSceneMarkerItem(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -28,7 +30,7 @@ TSharedRef<SWidget> UWidgetSceneMarkerItem::RebuildWidget()
 	if(WidgetTree && !WidgetTree->RootWidget)
 	{
 		UHorizontalBox* Row = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("MarkerRow"));
-		USizeBox* IconSizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("IconSize"));
+		IconSizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("IconSize"));
 		UOverlay* IconLayer = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("IconLayer"));
 		ImgIcon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("ImgIcon"));
 		TxtSymbol = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("TxtSymbol"));
@@ -72,13 +74,31 @@ TSharedRef<SWidget> UWidgetSceneMarkerItem::RebuildWidget()
 		if(UVerticalBoxSlot* DistanceSlot = Labels->AddChildToVerticalBox(TxtDistance)) DistanceSlot->SetHorizontalAlignment(HAlign_Left);
 	}
 	const TSharedRef<SWidget> Result = Super::RebuildWidget();
-	SetMarkerView(MarkerView, bShowName, bShowDistance);
+	SetMarkerView(MarkerView, bShowName, bShowDistance, IconStyleTag);
 	return Result;
 }
 
-void UWidgetSceneMarkerItem::SetMarkerView(const FSceneMarkerView& InMarkerView, bool bInShowName, bool bInShowDistance)
+void UWidgetSceneMarkerItem::NativeConstruct()
+{
+	Super::NativeConstruct();
+	if (!ThemeChangedHandle.IsValid())
+	{
+		ThemeChangedHandle = FWidgetThemeResolver::OnThemeChanged().AddUObject(this, &ThisClass::RefreshIcon);
+	}
+	RefreshIcon();
+}
+
+void UWidgetSceneMarkerItem::NativeDestruct()
+{
+	FWidgetThemeResolver::OnThemeChanged().Remove(ThemeChangedHandle);
+	ThemeChangedHandle.Reset();
+	Super::NativeDestruct();
+}
+
+void UWidgetSceneMarkerItem::SetMarkerView(const FSceneMarkerView& InMarkerView, bool bInShowName, bool bInShowDistance, FGameplayTag InIconStyleTag)
 {
 	MarkerView = InMarkerView;
+	IconStyleTag = InIconStyleTag;
 	bShowName = bInShowName;
 	bShowDistance = bInShowDistance;
 	SetToolTipText(MarkerView.Marker.Description.IsEmpty() ? MarkerView.Marker.DisplayName : MarkerView.Marker.Description);
@@ -87,30 +107,7 @@ void UWidgetSceneMarkerItem::SetMarkerView(const FSceneMarkerView& InMarkerView,
 		TxtBadge->SetText(MarkerView.Marker.Badge);
 		TxtBadge->SetVisibility(MarkerView.Marker.Badge.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
-	if(ImgIcon)
-	{
-		const TSoftObjectPtr<UTexture2D> DesiredIcon = MarkerView.bPlayer && MarkerView.Marker.Icon.IsNull() ? PlayerIcon : MarkerView.Marker.Icon;
-		UTexture2D* DesiredTexture = DesiredIcon.LoadSynchronous();
-		const bool bUsePlayerIcon = MarkerView.bPlayer && DesiredTexture;
-		ImgIcon->SetColorAndOpacity(bUsePlayerIcon ? FLinearColor::White : MarkerView.Marker.Color);
-		if(ImgIcon->GetBrush().GetResourceObject() != DesiredTexture)
-		{
-			ImgIcon->SetBrushResourceObject(DesiredTexture);
-		}
-		ImgIcon->SetRenderTransformPivot(FVector2D(0.5f));
-		ImgIcon->SetRenderScale(bUsePlayerIcon ? FVector2D(0.9f) : FVector2D(1.f));
-		if(!bUsePlayerIcon) ImgIcon->SetRenderTransformAngle(0.f);
-		ImgIcon->SetVisibility(DesiredTexture ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
-	}
-	if(TxtSymbol)
-	{
-		TxtSymbol->SetText(MarkerView.bPlayer ? NSLOCTEXT("SceneMarker", "PlayerSymbol", "▲") :
-			MarkerView.Marker.Symbol.IsEmpty() ? NSLOCTEXT("SceneMarker", "FallbackSymbol", "◆") : MarkerView.Marker.Symbol);
-		TxtSymbol->SetColorAndOpacity(FSlateColor(MarkerView.Marker.Color));
-		TxtSymbol->SetRenderScale(MarkerView.bPlayer ? FVector2D(4.f / 3.f) : FVector2D(1.f));
-		if(!MarkerView.bPlayer) TxtSymbol->SetRenderTransformAngle(0.f);
-		TxtSymbol->SetVisibility(ImgIcon && ImgIcon->GetBrush().GetResourceObject() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
-	}
+	RefreshIcon();
 	if(TxtName)
 	{
 		TxtName->SetText(MarkerView.Marker.DisplayName);
@@ -120,6 +117,57 @@ void UWidgetSceneMarkerItem::SetMarkerView(const FSceneMarkerView& InMarkerView,
 	{
 		TxtDistance->SetText(FText::Format(NSLOCTEXT("SceneMarker", "DistanceMeters", "{0}m"), FText::AsNumber(FMath::RoundToInt(MarkerView.Distance / 100.f))));
 		TxtDistance->SetVisibility(bInShowDistance ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	}
+}
+
+void UWidgetSceneMarkerItem::RefreshIcon()
+{
+	IconExtent = FVector2D(IconSize);
+	bool bStyledIcon = false;
+	if(ImgIcon)
+	{
+		UClass* StyleClass = MarkerView.Marker.Icon.IsNull() && IconStyleTag.IsValid() ?
+			FWidgetThemeResolver::ResolveClass(this, IconStyleTag, EWidgetStyleKind::Brush) : nullptr;
+		const UCommonBrushStyle* Style = StyleClass ? StyleClass->GetDefaultObject<UCommonBrushStyle>() : nullptr;
+		bStyledIcon = Style && Style->Brush.GetResourceObject();
+		const TSoftObjectPtr<UTexture2D> DesiredIcon = MarkerView.bPlayer && MarkerView.Marker.Icon.IsNull() ? PlayerIcon : MarkerView.Marker.Icon;
+		UTexture2D* DesiredTexture = bStyledIcon ? nullptr : DesiredIcon.LoadSynchronous();
+		const bool bUsePlayerIcon = MarkerView.bPlayer && DesiredTexture;
+		ImgIcon->SetColorAndOpacity(bStyledIcon || bUsePlayerIcon ? FLinearColor::White : MarkerView.Marker.Color);
+		if (bStyledIcon)
+		{
+			ImgIcon->SetBrush(Style->Brush);
+			if (Style->Brush.ImageSize.X > 0.f && Style->Brush.ImageSize.Y > 0.f &&
+				FMath::IsFinite(Style->Brush.ImageSize.X) && FMath::IsFinite(Style->Brush.ImageSize.Y))
+			{
+				IconExtent = FVector2D(Style->Brush.ImageSize);
+			}
+		}
+		else
+		{
+			FSlateBrush Brush;
+			Brush.SetResourceObject(DesiredTexture);
+			Brush.ImageSize = FVector2D(IconSize);
+			ImgIcon->SetBrush(Brush);
+		}
+		ImgIcon->SetRenderTransformPivot(FVector2D(0.5f));
+		ImgIcon->SetRenderScale(!bStyledIcon && bUsePlayerIcon ? FVector2D(0.9f) : FVector2D(1.f));
+		if(!MarkerView.bPlayer) ImgIcon->SetRenderTransformAngle(0.f);
+		ImgIcon->SetVisibility(bStyledIcon || DesiredTexture ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+	}
+	if (IconSizeBox)
+	{
+		IconSizeBox->SetWidthOverride(IconExtent.X);
+		IconSizeBox->SetHeightOverride(IconExtent.Y);
+	}
+	if(TxtSymbol)
+	{
+		TxtSymbol->SetText(MarkerView.bPlayer ? NSLOCTEXT("SceneMarker", "PlayerSymbol", "▲") :
+			MarkerView.Marker.Symbol.IsEmpty() ? NSLOCTEXT("SceneMarker", "FallbackSymbol", "◆") : MarkerView.Marker.Symbol);
+		TxtSymbol->SetColorAndOpacity(FSlateColor(MarkerView.Marker.Color));
+		TxtSymbol->SetRenderScale(MarkerView.bPlayer ? FVector2D(4.f / 3.f) : FVector2D(1.f));
+		if(!MarkerView.bPlayer) TxtSymbol->SetRenderTransformAngle(0.f);
+		TxtSymbol->SetVisibility(ImgIcon && ImgIcon->GetBrush().GetResourceObject() ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
 }
 

@@ -20,6 +20,9 @@ public:
 	static FString GetBlueprintGraphData(UBlueprint* Blueprint);
 
 	UFUNCTION(meta = (AICallable))
+	static FString GetWidgetPreviewData(UBlueprint* Blueprint);
+
+	UFUNCTION(meta = (AICallable))
 	static UWidget* CreateWidgetTemplate(UBlueprint* Blueprint, TSubclassOf<UWidget> WidgetClass, FName WidgetName);
 
 	UFUNCTION(meta = (AICallable))
@@ -41,10 +44,16 @@ public:
 	static bool CompileWidgetBlueprint(UBlueprint* Blueprint);
 
 	UFUNCTION(meta = (AICallable))
+	static bool FixupWidgetRedirectors(const TArray<FString>& PackageNames);
+
+	UFUNCTION(meta = (AICallable))
 	static UBlueprint* CreateStyle(UWidgetTheme* Theme, const FString& Tag, UClass* ParentClass, const FString& DestinationRoot);
 
 	UFUNCTION(meta = (AICallable))
 	static bool SetStyleProperty(UWidgetTheme* Theme, const FString& Tag, FName Property, const FString& Value);
+
+	UFUNCTION(meta = (AICallable))
+	static bool RemapThemeTextStyleTag(UWidgetTheme* Theme, const FString& OldTag, const FString& NewTag);
 
 	UFUNCTION(meta = (AICallable))
 	static bool ReimportTextureSource(UTexture2D* Texture, const FString& SourceFile);

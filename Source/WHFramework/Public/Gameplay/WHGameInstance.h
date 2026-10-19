@@ -3,8 +3,11 @@
 #pragma once
 
 #include "Engine/GameInstance.h"
-#include "SaveGame/SaveGameModuleTypes.h"
+#include "Engine/EngineBaseTypes.h"
+#include "SaveGame/SaveGameLoadSnapshot.h"
 #include "WHGameInstance.generated.h"
+
+class USaveGameModule;
 
 /**
  * 游戏实例基类
@@ -22,16 +25,29 @@ public:
 
 	virtual void Shutdown() override;
 
-	void SetPendingSaveLoad(const FPendingSaveLoadContext& InContext) { PendingSaveLoad = InContext; }
+	bool SetPendingSaveLoad(FSaveGameLoadSnapshot InSnapshot, USaveGameModule* InSource = nullptr);
 
-	FPendingSaveLoadContext ConsumePendingSaveLoad()
+	void CancelPendingSaveLoad(const FGuid& InOperationId)
 	{
-		const FPendingSaveLoadContext Result = PendingSaveLoad;
-		PendingSaveLoad = FPendingSaveLoadContext();
+		if (PendingSaveLoad.Context.OperationId == InOperationId)
+		{
+			PendingSaveLoad = FSaveGameLoadSnapshot();
+			PendingLoadSource.Reset();
+		}
+	}
+
+	FSaveGameLoadSnapshot ConsumePendingSaveLoad()
+	{
+		FSaveGameLoadSnapshot Result = MoveTemp(PendingSaveLoad);
+		PendingSaveLoad = FSaveGameLoadSnapshot();
+		PendingLoadSource.Reset();
 		return Result;
 	}
 
 private:
-	UPROPERTY(Transient)
-	FPendingSaveLoadContext PendingSaveLoad;
+	void OnSaveLoadTravelFailure(UWorld* InWorld, ETravelFailure::Type InType, const FString& InError);
+	FDelegateHandle SaveLoadTravelFailureHandle;
+	TWeakObjectPtr<USaveGameModule> PendingLoadSource;
+
+	FSaveGameLoadSnapshot PendingSaveLoad;
 };

@@ -5,8 +5,10 @@
 #include "WidgetSceneMarkerPanel.generated.h"
 
 class UCanvasPanel;
+class UCommonRoundedClip;
 class UWidgetSceneMapBase;
 class UWidgetSceneMarkerItem;
+class USceneModule;
 
 /** 世界地图、小地图与罗盘共用的标记面板 */
 UCLASS(BlueprintType)
@@ -29,6 +31,7 @@ public:
 
 	ESceneMarkerChannel GetMarkerChannel() const { return MarkerChannel; }
 	UCanvasPanel* GetMarkerCanvas() const { return MarkerCanvas; }
+	UCanvasPanel* GetMapContentCanvas() const { return MapContentCanvas; }
 	FName GetMarkerCanvasName() const { return MarkerCanvasName; }
 	FName GetMarkerCanvasHostName() const { return MarkerCanvasHostName; }
 	TSubclassOf<UWidgetSceneMarkerItem> GetMarkerItemClass() const { return MarkerItemClass; }
@@ -57,7 +60,25 @@ protected:
 	FName MarkerCanvasHostName = NAME_None;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker")
+	FName MapContentCanvasName = NAME_None;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker", meta = (ClampMin = "0.0"))
+	float MapContentCornerRadius = 0.f;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCanvasPanel> MapContentCanvas;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCommonRoundedClip> MapContentClip;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker")
 	TSubclassOf<UWidgetSceneMarkerItem> MarkerItemClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker")
+	FGameplayTag PlayerMarkerStyleTag;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker")
+	TMap<FGameplayTag, FGameplayTag> MarkerStyleTags;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker")
 	bool bShowMarkerNames = false;
@@ -74,7 +95,12 @@ protected:
 	UPROPERTY(Transient)
 	UWidgetSceneMapBase* MapBackground = nullptr;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker")
+	int32 MapBackgroundZOrder = -1;
+
 	FSceneMapView MapView;
+	TWeakObjectPtr<USceneModule> MarkerScene;
+	FDelegateHandle MapPresentationChangedHandle;
 	bool bPlayerMarkerPresent = false;
 
 	virtual FVector GetMarkerViewLocation() const;
@@ -85,7 +111,8 @@ protected:
 	void RefreshMarkerMembership();
 
 	void ResolveMarkerCanvas();
-	void ResolveMapBackground();
+	void ResolveMapContentCanvas();
+	virtual void ResolveMapBackground();
 	void AddPlayerMarker();
 	void RebuildMarkerItems();
 	void UpdateMarkerStates();

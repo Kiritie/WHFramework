@@ -27,10 +27,10 @@ void SWidgetThemeTreeRow::Construct(const FArguments& InArgs, const TSharedRef<S
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(0.f, 0.f, 7.f, 0.f)
 			[
-				SNew(SBox).WidthOverride(16.f).HeightOverride(16.f)
+				SNew(SBox).WidthOverride(16.f).HeightOverride(16.f).HAlign(HAlign_Center).VAlign(VAlign_Center)
 				[
 					SNew(SImage)
-					.Image(FAppStyle::GetBrush(Item->bRoot ? "Layer.Icon16x" : Item->bShared ? "GenericLink" : "ClassIcon.BlueprintCore"))
+					.Image(FAppStyle::GetBrush(Item->bRoot ? "Sequencer.KeyDiamond" : Item->bShared ? "GenericLink" : "ClassIcon.BlueprintCore"))
 					.ColorAndOpacity(Item->bRoot ? FStyleColors::AccentBlue : FStyleColors::Foreground)
 				]
 			]

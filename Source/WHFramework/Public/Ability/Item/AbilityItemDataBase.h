@@ -3,11 +3,21 @@
 #include "Ability/AbilityModuleTypes.h"
 #include "Ability/Inventory/InventoryItemRegistry.h"
 #include "Asset/Primary/PrimaryAssetBase.h"
+#include "GameplayEffectTypes.h"
 
 #include "AbilityItemDataBase.generated.h"
 
 class UItemAbilityBase;
 class AInventoryPickupActor;
+
+struct WHFRAMEWORK_API FAbilityItemAttributeValue
+{
+    FGameplayAttribute Attribute;
+    TEnumAsByte<EGameplayModOp::Type> ModifierOp = EGameplayModOp::Additive;
+    EGameplayModEvaluationChannel Channel = EGameplayModEvaluationChannel::Channel0;
+    float Value = 0.f;
+    bool bConditional = false;
+};
 
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UAbilityItemDataBase : public UPrimaryAssetBase
@@ -93,5 +103,7 @@ public:
 	virtual FString GetItemErrorInfo(FAbilityItem InItem, int32 InActorLevel) const;
 
 	virtual FInventoryItemDefinition BuildInventoryDefinition() const;
+
+    static bool GetEquipmentAttributeValues(const FInventoryItemDefinition& InDefinition, int32 InLevel, TArray<FAbilityItemAttributeValue>& OutValues);
 };
 

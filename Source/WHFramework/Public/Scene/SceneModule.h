@@ -134,6 +134,8 @@ protected:
 	UTextureRenderTarget2D* MiniMapTexture;
 
 public:
+	FSimpleMulticastDelegate OnMapPresentationChanged;
+
 	UFUNCTION(BlueprintPure)
 	AMiniMapCapture* GetMiniMapCapture() const { return MiniMapCapture; }
 
@@ -145,6 +147,9 @@ public:
 
 	UFUNCTION(BlueprintPure)
 	TSubclassOf<UWidgetSceneMapBase> GetMapBackgroundWidgetClass() const { return MapBackgroundWidgetClass; }
+
+	UFUNCTION(BlueprintCallable)
+	void SetMapBackgroundWidgetClass(TSubclassOf<UWidgetSceneMapBase> InClass);
 
 	UFUNCTION(BlueprintPure)
 	EWorldMiniMapMode GetMiniMapMode() const { return MiniMapMode; }

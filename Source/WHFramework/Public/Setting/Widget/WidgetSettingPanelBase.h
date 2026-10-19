@@ -52,7 +52,7 @@ protected:
 
 	void RefreshActionButtonState();
 	void RefreshPages();
-	void RefreshConfirmation();
+	virtual void RefreshConfirmation();
 	void ReleaseEditSession();
 	bool bOwnsEditSession = false;
 	void OnCloseButtonClicked();
@@ -81,18 +81,6 @@ protected:
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UCommonButton> Btn_Close;
-
-	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UPanelWidget> ConfirmationContent;
-
-	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UCommonTextBlockN> Txt_Confirmation;
-
-	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UCommonButton> Btn_Confirm;
-
-	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UCommonButton> Btn_Revert;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = true), Category = "Components")
 	TObjectPtr<UPanelWidget> PageItemContainer;

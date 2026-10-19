@@ -203,8 +203,11 @@ struct WHFRAMEWORK_API FInventoryDelta
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FInventoryViewSnapshot, const FInventorySnapshot&);
 DECLARE_MULTICAST_DELEGATE_OneParam(FInventoryViewDelta, const FInventoryDelta&);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FInventoryViewChanges, const FInventoryDelta&, const FInventoryChangeSet&);
 DECLARE_MULTICAST_DELEGATE_OneParam(FInventoryRequestFinished, const FInventoryCommandResult&);
+DECLARE_MULTICAST_DELEGATE_OneParam(FInventoryRequestQueued, const FInventoryClientRequest&);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FInventoryViewClosed, const FGuid&, EInventoryResultCode);
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FInventoryConnectionReset, const FGuid&, const FGuid&, EInventoryResultCode);
 
 using FInventoryClientActionHandler = TFunction<FInventoryCommandResult(const FInventoryClientRequest&, const FInventoryAuthorityContext&)>;
 
@@ -216,6 +219,7 @@ class WHFRAMEWORK_API UInventoryNetworkComponent : public UActorComponent
 #if WITH_DEV_AUTOMATION_TESTS
     friend class FInventoryNetworkReplicaTest;
     friend class FInventoryArchiveAdoptionTest;
+    friend class FInventoryConnectionLifecycleTest;
 #endif
 
 public:
@@ -229,6 +233,7 @@ public:
     bool RegisterAction(FName InAction, FInventoryClientActionHandler InHandler);
     void UnregisterAction(FName InAction);
     uint64 SubmitRequest(FInventoryClientRequest InRequest);
+    TArray<FInventoryClientRequest> GetPendingRequests() const;
     void OpenInventory(const FGuid& InInventoryId, uint32 InGeneration = 1);
     void CloseInventory(const FGuid& InInventoryId);
     void ResyncInventory(const FGuid& InInventoryId);
@@ -241,8 +246,12 @@ public:
 
     FInventoryViewSnapshot OnSnapshot;
     FInventoryViewDelta OnDelta;
+    /** 已应用视图的前后差异；重同步不含逐笔事务身份。 */
+    FInventoryViewChanges OnAppliedChanges;
     FInventoryRequestFinished OnResult;
+    FInventoryRequestQueued OnRequestQueued;
     FInventoryViewClosed OnSessionClosed;
+    FInventoryConnectionReset OnConnectionReset;
 
 private:
     struct FServerSession
@@ -284,6 +293,7 @@ private:
     TWeakObjectPtr<UInventoryWorldSubsystem> WorldSubsystem;
     TMap<FGuid, FServerSession> Sessions;
     TMap<FGuid, FClientView> Views;
+    TSet<FGuid> LocallyClosedSessions;
     TMap<FGuid, FAssembly> Assemblies;
     TMap<uint64, FPendingRequest> Pending;
     TMap<FName, FInventoryClientActionHandler> Actions;
@@ -299,6 +309,7 @@ private:
     FGuid ConnectionWorldId;
     FGuid ConnectionStoreId;
     uint64 NextRequestId = 1;
+    uint64 ClientContextRevision = 0;
     uint64 RequestHighWaterMark = 0;
     double BudgetUpdatedAt = 0;
     double Tokens = 40;

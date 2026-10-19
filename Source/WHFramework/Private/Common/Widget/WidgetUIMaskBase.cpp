@@ -19,20 +19,18 @@ void UWidgetUIMaskBase::OnInitialize(const FParameter& InParam)
 
 void UWidgetUIMaskBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
-	Super::OnOpen(InParam, bInstant);
-
 	OnPressAnyKey.Clear();
 	if(const FWidgetDelegateOpenParameter* Param = InParam.GetPtr<FWidgetDelegateOpenParameter>())
 	{
 		OnPressAnyKey = Param->Delegate;
 	}
+	Super::OnOpen(InParam, bInstant);
 }
 
 void UWidgetUIMaskBase::OnClose(bool bInstant)
 {
-	Super::OnClose(bInstant);
-
 	OnPressAnyKey.Clear();
+	Super::OnClose(bInstant);
 }
 
 FReply UWidgetUIMaskBase::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)

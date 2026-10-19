@@ -12,6 +12,7 @@
 #include "Widget/Common/CommonProgress.h"
 #include "Widget/Common/CommonScroll.h"
 #include "Widget/Common/CommonBorderN.h"
+#include "Widget/Common/CommonWindow.h"
 
 #include "AssetTypeActions_Base.h"
 #include "AssetToolsModule.h"
@@ -214,6 +215,13 @@ void FWidgetThemeToolkit::Open(UWidgetTheme* InTheme, const TSharedPtr<IToolkitH
 	TextScroll->SetText(LOCTEXT("TextScrollPreview", "Long text scroll preview — 长文字滚动效果预览 Aa 0123456789"));
 	TextScroll->SetScrollingEnabled(true);
 	PreviewControls.Add(EWidgetStyleKind::TextScroll, TextScroll);
+	UCommonWindow* Window = NewObject<UCommonWindow>(PreviewRoot);
+	PrepareControl(Window);
+	Window->SetTitle(LOCTEXT("WindowTitlePreview", "Window 窗体标题"));
+	UCommonTextBlockN* WindowText = NewObject<UCommonTextBlockN>(Window);
+	WindowText->SetText(LOCTEXT("WindowContentPreview", "NamedSlot 窗体内容"));
+	Window->SetContentForSlot(TEXT("Content"), WindowText);
+	PreviewControls.Add(EWidgetStyleKind::Window, Window);
 	FDetailsViewArgs Args;
 	Args.bAllowSearch = true;
 	Args.bHideSelectionTip = true;
@@ -471,15 +479,15 @@ FReply FWidgetThemeToolkit::OpenRenameDialog()
 TSharedPtr<SWidget> FWidgetThemeToolkit::BuildContextMenu()
 {
 	FMenuBuilder Menu(true, GetToolkitCommands());
-	Menu.AddMenuEntry(LOCTEXT("Create", "Create"), LOCTEXT("CreateHelp", "Create a native style or associate an existing style."), FSlateIcon(),
+	Menu.AddMenuEntry(LOCTEXT("Create", "Create"), LOCTEXT("CreateHelp", "创建样式或关联现有样式。"), FSlateIcon(),
 		FUIAction(FExecuteAction::CreateSPLambda(this, [this] { OpenStyleDialog(); }),
 			FCanExecuteAction::CreateSPLambda(this, [this] { return Theme && !Theme->bDuplicateFailed && !FWidgetThemeEditorService::IsBusy(); })));
-	Menu.AddMenuEntry(LOCTEXT("Remove", "Remove"), FText(), FSlateIcon(),
+	Menu.AddMenuEntry(LOCTEXT("Remove", "Remove"), LOCTEXT("RemoveHelp", "删除自有样式，或解除关联。"), FSlateIcon(),
 		FUIAction(FExecuteAction::CreateSPLambda(this, [this]
 		{
 			Run(TEXT("Remove"), [this](FString& Result) { return FWidgetThemeEditorService::RemoveBinding(Theme, SelectedTag, Result); });
 		}), FCanExecuteAction::CreateSPLambda(this, [this] { return bCanRemoveSelection && !FWidgetThemeEditorService::IsBusy(); })));
-	Menu.AddMenuEntry(LOCTEXT("CopyProperties", "Copy properties"), FText(), FSlateIcon(),
+	Menu.AddMenuEntry(LOCTEXT("CopyProperties", "Copy properties"), LOCTEXT("CopyPropertiesHelp", "复制样式属性。"), FSlateIcon(),
 		FUIAction(FExecuteAction::CreateSPLambda(this, [this]
 		{
 			Run(TEXT("Copy properties"), [this](FString& Result) { return FWidgetThemeEditorService::CopyProperties(Theme, SelectedTag, Result); });
@@ -487,7 +495,7 @@ TSharedPtr<SWidget> FWidgetThemeToolkit::BuildContextMenu()
 		{
 			return !FWidgetThemeEditorService::IsBusy() && !WidgetStyleTags::IsRoot(SelectedTag) && FWidgetThemeEditorService::Blueprint(Theme, SelectedTag);
 		})));
-	Menu.AddMenuEntry(LOCTEXT("PasteProperties", "Paste properties"), FText(), FSlateIcon(),
+	Menu.AddMenuEntry(LOCTEXT("PasteProperties", "Paste properties"), LOCTEXT("PastePropertiesHelp", "粘贴同类型属性，仅限本主题自有样式。"), FSlateIcon(),
 		FUIAction(FExecuteAction::CreateSPLambda(this, [this]
 		{
 			Run(TEXT("Paste properties"), [this](FString& Result) { return FWidgetThemeEditorService::PasteProperties(Theme, SelectedTag, Result); });
@@ -495,22 +503,24 @@ TSharedPtr<SWidget> FWidgetThemeToolkit::BuildContextMenu()
 		{
 			return !FWidgetThemeEditorService::IsBusy() && FWidgetThemeEditorService::CanPasteProperties(Theme, SelectedTag);
 		})));
-	Menu.AddMenuEntry(LOCTEXT("Rename", "Rename"), LOCTEXT("RenameHelp", "Rename the Tag, migrate references and retain a redirect from its previous name."), FSlateIcon(),
+	Menu.AddMenuEntry(LOCTEXT("Rename", "Rename"), LOCTEXT("RenameHelp", "重命名 Tag 并迁移引用，保留旧名重定向。"), FSlateIcon(),
 		FUIAction(FExecuteAction::CreateSPLambda(this, [this] { OpenRenameDialog(); }),
 			FCanExecuteAction::CreateSPLambda(this, [this] { return CanEditSelection() && !WidgetStyleTags::IsRoot(SelectedTag); })));
-	if (!WidgetStyleTags::IsRoot(SelectedTag) && FWidgetThemeEditorService::Blueprint(Theme, SelectedTag))
+	if (!WidgetStyleTags::IsRoot(SelectedTag))
 	{
-		Menu.AddMenuEntry(LOCTEXT("OpenAssociatedAsset", "Open associated asset"), FText(), FSlateIcon(),
+		Menu.AddMenuEntry(LOCTEXT("OpenAssociatedAsset", "Open associated asset"), LOCTEXT("OpenAssociatedAssetHelp", "打开关联的来源主题资产。"), FSlateIcon(),
 			FUIAction(FExecuteAction::CreateSPLambda(this, [this]
 			{
 				FinishDetailsEdit();
-				if (UBlueprint* Style = FWidgetThemeEditorService::Blueprint(Theme, SelectedTag))
+				const FWidgetStyleBinding* Binding = Theme ? Theme->Bindings.Find(SelectedTag) : nullptr;
+				if (Binding && !Binding->bManaged && IsValid(Binding->SourceTheme.Get()))
 				{
-					GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Style);
+					GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Binding->SourceTheme.Get());
 				}
 			}), FCanExecuteAction::CreateSPLambda(this, [this]
 			{
-				return !FWidgetThemeEditorService::IsBusy() && FWidgetThemeEditorService::Blueprint(Theme, SelectedTag);
+				const FWidgetStyleBinding* Binding = Theme ? Theme->Bindings.Find(SelectedTag) : nullptr;
+				return !FWidgetThemeEditorService::IsBusy() && Binding && !Binding->bManaged && IsValid(Binding->SourceTheme.Get());
 			})));
 	}
 	return Menu.MakeWidget();
@@ -809,6 +819,10 @@ void FWidgetThemeToolkit::UpdatePreview()
 void FWidgetThemeToolkit::UpdatePreviewSize(UObject* Style, EWidgetStyleKind Kind)
 {
 	FVector2D Size = Kind == EWidgetStyleKind::Brush ? FVector2D(80, 80) : FVector2D(200, 60);
+	if (Kind == EWidgetStyleKind::Window)
+	{
+		Size = FVector2D(520.f, 260.f);
+	}
 	if (const UCommonButtonStyleN* ButtonStyle = Cast<UCommonButtonStyleN>(Style))
 	{
 		if (ButtonStyle->MinWidth > 0)
