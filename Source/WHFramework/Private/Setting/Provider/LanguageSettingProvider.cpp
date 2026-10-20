@@ -4,6 +4,8 @@
 
 void ULanguageSettingProvider::CollectDefinitions(TArray<FSettingDefinition>& OutDefinitions) const
 {
+	const UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld());
+	if (!Widgets) return;
 	const FSettingId LanguageId{FName(TEXT("Widget.LanguageType"))};
 	FSettingDefinition* Definition = OutDefinitions.FindByPredicate([LanguageId](const FSettingDefinition& Item)
 	{
@@ -18,7 +20,7 @@ void ULanguageSettingProvider::CollectDefinitions(TArray<FSettingDefinition>& Ou
 	Definition->Renderer = ESettingRendererType::Option;
 	Definition->ApplyPolicy = ESettingApplyPolicy::Immediate;
 	Definition->Options.Reset();
-	const TArray<FLanguageType> LanguageTypes = UWidgetModule::Get().GetLanguageTypes();
+	const TArray<FLanguageType> LanguageTypes = Widgets->GetLanguageTypes();
 	for(int32 Index = 0; Index < LanguageTypes.Num(); ++Index)
 	{
 		FSettingOption& Option = Definition->Options.AddDefaulted_GetRef();

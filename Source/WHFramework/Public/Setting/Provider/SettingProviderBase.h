@@ -10,6 +10,8 @@ class WHFRAMEWORK_API USettingProviderBase : public UObject
 	GENERATED_BODY()
 
 public:
+	virtual UWorld* GetWorld() const override;
+
 	virtual void CollectDefinitions(TArray<FSettingDefinition>& OutDefinitions) const;
 
 	virtual bool CanHandle(const FSettingDefinition& InDefinition) const;

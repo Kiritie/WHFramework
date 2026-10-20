@@ -7,12 +7,13 @@
 #include "Components/HorizontalBoxSlot.h"
 #include "Engine/World.h"
 #include "Input/InputModule.h"
-#include "Input/InputModuleStatics.h"
+#include "Engine/LocalPlayer.h"
 #include "TimerManager.h"
 #include "Setting/SettingModule.h"
 #include "Setting/Widget/Page/WidgetSettingPageBase.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "Widget/Common/CommonButton.h"
+#include "Widget/Common/CommonWindow.h"
 #include "Widget/Common/CommonButtonGroup.h"
 #include "Widget/Common/CommonTextBlockN.h"
 
@@ -42,8 +43,6 @@ void UWidgetSettingPanelBase::OnCreate(const FParameter& InParam)
 	};
 	BindButton(Btn_Apply, &ThisClass::OnApplyButtonClicked);
 	BindButton(Btn_Reset, &ThisClass::OnResetButtonClicked);
-	BindButton(Btn_Close, &ThisClass::OnCloseButtonClicked);
-	USettingModule::Get().OnSettingEditStateChanged.AddUniqueDynamic(this, &ThisClass::OnSettingEditStateChanged);
 
 	PageItemGroup = NewObject<UCommonButtonGroup>(this);
 	PageItemGroup->SetSelectionRequiredN(true);
@@ -60,47 +59,52 @@ void UWidgetSettingPanelBase::OnInitialize(const FParameter& InParam)
 
 void UWidgetSettingPanelBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
-	USettingModule::Get().BeginEdit();
-	bOwnsEditSession = true;
-	RefreshActionButtonState();
-	if(GetSubWidgets<UWidgetSettingPageBase>().IsEmpty())
+	const FScopedWorldContext WorldContext(GetWorld());
+	const uint64 Revision = ++EditSessionRevision;
+	SessionStatus = FText::GetEmpty();
+	if (!bOwnsEditSession)
 	{
-		GenerateSettingPages();
-	}
-	if(PageItemGroup && PageItemGroup->GetButtons().IsEmpty())
-	{
-		for(UWidgetSettingPageBase* Page : GetSubWidgets<UWidgetSettingPageBase>())
+		USettingModule* Settings = USettingModule::GetPtr(GetWorld());
+		if (Settings && !Settings->IsEditSessionActive())
 		{
-			if(Page)
-			{
-				SpawnPageItem(Page);
-			}
+			EditSessionSource = Settings;
+			bOwnsEditSession = true;
+			Settings->BeginEdit();
+		}
+		else
+		{
+			SessionStatus = Settings ? NSLOCTEXT("WH.Setting", "SessionInUse", "设置正在其他界面中编辑，请关闭后重试。") :
+				NSLOCTEXT("WH.Setting", "ServiceUnavailable", "设置服务尚未就绪，请稍后重新打开。");
 		}
 	}
-
-	Super::OnOpen(InParam, bInstant);
-
-	RefreshPages();
-	
-	if(PageItemGroup && !PageItemGroup->GetButtons().IsEmpty())
+	if (Revision != EditSessionRevision) return;
+	BindEditObservers();
+	if (GetSubWidgets<UWidgetSettingPageBase>().IsEmpty()) GenerateSettingPages();
+	if (PageItemGroup && PageItemGroup->GetButtons().IsEmpty())
 	{
-		SetCurrentPage(0);
+		for (UWidgetSettingPageBase* Page : GetSubWidgets<UWidgetSettingPageBase>())
+		{
+			if (Page) SpawnPageItem(Page);
+		}
 	}
+	RefreshPages();
+	Super::OnOpen(InParam, bInstant);
+	if (Revision != EditSessionRevision) return;
+	if (PageItemGroup && !PageItemGroup->GetButtons().IsEmpty()) SetCurrentPage(0);
+	RefreshActionButtonState();
 }
 
 void UWidgetSettingPanelBase::OnClose(bool bInstant)
 {
 	ReleaseEditSession();
-	GetWorld()->GetTimerManager().ClearTimer(ConfirmationRefreshTimer);
 	Super::OnClose(bInstant);
 }
 
 void UWidgetSettingPanelBase::OnDestroy(EObjectDespawnMode InMode)
 {
+	Window_Content->OnCloseRequested.RemoveDynamic(this, &ThisClass::OnCloseButtonClicked);
 	ReleaseEditSession();
-	USettingModule::Get().OnSettingEditStateChanged.RemoveDynamic(this, &ThisClass::OnSettingEditStateChanged);
-	GetWorld()->GetTimerManager().ClearTimer(ConfirmationRefreshTimer);
-	for (UCommonButton* Button : {Btn_Apply, Btn_Reset, Btn_Close.Get()})
+	for (UCommonButton* Button : {Btn_Apply, Btn_Reset})
 	{
 		if (Button)
 		{
@@ -120,26 +124,69 @@ void UWidgetSettingPanelBase::OnDestroy(EObjectDespawnMode InMode)
 	Super::OnDestroy(InMode);
 }
 
+void UWidgetSettingPanelBase::NativeConstruct()
+{
+	const FScopedWorldContext WorldContext(GetWorld());
+	Super::NativeConstruct();
+	Window_Content->OnCloseRequested.AddUniqueDynamic(this, &ThisClass::OnCloseButtonClicked);
+	if (bOwnsEditSession)
+	{
+		BindEditObservers();
+		RefreshPages();
+		RefreshActionButtonState();
+	}
+}
+
 void UWidgetSettingPanelBase::NativeDestruct()
 {
-	ReleaseEditSession();
+	Window_Content->OnCloseRequested.RemoveDynamic(this, &ThisClass::OnCloseButtonClicked);
+	UnbindEditObservers();
+	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ConfirmationRefreshTimer);
 	Super::NativeDestruct();
 }
 
 void UWidgetSettingPanelBase::ReleaseEditSession()
 {
+	++EditSessionRevision;
+	if (!bOwnsEditSession && !EditSessionSource.IsValid()) return;
 	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ConfirmationRefreshTimer);
-	if (bOwnsEditSession)
+	UnbindEditObservers();
+	USettingModule* Settings = EditSessionSource.Get();
+	const bool bRelease = bOwnsEditSession;
+	bOwnsEditSession = false;
+	EditSessionSource.Reset();
+	for (UWidgetSettingPageBase* Page : GetSubWidgets<UWidgetSettingPageBase>())
 	{
-		bOwnsEditSession = false;
-		if (USettingModule* Settings = USettingModule::GetPtr(GetWorld())) Settings->EndEdit();
+		if (Page) Page->SetSettingSource(nullptr);
 	}
+	if (bRelease && Settings) Settings->EndEdit();
+}
+
+USettingModule* UWidgetSettingPanelBase::GetSettingSource() const
+{
+	const UWorld* World = GetWorld();
+	USettingModule* Settings = EditSessionSource.Get();
+	return bOwnsEditSession && World && !World->bIsTearingDown && Settings && Settings->GetWorld() == World && Settings->IsEditSessionActive() ? Settings : nullptr;
+}
+
+void UWidgetSettingPanelBase::BindEditObservers()
+{
+	if (USettingModule* Settings = GetSettingSource())
+	{
+		Settings->OnSettingEditStateChanged.AddUniqueDynamic(this, &ThisClass::OnSettingEditStateChanged);
+	}
+}
+
+void UWidgetSettingPanelBase::UnbindEditObservers()
+{
+	if (EditSessionSource.IsValid()) EditSessionSource->OnSettingEditStateChanged.RemoveDynamic(this, &ThisClass::OnSettingEditStateChanged);
 }
 
 FReply UWidgetSettingPanelBase::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if (GetWorld() && GetWorld()->IsGameWorld() && UInputModule::IsValid() &&
-		UInputModuleStatics::IsPlayerMappedKeyByTag(GameplayTags::Input_SystemOperation, InKeyEvent.GetKey()))
+	const UInputModule* Inputs = UInputModule::GetPtr(GetWorld());
+	const int32 PlayerIndex = GetOwningLocalPlayer() ? GetOwningLocalPlayer()->GetLocalPlayerIndex() : INDEX_NONE;
+	if (Inputs && PlayerIndex != INDEX_NONE && Inputs->IsPlayerMappedKeyByTag(GameplayTags::Input_SystemOperation, InKeyEvent.GetKey(), PlayerIndex))
 	{
 		Close();
 		return FReply::Handled();
@@ -154,20 +201,28 @@ void UWidgetSettingPanelBase::OnPageItemSelected_Implementation(UCommonButtonBas
 
 void UWidgetSettingPanelBase::OnApplyButtonClicked()
 {
-	if(USettingModule::Get().ApplyEditSession())
-	{
-		if(USettingModule::Get().HasPendingConfirmation())
-		{
-			K2_OnConfirmationRequested(USettingModule::Get().GetConfirmationTimeout());
-		}
-		RefreshPages();
-	}
+	USettingModule* Settings = GetSettingSource();
+	if (!Settings || !Settings->CanApply()) return;
+	const uint64 Revision = EditSessionRevision;
+	const bool bApplied = Settings->ApplyEditSession();
+	if (Revision != EditSessionRevision || Settings != GetSettingSource()) return;
+	SessionStatus = bApplied ? FText::GetEmpty() : NSLOCTEXT("WH.Setting", "ApplyFailed", "设置未能应用，请检查输入或稍后重试。");
+	if (bApplied && Settings->HasPendingConfirmation()) K2_OnConfirmationRequested(Settings->GetConfirmationTimeout());
+	if (Revision != EditSessionRevision) return;
+	RefreshPages();
+	RefreshActionButtonState();
 }
 
 void UWidgetSettingPanelBase::OnResetButtonClicked()
 {
-	USettingModule::Get().ResetAllToDefault();
+	USettingModule* Settings = GetSettingSource();
+	if (!Settings || Settings->HasPendingConfirmation()) return;
+	const uint64 Revision = EditSessionRevision;
+	SessionStatus = FText::GetEmpty();
+	Settings->ResetAllToDefault();
+	if (Revision != EditSessionRevision) return;
 	RefreshPages();
+	RefreshActionButtonState();
 }
 
 void UWidgetSettingPanelBase::RefreshPages()
@@ -176,13 +231,14 @@ void UWidgetSettingPanelBase::RefreshPages()
 	{
 		if(Page)
 		{
-			Page->RefreshEntries();
+			Page->SetSettingSource(GetSettingSource());
 		}
 	}
 }
 
 UCommonButton* UWidgetSettingPanelBase::SpawnPageItem_Implementation(UWidgetSettingPageBase* InPage)
 {
+	const FScopedWorldContext WorldContext(GetWorld());
 	if(UCommonButton* PageItem = UObjectPoolModuleStatics::SpawnObject<UCommonButton>(
 		FWidgetSpawnParameter(InPage),
 		PageItemClass))
@@ -205,14 +261,18 @@ UCommonButton* UWidgetSettingPanelBase::SpawnPageItem_Implementation(UWidgetSett
 
 void UWidgetSettingPanelBase::GenerateSettingPages()
 {
+	const FScopedWorldContext WorldContext(GetWorld());
 	if(!SettingPageClass || !Switcher_Page)
 	{
 		return;
 	}
-	for(const FSettingPageDefinition& PageDefinition : USettingModule::Get().GetSettingPages())
+	USettingModule* Settings = GetSettingSource();
+	if (!Settings) return;
+	for(const FSettingPageDefinition& PageDefinition : Settings->GetSettingPages())
 	{
 		if(UWidgetSettingPageBase* Page = CreateSubWidget<UWidgetSettingPageBase>(FParameter(), SettingPageClass))
 		{
+			Page->SetSettingSource(Settings);
 			Page->SetPageDefinition(PageDefinition);
 			Switcher_Page->AddChild(Page);
 		}
@@ -221,29 +281,24 @@ void UWidgetSettingPanelBase::GenerateSettingPages()
 
 void UWidgetSettingPanelBase::OnSettingEditStateChanged(const FSettingEditState& InState)
 {
-	if(Btn_Apply)
-	{
-		Btn_Apply->SetIsEnabledN(InState.bCanApply);
-	}
-	if(Btn_Reset)
-	{
-		Btn_Reset->SetIsEnabledN(InState.bCanReset);
-	}
-	const bool bPending = USettingModule::Get().HasPendingConfirmation();
-	if (Switcher_Page)
-	{
-		Switcher_Page->SetIsEnabled(!bPending);
-	}
-	if (PageItemContainer)
-	{
-		PageItemContainer->SetIsEnabled(!bPending);
-	}
+	USettingModule* Settings = GetSettingSource();
+	const bool bPending = Settings && Settings->HasPendingConfirmation();
+	if (Btn_Apply) Btn_Apply->SetIsEnabledN(Settings && InState.bCanApply && !bPending);
+	if (Btn_Reset) Btn_Reset->SetIsEnabledN(Settings && InState.bCanReset && !bPending);
+	if (Switcher_Page) Switcher_Page->SetIsEnabled(Settings && !bPending);
+	if (PageItemContainer) PageItemContainer->SetIsEnabled(Settings && !bPending);
+	FText Message = SessionStatus;
+	if (!Settings && Message.IsEmpty()) Message = NSLOCTEXT("WH.Setting", "ServiceUnavailable", "设置服务尚未就绪，请稍后重新打开。");
+	Txt_Status->SetText(Message);
+	Txt_Status->SetVisibility(Message.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
 	RefreshConfirmation();
 }
 
 void UWidgetSettingPanelBase::RefreshConfirmation()
 {
-	const bool bPending = bOwnsEditSession && USettingModule::Get().HasPendingConfirmation();
+	if (!GetWorld()) return;
+	const USettingModule* Settings = GetSettingSource();
+	const bool bPending = Settings && Settings->HasPendingConfirmation();
 	if (bPending)
 	{
 		if (!GetWorld()->GetTimerManager().IsTimerActive(ConfirmationRefreshTimer))
@@ -262,19 +317,10 @@ void UWidgetSettingPanelBase::OnCloseButtonClicked()
 	Close();
 }
 
-void UWidgetSettingPanelBase::OnConfirmButtonClicked()
-{
-	ConfirmPendingSettings();
-}
-
-void UWidgetSettingPanelBase::OnRevertButtonClicked()
-{
-	RejectPendingSettings();
-}
-
 void UWidgetSettingPanelBase::RefreshActionButtonState()
 {
-	OnSettingEditStateChanged(USettingModule::Get().GetEditState());
+	const USettingModule* Settings = GetSettingSource();
+	OnSettingEditStateChanged(Settings ? Settings->GetEditState() : FSettingEditState());
 }
 
 int32 UWidgetSettingPanelBase::GetCurrentPageIndex() const
@@ -297,16 +343,19 @@ void UWidgetSettingPanelBase::SetCurrentPage(int32 InPageIndex)
 
 bool UWidgetSettingPanelBase::ConfirmPendingSettings()
 {
-	const bool bResult = USettingModule::Get().ConfirmPendingSettings();
-	if(bResult)
-	{
-		RefreshPages();
-	}
+	USettingModule* Settings = GetSettingSource();
+	if (!Settings) return false;
+	const uint64 Revision = EditSessionRevision;
+	const bool bResult = Settings->ConfirmPendingSettings();
+	if (Revision == EditSessionRevision && bResult) RefreshPages();
 	return bResult;
 }
 
 void UWidgetSettingPanelBase::RejectPendingSettings()
 {
-	USettingModule::Get().RejectPendingSettings();
-	RefreshPages();
+	USettingModule* Settings = GetSettingSource();
+	if (!Settings) return;
+	const uint64 Revision = EditSessionRevision;
+	Settings->RejectPendingSettings();
+	if (Revision == EditSessionRevision) RefreshPages();
 }

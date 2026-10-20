@@ -29,6 +29,10 @@ public:
     virtual void OnReset(bool bForce = false) override;
     virtual void OnDestroy(EObjectDespawnMode InMode) override;
     virtual void NativeDestruct() override;
+    virtual void SynchronizeProperties() override;
+
+    UFUNCTION(BlueprintCallable)
+    void SetShowExtensionButtons(bool bInShowExtensionButtons);
 
     UFUNCTION(BlueprintCallable)
     void BindInventories(UInventoryNetworkComponent* InNetwork, const TArray<FGuid>& InInventoryIds, bool bInFollowOwner = false);
@@ -40,7 +44,7 @@ public:
     void SelectSlot(FGuid InInventoryId, FInventorySlotKey InSlot);
 
     UFUNCTION(BlueprintCallable)
-    bool RequestUse(FGuid InInventoryId, FInventorySlotKey InSlot);
+    virtual bool RequestUse(FGuid InInventoryId, FInventorySlotKey InSlot);
 
     UFUNCTION(BlueprintCallable)
     bool RequestDrop(FGuid InInventoryId, FInventorySlotKey InSlot, int32 InQuantity);
@@ -76,6 +80,7 @@ public:
     void SyncSelection(FGuid InInventoryId, FInventorySlotKey InSlot);
     bool SubmitRequest(FInventoryClientRequest InRequest);
     void SetResultText(const FText& InText);
+    void SetGroupSlotHosts(FGameplayTag InGroup, const TMap<int32, UPanelWidget*>& InHosts);
 
 protected:
     virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -99,6 +104,9 @@ protected:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     bool bShowGroupTitles = true;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ExposeOnSpawn = "true"))
+    bool bShowExtensionButtons = true;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TMap<FGameplayTag, FName> GroupPanelNames;
@@ -149,6 +157,9 @@ protected:
     TObjectPtr<UCommonTextBlockN> ResultText;
 
     UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UHorizontalBox> InventoryActions;
+
+    UPROPERTY(meta = (BindWidgetOptional))
     TObjectPtr<UCommonButton> Btn_Sort;
 
     UPROPERTY(meta = (BindWidgetOptional))
@@ -159,6 +170,7 @@ private:
     TArray<FGuid> InventoryIds;
     FGuid TransferInventoryId;
     TMap<FString, TWeakObjectPtr<UWidgetAbilityInventorySlotBase>> Slots;
+    TMap<FGameplayTag, TMap<int32, TWeakObjectPtr<UPanelWidget>>> GroupSlotHosts;
     TMap<uint64, TArray<FString>> PendingSlots;
     FInventoryClientRequest SplitRequest;
     FInventoryStackSignature SplitSignature;

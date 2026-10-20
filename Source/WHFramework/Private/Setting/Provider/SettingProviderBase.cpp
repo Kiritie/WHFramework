@@ -1,5 +1,13 @@
 #include "Setting/Provider/SettingProviderBase.h"
 
+#include "Setting/SettingModule.h"
+
+UWorld* USettingProviderBase::GetWorld() const
+{
+	const USettingModule* Owner = GetTypedOuter<USettingModule>();
+	return Owner ? Owner->GetWorld() : nullptr;
+}
+
 void USettingProviderBase::CollectDefinitions(TArray<FSettingDefinition>& OutDefinitions) const
 {
 }

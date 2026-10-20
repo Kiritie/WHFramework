@@ -384,14 +384,26 @@ void UInventoryNetworkComponent::TickComponent(float InDeltaTime, ELevelTick InT
             }
             if(Entry->Attempts >= 4)
             {
+                if (Entry->bUnconfirmed)
+                {
+                    if (Now - Entry->SentAt >= 10.0)
+                    {
+                        Entry->SentAt = Now;
+                        const FInventoryClientRequest Request = Entry->Request;
+                        ServerSubmit(Request);
+                    }
+                    continue;
+                }
+                Entry->bUnconfirmed = true;
                 FInventoryCommandResult Result;
                 Result.RequestId = RequestId;
                 Result.Code = EInventoryResultCode::ConfirmationPending;
                 const TArray<FInventoryClientParticipant> Participants = Entry->Request.Participants;
-                Pending.Remove(RequestId);
+                const FGuid OriginalConnection = ConnectionId;
                 OnResult.Broadcast(Result);
                 for(const FInventoryClientParticipant& Participant : Participants)
                 {
+                    if (ConnectionId != OriginalConnection || !Pending.Contains(RequestId)) break;
                     ResyncInventory(Participant.InventoryId);
                 }
                 continue;
@@ -544,6 +556,36 @@ TArray<FInventoryClientRequest> UInventoryNetworkComponent::GetPendingRequests()
         return First.RequestId < Second.RequestId;
     });
     return Requests;
+}
+
+bool UInventoryNetworkComponent::GetPendingRequest(uint64 InRequestId, FInventoryClientRequest& OutRequest) const
+{
+    OutRequest = FInventoryClientRequest();
+    const FPendingRequest* Entry = Pending.Find(InRequestId);
+    if (!Entry || !ConnectionId.IsValid() || Entry->Request.ConnectionId != ConnectionId ||
+        Entry->Request.StoreId != ConnectionStoreId || Entry->Request.WorldEpoch != WorldEpoch) return false;
+    OutRequest = Entry->Request;
+    return true;
+}
+
+bool UInventoryNetworkComponent::IsRequestUnconfirmed(uint64 InRequestId) const
+{
+    FInventoryClientRequest Request;
+    const FPendingRequest* Entry = Pending.Find(InRequestId);
+    return Entry && Entry->bUnconfirmed && GetPendingRequest(InRequestId, Request);
+}
+
+bool UInventoryNetworkComponent::RetryRequest(uint64 InRequestId)
+{
+    const APlayerController* Controller = Cast<APlayerController>(GetOwner());
+    FInventoryClientRequest Request;
+    FPendingRequest* Entry = Pending.Find(InRequestId);
+    const double Now = FPlatformTime::Seconds();
+    if (!Controller || !Controller->IsLocalController() || !Entry || !Entry->bUnconfirmed ||
+        Now - Entry->SentAt < 2.0 || !GetPendingRequest(InRequestId, Request)) return false;
+    Entry->SentAt = Now;
+    ServerSubmit(Request);
+    return true;
 }
 
 void UInventoryNetworkComponent::OpenInventory(const FGuid& InInventoryId, uint32 InGeneration)
@@ -726,12 +768,6 @@ void UInventoryNetworkComponent::ServerSubmit_Implementation(const FInventoryCli
         DeliverResult(Result);
         return;
     }
-    if(!ConsumeBudget(1.0))
-    {
-        Result.Code = EInventoryResultCode::RateLimited;
-        DeliverResult(Result);
-        return;
-    }
     if(InRequest.RequestId <= RequestHighWaterMark)
     {
         for(const FActionReceipt& Receipt : Receipts)
@@ -742,12 +778,20 @@ void UInventoryNetworkComponent::ServerSubmit_Implementation(const FInventoryCli
                 return;
             }
         }
+        Result.Code = EInventoryResultCode::ConfirmationPending;
         DeliverResult(Result);
         return;
     }
     RequestHighWaterMark = InRequest.RequestId;
     const FGuid RequestConnection = ConnectionId;
-    Result = ExecuteRequest(InRequest, Identity);
+    if (ConsumeBudget(1.0))
+    {
+        Result = ExecuteRequest(InRequest, Identity);
+    }
+    else
+    {
+        Result.Code = EInventoryResultCode::RateLimited;
+    }
     if(ConnectionId != RequestConnection)
     {
         return;
@@ -1324,8 +1368,19 @@ void UInventoryNetworkComponent::ClientDelta_Implementation(const FInventoryDelt
 
 void UInventoryNetworkComponent::ClientResult_Implementation(FGuid InConnectionId, const FInventoryCommandResult& InResult)
 {
-    if(InConnectionId == ConnectionId && Pending.Remove(InResult.RequestId) > 0)
+    FPendingRequest* Entry = Pending.Find(InResult.RequestId);
+    if(InConnectionId == ConnectionId && Entry)
     {
+        if (InResult.Code == EInventoryResultCode::ConfirmationPending)
+        {
+            if (Entry->bUnconfirmed) return;
+            Entry->bUnconfirmed = true;
+            Entry->Attempts = 4;
+        }
+        else
+        {
+            Pending.Remove(InResult.RequestId);
+        }
         OnResult.Broadcast(InResult);
     }
 }
@@ -1333,6 +1388,7 @@ void UInventoryNetworkComponent::ClientResult_Implementation(FGuid InConnectionI
 void UInventoryNetworkComponent::ClientClosed_Implementation(FGuid InConnectionId, FGuid InInventoryId, FGuid InSessionId, EInventoryResultCode InReason)
 {
     if(!ConnectionId.IsValid() || InConnectionId != ConnectionId) return;
+    const uint64 ContextRevision = ClientContextRevision;
     const bool bLocallyClosed = LocallyClosedSessions.Remove(InSessionId) > 0;
     const FClientView* View = Views.Find(InInventoryId);
     if(View && (!InSessionId.IsValid() || View->SessionId != InSessionId))
@@ -1355,9 +1411,9 @@ void UInventoryNetworkComponent::ClientClosed_Implementation(FGuid InConnectionI
     TArray<uint64> Cancelled;
     for(const TPair<uint64, FPendingRequest>& Pair : Pending)
     {
-        if(Pair.Value.Request.Participants.ContainsByPredicate([&InInventoryId](const FInventoryClientParticipant& Participant)
+        if(Pair.Value.Request.Participants.ContainsByPredicate([&InInventoryId, &InSessionId](const FInventoryClientParticipant& Participant)
         {
-            return Participant.InventoryId == InInventoryId;
+            return Participant.InventoryId == InInventoryId && Participant.SessionId == InSessionId;
         }))
         {
             Cancelled.Add(Pair.Key);
@@ -1365,13 +1421,25 @@ void UInventoryNetworkComponent::ClientClosed_Implementation(FGuid InConnectionI
     }
     for(uint64 RequestId : Cancelled)
     {
-        const FPendingRequest* Request = Pending.Find(RequestId);
-        const bool bSent = Request && Request->Attempts > 0;
-        Pending.Remove(RequestId);
+        if (ConnectionId != InConnectionId || ClientContextRevision != ContextRevision) return;
+        FPendingRequest* Request = Pending.Find(RequestId);
+        if (!Request || Request->Request.ConnectionId != InConnectionId) continue;
+        const bool bSent = Request->Attempts > 0;
+        if (bSent)
+        {
+            if (Request->bUnconfirmed) continue;
+            Request->bUnconfirmed = true;
+            Request->Attempts = FMath::Max(4, Request->Attempts);
+        }
+        else
+        {
+            Pending.Remove(RequestId);
+        }
         FInventoryCommandResult Result;
         Result.RequestId = RequestId;
         Result.Code = bSent ? EInventoryResultCode::ConfirmationPending : InReason;
+        if (!bSent && Result.IsSuccess()) Result.Code = EInventoryResultCode::InvalidState;
         OnResult.Broadcast(Result);
     }
-    if (!bLocallyClosed) OnSessionClosed.Broadcast(InInventoryId, InReason);
+    if (ConnectionId == InConnectionId && ClientContextRevision == ContextRevision && !bLocallyClosed) OnSessionClosed.Broadcast(InInventoryId, InReason);
 }

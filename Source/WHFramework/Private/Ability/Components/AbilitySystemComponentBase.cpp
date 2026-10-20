@@ -1274,6 +1274,12 @@ bool UAbilitySystemComponentBase::IsActionActive(const FGuid& ActivationId) cons
 	return FindActiveAction(ActivationId) != nullptr;
 }
 
+FGameplayAbilitySpecHandle UAbilitySystemComponentBase::GetPendingActionHandle(const FGuid& ActivationId) const
+{
+	const FGameplayAbilitySpecHandle* Handle = PendingActionReplies.Find(ActivationId);
+	return Handle ? *Handle : FGameplayAbilitySpecHandle();
+}
+
 bool UAbilitySystemComponentBase::GetActionResult(const FGuid& ActivationId, FAbilityActionResult& OutResult) const
 {
 	if (const FAbilityActionResult* Result = RecentActionResults.Find(ActivationId))

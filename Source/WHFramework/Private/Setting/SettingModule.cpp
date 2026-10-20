@@ -842,6 +842,7 @@ bool USettingModule::WriteSessionValue(FSettingModuleSaveData& InData, FSettingI
 
 FSettingModuleSaveData USettingModule::GetCurrentCombinedSettings() const
 {
+	const FScopedWorldContext WorldContext(GetWorld());
 	FSettingModuleSaveData Data;
 	Data.WidgetData = UWidgetModule::Get().GetSaveData(true).GetRef<FWidgetModuleSaveData>();
 	Data.AudioData = UAudioModule::Get().GetSaveData(true).GetRef<FAudioModuleSaveData>();
@@ -859,12 +860,14 @@ FSettingModuleSaveData USettingModule::GetDefaultCombinedSettings() const
 
 void USettingModule::ApplyCombinedSettings(FSettingModuleSaveData& InData)
 {
+	const FScopedWorldContext WorldContext(GetWorld());
 	UWidgetModule::Get().LoadSaveData(FParameter(InData.WidgetData), EPhase::All);
 	UVideoModule::Get().LoadSaveData(FParameter(InData.VideoData), EPhase::All);
 }
 
 void USettingModule::SaveSettings()
 {
+	const FScopedWorldContext WorldContext(GetWorld());
 	USaveGameModuleStatics::SaveProfile();
 }
 
@@ -1281,6 +1284,7 @@ bool USettingModule::SetPendingValue(FSettingId InSettingId, const FParameter& I
 		BroadcastEditStateChanged();
 		return false;
 	}
+	const FParameter PreviousValue = GetPendingValue(InSettingId);
 	if (!WriteSessionValue(EditSession.PendingData, InSettingId, InValue))
 	{
 		return false;
@@ -1289,12 +1293,25 @@ bool USettingModule::SetPendingValue(FSettingId InSettingId, const FParameter& I
 	{
 		if (Definition->SourcePath.StartsWith(TEXT("WidgetData.")))
 		{
-			FWidgetModuleSaveData Preview = UWidgetModule::Get().GetSaveData(true).GetRef<FWidgetModuleSaveData>();
-			FResolvedSettingProperty Resolved;
-			if (ResolvePropertyPath(FWidgetModuleSaveData::StaticStruct(), &Preview, Definition->SourcePath.RightChop(11), Resolved) && WritePropertyValue(Resolved, InValue))
+			UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld());
+			if (!Widgets)
 			{
-				UWidgetModule::Get().LoadSaveData(FParameter(Preview), EPhase::All);
+				WriteSessionValue(EditSession.PendingData, InSettingId, PreviousValue);
+				ValidationResults.Add(InSettingId, FSettingValidationResult::Invalid(NSLOCTEXT("WH.SettingModule", "WidgetServiceUnavailable", "当前世界的界面设置服务不可用。")));
+				BroadcastEditStateChanged();
+				return false;
 			}
+			FWidgetModuleSaveData Preview = Widgets->GetSaveData(true).GetRef<FWidgetModuleSaveData>();
+			FResolvedSettingProperty Resolved;
+			if (!ResolvePropertyPath(FWidgetModuleSaveData::StaticStruct(), &Preview, Definition->SourcePath.RightChop(11), Resolved) || !WritePropertyValue(Resolved, InValue))
+			{
+				WriteSessionValue(EditSession.PendingData, InSettingId, PreviousValue);
+				ValidationResults.Add(InSettingId, FSettingValidationResult::Invalid(NSLOCTEXT("WH.SettingModule", "WidgetPreviewRejected", "界面设置预览未能应用，已恢复原值。")));
+				BroadcastEditStateChanged();
+				return false;
+			}
+			const FScopedWorldContext WorldContext(GetWorld());
+			Widgets->LoadSaveData(FParameter(Preview), EPhase::All);
 		}
 	}
 	OnSettingValueChanged.Broadcast(InSettingId);
@@ -1391,6 +1408,7 @@ TArray<FSettingPageDefinition> USettingModule::GetSettingPages() const
 
 void USettingModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
+	const FScopedWorldContext WorldContext(GetWorld());
 	auto& SaveData = InSaveData.GetRef<FSettingModuleSaveData>();
 
 	UWidgetModule::Get().LoadSaveData(FParameter(SaveData.WidgetData), InPhase);
@@ -1407,6 +1425,7 @@ void USettingModule::UnloadData(EPhase InPhase)
 
 FParameter USettingModule::ToData()
 {
+	const FScopedWorldContext WorldContext(GetWorld());
 	FSettingModuleSaveData SaveData;
 
 	SaveData.WidgetData = UWidgetModule::Get().GetSaveData(true).GetRef<FWidgetModuleSaveData>();

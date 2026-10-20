@@ -9,6 +9,7 @@
 
 class UItemAbilityBase;
 class AInventoryPickupActor;
+class UEffectBase;
 
 struct WHFRAMEWORK_API FAbilityItemAttributeValue
 {
@@ -105,5 +106,8 @@ public:
 	virtual FInventoryItemDefinition BuildInventoryDefinition() const;
 
     static bool GetEquipmentAttributeValues(const FInventoryItemDefinition& InDefinition, int32 InLevel, TArray<FAbilityItemAttributeValue>& OutValues);
+    static bool GetEffectAttributeValues(const TArray<TSubclassOf<UEffectBase>>& InEffects, int32 InLevel, TArray<FAbilityItemAttributeValue>& OutValues);
+    static FText FormatAttributeName(const FAbilityItemAttributeValue& InValue);
+    static FText FormatAttributeValue(const FAbilityItemAttributeValue& InValue, float InMagnitude, bool bInSigned);
 };
 

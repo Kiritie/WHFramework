@@ -1,6 +1,7 @@
 #include "Setting/Provider/ParameterSettingProvider.h"
 
 #include "Parameter/ParameterModule.h"
+#include "Common/CommonModuleTypes.h"
 
 namespace
 {
@@ -32,8 +33,10 @@ namespace
 
 void UParameterSettingProvider::CollectDefinitions(TArray<FSettingDefinition>& OutDefinitions) const
 {
+	UParameterModule* Parameters = UParameterModule::GetPtr(GetWorld());
+	if (!Parameters) return;
 	int32 Order = 0;
-	for(const FParameterSet& ParameterSet : UParameterModule::Get().GetAllParameter())
+	for(const FParameterSet& ParameterSet : Parameters->GetAllParameter())
 	{
 		FSettingDefinition& Definition = OutDefinitions.AddDefaulted_GetRef();
 		Definition.SettingId = FSettingId(MakeParameterSettingId(ParameterSet));
@@ -60,7 +63,9 @@ void UParameterSettingProvider::BeginEdit(const TArray<FSettingDefinition>& InDe
 	DefaultValues.Reset();
 	ParameterNames.Reset();
 
-	for(const FParameterSet& ParameterSet : UParameterModule::Get().GetAllParameter())
+	UParameterModule* Parameters = UParameterModule::GetPtr(GetWorld());
+	if (!Parameters) return;
+	for(const FParameterSet& ParameterSet : Parameters->GetAllParameter())
 	{
 		const FSettingId SettingId(MakeParameterSettingId(ParameterSet));
 		AppliedValues.Add(SettingId, ParameterSet.Parameter);
@@ -100,12 +105,14 @@ bool UParameterSettingProvider::SetPendingValue(const FSettingDefinition& InDefi
 
 bool UParameterSettingProvider::Apply(const FSettingDefinition& InDefinition, const FParameter& InValue)
 {
+	UParameterModule* Parameters = UParameterModule::GetPtr(GetWorld());
 	const FName* ParameterName = ParameterNames.Find(InDefinition.SettingId);
-	if(!ParameterName)
+	if(!Parameters || !ParameterName)
 	{
 		return false;
 	}
-	UParameterModule::Get().SetParameter(*ParameterName, InValue);
+	const FScopedWorldContext WorldContext(GetWorld());
+	Parameters->SetParameter(*ParameterName, InValue);
 	return true;
 }
 

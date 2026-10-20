@@ -1,6 +1,7 @@
 #include "Setting/Provider/AudioSettingProvider.h"
 
 #include "Audio/AudioModule.h"
+#include "Common/CommonModuleTypes.h"
 
 namespace
 {
@@ -35,6 +36,7 @@ namespace
 
 void UAudioSettingProvider::CollectDefinitions(TArray<FSettingDefinition>& OutDefinitions) const
 {
+	if (!UAudioModule::GetPtr(GetWorld())) return;
 	OutDefinitions.Add(MakeAudioVolumeDefinition(MasterVolumeId, NSLOCTEXT("WH.Setting", "MasterVolume", "Master Volume"), 0));
 	OutDefinitions.Add(MakeAudioVolumeDefinition(BackgroundVolumeId, NSLOCTEXT("WH.Setting", "BackgroundVolume", "Background Volume"), 1));
 	OutDefinitions.Add(MakeAudioVolumeDefinition(EnvironmentVolumeId, NSLOCTEXT("WH.Setting", "EnvironmentVolume", "Environment Volume"), 2));
@@ -49,7 +51,8 @@ bool UAudioSettingProvider::CanHandle(const FSettingDefinition& InDefinition) co
 void UAudioSettingProvider::BeginEdit(const TArray<FSettingDefinition>& InDefinitions)
 {
 	Super::BeginEdit(InDefinitions);
-	AppliedData = UAudioModule::Get().GetSaveData(true).GetRef<FAudioModuleSaveData>();
+	UAudioModule* Audio = UAudioModule::GetPtr(GetWorld());
+	AppliedData = Audio ? Audio->GetSaveData(true).GetRef<FAudioModuleSaveData>() : FAudioModuleSaveData();
 	PendingData = AppliedData;
 	DefaultData = FAudioModuleSaveData();
 }
@@ -82,27 +85,29 @@ bool UAudioSettingProvider::SetPendingValue(const FSettingDefinition& InDefiniti
 
 bool UAudioSettingProvider::Apply(const FSettingDefinition& InDefinition, const FParameter& InValue)
 {
+	UAudioModule* Audio = UAudioModule::GetPtr(GetWorld());
 	float Value = 0.f;
-	if(!InValue.TryGet(Value))
+	if(!Audio || !CanHandle(InDefinition) || !InValue.TryGet(Value))
 	{
 		return false;
 	}
 
+	const FScopedWorldContext WorldContext(GetWorld());
 	if(InDefinition.SettingId.Name == MasterVolumeId)
 	{
-		UAudioModule::Get().SetGlobalSoundVolume(Value);
+		Audio->SetGlobalSoundVolume(Value);
 	}
 	else if(InDefinition.SettingId.Name == BackgroundVolumeId)
 	{
-		UAudioModule::Get().SetBackgroundSoundVolume(Value);
+		Audio->SetBackgroundSoundVolume(Value);
 	}
 	else if(InDefinition.SettingId.Name == EnvironmentVolumeId)
 	{
-		UAudioModule::Get().SetEnvironmentSoundVolume(Value);
+		Audio->SetEnvironmentSoundVolume(Value);
 	}
 	else if(InDefinition.SettingId.Name == EffectVolumeId)
 	{
-		UAudioModule::Get().SetEffectSoundVolume(Value);
+		Audio->SetEffectSoundVolume(Value);
 	}
 	else
 	{

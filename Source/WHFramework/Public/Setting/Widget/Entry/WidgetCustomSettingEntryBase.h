@@ -11,6 +11,9 @@ class WHFRAMEWORK_API UWidgetCustomSettingEntryBase : public UWidgetSettingEntry
 {
 	GENERATED_BODY()
 
+public:
+	virtual void SetSettingEntry(USettingEntry* InEntry) override;
+
 protected:
 	virtual UWidget* GetValueControl() const override;
 	virtual FName GetRendererName() const override;

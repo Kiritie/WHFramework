@@ -218,8 +218,11 @@ void FWidgetThemeToolkit::Open(UWidgetTheme* InTheme, const TSharedPtr<IToolkitH
 	UCommonWindow* Window = NewObject<UCommonWindow>(PreviewRoot);
 	PrepareControl(Window);
 	Window->SetTitle(LOCTEXT("WindowTitlePreview", "Window 窗体标题"));
+	Window->SetShowCloseButton(true);
 	UCommonTextBlockN* WindowText = NewObject<UCommonTextBlockN>(Window);
-	WindowText->SetText(LOCTEXT("WindowContentPreview", "NamedSlot 窗体内容"));
+	WindowText->SetAutoWrapText(true);
+	WindowText->SetWrapTextAt(420.f);
+	WindowText->SetText(LOCTEXT("WindowContentPreview", "NamedSlot 窗体内容。关闭按钮的样式、文字、尺寸与间距由窗口样式配置；关闭请求由外层界面处理。"));
 	Window->SetContentForSlot(TEXT("Content"), WindowText);
 	PreviewControls.Add(EWidgetStyleKind::Window, Window);
 	FDetailsViewArgs Args;

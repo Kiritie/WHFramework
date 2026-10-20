@@ -5,6 +5,18 @@
 #include "Setting/Widget/Entry/WidgetCustomSettingValueBase.h"
 #include "Widget/Common/CommonTextBlockN.h"
 
+void UWidgetCustomSettingEntryBase::SetSettingEntry(USettingEntry* InEntry)
+{
+	if (SettingEntry != InEntry)
+	{
+		UnbindValueControl();
+		UWidgetCustomSettingValueBase* Previous = ValueControl;
+		ValueControl = nullptr;
+		if (Previous) Previous->RemoveFromParent();
+	}
+	Super::SetSettingEntry(InEntry);
+}
+
 UWidget* UWidgetCustomSettingEntryBase::GetValueControl() const
 {
 	return ValueControl;

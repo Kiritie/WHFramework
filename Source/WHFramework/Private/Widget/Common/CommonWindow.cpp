@@ -2,10 +2,15 @@
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/NamedSlot.h"
+#include "Components/SizeBox.h"
+#include "Components/SizeBoxSlot.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Widget/Common/CommonTextBlockN.h"
+#include "Widget/Common/CommonButton.h"
 #include "Widget/Style/CommonWindowStyle.h"
 #include "Widget/Theme/WidgetStyleTags.h"
 
@@ -38,12 +43,59 @@ void UCommonWindow::BuildNativeLayout()
 	WidgetTree->RootWidget = WindowBody;
 	UVerticalBox* Column = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("WindowColumn"));
 	WindowBody->AddChild(Column);
+	TitleBarSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("TitleBarSize"));
+	Column->AddChildToVerticalBox(TitleBarSize);
+	TitleBar = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("TitleBar"));
+	TitleBarSize->AddChild(TitleBar);
 	Txt_Title = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass(), TEXT("Txt_Title"));
 	Txt_Title->SetStyleTag(FGameplayTag());
-	Column->AddChildToVerticalBox(Txt_Title);
+	UHorizontalBoxSlot* TitleSlot = TitleBar->AddChildToHorizontalBox(Txt_Title);
+	TitleSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	TitleSlot->SetVerticalAlignment(VAlign_Center);
+	Btn_Close = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_Close"));
+	TitleBar->AddChildToHorizontalBox(Btn_Close)->SetVerticalAlignment(VAlign_Top);
 	Content = WidgetTree->ConstructWidget<UNamedSlot>(UNamedSlot::StaticClass(), TEXT("Content"));
 	Column->AddChildToVerticalBox(Content)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 	SetTitle(Title);
+}
+
+void UCommonWindow::BindControlEvents()
+{
+	Super::BindControlEvents();
+	if (Btn_Close)
+	{
+		Btn_Close->OnClicked().RemoveAll(this);
+		Btn_Close->OnClicked().AddUObject(this, &ThisClass::RequestClose);
+	}
+}
+
+void UCommonWindow::UnbindControlEvents()
+{
+	if (Btn_Close) Btn_Close->OnClicked().RemoveAll(this);
+	Super::UnbindControlEvents();
+}
+
+void UCommonWindow::OnDespawn_Implementation(EObjectDespawnMode InMode)
+{
+	OnCloseRequested.Clear();
+	Super::OnDespawn_Implementation(InMode);
+}
+
+void UCommonWindow::RequestClose()
+{
+	if (bShowCloseButton && GetIsEnabled()) OnCloseRequested.Broadcast();
+}
+
+void UCommonWindow::SetShowCloseButton(bool bInShowCloseButton)
+{
+	bShowCloseButton = bInShowCloseButton;
+	SetTitle(Title);
+}
+
+void UCommonWindow::SetCloseButtonStyleTag(FGameplayTag InStyleTag)
+{
+	CloseButtonStyleTag = InStyleTag;
+	RefreshStyle();
 }
 
 void UCommonWindow::SynchronizeProperties()
@@ -63,6 +115,9 @@ void UCommonWindow::SetTitle(const FText& InTitle)
 		Txt_Title->SetText(Title);
 		Txt_Title->SetVisibility(Title.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
 	}
+	if (Btn_Close) Btn_Close->SetVisibility(bShowCloseButton ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	if (TitleBar) TitleBar->SetVisibility(Title.IsEmpty() && !bShowCloseButton ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+	if (TitleBarSize) TitleBarSize->SetVisibility(Title.IsEmpty() && !bShowCloseButton ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 }
 
 void UCommonWindow::GetSlotNames(TArray<FName>& SlotNames) const
@@ -96,6 +151,12 @@ void UCommonWindow::ApplyResolvedStyle(const UObject* InStyle)
 	WindowBody->SetPadding(Style->Padding);
 	Txt_Title->SetStyle(Style->TitleTextStyle);
 	Txt_Title->SetWrapTextAt(Style->TextWidth);
-	CastChecked<UVerticalBoxSlot>(Txt_Title->Slot)->SetPadding(FMargin(0.f, 0.f, 0.f, Style->TitleSpacing));
+	if (Style->TitleBarHeight > 0.f) TitleBarSize->SetHeightOverride(Style->TitleBarHeight);
+	else TitleBarSize->ClearHeightOverride();
+	CastChecked<UVerticalBoxSlot>(TitleBarSize->Slot)->SetPadding(FMargin(0.f, 0.f, 0.f, Style->TitleSpacing));
+	Btn_Close->SetStyleTag(CloseButtonStyleTag.IsValid() ? CloseButtonStyleTag : Style->CloseButtonStyleTag);
+	Btn_Close->SetTitle(Style->CloseButtonText);
+	Btn_Close->SetContentMinSize(Style->CloseButtonSize);
+	CastChecked<UHorizontalBoxSlot>(Btn_Close->Slot)->SetPadding(Style->CloseButtonPadding);
 	SetTitle(Title);
 }

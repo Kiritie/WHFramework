@@ -1,6 +1,7 @@
 #include "Setting/Provider/InputSettingProvider.h"
 
 #include "Input/InputModule.h"
+#include "Common/CommonModuleTypes.h"
 
 namespace
 {
@@ -24,7 +25,9 @@ namespace
 
 void UInputSettingProvider::CollectDefinitions(TArray<FSettingDefinition>& OutDefinitions) const
 {
-	for(const FInputMappableEntry& Entry : UInputModule::Get().GetAllMappableEntries())
+	const UInputModule* Input = UInputModule::GetPtr(GetWorld());
+	if (!Input) return;
+	for(const FInputMappableEntry& Entry : Input->GetAllMappableEntries())
 	{
 		const FSettingId SettingId{FName(*FString::Printf(TEXT("Input.%s.%s"), *Entry.MappingName.ToString(), *GetSlotName(Entry.Slot)))};
 		FSettingDefinition* Definition = OutDefinitions.FindByPredicate([SettingId](const FSettingDefinition& Item)
@@ -106,19 +109,36 @@ FParameter UInputSettingProvider::GetDefaultValue(const FSettingDefinition& InDe
 
 FSettingValidationResult UInputSettingProvider::Validate(const FSettingDefinition& InDefinition, const FParameter& InValue) const
 {
+	UInputModule* Input = UInputModule::GetPtr(GetWorld());
+	if (!Input)
+	{
+		return FSettingValidationResult::Invalid(NSLOCTEXT("WH.InputSettingProvider", "Unavailable", "当前世界的输入设置服务不可用。"));
+	}
 	const FKey* Key = InValue.GetPtr<FKey>();
 	if(!Key || !Key->IsValid())
 	{
 		return FSettingValidationResult::Invalid(NSLOCTEXT("WH.InputSettingProvider", "InvalidKey", "请选择有效的按键。"));
 	}
 
-	for(const FPlayerKeyMapping& Mapping : UInputModule::Get().GetAllPlayerKeyMappings())
+	const auto Conflict = [Key]()
 	{
-		if(Mapping.GetCurrentKey() == *Key && (Mapping.GetMappingName() != FName(*InDefinition.SourcePath) || Mapping.GetSlot() != static_cast<EPlayerMappableKeySlot>(InDefinition.Order)))
+		return FSettingValidationResult::Invalid(FText::Format(
+			NSLOCTEXT("WH.InputSettingProvider", "KeyConflict", "按键 {0} 已被其他输入操作占用。"),
+			Key->GetDisplayName()));
+	};
+	for (const TPair<FSettingId, FKey>& Pending : PendingKeys)
+	{
+		if (Pending.Key != InDefinition.SettingId && Pending.Value == *Key)
 		{
-			return FSettingValidationResult::Invalid(FText::Format(
-				NSLOCTEXT("WH.InputSettingProvider", "KeyConflict", "按键 {0} 已被其他输入操作占用。"),
-				Key->GetDisplayName()));
+			return Conflict();
+		}
+	}
+	for(const FPlayerKeyMapping& Mapping : Input->GetAllPlayerKeyMappings())
+	{
+		const FSettingId MappingId{FName(*FString::Printf(TEXT("Input.%s.%s"), *Mapping.GetMappingName().ToString(), *GetSlotName(Mapping.GetSlot())))};
+		if (!PendingKeys.Contains(MappingId) && MappingId != InDefinition.SettingId && Mapping.GetCurrentKey() == *Key)
+		{
+			return Conflict();
 		}
 	}
 	return FSettingValidationResult::Valid();
@@ -137,14 +157,16 @@ bool UInputSettingProvider::SetPendingValue(const FSettingDefinition& InDefiniti
 
 bool UInputSettingProvider::Apply(const FSettingDefinition& InDefinition, const FParameter& InValue)
 {
+	UInputModule* Input = UInputModule::GetPtr(GetWorld());
 	const FKey* Key = InValue.GetPtr<FKey>();
-	if(!Key)
+	if(!Input || !CanHandle(InDefinition) || !Key)
 	{
 		return false;
 	}
 
 	FGameplayTagContainer FailureReasons;
-	return UInputModule::Get().MapPlayerKeyByMappingName(
+	const FScopedWorldContext WorldContext(GetWorld());
+	return Input->MapPlayerKeyByMappingName(
 		FName(*InDefinition.SourcePath),
 		*Key,
 		static_cast<EPlayerMappableKeySlot>(InDefinition.Order),
@@ -156,10 +178,7 @@ void UInputSettingProvider::Rollback(const FSettingDefinition& InDefinition)
 {
 	if(const FKey* Key = AppliedKeys.Find(InDefinition.SettingId))
 	{
-		UInputModule::Get().MapPlayerKeyByMappingName(
-			FName(*InDefinition.SourcePath),
-			*Key,
-			static_cast<EPlayerMappableKeySlot>(InDefinition.Order));
+		Apply(InDefinition, FParameter(*Key));
 		PendingKeys.Add(InDefinition.SettingId, *Key);
 	}
 }
@@ -178,8 +197,10 @@ void UInputSettingProvider::EndEdit()
 
 FKey UInputSettingProvider::FindCurrentKey(const FSettingDefinition& InDefinition) const
 {
+	const UInputModule* Input = UInputModule::GetPtr(GetWorld());
+	if (!Input) return FKey();
 	const EPlayerMappableKeySlot Slot = static_cast<EPlayerMappableKeySlot>(InDefinition.Order);
-	const TArray<FPlayerKeyMapping> Mappings = UInputModule::Get().GetPlayerKeyMappingsByMappingName(FName(*InDefinition.SourcePath));
+	const TArray<FPlayerKeyMapping> Mappings = Input->GetPlayerKeyMappingsByMappingName(FName(*InDefinition.SourcePath));
 	if(const FPlayerKeyMapping* Mapping = Mappings.FindByPredicate([Slot](const FPlayerKeyMapping& Item)
 	{
 		return Item.GetSlot() == Slot;
@@ -192,9 +213,11 @@ FKey UInputSettingProvider::FindCurrentKey(const FSettingDefinition& InDefinitio
 
 FKey UInputSettingProvider::FindDefaultKey(const FSettingDefinition& InDefinition) const
 {
+	const UInputModule* Input = UInputModule::GetPtr(GetWorld());
+	if (!Input) return FKey();
 	const FName MappingName(*InDefinition.SourcePath);
 	const EPlayerMappableKeySlot Slot = static_cast<EPlayerMappableKeySlot>(InDefinition.Order);
-	const TArray<FInputMappableEntry> Entries = UInputModule::Get().GetAllMappableEntries();
+	const TArray<FInputMappableEntry> Entries = Input->GetAllMappableEntries();
 	if(const FInputMappableEntry* Entry = Entries.FindByPredicate([MappingName, Slot](const FInputMappableEntry& Item)
 	{
 		return Item.MappingName == MappingName && Item.Slot == Slot;

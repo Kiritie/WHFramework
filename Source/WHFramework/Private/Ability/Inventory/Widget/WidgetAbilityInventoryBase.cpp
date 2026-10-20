@@ -43,14 +43,14 @@ TSharedRef<SWidget> UWidgetAbilityInventoryBase::RebuildWidget()
         UVerticalBox* Root = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventoryRoot"));
         ResultText = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass(), TEXT("ResultText"));
         Root->AddChildToVerticalBox(ResultText);
-        UHorizontalBox* Toolbar = WidgetTree->ConstructWidget<UHorizontalBox>();
+        InventoryActions = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("InventoryActions"));
         Btn_Sort = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_Sort"));
         Btn_Sort->SetTitle(NSLOCTEXT("WH.Inventory", "Sort", "整理当前分组"));
-        Toolbar->AddChildToHorizontalBox(Btn_Sort);
+        InventoryActions->AddChildToHorizontalBox(Btn_Sort);
         Btn_QuickStack = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_QuickStack"));
         Btn_QuickStack->SetTitle(NSLOCTEXT("WH.Inventory", "QuickStack", "快捷堆叠"));
-        Toolbar->AddChildToHorizontalBox(Btn_QuickStack);
-        Root->AddChildToVerticalBox(Toolbar);
+        InventoryActions->AddChildToHorizontalBox(Btn_QuickStack);
+        Root->AddChildToVerticalBox(InventoryActions);
         UCommonScroll* Scroll = WidgetTree->ConstructWidget<UCommonScroll>(UCommonScroll::StaticClass(), TEXT("InventoryScroll"));
         InventoryContent = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("InventoryContent"));
         Scroll->AddChild(InventoryContent);
@@ -74,6 +74,32 @@ TSharedRef<SWidget> UWidgetAbilityInventoryBase::RebuildWidget()
 void UWidgetAbilityInventoryBase::OnInitialize(const FParameter& InParams)
 {
     Super::OnInitialize(InParams);
+}
+
+void UWidgetAbilityInventoryBase::SynchronizeProperties()
+{
+    Super::SynchronizeProperties();
+    SetShowExtensionButtons(bShowExtensionButtons);
+}
+
+void UWidgetAbilityInventoryBase::SetShowExtensionButtons(bool bInShowExtensionButtons)
+{
+    bShowExtensionButtons = bInShowExtensionButtons;
+    const ESlateVisibility ActionsVisibility = bShowExtensionButtons ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed;
+    if (InventoryActions)
+    {
+        InventoryActions->SetVisibility(ActionsVisibility);
+    }
+    else
+    {
+        for (UCommonButton* Button : {Btn_Sort.Get(), Btn_QuickStack.Get()})
+        {
+            if (Button)
+            {
+                Button->SetVisibility(bShowExtensionButtons ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+            }
+        }
+    }
 }
 
 void UWidgetAbilityInventoryBase::OnRefresh()
@@ -219,11 +245,30 @@ void UWidgetAbilityInventoryBase::UnbindInventories()
     SelectedSlot = FInventorySlotKey();
     CancelSplit();
     SetToolTipText(FText::GetEmpty());
+    SetResultText(FText::GetEmpty());
 }
 
 FString UWidgetAbilityInventoryBase::SlotId(const FGuid& InInventoryId, const FInventorySlotKey& InSlot)
 {
     return InInventoryId.ToString(EGuidFormats::Digits) + TEXT("/") + InSlot.Group.ToString() + TEXT("/") + LexToString(InSlot.Index);
+}
+
+void UWidgetAbilityInventoryBase::SetGroupSlotHosts(FGameplayTag InGroup, const TMap<int32, UPanelWidget*>& InHosts)
+{
+    check(InGroup.IsValid());
+    TMap<int32, TWeakObjectPtr<UPanelWidget>> Hosts;
+    for (const TPair<int32, UPanelWidget*>& Entry : InHosts)
+    {
+        check(Entry.Key >= 0 && IsValid(Entry.Value) && Entry.Value->GetWorld() == GetWorld());
+        Hosts.Add(Entry.Key, Entry.Value);
+    }
+    const TMap<int32, TWeakObjectPtr<UPanelWidget>>* Previous = GroupSlotHosts.Find(InGroup);
+    if (Previous && Previous->OrderIndependentCompareEqual(Hosts))
+    {
+        return;
+    }
+    GroupSlotHosts.Add(InGroup, MoveTemp(Hosts));
+    RebuildViews();
 }
 
 void UWidgetAbilityInventoryBase::RebuildViews()
@@ -241,6 +286,7 @@ void UWidgetAbilityInventoryBase::RebuildViews()
     const bool bFixedSize = !GridSlotSize.IsNearlyZero();
     checkf(!bFixedSize || (FMath::IsFinite(GridSlotSize.X) && FMath::IsFinite(GridSlotSize.Y) && GridSlotSize.X > 0.f && GridSlotSize.Y > 0.f), TEXT("Fixed inventory cells require a positive finite size."));
     checkf(SlotHostPrefixes.IsEmpty() || InventoryIds.Num() <= 1, TEXT("Fixed inventory slot hosts require one bound inventory."));
+    checkf(GroupSlotHosts.IsEmpty() || InventoryIds.Num() <= 1, TEXT("External inventory slot hosts require one bound inventory."));
     TMap<FGameplayTag, UPanelWidget*> GroupPanels;
     for (const TPair<FGameplayTag, FName>& Mapping : GroupPanelNames)
     {
@@ -299,7 +345,16 @@ void UWidgetAbilityInventoryBase::RebuildViews()
                 continue;
             }
             UPanelWidget* FixedHost = nullptr;
-            if (const FName* Prefix = SlotHostPrefixes.Find(SlotState.Key.Group))
+            if (const TMap<int32, TWeakObjectPtr<UPanelWidget>>* Hosts = GroupSlotHosts.Find(SlotState.Key.Group))
+            {
+                const TWeakObjectPtr<UPanelWidget>* Host = Hosts->Find(SlotState.Key.Index);
+                if (!Host || !Host->IsValid())
+                {
+                    continue;
+                }
+                FixedHost = Host->Get();
+            }
+            else if (const FName* Prefix = SlotHostPrefixes.Find(SlotState.Key.Group))
             {
                 const FName HostName(*FString::Printf(TEXT("%s%d"), *Prefix->ToString(), SlotState.Key.Index));
                 FixedHost = Cast<UPanelWidget>(WidgetTree->FindWidget(HostName));
@@ -480,26 +535,30 @@ void UWidgetAbilityInventoryBase::HandleDelta(const FInventoryDelta& InDelta)
 
 void UWidgetAbilityInventoryBase::HandleResult(const FInventoryCommandResult& InResult)
 {
-    if (PendingSlots.Remove(InResult.RequestId) == 0)
+    if (!PendingSlots.Contains(InResult.RequestId))
     {
         return;
+    }
+    if (InResult.Code != EInventoryResultCode::ConfirmationPending || !Network.IsValid() || !Network->IsRequestUnconfirmed(InResult.RequestId))
+    {
+        PendingSlots.Remove(InResult.RequestId);
     }
     RefreshPending();
     if (ResultText)
     {
         if(InResult.Code == EInventoryResultCode::ConfirmationPending)
         {
-            ResultText->SetText(NSLOCTEXT("WH.Inventory", "AwaitConfirmation", "结果待确认，请等待重新同步库存。"));
+            SetResultText(NSLOCTEXT("WH.Inventory", "AwaitConfirmation", "结果待确认，请等待重新同步库存。"));
             return;
         }
         if (InResult.IsSuccess())
         {
-            ResultText->SetText(InResult.RemainingCount > 0 ? FText::Format(NSLOCTEXT("WH.Inventory", "Partial", "已处理 {0}，剩余 {1}"), FText::AsNumber(InResult.AcceptedCount), FText::AsNumber(InResult.RemainingCount)) : FText::GetEmpty());
+            SetResultText(InResult.RemainingCount > 0 ? FText::Format(NSLOCTEXT("WH.Inventory", "Partial", "已处理 {0}，剩余 {1}"), FText::AsNumber(InResult.AcceptedCount), FText::AsNumber(InResult.RemainingCount)) : FText::GetEmpty());
         }
         else
         {
             const UEnum* Codes = StaticEnum<EInventoryResultCode>();
-            ResultText->SetText(FText::Format(NSLOCTEXT("WH.Inventory", "Rejected", "操作未完成：{0}"), Codes->GetDisplayNameTextByValue(static_cast<int64>(InResult.Code))));
+            SetResultText(FText::Format(NSLOCTEXT("WH.Inventory", "Rejected", "操作未完成：{0}"), Codes->GetDisplayNameTextByValue(static_cast<int64>(InResult.Code))));
         }
     }
 }
@@ -517,7 +576,7 @@ void UWidgetAbilityInventoryBase::HandleClosed(const FGuid& InInventoryId, EInve
         RebuildViews();
         if (ResultText)
         {
-            ResultText->SetText(NSLOCTEXT("WH.Inventory", "Closed", "容器会话已关闭"));
+            SetResultText(NSLOCTEXT("WH.Inventory", "Closed", "容器会话已关闭"));
         }
     }
 }
@@ -860,7 +919,7 @@ void UWidgetAbilityInventoryBase::ConfirmSplitQuantity(int32 InQuantity)
     }
     else if (ResultText)
     {
-        ResultText->SetText(NSLOCTEXT("WH.Inventory", "SplitChanged", "拆分期间物品已变化，请重新选择。"));
+        SetResultText(NSLOCTEXT("WH.Inventory", "SplitChanged", "拆分期间物品已变化，请重新选择。"));
     }
 }
 
@@ -888,7 +947,7 @@ void UWidgetAbilityInventoryBase::Navigate(const FGuid& InInventoryId, const FIn
     FInventorySlotKey Target = InSlot;
     const TWeakObjectPtr<UWidgetAbilityInventorySlotBase>* Source = Slots.Find(SlotId(InInventoryId, InSlot));
     const bool bDirectional = InOffset == -1 || InOffset == 1 || InOffset == -10 || InOffset == 10;
-    if (bDirectional && SlotHostPrefixes.Contains(InSlot.Group) && Source && Source->IsValid() &&
+    if (bDirectional && (SlotHostPrefixes.Contains(InSlot.Group) || GroupSlotHosts.Contains(InSlot.Group)) && Source && Source->IsValid() &&
         Source->Get()->GetCachedGeometry().GetLocalSize().X > 0.f && Source->Get()->GetCachedGeometry().GetLocalSize().Y > 0.f)
     {
         const FGeometry& Geometry = Source->Get()->GetCachedGeometry();
@@ -997,5 +1056,6 @@ void UWidgetAbilityInventoryBase::SetResultText(const FText& InText)
     if (ResultText)
     {
         ResultText->SetText(InText);
+        ResultText->SetVisibility(InText.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
     }
 }

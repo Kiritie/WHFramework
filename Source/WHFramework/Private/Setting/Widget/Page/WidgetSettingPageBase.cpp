@@ -1,6 +1,7 @@
 #include "Setting/Widget/Page/WidgetSettingPageBase.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Engine/World.h"
 #include "CommonListView.h"
 #include "Setting/SettingEntry.h"
 #include "Setting/SettingCategoryEntry.h"
@@ -29,7 +30,6 @@ void UWidgetSettingPageBase::OnCreate(const FParameter& InParam)
 		SettingList->OnGetEntryClassForItem().BindUObject(this, &ThisClass::ResolveEntryClass);
 		SettingList->OnEntryWidgetGenerated().RemoveAll(this);
 		SettingList->OnEntryWidgetGenerated().AddUObject(this, &ThisClass::HandleEntryWidgetGenerated);
-		USettingModule::Get().OnSettingValueChanged.AddDynamic(this, &ThisClass::OnSettingValueChanged);
 		RefreshEntries();
 	}
 }
@@ -41,7 +41,9 @@ void UWidgetSettingPageBase::OnReset(bool bForce)
 	{
 		return;
 	}
-	for(USettingEntry* Entry : USettingModule::Get().GetSettingEntriesByPage(PageName))
+	USettingModule* Settings = GetSettingSource();
+	if (!Settings) return;
+	for(USettingEntry* Entry : Settings->GetSettingEntriesByPage(PageName))
 	{
 		if(Entry)
 		{
@@ -61,8 +63,35 @@ void UWidgetSettingPageBase::OnDestroy(EObjectDespawnMode InMode)
 	}
 	PendingFocusItem.Reset();
 	PendingFocusWidgetName = NAME_None;
-	USettingModule::Get().OnSettingValueChanged.RemoveDynamic(this, &ThisClass::OnSettingValueChanged);
+	SetSettingSource(nullptr);
 	Super::OnDestroy(InMode);
+}
+
+void UWidgetSettingPageBase::NativeConstruct()
+{
+	Super::NativeConstruct();
+	SetSettingSource(SettingSource.Get());
+}
+
+void UWidgetSettingPageBase::NativeDestruct()
+{
+	if (SettingSource.IsValid()) SettingSource->OnSettingValueChanged.RemoveDynamic(this, &ThisClass::OnSettingValueChanged);
+	Super::NativeDestruct();
+}
+
+USettingModule* UWidgetSettingPageBase::GetSettingSource() const
+{
+	const UWorld* World = GetWorld();
+	USettingModule* Settings = SettingSource.Get();
+	return World && !World->bIsTearingDown && Settings && Settings->GetWorld() == World && Settings->IsEditSessionActive() ? Settings : nullptr;
+}
+
+void UWidgetSettingPageBase::SetSettingSource(USettingModule* InSource)
+{
+	if (SettingSource.IsValid()) SettingSource->OnSettingValueChanged.RemoveDynamic(this, &ThisClass::OnSettingValueChanged);
+	SettingSource = InSource;
+	if (USettingModule* Settings = GetSettingSource()) Settings->OnSettingValueChanged.AddUniqueDynamic(this, &ThisClass::OnSettingValueChanged);
+	RefreshEntries();
 }
 
 void UWidgetSettingPageBase::NativeOnActivated()
@@ -82,7 +111,7 @@ void UWidgetSettingPageBase::OnApply()
 
 void UWidgetSettingPageBase::OnSettingValueChanged(FSettingId InSettingId)
 {
-	if(!SettingList)
+	if(!SettingList || !GetSettingSource())
 	{
 		return;
 	}
@@ -173,7 +202,8 @@ void UWidgetSettingPageBase::HandleEntryWidgetGenerated(UUserWidget& InEntryWidg
 
 bool UWidgetSettingPageBase::CanApply_Implementation() const
 {
-	return !PageName.IsNone() && USettingModule::Get().CanApply();
+	const USettingModule* Settings = GetSettingSource();
+	return !PageName.IsNone() && Settings && Settings->CanApply();
 }
 
 bool UWidgetSettingPageBase::CanReset_Implementation() const
@@ -182,7 +212,9 @@ bool UWidgetSettingPageBase::CanReset_Implementation() const
 	{
 		return false;
 	}
-	for(USettingEntry* Entry : USettingModule::Get().GetSettingEntriesByPage(PageName))
+	USettingModule* Settings = GetSettingSource();
+	if (!Settings) return false;
+	for(USettingEntry* Entry : Settings->GetSettingEntriesByPage(PageName))
 	{
 		if(Entry && Entry->CanReset())
 		{
@@ -220,7 +252,8 @@ void UWidgetSettingPageBase::RefreshEntries()
 	}
 
 	CategoryEntries.Reset();
-	TArray<USettingEntry*> Entries = USettingModule::Get().GetSettingEntriesByPage(PageName);
+	const USettingModule* Settings = GetSettingSource();
+	TArray<USettingEntry*> Entries = Settings ? Settings->GetSettingEntriesByPage(PageName) : TArray<USettingEntry*>();
 	Entries.Sort([](const USettingEntry& A, const USettingEntry& B)
 	{
 		const FSettingDefinition& DefinitionA = A.GetDefinition();

@@ -89,6 +89,7 @@ public:
 	FAbilityActionStartResult RequestAction(const FAbilityActionRequest& Request);
 	bool CancelAction(const FGuid& ActivationId, FGameplayTag Reason);
 	bool GetActionResult(const FGuid& ActivationId, FAbilityActionResult& OutResult) const;
+	FGameplayAbilitySpecHandle GetPendingActionHandle(const FGuid& ActivationId) const;
 	bool IsActionActive(const FGuid& ActivationId) const;
 	FOnAbilityActionFinished OnActionFinished;
 	bool ValidateGrantedRequest(const FAbilityActionRequest& Request, FGameplayTag& OutReason, bool bRequireReplicatedEntry = true) const;

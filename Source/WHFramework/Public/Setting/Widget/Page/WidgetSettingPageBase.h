@@ -9,6 +9,7 @@ class USettingEntry;
 class USettingCategoryEntry;
 class UWidgetSettingEntryBase;
 class UWidget;
+class USettingModule;
 struct FSettingPageDefinition;
 
 UCLASS()
@@ -27,6 +28,8 @@ public:
 	virtual void OnReset(bool bForce) override;
 
 	virtual void OnDestroy(EObjectDespawnMode InMode) override;
+	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// CommonActivatableWidget
@@ -61,6 +64,7 @@ public:
 	void SetPage(FName InPage);
 
 	void SetPageDefinition(const FSettingPageDefinition& InDefinition);
+	void SetSettingSource(USettingModule* InSource);
 
 	UFUNCTION(BlueprintCallable)
 	void RefreshEntries();
@@ -69,6 +73,8 @@ protected:
 	TSubclassOf<UUserWidget> ResolveEntryClass(UObject* InItem) const;
 
 private:
+	USettingModule* GetSettingSource() const;
+	TWeakObjectPtr<USettingModule> SettingSource;
 	void HandleThemeChanged();
 	void HandleEntryWidgetGenerated(UUserWidget& InEntryWidget);
 	TWeakObjectPtr<UObject> PendingFocusItem;

@@ -1,4 +1,5 @@
 #include "Widget/Style/CommonWindowStyle.h"
+#include "Widget/Theme/WidgetStyleTags.h"
 
 UCommonWindowStyle::UCommonWindowStyle()
 {
@@ -7,4 +8,6 @@ UCommonWindowStyle::UCommonWindowStyle()
 	Background.OutlineSettings.CornerRadii = FVector4(4.f, 4.f, 4.f, 4.f);
 	Background.OutlineSettings.RoundingType = ESlateBrushRoundingType::FixedRadius;
 	TitleTextStyle = UCommonTextStyle::StaticClass();
+	CloseButtonStyleTag = WidgetStyleTags::CommonDefault(EWidgetStyleKind::Button);
+	CloseButtonText = NSLOCTEXT("WH.Window", "Close", "关闭");
 }

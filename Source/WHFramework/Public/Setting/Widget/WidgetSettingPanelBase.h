@@ -12,6 +12,8 @@ class UCommonButton;
 class UCommonButtonGroup;
 class UPanelWidget;
 class UCommonTextBlockN;
+class USettingModule;
+class UCommonWindow;
 /**
  * 
  */
@@ -33,6 +35,7 @@ public:
 	virtual void OnClose(bool bInstant) override;
 
 	virtual void OnDestroy(EObjectDespawnMode InMode) override;
+	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
@@ -54,10 +57,15 @@ protected:
 	void RefreshPages();
 	virtual void RefreshConfirmation();
 	void ReleaseEditSession();
+	void BindEditObservers();
+	void UnbindEditObservers();
+	USettingModule* GetSettingSource() const;
 	bool bOwnsEditSession = false;
+	TWeakObjectPtr<USettingModule> EditSessionSource;
+	FText SessionStatus;
+	uint64 EditSessionRevision = 0;
+	UFUNCTION()
 	void OnCloseButtonClicked();
-	void OnConfirmButtonClicked();
-	void OnRevertButtonClicked();
 	FTimerHandle ConfirmationRefreshTimer;
 
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnConfirmationRequested")
@@ -70,6 +78,9 @@ protected:
 	void GenerateSettingPages();
 
 protected:
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCommonTextBlockN> Txt_Status;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UCommonActivatableWidgetSwitcher* Switcher_Page;
 
@@ -79,8 +90,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = false), Category = "Components")
 	UCommonButton* Btn_Reset;
 
-	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UCommonButton> Btn_Close;
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCommonWindow> Window_Content;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget, OptionalWidget = true), Category = "Components")
 	TObjectPtr<UPanelWidget> PageItemContainer;

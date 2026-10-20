@@ -234,6 +234,9 @@ public:
     void UnregisterAction(FName InAction);
     uint64 SubmitRequest(FInventoryClientRequest InRequest);
     TArray<FInventoryClientRequest> GetPendingRequests() const;
+    bool GetPendingRequest(uint64 InRequestId, FInventoryClientRequest& OutRequest) const;
+    bool IsRequestUnconfirmed(uint64 InRequestId) const;
+    bool RetryRequest(uint64 InRequestId);
     void OpenInventory(const FGuid& InInventoryId, uint32 InGeneration = 1);
     void CloseInventory(const FGuid& InInventoryId);
     void ResyncInventory(const FGuid& InInventoryId);
@@ -281,6 +284,7 @@ private:
         FInventoryClientRequest Request;
         double SentAt = 0;
         int32 Attempts = 1;
+        bool bUnconfirmed = false;
     };
 
     struct FActionReceipt
