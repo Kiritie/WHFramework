@@ -232,7 +232,7 @@ bool FThemeAllTypesAndParentChainTest::RunTest(const FString& Parameters)
 	Utilities->ParentTheme = Framework;
 	Game->ParentTheme = Utilities;
 	FString Error;
-	TestEqual(TEXT("Exactly ten supported style kinds"), WidgetStyleTags::Kinds().Num(), 10);
+	TestEqual(TEXT("Exactly eleven supported style kinds"), WidgetStyleTags::Kinds().Num(), 11);
 	for (EWidgetStyleKind Type : WidgetStyleTags::Kinds())
 	{
 		const FString FullTag = WidgetStyleTags::Root(Type).ToString() + TEXT(".ThemeParentChain");
@@ -894,7 +894,7 @@ bool FThemeTreeAndLayoutTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	const auto Roots = FWidgetThemeTree::Build(Theme, EWidgetStyleKind::None, TEXT(""));
-	TestEqual(TEXT("Ten roots always present"), Roots.Num(), 10);
+	TestEqual(TEXT("Eleven roots always present"), Roots.Num(), 11);
 	TestTrue(TEXT("No outer Style node"), Roots[0]->bRoot && Roots[0]->Tag == WidgetStyleTags::Button);
 	const auto BrushRoot = Roots[2];
 	TestEqual(TEXT("Shared parent visible"), BrushRoot->Children.Num(), 1);
@@ -1118,7 +1118,9 @@ bool FThemeRenameReferenceTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Source and config reference rewritten"), Text.Contains(NewName));
 		TestFalse(TEXT("Old reference replaced exactly"), Text.Contains(OldName + TEXT("\n")));
 	}
-	TestFalse(TEXT("The old Tag definition is removed"), FGameplayTag::RequestGameplayTag(FName(*OldName), false).IsValid());
+	FGameplayTagContainer RegisteredTags;
+	UGameplayTagsManager::Get().RequestAllGameplayTags(RegisteredTags, true);
+	TestFalse(TEXT("The old Tag definition is removed"), RegisteredTags.HasTagExact(OldTag));
 	FGameplayTag RedirectedTag = OldTag;
 	UGameplayTagsManager::Get().RedirectSingleGameplayTag(RedirectedTag, nullptr);
 	TestEqual(TEXT("Old serialized Tags resolve through the native redirect"), RedirectedTag, NewTag);

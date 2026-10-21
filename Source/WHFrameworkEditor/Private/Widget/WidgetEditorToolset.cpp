@@ -8,7 +8,9 @@
 #include "Misc/PackageName.h"
 #include "ObjectTools.h"
 #include "AssetToolsModule.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "IAssetTools.h"
+#include "Modules/ModuleManager.h"
 #include "Engine/Texture2D.h"
 #include "UObject/Package.h"
 #include "UObject/ObjectRedirector.h"
@@ -29,6 +31,7 @@ bool UWidgetEditorToolset::FixupWidgetRedirectors(const TArray<FString>& Package
 		if (!FPackageName::IsValidLongPackageName(PackageName) ||
 			(!PackageName.StartsWith(TEXT("/Game/Blueprints/Widget/")) &&
 			 !PackageName.StartsWith(TEXT("/WHFramework/Blueprints/Widget/")) &&
+			 !PackageName.StartsWith(TEXT("/WHFramework/Input/Blueprints/Widget/")) &&
 			 !PackageName.StartsWith(TEXT("/WHFrameworkUtilities/Blueprints/Widget/"))))
 		{
 			UKismetSystemLibrary::RaiseScriptError(TEXT("Only explicit widget asset packages can be cleaned."));
@@ -67,16 +70,60 @@ bool UWidgetEditorToolset::FixupWidgetRedirectors(const TArray<FString>& Package
 			Packages.AddUnique(Package);
 		}
 	}
-	if (!Redirectors.IsEmpty())
+	IAssetRegistry& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
+	TArray<UObjectRedirector*> UnreferencedRedirectors;
+	TArray<UObjectRedirector*> ReferencedRedirectors;
+	for (UObjectRedirector* Redirector : Redirectors)
 	{
-		FAssetToolsModule::GetModule().Get().FixupReferencers(Redirectors, false, ERedirectFixupMode::DeleteFixedUpRedirectors);
-		return !FAssetToolsModule::GetModule().Get().IsFixupReferencersInProgress();
+		TArray<FName> Referencers;
+		const FName PackageName = Redirector->GetOutermost()->GetFName();
+		Registry.GetReferencers(PackageName, Referencers, UE::AssetRegistry::EDependencyCategory::All);
+		Referencers.Remove(PackageName);
+		if (Referencers.IsEmpty())
+		{
+			UnreferencedRedirectors.Add(Redirector);
+		}
+		else if (!Redirector->DestinationObject)
+		{
+			UKismetSystemLibrary::RaiseScriptError(FString::Printf(TEXT("Broken redirector still has referencers: %s"), *Redirector->GetPathName()));
+			return false;
+		}
+		else
+		{
+			ReferencedRedirectors.Add(Redirector);
+		}
 	}
-	ObjectTools::CleanupAfterSuccessfulDelete(Packages, false);
+	TArray<UPackage*> DeletedPackages;
+	for (UObjectRedirector* Redirector : UnreferencedRedirectors)
+	{
+		const FString AssetPath = Redirector->GetPathName();
+		UPackage* Package = Redirector->GetOutermost();
+		if (!ObjectTools::DeleteSingleObject(Redirector))
+		{
+			UKismetSystemLibrary::RaiseScriptError(FString::Printf(TEXT("Could not safely delete redirector: %s"), *AssetPath));
+			return false;
+		}
+		DeletedPackages.AddUnique(Package);
+	}
+	if (!DeletedPackages.IsEmpty())
+	{
+		ObjectTools::CleanupAfterSuccessfulDelete(DeletedPackages);
+	}
+	if (!ReferencedRedirectors.IsEmpty())
+	{
+		FAssetToolsModule::GetModule().Get().FixupReferencers(ReferencedRedirectors, false, ERedirectFixupMode::DeleteFixedUpRedirectors);
+		if (FAssetToolsModule::GetModule().Get().IsFixupReferencersInProgress()) return false;
+	}
+	if (Redirectors.IsEmpty())
+	{
+		ObjectTools::CleanupAfterSuccessfulDelete(Packages);
+	}
 	for (const FString& PackageName : PackageNames)
 	{
-		if (FPackageName::DoesPackageExist(PackageName))
+		const FString PackageFile = FPackageName::LongPackageNameToFilename(PackageName, FPackageName::GetAssetPackageExtension());
+		if (IFileManager::Get().FileExists(*PackageFile))
 		{
+			UKismetSystemLibrary::RaiseScriptError(FString::Printf(TEXT("Redirector package remains on disk: %s"), *PackageName));
 			return false;
 		}
 	}

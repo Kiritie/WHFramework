@@ -1668,6 +1668,7 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyGraph(const FVoxelHydrologyRegio
 	FVoxelHydrologyRegionGraphBuild::FReadCell InReadCell, FVoxelHydrologyRegionGraphPtr& OutGraph,
 	FString& OutError, const TAtomic<bool>* InCancel)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_HydrologyRegionGraph);
 	OutError.Reset();
 	if (InCancel && InCancel->Load())
 	{
@@ -1919,6 +1920,7 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyFact(const FVoxelHydrologyRegion
     TFunctionRef<EVoxelHydrologyRegionStep(THydrologyFactOwner<BuildType, ResultType>&, FString&)> InAdvance,
     TSharedPtr<const ResultType, ESPMode::ThreadSafe>& OutResult, FString& OutError, const TAtomic<bool>* InCancel)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_HydrologyMacroFact);
 	OutError.Reset();
 	if (InCancel && InCancel->Load())
 	{
@@ -2488,6 +2490,7 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyPlan(const FVoxelHydrologyRegion
 	TSharedRef<const FVoxelTerrainGenerator, ESPMode::ThreadSafe> InTerrain,
 	FVoxelHydrologyPlanPtr& OutPlan, FString& OutError, const TAtomic<bool>* InCancel)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_HydrologyCoverage);
 	if (InCancel && InCancel->Load())
 	{
 		OutError = TEXT("Canceled");

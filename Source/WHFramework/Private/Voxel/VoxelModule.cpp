@@ -1866,6 +1866,17 @@ FVoxelGenerationDependencyStatus UVoxelModule::QueryEnvironment(const FIntPoint&
 		: FVoxelGenerationDependencyStatus{ false, true, TEXT("Voxel world is unavailable") };
 }
 
+FVoxelGenerationDependencyStatus UVoxelModule::EnsureEnvironmentSamples(
+	const FVoxelGenerationConsumerKey& InConsumer, const FIntPoint& InOrigin,
+	const int32 InWidth, const int32 InHeight, const int32 InStep,
+	const double InDistanceScore, bool& bOutNeedsAdvance)
+{
+	bOutNeedsAdvance = false;
+	return EmergeManager ? EmergeManager->EnsureEnvironmentSamples(InConsumer, InOrigin,
+		InWidth, InHeight, InStep, InDistanceScore, bOutNeedsAdvance)
+		: FVoxelGenerationDependencyStatus{false, true, TEXT("Voxel world is unavailable")};
+}
+
 FVoxelGenerationDependencyStatus UVoxelModule::EnsureEnvironmentGeometry(
 	const FVoxelGenerationConsumerKey& InConsumer, const FVoxelTerrainGeometry& InGeometry,
 	const EVoxelWorkClass InWorkClass, const int32 InSourcePriority,

@@ -5,6 +5,9 @@
 #include "Widget/World/WorldWidgetBase.h"
 #include "WidgetWorldText.generated.h"
 
+class UTextBlock;
+class UWidgetAnimation;
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FWorldTextWidgetParameter : public FWidgetSpawnParameter
 {
@@ -39,4 +42,22 @@ class WHFRAMEWORK_API UWidgetWorldText : public UWorldWidgetBase
 
 public:
 	UWidgetWorldText(const FObjectInitializer& ObjectInitializer);
+
+	virtual void OnCreate(FWorldWidgetMapping InMapping, const FParameter& InParam) override;
+
+	virtual void OnDestroy(EObjectDespawnMode InMode) override;
+
+protected:
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UTextBlock> TextContent;
+
+	UPROPERTY(BlueprintReadOnly, Transient, meta = (BindWidgetAnim))
+	TObjectPtr<UWidgetAnimation> NormalAnim;
+
+	UPROPERTY(BlueprintReadOnly, Transient, meta = (BindWidgetAnim))
+	TObjectPtr<UWidgetAnimation> StressAnim;
+
+private:
+	FTimerHandle ExpiryTimer;
+	uint64 TextSession = 0;
 };

@@ -6,6 +6,12 @@
 #include "GameFramework/Pawn.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/Image.h"
+#include "Components/SceneCaptureComponent2D.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "UObject/ConstructorHelpers.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Blueprint/WidgetTree.h"
@@ -22,6 +28,8 @@ UWidgetSceneMarkerPanel::UWidgetSceneMarkerPanel(const FObjectInitializer& Objec
 	WidgetRefreshType = EWidgetRefreshType::Tick;
 	MarkerCanvas = nullptr;
 	MarkerItemClass = UWidgetSceneMarkerItem::StaticClass();
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> CaptureMaterialFinder(TEXT("/WHFramework/Scene/Materials/M_MiniMap_Default.M_MiniMap_Default"));
+	if(CaptureMaterialFinder.Succeeded()) CaptureMaterial = CaptureMaterialFinder.Object;
 }
 
 void UWidgetSceneMarkerPanel::OnInitialize(const FParameter& InParams)
@@ -56,6 +64,7 @@ void UWidgetSceneMarkerPanel::OnRefresh()
 		MapView = FSceneMapView();
 		bPlayerMarkerPresent = false;
 		if(MapBackground) MapBackground->SetVisibility(ESlateVisibility::Collapsed);
+		ClearCaptureBackground();
 		if(!Markers.IsEmpty() || !MarkerItems.IsEmpty())
 		{
 			Markers.Reset();
@@ -66,6 +75,7 @@ void UWidgetSceneMarkerPanel::OnRefresh()
 	}
 	MapView = USceneModule::Get().GetMapView(MarkerChannel);
 	ResolveMarkerCanvas();
+	UpdateCaptureBackground();
 	if(MapBackground)
 	{
 		MapBackground->SetMapView(MapView, MarkerChannel);
@@ -86,6 +96,8 @@ void UWidgetSceneMarkerPanel::OnDestroy(EObjectDespawnMode InMode)
 	}
 	MapPresentationChangedHandle.Reset();
 	MarkerScene.Reset();
+	ClearCaptureBackground();
+	CaptureMaterialInstance = nullptr;
 	DestroyMarkerItems();
 	Super::OnDestroy(InMode);
 }
@@ -134,7 +146,7 @@ bool UWidgetSceneMarkerPanel::ProjectMarker(const FSceneMarkerView& InMarker, FV
 		case ESceneMarkerChannel::Compass:
 		{
 			float Position = 0.f;
-			if(!USceneModuleStatics::ProjectMarkerToCompass(InMarker, 180.f, InPanelSize.X, false, Position)) return false;
+			if(!USceneModuleStatics::ProjectMarkerToCompass(InMarker, CompassFieldOfView, InPanelSize.X, false, Position)) return false;
 			OutPosition = FVector2D(Position, InPanelSize.Y * 0.5f);
 			return true;
 		}
@@ -253,6 +265,29 @@ void UWidgetSceneMarkerPanel::ResolveMapBackground()
 {
 	const FScopedWorldContext WorldContext(GetWorld());
 	const USceneModule* Scene = MarkerScene.Get();
+	const bool bUsesCapture = Scene && Scene->GetWorld() == GetWorld() && MarkerChannel == ESceneMarkerChannel::MiniMap &&
+		Scene->GetMiniMapSource() == EWorldMiniMapSource::SceneCapture;
+	if(bUsesCapture)
+	{
+		ResolveMapContentCanvas();
+		if(!CaptureBackground && WidgetTree && MapContentCanvas)
+		{
+			CaptureBackground = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("CaptureBackground"));
+			if(UCanvasPanelSlot* CaptureSlot = MapContentCanvas->AddChildToCanvas(CaptureBackground))
+			{
+				CaptureSlot->SetAnchors(FAnchors(0.5f));
+				CaptureSlot->SetAlignment(FVector2D(0.5f));
+				CaptureSlot->SetPosition(FVector2D::ZeroVector);
+				CaptureSlot->SetZOrder(MapBackgroundZOrder);
+			}
+		}
+		if(CaptureBackground)
+		{
+			CaptureBackground->SetRenderTransformPivot(FVector2D(0.5f));
+			CaptureBackground->SetRenderScale(FVector2D(1.f, -1.f));
+		}
+	}
+	UpdateCaptureBackground();
 	const bool bUsesWidget = Scene && Scene->GetWorld() == GetWorld() && Scene->GetMapBackgroundWidgetClass() &&
 		(MarkerChannel == ESceneMarkerChannel::Map ||
 			MarkerChannel == ESceneMarkerChannel::MiniMap && Scene->GetMiniMapSource() == EWorldMiniMapSource::Widget && Scene->GetMiniMapMode() != EWorldMiniMapMode::None);
@@ -279,6 +314,48 @@ void UWidgetSceneMarkerPanel::ResolveMapBackground()
 	}
 	MapBackground->SetMapView(Scene->GetMapView(MarkerChannel), MarkerChannel);
 	MapBackground->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+}
+
+void UWidgetSceneMarkerPanel::UpdateCaptureBackground()
+{
+	if(!CaptureBackground) return;
+	const USceneModule* Scene = MarkerScene.Get();
+	const AMiniMapCapture* Actor = Scene && Scene->GetWorld() == GetWorld() ? Scene->GetMiniMapCapture() : nullptr;
+	const USceneCaptureComponent2D* Capture = ::IsValid(Actor) ? Actor->GetCapture() : nullptr;
+	UTextureRenderTarget2D* Texture = Capture ? Capture->TextureTarget.Get() : nullptr;
+	const FVector2D PanelSize = MapContentCanvas ? MapContentCanvas->GetCachedGeometry().GetLocalSize() : FVector2D::ZeroVector;
+	const bool bCanPresent = Scene && MarkerChannel == ESceneMarkerChannel::MiniMap && Scene->GetMiniMapSource() == EWorldMiniMapSource::SceneCapture &&
+		Scene->GetMiniMapMode() != EWorldMiniMapMode::None && Capture && Capture->IsVisible() && CaptureMaterial && ::IsValid(Texture) &&
+		Texture->SizeX > 0 && Texture->SizeY > 0 && FMath::IsFinite(MapView.Range) && MapView.Range > UE_SMALL_NUMBER &&
+		PanelSize.X > 0.f && PanelSize.Y > 0.f && !PanelSize.ContainsNaN();
+	if(!bCanPresent)
+	{
+		ClearCaptureBackground();
+		return;
+	}
+
+	if(!CaptureMaterialInstance || CaptureMaterialInstance->Parent != CaptureMaterial)
+	{
+		CaptureMaterialInstance = UMaterialInstanceDynamic::Create(CaptureMaterial, this);
+	}
+	CaptureMaterialInstance->SetTextureParameterValue(TEXT("MiniMapTexture"), Texture);
+	if(CaptureBackground->GetBrush().GetResourceObject() != CaptureMaterialInstance) CaptureBackground->SetBrushResourceObject(CaptureMaterialInstance);
+	const float TextureAspect = static_cast<float>(Texture->SizeX) / Texture->SizeY;
+	const double Width = PanelSize.X * Capture->OrthoWidth / MapView.Range;
+	const FVector2D Size(Width, Width / TextureAspect);
+	UCanvasPanelSlot* CaptureSlot = CastChecked<UCanvasPanelSlot>(CaptureBackground->Slot);
+	if(!CaptureSlot->GetSize().Equals(Size)) CaptureSlot->SetSize(Size);
+	CaptureBackground->SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
+void UWidgetSceneMarkerPanel::ClearCaptureBackground()
+{
+	if(CaptureBackground)
+	{
+		CaptureBackground->SetVisibility(ESlateVisibility::Collapsed);
+		if(CaptureBackground->GetBrush().GetResourceObject()) CaptureBackground->SetBrushResourceObject(nullptr);
+	}
+	if(CaptureMaterialInstance) CaptureMaterialInstance->SetTextureParameterValue(TEXT("MiniMapTexture"), nullptr);
 }
 
 void UWidgetSceneMarkerPanel::AddPlayerMarker()

@@ -2,6 +2,7 @@
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "HAL/PlatformTime.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 namespace
 {
@@ -370,6 +371,7 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::ReadFailure(const EVoxe
 EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 InGeneration, FReadRegion InReadRegion,
 	int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_HydrologyControlSearch);
 	// 续跑可能更换 Worker；跨线程共享的节流仅限制日志，不参与求解状态。
 	static TAtomic<uint64> NextDiagnosticMilliseconds{0};
 	const uint64 Now = uint64(FPlatformTime::Seconds() * 1000.0);

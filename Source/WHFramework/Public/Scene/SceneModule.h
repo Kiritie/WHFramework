@@ -101,6 +101,8 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 private:
 	void RefreshMiniMapCapture();
+	void UpdateMiniMapCapture();
+	FSceneMapView ResolveMiniMapView(FVector* OutLocation = nullptr) const;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "MiniMap")

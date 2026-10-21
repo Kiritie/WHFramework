@@ -251,10 +251,7 @@ void USceneModule::OnPreparatory(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		if(MiniMapCapture)
-		{
-			MiniMapCapture->GetCapture()->SetActive(MiniMapSource == EWorldMiniMapSource::SceneCapture && MiniMapMode != EWorldMiniMapMode::None, true);
-		}
+		UpdateMiniMapCapture();
 		if(WorldTimer)
     	{
     		WorldTimer->OnPreparatory();
@@ -281,36 +278,7 @@ void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 	Altitude = UCameraModuleStatics::GetViewLocation().Z - SeaLevel;
 	RefreshWorldMarkerWidgets();
 
-	if(MiniMapCapture && MiniMapSource == EWorldMiniMapSource::SceneCapture)
-	{
-		switch(MiniMapMode)
-		{
-			case EWorldMiniMapMode::FixedPoint:
-			{
-				MiniMapCapture->SetActorLocationAndRotation(MiniMapPoint.GetLocation(), bMiniMapRotatable ? FRotator(0.f, MiniMapPoint.Rotator().Yaw, 0.f) : FRotator::ZeroRotator);
-				break;
-			}
-			case EWorldMiniMapMode::ViewPoint:
-			{
-				if(const APlayerController* PlayerController = UCommonModuleStatics::GetPlayerController())
-				{
-					if(const AActor* ViewTarget = PlayerController->GetViewTarget())
-					{
-						MiniMapCapture->SetActorLocationAndRotation(ViewTarget->GetActorLocation(), bMiniMapRotatable ? FRotator(0.f, ViewTarget->GetActorRotation().Yaw, 0.f) : FRotator::ZeroRotator);
-					}
-				}
-				break;
-			}
-			case EWorldMiniMapMode::CameraPoint:
-			{
-				const FTransform ViewTransform = UCameraModuleStatics::GetViewTransform();
-				MiniMapCapture->SetActorLocationAndRotation(ViewTransform.GetLocation(), bMiniMapRotatable ? FRotator(0.f, ViewTransform.Rotator().Yaw, 0.f) : FRotator::ZeroRotator);
-				break;
-			}
-			default: break;
-		}
-		MiniMapCapture->GetCapture()->OrthoWidth = MiniMapRange;
-	}
+	UpdateMiniMapCapture();
 
 	if(WorldTimer)
 	{
@@ -660,11 +628,26 @@ void USceneModule::RefreshMiniMapCapture()
 			MiniMapCapture->AttachToActor(GetModuleOwner(), FAttachmentTransformRules::KeepWorldTransform);
 		}
 	}
-	if(MiniMapCapture)
-	{
-		MiniMapCapture->GetCapture()->TextureTarget = MiniMapTexture;
-		MiniMapCapture->GetCapture()->SetActive(MiniMapMode != EWorldMiniMapMode::None, true);
-	}
+	UpdateMiniMapCapture();
+}
+
+void USceneModule::UpdateMiniMapCapture()
+{
+	if(!::IsValid(MiniMapCapture)) return;
+	USceneCaptureComponent2D* Capture = MiniMapCapture->GetCapture();
+	FVector Location;
+	const FSceneMapView View = ResolveMiniMapView(&Location);
+	const bool bCaptureEnabled = MiniMapSource == EWorldMiniMapSource::SceneCapture && View.Range > UE_SMALL_NUMBER;
+	Capture->TextureTarget = bCaptureEnabled ? MiniMapTexture : nullptr;
+	Capture->SetVisibility(bCaptureEnabled);
+	if(Capture->IsActive() != bCaptureEnabled) Capture->SetActive(bCaptureEnabled);
+	if(!bCaptureEnabled) return;
+
+	// Camera right is +Y at yaw 0; map right is +X. The image flips V for map up.
+	MiniMapCapture->SetActorLocationAndRotation(Location, FRotator(0.f, View.Yaw - 90.f, 0.f));
+	const float TextureAspect = static_cast<float>(MiniMapTexture->SizeX) / MiniMapTexture->SizeY;
+	// Cover the full square map extent even when the target has a wide aspect ratio.
+	Capture->OrthoWidth = View.Range * FMath::Max(1.f, TextureAspect);
 }
 
 void USceneModule::SetMiniMapSource(EWorldMiniMapSource InMiniMapSource)
@@ -686,10 +669,7 @@ void USceneModule::SetMiniMapMode(EWorldMiniMapMode InMiniMapMode)
 {
 	const bool bChanged = MiniMapMode != InMiniMapMode;
 	MiniMapMode = InMiniMapMode;
-	if(MiniMapCapture)
-	{
-		MiniMapCapture->GetCapture()->SetActive(MiniMapSource == EWorldMiniMapSource::SceneCapture && MiniMapMode != EWorldMiniMapMode::None, true);
-	}
+	RefreshMiniMapCapture();
 	if (bChanged) OnMapPresentationChanged.Broadcast();
 }
 
@@ -698,7 +678,7 @@ void USceneModule::SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture)
 	const bool bChanged = MiniMapTexture != InMiniMapTexture;
 	MiniMapTexture = InMiniMapTexture;
 
-	if(MiniMapCapture) MiniMapCapture->GetCapture()->TextureTarget = MiniMapTexture;
+	UpdateMiniMapCapture();
 	if (bChanged) OnMapPresentationChanged.Broadcast();
 }
 
@@ -717,7 +697,18 @@ FSceneMapView USceneModule::GetMapView(ESceneMarkerChannel InChannel) const
 		View.Range = WorldMapRange;
 		return View;
 	}
-	if(InChannel != ESceneMarkerChannel::MiniMap || MiniMapSource == EWorldMiniMapSource::None || MiniMapMode == EWorldMiniMapMode::None) return View;
+	return InChannel == ESceneMarkerChannel::MiniMap ? ResolveMiniMapView() : View;
+}
+
+FSceneMapView USceneModule::ResolveMiniMapView(FVector* OutLocation) const
+{
+	FSceneMapView View;
+	if(OutLocation) *OutLocation = FVector::ZeroVector;
+	if(MiniMapSource == EWorldMiniMapSource::None || MiniMapMode == EWorldMiniMapMode::None ||
+		!FMath::IsFinite(MiniMapRange) || MiniMapRange <= UE_SMALL_NUMBER) return View;
+	if(MiniMapSource == EWorldMiniMapSource::SceneCapture &&
+		(!::IsValid(MiniMapTexture) || MiniMapTexture->SizeX <= 0 || MiniMapTexture->SizeY <= 0 ||
+		!FMath::IsFinite(MiniMapRange * FMath::Max(1.f, static_cast<float>(MiniMapTexture->SizeX) / MiniMapTexture->SizeY)))) return View;
 
 	FVector Location = MiniMapPoint.GetLocation();
 	float Yaw = MiniMapPoint.Rotator().Yaw;
@@ -744,6 +735,8 @@ FSceneMapView USceneModule::GetMapView(ESceneMarkerChannel InChannel) const
 		}
 		default: break;
 	}
+	if(Location.ContainsNaN() || !FMath::IsFinite(Yaw)) return View;
+	if(OutLocation) *OutLocation = Location;
 	View.Center = FVector2D(Location);
 	View.Range = MiniMapRange;
 	View.Yaw = bMiniMapRotatable ? Yaw : 0.f;

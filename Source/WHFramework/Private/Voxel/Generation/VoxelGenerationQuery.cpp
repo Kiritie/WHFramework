@@ -572,13 +572,19 @@ bool FVoxelGenerationQuery::EnsureHydrologyPlan(
 	const TAtomic<bool>* InCancel) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_QueryHydrologyPlan);
-	if (!ValidateConsumer(OutError)) return false;
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_HydrologyValidateConsumer);
+		if (!ValidateConsumer(OutError)) return false;
+	}
 	if (InCancel && InCancel->Load())
 	{
 		OutError = TEXT("Canceled");
 		return false;
 	}
-	if (!Cache->BindHydrologyRecipe(Config->Recipe->RecipeHash, Config->Recipe->AlgorithmVersion, OutError, CacheGeneration)) return false;
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_HydrologyBindRecipe);
+		if (!Cache->BindHydrologyRecipe(Config->Recipe->RecipeHash, Config->Recipe->AlgorithmVersion, OutError, CacheGeneration)) return false;
+	}
 	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
 	FVoxelGenerationPlanningReadScope ConsumerScope(nullptr, nullptr, InCancel, Resources ? &Consumer : nullptr);
 	const auto& Settings = Config->Recipe->Settings;
@@ -604,6 +610,7 @@ bool FVoxelGenerationQuery::EnsureHydrologyPlan(
 		OutError = TEXT("DependencyNotReady: Hydrology");
 		return false;
 	}
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_HydrologyAdvancePlan);
 	return Cache->AdvanceHydrologyPlan(InKey, Config.ToSharedRef(), Climate.ToSharedRef(), Terrain.ToSharedRef(),
 		OutPlan, OutError, InCancel);
 

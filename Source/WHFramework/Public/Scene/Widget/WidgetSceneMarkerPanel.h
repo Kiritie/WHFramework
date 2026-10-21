@@ -5,6 +5,9 @@
 #include "WidgetSceneMarkerPanel.generated.h"
 
 class UCanvasPanel;
+class UImage;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
 class UCommonRoundedClip;
 class UWidgetSceneMapBase;
 class UWidgetSceneMarkerItem;
@@ -30,6 +33,7 @@ public:
 	TArray<FSceneMarkerView> GetMarkers() const { return Markers; }
 
 	ESceneMarkerChannel GetMarkerChannel() const { return MarkerChannel; }
+	float GetCompassFieldOfView() const { return CompassFieldOfView; }
 	UCanvasPanel* GetMarkerCanvas() const { return MarkerCanvas; }
 	UCanvasPanel* GetMapContentCanvas() const { return MapContentCanvas; }
 	FName GetMarkerCanvasName() const { return MarkerCanvasName; }
@@ -44,6 +48,9 @@ public:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker")
 	ESceneMarkerChannel MarkerChannel = ESceneMarkerChannel::Map;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker", meta = (ClampMin = "1.0", ClampMax = "360.0"))
+	float CompassFieldOfView = 180.f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Marker")
 	TArray<FSceneMarkerView> Markers;
@@ -95,6 +102,15 @@ protected:
 	UPROPERTY(Transient)
 	UWidgetSceneMapBase* MapBackground = nullptr;
 
+	UPROPERTY(Transient, meta = (BindWidgetOptional))
+	TObjectPtr<UImage> CaptureBackground;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Marker")
+	TObjectPtr<UMaterialInterface> CaptureMaterial;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> CaptureMaterialInstance;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Marker")
 	int32 MapBackgroundZOrder = -1;
 
@@ -113,6 +129,8 @@ protected:
 	void ResolveMarkerCanvas();
 	void ResolveMapContentCanvas();
 	virtual void ResolveMapBackground();
+	void UpdateCaptureBackground();
+	void ClearCaptureBackground();
 	void AddPlayerMarker();
 	void RebuildMarkerItems();
 	void UpdateMarkerStates();

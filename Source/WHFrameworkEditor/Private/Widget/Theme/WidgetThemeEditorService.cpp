@@ -2790,13 +2790,6 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 		TagList->GameplayTagRedirects.RemoveAll([&](const FGameplayTagRedirect& Redirect) { return Redirect.OldTagName == Old.GetTagName(); });
 		if (bCreateRedirect)
 		{
-			for (FGameplayTagRedirect& Redirect : TagList->GameplayTagRedirects)
-			{
-				if (Redirect.NewTagName == Old.GetTagName())
-				{
-					Redirect.NewTagName = New.GetTagName();
-				}
-			}
 			if (bDefinesOldTag && !bRedirectWritten)
 			{
 				FGameplayTagRedirect Redirect;
@@ -2814,6 +2807,38 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 		Report += TEXT("Updated Tag definition and redirect config: ") + TagList->ConfigFileName + TEXT("\n");
 	}
 	Manager.EditorRefreshGameplayTagTree();
+	// The first refresh resolves older aliases through Old -> New. UE appends
+	// source redirects before resetting its cache, so flatten their definitions
+	// only after that cache already resolves to New, avoiding conflicting targets.
+	bool bFlattenedAliases = false;
+	if (bCreateRedirect)
+	{
+		for (UGameplayTagsList* TagList : TagListsToUpdate)
+		{
+			bool bChanged = false;
+			for (FGameplayTagRedirect& Redirect : TagList->GameplayTagRedirects)
+			{
+				if (Redirect.NewTagName == Old.GetTagName())
+				{
+					Redirect.NewTagName = New.GetTagName();
+					bChanged = true;
+				}
+			}
+			if (bChanged)
+			{
+				if (!TagList->TryUpdateDefaultConfigFile(TagList->ConfigFileName))
+				{
+					Report += TEXT("Could not save flattened Tag aliases: ") + TagList->ConfigFileName + TEXT(". The saved redirect chain still resolves to the new Tag.\n");
+					return false;
+				}
+				bFlattenedAliases = true;
+			}
+		}
+	}
+	if (bFlattenedAliases)
+	{
+		Manager.EditorRefreshGameplayTagTree();
+	}
 	Report += FString::Printf(TEXT("Migrated reflected references in %d packages. GUID names are unchanged. Config writes are not undone by Ctrl+Z.\n"), Packages.Num());
 	Report += bCreateRedirect ? TEXT("The previous Tag name redirects to the new name; older aliases target the new name directly.\n")
 		: TEXT("The old definition and redirects were removed.\n");
