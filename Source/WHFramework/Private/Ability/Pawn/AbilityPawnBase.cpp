@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Pawn/AbilityPawnBase.h"
+#include "Ability/Components/AbilityControlComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Ability/Effects/EffectBase.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
@@ -20,8 +21,6 @@
 #include "Voxel/VoxelModule.h"
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Abilities/VitalityActionAbilityBase.h"
-#include "Ability/Pawn/States/AbilityPawnState_Interrupt.h"
-#include "Ability/Pawn/States/AbilityPawnState_Static.h"
 #include "Ability/Pawn/States/AbilityPawnState_Walk.h"
 
 AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer)
@@ -47,11 +46,7 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer)
 	FSM->GroupName = FName("Vitality");
 	FSM->DomainName = TEXT("Lifecycle");
 	FSM->bAutoSwitchDefault = false;
-	ControlFSM = CreateDefaultSubobject<UFSMComponent>(TEXT("ControlFSM"));
-	ControlFSM->DomainName = TEXT("Control");
-	ControlFSM->bAutoSwitchDefault = false;
-	ControlFSM->States.Add(UAbilityPawnState_Static::StaticClass());
-	ControlFSM->States.Add(UAbilityPawnState_Interrupt::StaticClass());
+	Control = CreateDefaultSubobject<UAbilityControlComponent>(TEXT("Control"));
 
 	FSM->DefaultState = UAbilityPawnState_Spawn::StaticClass();
 	FSM->FinalState = UAbilityPawnState_Death::StaticClass();
@@ -87,8 +82,6 @@ void AAbilityPawnBase::OnSpawn_Implementation(const FParameter& InParam)
 		}
 	}
 
-	ControlFSM->OnInitialize();
-
 	Super::OnSpawn_Implementation(InParam);
 
 	AbilitySystem->SetAbilityEntityId(ActorID);
@@ -102,7 +95,7 @@ void AAbilityPawnBase::OnSpawn_Implementation(const FParameter& InParam)
 
 void AAbilityPawnBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	ControlFSM->OnTermination();
+	Control->ResetControls();
 
 	UninitializeAbilities();
 	if (HasAuthority())
@@ -162,7 +155,7 @@ void AAbilityPawnBase::OnRefresh_Implementation(float DeltaSeconds)
 void AAbilityPawnBase::OnTermination_Implementation()
 {
 	BindInventory(nullptr);
-	ControlFSM->OnTermination();
+	Control->ResetControls();
 
 	UninitializeAbilities();
 	if (HasAuthority())
@@ -197,7 +190,26 @@ void AAbilityPawnBase::BindASCInput()
 
 void AAbilityPawnBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
-	Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
+	if (IsActive() && !Control->IsMovementBlocked() && !WorldDirection.ContainsNaN() && FMath::IsFinite(ScaleValue))
+	{
+		Super::AddMovementInput(WorldDirection, FMath::Clamp(ScaleValue, -1.f, 1.f), bForce);
+	}
+}
+
+void AAbilityPawnBase::FaceRotation(FRotator NewControlRotation, float DeltaTime)
+{
+	if (IsActive() && !Control->IsRotationBlocked() && !NewControlRotation.ContainsNaN() && FMath::IsFinite(DeltaTime))
+	{
+		Super::FaceRotation(NewControlRotation, DeltaTime);
+	}
+}
+
+void AAbilityPawnBase::RotationTowards(FRotator InRotation, float InDuration, bool bMulticast)
+{
+	if (IsActive() && !Control->IsRotationBlocked() && !InRotation.ContainsNaN() && FMath::IsFinite(InDuration))
+	{
+		Super::RotationTowards(InRotation, InDuration, bMulticast);
+	}
 }
 
 void AAbilityPawnBase::Serialize(FArchive& Ar)
@@ -297,11 +309,7 @@ void AAbilityPawnBase::ResetData()
 
 void AAbilityPawnBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
-	if (InCurrentState && ControlFSM->GetCurrentState() == InCurrentState)
-	{
-		ControlFSM->SwitchState(nullptr);
-	}
-	else if (!IsDead())
+	if (!IsDead())
 	{
 		SwitchFiniteStateByClass<UAbilityPawnState_Walk>();
 	}
@@ -314,18 +322,40 @@ void AAbilityPawnBase::Death(IAbilityVitalityInterface* InKiller)
 		return;
 	}
 
-	ControlFSM->SwitchState(nullptr);
-	const TArray<FAbilityGrantedEntry> Entries = AbilitySystem->GetGrantedEntries();
+	const FGuid DyingIdentity = ActorID;
+	UAbilitySystemComponentBase* const DyingSystem = AbilitySystem;
+	const auto IsSameDeath = [this, DyingIdentity, DyingSystem]()
+	{
+		return IsValid(this) && ActorID == DyingIdentity && AbilitySystem == DyingSystem &&
+			DyingSystem->GetAvatarActor() == this && IsDead();
+	};
+	SwitchFinalFiniteState({Cast<UObject>(InKiller)});
+	if (!IsSameDeath())
+	{
+		return;
+	}
+	Control->ResetControls();
+	if (!IsSameDeath())
+	{
+		return;
+	}
+	const TArray<FAbilityGrantedEntry> Entries = DyingSystem->GetGrantedEntries();
 	for (const FAbilityGrantedEntry& Entry : Entries)
 	{
-		const FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(Entry.AbilityHandle);
+		const FGameplayAbilitySpec* Spec = DyingSystem->FindAbilitySpecFromHandle(Entry.AbilityHandle);
 		if (UAbilityBase* Action = Spec ? Cast<UAbilityBase>(Spec->GetPrimaryInstance()) : nullptr; Action && Action->IsActive())
 		{
 			Action->FailAction(AbilityActionTags::Blocked);
+			if (!IsSameDeath())
+			{
+				return;
+			}
 		}
 	}
-	AbilitySystem->RemoveEffectsOnDeath();
-	SwitchFinalFiniteState({Cast<UObject>(InKiller)});
+	if (IsSameDeath())
+	{
+		DyingSystem->RemoveEffectsOnDeath();
+	}
 }
 
 void AAbilityPawnBase::Kill(IAbilityVitalityInterface* InTarget)
@@ -354,34 +384,25 @@ void AAbilityPawnBase::Revive(IAbilityVitalityInterface* InRescuer)
 
 void AAbilityPawnBase::Static()
 {
-	if (HasAuthority() && !IsDead())
-	{
-		ControlFSM->SwitchStateByClass<UAbilityPawnState_Static>();
-	}
+	Control->SetStatic(true);
 }
 
 void AAbilityPawnBase::UnStatic()
 {
-	if (HasAuthority() && ControlFSM->IsCurrentStateClass<UAbilityPawnState_Static>())
-	{
-		ControlFSM->SwitchState(nullptr);
-	}
+	Control->SetStatic(false);
 }
 
 void AAbilityPawnBase::Interrupt(float InDuration)
 {
-	if (HasAuthority() && !IsDead() && FMath::IsFinite(InDuration))
+	if (FMath::IsFinite(InDuration))
 	{
-		ControlFSM->SwitchStateByClass<UAbilityPawnState_Interrupt>({InDuration});
+		Control->AddInterrupt(InDuration > 0.f ? InDuration : 0.35f);
 	}
 }
 
 void AAbilityPawnBase::UnInterrupt()
 {
-	if (HasAuthority() && ControlFSM->IsCurrentStateClass<UAbilityPawnState_Interrupt>())
-	{
-		ControlFSM->SwitchState(nullptr);
-	}
+	Control->ClearInterrupts();
 }
 
 bool AAbilityPawnBase::DoAction(const FGameplayTag& InActionTag)
@@ -668,8 +689,8 @@ float AAbilityPawnBase::GetDistance(AActor* InTargetActor, bool bIgnoreRadius /*
 
 void AAbilityPawnBase::GetMotionRate(float& OutMovementRate, float& OutRotationRate)
 {
-	OutMovementRate = MovementRate;
-	OutRotationRate = RotationRate;
+	OutMovementRate = Control->IsMovementBlocked() ? 0.f : MovementRate;
+	OutRotationRate = Control->IsRotationBlocked() ? 0.f : RotationRate;
 }
 
 void AAbilityPawnBase::SetMotionRate(float InMovementRate, float InRotationRate)

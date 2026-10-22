@@ -2,6 +2,7 @@
 
 #include "Ability/Attributes/AttributeSetBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Ability/Components/AbilityControlComponent.h"
 #include "Components/MeshComponent.h"
 
 void IAbilityActorInterface::InitializeAbilities(AActor* InOwnerActor, AActor* InAvatarActor)
@@ -18,6 +19,10 @@ void IAbilityActorInterface::InitializeAbilities(AActor* InOwnerActor, AActor* I
 	if (bAbilitiesInitialized && BoundAbilitySystem == AbilitySystem && BoundAbilityAvatar == Avatar)
 	{
 		AbilitySystem->BindOwnerAvatar(Owner, Avatar);
+		if (UAbilityControlComponent* Control = Avatar->FindComponentByClass<UAbilityControlComponent>())
+		{
+			Control->BindAbilitySystem(AbilitySystem);
+		}
 		return;
 	}
 	UninitializeAbilities(false);
@@ -27,6 +32,10 @@ void IAbilityActorInterface::InitializeAbilities(AActor* InOwnerActor, AActor* I
 	}
 	BoundAbilitySystem = AbilitySystem;
 	BoundAbilityAvatar = Avatar;
+	if (UAbilityControlComponent* Control = Avatar->FindComponentByClass<UAbilityControlComponent>())
+	{
+		Control->BindAbilitySystem(AbilitySystem);
+	}
 	for (const FGameplayAttribute& Attribute : Attributes->GetAllAttributes())
 	{
 		const FDelegateHandle Delegate = AbilitySystem->GetGameplayAttributeValueChangeDelegate(Attribute).AddWeakLambda(_getUObject(), [this](const FOnAttributeChangeData& Change)
@@ -47,6 +56,13 @@ void IAbilityActorInterface::UninitializeAbilities(bool bUnbindAvatar)
 		for (const TPair<FGameplayAttribute, FDelegateHandle>& Entry : AttributeDelegateHandles)
 		{
 			AbilitySystem->GetGameplayAttributeValueChangeDelegate(Entry.Key).Remove(Entry.Value);
+		}
+		if (AActor* Avatar = BoundAbilityAvatar.Get())
+		{
+			if (UAbilityControlComponent* Control = Avatar->FindComponentByClass<UAbilityControlComponent>())
+			{
+				Control->BindAbilitySystem(nullptr);
+			}
 		}
 		if (bUnbindAvatar && AbilitySystem->GetAvatarActor() == BoundAbilityAvatar.Get())
 		{

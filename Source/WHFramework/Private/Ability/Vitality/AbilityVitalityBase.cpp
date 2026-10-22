@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Vitality/AbilityVitalityBase.h"
+#include "Ability/Components/AbilityControlComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Ability/Effects/EffectBase.h"
 #include "Voxel/Agent/VoxelAgentComponent.h"
@@ -16,8 +17,6 @@
 #include "FSM/Components/FSMComponent.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
-#include "Ability/Vitality/States/AbilityVitalityState_Interrupt.h"
-#include "Ability/Vitality/States/AbilityVitalityState_Static.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Walk.h"
 #include "Common/Interaction/InteractionComponent.h"
 
@@ -28,11 +27,7 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 	FSM->GroupName = TEXT("Vitality");
 	FSM->DomainName = TEXT("Lifecycle");
 	FSM->bAutoSwitchDefault = false;
-	ControlFSM = CreateDefaultSubobject<UFSMComponent>(TEXT("ControlFSM"));
-	ControlFSM->DomainName = TEXT("Control");
-	ControlFSM->bAutoSwitchDefault = false;
-	ControlFSM->States.Add(UAbilityVitalityState_Static::StaticClass());
-	ControlFSM->States.Add(UAbilityVitalityState_Interrupt::StaticClass());
+	Control = CreateDefaultSubobject<UAbilityControlComponent>(TEXT("Control"));
 
 	FSM->DefaultState = UAbilityVitalityState_Spawn::StaticClass();
 	FSM->FinalState = UAbilityVitalityState_Death::StaticClass();
@@ -51,8 +46,6 @@ AAbilityVitalityBase::AAbilityVitalityBase(const FObjectInitializer& ObjectIniti
 
 void AAbilityVitalityBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	ControlFSM->OnInitialize();
-
 	Super::OnSpawn_Implementation(InParam);
 	if (VoxelAgentComponent)
 	{
@@ -73,7 +66,7 @@ UVoxelAgentComponent* AAbilityVitalityBase::GetVoxelAgentComponent() const
 
 void AAbilityVitalityBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	ControlFSM->OnTermination();
+	Control->ResetControls();
 
 	if (HasAuthority())
 	{
@@ -114,7 +107,7 @@ void AAbilityVitalityBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void AAbilityVitalityBase::OnTermination_Implementation()
 {
-	ControlFSM->OnTermination();
+	Control->ResetControls();
 
 	if (HasAuthority())
 	{
@@ -186,11 +179,7 @@ void AAbilityVitalityBase::ResetData()
 
 void AAbilityVitalityBase::OnFiniteStateRefresh(UFiniteStateBase* InCurrentState)
 {
-	if (InCurrentState && ControlFSM->GetCurrentState() == InCurrentState)
-	{
-		ControlFSM->SwitchState(nullptr);
-	}
-	else if (!IsDead())
+	if (!IsDead())
 	{
 		SwitchFiniteStateByClass<UAbilityVitalityState_Walk>();
 	}
@@ -208,18 +197,40 @@ void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 		return;
 	}
 
-	ControlFSM->SwitchState(nullptr);
-	const TArray<FAbilityGrantedEntry> Entries = AbilitySystem->GetGrantedEntries();
+	const FGuid DyingIdentity = ActorID;
+	UAbilitySystemComponentBase* const DyingSystem = AbilitySystem;
+	const auto IsSameDeath = [this, DyingIdentity, DyingSystem]()
+	{
+		return IsValid(this) && ActorID == DyingIdentity && AbilitySystem == DyingSystem &&
+			DyingSystem->GetAvatarActor() == this && IsDead();
+	};
+	SwitchFinalFiniteState({Cast<UObject>(InKiller)});
+	if (!IsSameDeath())
+	{
+		return;
+	}
+	Control->ResetControls();
+	if (!IsSameDeath())
+	{
+		return;
+	}
+	const TArray<FAbilityGrantedEntry> Entries = DyingSystem->GetGrantedEntries();
 	for (const FAbilityGrantedEntry& Entry : Entries)
 	{
-		const FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(Entry.AbilityHandle);
+		const FGameplayAbilitySpec* Spec = DyingSystem->FindAbilitySpecFromHandle(Entry.AbilityHandle);
 		if (UAbilityBase* Action = Spec ? Cast<UAbilityBase>(Spec->GetPrimaryInstance()) : nullptr; Action && Action->IsActive())
 		{
 			Action->FailAction(AbilityActionTags::Blocked);
+			if (!IsSameDeath())
+			{
+				return;
+			}
 		}
 	}
-	AbilitySystem->RemoveEffectsOnDeath();
-	SwitchFinalFiniteState({Cast<UObject>(InKiller)});
+	if (IsSameDeath())
+	{
+		DyingSystem->RemoveEffectsOnDeath();
+	}
 }
 
 void AAbilityVitalityBase::Kill(IAbilityVitalityInterface* InTarget)
@@ -248,34 +259,25 @@ void AAbilityVitalityBase::Revive(IAbilityVitalityInterface* InRescuer)
 
 void AAbilityVitalityBase::Static()
 {
-	if (HasAuthority() && !IsDead())
-	{
-		ControlFSM->SwitchStateByClass<UAbilityVitalityState_Static>();
-	}
+	Control->SetStatic(true);
 }
 
 void AAbilityVitalityBase::UnStatic()
 {
-	if (HasAuthority() && ControlFSM->IsCurrentStateClass<UAbilityVitalityState_Static>())
-	{
-		ControlFSM->SwitchState(nullptr);
-	}
+	Control->SetStatic(false);
 }
 
 void AAbilityVitalityBase::Interrupt(float InDuration)
 {
-	if (HasAuthority() && !IsDead() && FMath::IsFinite(InDuration))
+	if (FMath::IsFinite(InDuration))
 	{
-		ControlFSM->SwitchStateByClass<UAbilityVitalityState_Interrupt>({InDuration});
+		Control->AddInterrupt(InDuration > 0.f ? InDuration : 0.35f);
 	}
 }
 
 void AAbilityVitalityBase::UnInterrupt()
 {
-	if (HasAuthority() && ControlFSM->IsCurrentStateClass<UAbilityVitalityState_Interrupt>())
-	{
-		ControlFSM->SwitchState(nullptr);
-	}
+	Control->ClearInterrupts();
 }
 
 bool AAbilityVitalityBase::DoAction(const FGameplayTag& InActionTag)

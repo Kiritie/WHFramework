@@ -111,13 +111,7 @@ AAbilityItemBase* UAbilityModuleStatics::SpawnAbilityItem(FAbilityItem InItem, A
 }
 
 
-AAbilityProjectileBase* UAbilityModuleStatics::SpawnAbilityProjectile(const TSubclassOf<AAbilityProjectileBase>& InClass, AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle)
-{
-	return UAbilityModule::Get().SpawnAbilityProjectile(InClass, InOwnerActor, InAbilityHandle);
-}
-
 AActor* UAbilityModuleStatics::SpawnAbilityActor(const FParameter& InSaveData, ISceneContainerInterface* InContainer)
 {
 	return UAbilityModule::Get().SpawnAbilityActor(InSaveData, InContainer);
 }
-

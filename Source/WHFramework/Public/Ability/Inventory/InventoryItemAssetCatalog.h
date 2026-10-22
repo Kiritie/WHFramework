@@ -24,6 +24,7 @@ public:
     }
 
     UObject* FindIcon(const FPrimaryAssetId& InItemId) const;
+    TSubclassOf<AInventoryPickupActor> FindPickupClass(const FPrimaryAssetId& InItemId) const;
     bool IsInitialized() const;
 
 private:

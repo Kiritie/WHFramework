@@ -36,8 +36,6 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 		KillerActor = Cast<AActor>(InParams[0].Get<UObject*>());
 	}
 
-	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, {GetAgent(), KillerActor.Get()});
-
 	AAbilityVitalityBase* Vitality = GetAgent<AAbilityVitalityBase>();
 
 	SetStateTag(GameplayTags::State_Vitality_Active, false);
@@ -49,6 +47,7 @@ void UAbilityVitalityState_Death::OnEnter(UFiniteStateBase* InLastState, const T
 	Vitality->SetHealth(0.f);
 
 	DeathStart();
+	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, {GetAgent(), KillerActor.Get()});
 }
 
 void UAbilityVitalityState_Death::OnRefresh(float DeltaSeconds)

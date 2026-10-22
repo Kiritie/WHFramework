@@ -13,6 +13,7 @@
 #include "AbilityVitalityBase.generated.h"
 
 class UFSMComponent;
+class UAbilityControlComponent;
 class UInteractionComponent;
 class UVitalityAbilityBase;
 class UAbilitySystemComponentBase;
@@ -134,7 +135,7 @@ protected:
 	UFSMComponent* FSM;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UFSMComponent> ControlFSM;
+	TObjectPtr<UAbilityControlComponent> Control;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Replicated, Category = "VitalityStats")

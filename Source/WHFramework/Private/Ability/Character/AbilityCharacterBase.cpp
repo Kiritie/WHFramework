@@ -1,6 +1,7 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "Ability/Components/AbilityControlComponent.h"
 #include "Ability/Character/States/AbilityCharacterState_Alive.h"
 #include "Ability/Effects/CharacterStateEffectBase.h"
 #include "Character/Components/CharacterMovementComponentBase.h"
@@ -51,6 +52,7 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 	AttributeSet = CreateDefaultSubobject<UCharacterAttributeSetBase>(FName("AttributeSet"));
 
 	Inventory = nullptr;
+	Control = CreateDefaultSubobject<UAbilityControlComponent>(TEXT("Control"));
 
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(FName("Interaction"));
 	Interaction->SetupAttachment(RootComponent);
@@ -117,8 +119,7 @@ void AAbilityCharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	RaceID = NAME_None;
 	Level = 0;
 	BirthTransform = FTransform::Identity;
-	StaticEffect.Invalidate();
-	InterruptEffect.Invalidate();
+	Control->ResetControls();
 	Super::OnDespawn_Implementation(InMode);
 }
 
@@ -170,7 +171,7 @@ void AAbilityCharacterBase::BindASCInput()
 
 void AAbilityCharacterBase::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
 {
-	if (IsActive() && !WorldDirection.ContainsNaN() && FMath::IsFinite(ScaleValue))
+	if (IsActive() && !Control->IsMovementBlocked() && !WorldDirection.ContainsNaN() && FMath::IsFinite(ScaleValue))
 	{
 		Super::AddMovementInput(WorldDirection, FMath::Clamp(ScaleValue, -1.f, 1.f), bForce);
 	}
@@ -281,48 +282,25 @@ void AAbilityCharacterBase::Revive(IAbilityVitalityInterface* InRescuer)
 
 void AAbilityCharacterBase::Static()
 {
-	if (!AbilitySystem || !HasAuthority() || StaticEffect.IsValid())
-	{
-		return;
-	}
-	FGameplayEffectSpecHandle Spec = AbilitySystem->MakeOutgoingSpec(UCharacterStateEffectBase::StaticClass(), 1.f, AbilitySystem->MakeEffectContext());
-	Spec.Data->DynamicGrantedTags.AddTag(CharacterLifecycleTags::Suspended);
-	StaticEffect = AbilitySystem->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
-	FCharacterMovementConstraint Constraint;
-	Constraint.bBlockMovement = true;
-	Constraint.bBlockRotation = true;
-	CastChecked<UCharacterMovementComponentBase>(GetCharacterMovement())->SetMovementConstraint(StaticMovementSource, this, Constraint);
+	Control->SetStatic(true);
 }
 
 void AAbilityCharacterBase::UnStatic()
 {
-	if (HasAuthority() && AbilitySystem)
-	{
-		AbilitySystem->RemoveActiveGameplayEffect(StaticEffect);
-		StaticEffect.Invalidate();
-		CastChecked<UCharacterMovementComponentBase>(GetCharacterMovement())->ReleaseMovementSource(StaticMovementSource, this);
-	}
+	Control->SetStatic(false);
 }
 
-void AAbilityCharacterBase::Interrupt(float InDuration /*= -1*/)
+void AAbilityCharacterBase::Interrupt(float InDuration)
 {
-	if (!HasAuthority() || !AbilitySystem || !FMath::IsFinite(InDuration) || InDuration <= 0.f)
+	if (FMath::IsFinite(InDuration))
 	{
-		return;
+		Control->AddInterrupt(InDuration > 0.f ? InDuration : 0.35f);
 	}
-	FGameplayEffectSpecHandle Spec = AbilitySystem->MakeOutgoingSpec(UCharacterTimedStateEffectBase::StaticClass(), 1.f, AbilitySystem->MakeEffectContext());
-	Spec.Data->SetDuration(InDuration, true);
-	Spec.Data->DynamicGrantedTags.AddTag(GameplayTags::State_Vitality_Interrupting);
-	InterruptEffect = AbilitySystem->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 }
 
 void AAbilityCharacterBase::UnInterrupt()
 {
-	if (HasAuthority() && AbilitySystem)
-	{
-		AbilitySystem->RemoveActiveGameplayEffect(InterruptEffect);
-		InterruptEffect.Invalidate();
-	}
+	Control->ClearInterrupts();
 }
 
 void AAbilityCharacterBase::FreeToAnim()

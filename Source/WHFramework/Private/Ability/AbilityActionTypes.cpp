@@ -48,9 +48,12 @@ bool FAbilityActionTargetData::NetSerialize(FArchive& Ar, UPackageMap* Map, bool
 	const bool bTargetMapped = Map->SerializeObject(Ar, AActor::StaticClass(), Target);
 	FVector Location = Request.TargetLocation;
 	FVector_NetQuantizeNormal Direction(Request.AimDirection.GetSafeNormal());
+	FVector_NetQuantizeNormal Movement(Request.MovementDirection.GetSafeNormal());
 	bool bVectorSuccess = true;
 	Ar << Location;
 	Direction.NetSerialize(Ar, Map, bVectorSuccess);
+	bOutSuccess &= bVectorSuccess;
+	Movement.NetSerialize(Ar, Map, bVectorSuccess);
 	bOutSuccess &= bVectorSuccess;
 	Ar << Request.WeaponPart;
 	Ar << Request.ComboIndex;
@@ -60,10 +63,11 @@ bool FAbilityActionTargetData::NetSerialize(FArchive& Ar, UPackageMap* Map, bool
 		Request.TargetActor = Cast<AActor>(Target);
 		Request.TargetLocation = Location;
 		Request.AimDirection = Direction;
+		Request.MovementDirection = Movement;
 		Request.AbilityHandle = FGameplayAbilitySpecHandle();
 	}
 	bOutSuccess &= !Ar.IsError() && ActivationId.IsValid() && Request.DefinitionId.IsValid() && Request.ActionTag.IsValid();
-	bOutSuccess &= !Request.TargetLocation.ContainsNaN() && !Request.AimDirection.ContainsNaN();
+	bOutSuccess &= !Request.TargetLocation.ContainsNaN() && !Request.AimDirection.ContainsNaN() && !Request.MovementDirection.ContainsNaN();
 	bOutSuccess &= Request.WeaponPart >= 0 && Request.WeaponPart <= 255 && Request.ComboIndex >= INDEX_NONE && Request.ComboIndex <= 255;
 	return bTargetMapped;
 }

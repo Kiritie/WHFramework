@@ -18,7 +18,6 @@ class ISceneContainerInterface;
 class AAbilityVitalityBase;
 class AAbilityCharacterBase;
 class AAbilityPawnBase;
-class AAbilityProjectileBase;
 /**
  * 
  */
@@ -75,11 +74,6 @@ public:
 	static AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Projectile
-	static AAbilityProjectileBase* SpawnAbilityProjectile(const TSubclassOf<AAbilityProjectileBase>& InClass, AActor* InOwnerActor = nullptr, const FGameplayAbilitySpecHandle& InAbilityHandle = FGameplayAbilitySpecHandle());
-
-	//////////////////////////////////////////////////////////////////////////
 	// Actor
 	static AActor* SpawnAbilityActor(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr);
 };
-

@@ -5,8 +5,6 @@
 
 #include "AbilitySkillDataBase.generated.h"
 
-class AAbilityProjectileBase;
-
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UAbilitySkillDataBase : public UAbilityTransItemDataBase
 {
@@ -18,7 +16,4 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EAbilitySkillMode SkillMode;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AAbilityProjectileBase> ProjectileClass;
 };

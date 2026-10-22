@@ -4,7 +4,6 @@
 #include "Ability/AbilityModuleTypes.h"
 #include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Item/AbilityItemBase.h"
-#include "Ability/Projectile/AbilityProjectileBase.h"
 #include "Ability/Spawner/AbilitySpawnerBase.h"
 #include "Character/Base/CharacterBase.h"
 #include "Common/Base/WHActor.h"
@@ -47,7 +46,6 @@ void FWHFrameworkModule::StartupModule()
 
 	FObjectPoolSpawnParameterRegistry::Register(AWHActor::StaticClass(), FWHActorSpawnParameter::StaticStruct());
 	FObjectPoolSpawnParameterRegistry::Register(AAbilityActorBase::StaticClass(), FAbilityActorSpawnParameter::StaticStruct());
-	FObjectPoolSpawnParameterRegistry::Register(AAbilityProjectileBase::StaticClass(), FAbilityProjectileSpawnParameter::StaticStruct());
 	FObjectPoolSpawnParameterRegistry::Register(AAbilityItemBase::StaticClass(), FAbilityItemSpawnParameter::StaticStruct());
 	FObjectPoolSpawnParameterRegistry::Register(AAbilitySpawnerBase::StaticClass(), FWHActorSpawnParameter::StaticStruct());
 	FObjectPoolSpawnParameterRegistry::Register(ACharacterBase::StaticClass(), FAbilityActorSpawnParameter::StaticStruct());

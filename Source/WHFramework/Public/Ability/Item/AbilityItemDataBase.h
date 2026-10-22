@@ -2,12 +2,13 @@
 
 #include "Ability/AbilityModuleTypes.h"
 #include "Ability/Inventory/InventoryItemRegistry.h"
+#include "Ability/Inventory/InventoryItemPresentation.h"
 #include "Asset/Primary/PrimaryAssetBase.h"
 #include "GameplayEffectTypes.h"
 
 #include "AbilityItemDataBase.generated.h"
 
-class UItemAbilityBase;
+class UAbilityBase;
 class AInventoryPickupActor;
 class UEffectBase;
 
@@ -53,10 +54,16 @@ public:
 	int32 MaxLevel;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TSubclassOf<UItemAbilityBase> AbilityClass;
+	TSubclassOf<UAbilityBase> AbilityClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AInventoryPickupActor> PickUpClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    FInventoryPickupPresentation PickupPresentation;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly)
+    TArray<FInventoryPersistentBuffPolicy> ConsumableBuffPolicies;
 
 public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -110,4 +117,3 @@ public:
     static FText FormatAttributeName(const FAbilityItemAttributeValue& InValue);
     static FText FormatAttributeValue(const FAbilityItemAttributeValue& InValue, float InMagnitude, bool bInSigned);
 };
-

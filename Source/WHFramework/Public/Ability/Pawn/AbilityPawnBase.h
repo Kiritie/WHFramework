@@ -15,6 +15,7 @@
 #include "AbilityPawnBase.generated.h"
 
 class UFSMComponent;
+class UAbilityControlComponent;
 class UInteractionComponent;
 class UAbilityInventoryBase;
 class UVitalityAttributeSetBase;
@@ -73,6 +74,10 @@ protected:
 
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
 
+public:
+	virtual void FaceRotation(FRotator NewControlRotation, float DeltaTime = 0.f) override;
+	virtual void RotationTowards(FRotator InRotation, float InDuration = 1.f, bool bMulticast = false) override;
+
 protected:
 	virtual bool HasArchive() const override
 	{
@@ -122,7 +127,6 @@ public:
 
 
 protected:
-protected:
 	virtual void OnAttributeChange(const FOnAttributeChangeData& InAttributeChangeData) override;
 
 	virtual void OnActorAttached(AActor* InActor) override;
@@ -167,7 +171,7 @@ protected:
 	UFSMComponent* FSM;
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UFSMComponent> ControlFSM;
+	TObjectPtr<UAbilityControlComponent> Control;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Replicated, Category = "PawnStats")

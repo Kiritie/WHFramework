@@ -1061,6 +1061,7 @@ FAbilityActionStartResult UAbilitySystemComponentBase::RequestAction(const FAbil
 	Data->ActivationId = Start.ActivationId;
 	Data->Request = Request;
 	Data->Request.AimDirection = Request.AimDirection.GetSafeNormal();
+	Data->Request.MovementDirection = Request.MovementDirection.GetSafeNormal();
 	FGameplayEventData Event;
 	Event.EventTag = AbilityActionTags::Request;
 	Event.Instigator = AbilityActorInfo->AvatarActor.Get();
@@ -1112,7 +1113,7 @@ bool UAbilitySystemComponentBase::ValidateGrantedRequest(const FAbilityActionReq
 		OutReason = AbilityActionTags::NotReady;
 		return false;
 	}
-	if (!Request.AbilityHandle.IsValid() || !Request.DefinitionId.IsValid() || !Request.ActionTag.IsValid() || Request.TargetLocation.ContainsNaN() || Request.AimDirection.ContainsNaN() || Request.AimDirection.IsNearlyZero() || Request.WeaponPart < 0 || Request.WeaponPart > 255 || Request.ComboIndex < INDEX_NONE || Request.ComboIndex > 255)
+	if (!Request.AbilityHandle.IsValid() || !Request.DefinitionId.IsValid() || !Request.ActionTag.IsValid() || Request.TargetLocation.ContainsNaN() || Request.AimDirection.ContainsNaN() || Request.MovementDirection.ContainsNaN() || Request.MovementDirection.SizeSquared() > 1.01f || Request.AimDirection.IsNearlyZero() || Request.WeaponPart < 0 || Request.WeaponPart > 255 || Request.ComboIndex < INDEX_NONE || Request.ComboIndex > 255)
 	{
 		OutReason = AbilityActionTags::InvalidRequest;
 		return false;

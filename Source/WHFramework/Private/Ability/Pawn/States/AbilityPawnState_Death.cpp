@@ -38,8 +38,6 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 		KillerActor = Cast<AActor>(InParams[0].Get<UObject*>());
 	}
 
-	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, {GetAgent(), KillerActor.Get()});
-
 	AAbilityPawnBase* Pawn = GetAgent<AAbilityPawnBase>();
 
 	SetStateTag(GameplayTags::State_Vitality_Active, false);
@@ -56,6 +54,7 @@ void UAbilityPawnState_Death::OnEnter(UFiniteStateBase* InLastState, const TArra
 	Pawn->SetHealth(0.f);
 
 	DeathStart();
+	UEventModuleStatics::BroadcastEvent<FEventVitalityDead>(this, {GetAgent(), KillerActor.Get()});
 }
 
 void UAbilityPawnState_Death::OnRefresh(float DeltaSeconds)

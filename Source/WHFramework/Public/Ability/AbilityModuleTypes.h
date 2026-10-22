@@ -22,7 +22,6 @@ class UAbilityInventoryBase;
 class UAbilityCharacterDataBase;
 class UAbilityVitalityDataBase;
 class UAbilityItemDataBase;
-class AAbilityProjectileBase;
 class AAbilityEquipBase;
 
 extern WHFRAMEWORK_API FPrimaryAssetId PAID_EXP;
@@ -50,27 +49,6 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FPrimaryAssetId AssetID;
-};
-
-USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FAbilityProjectileSpawnParameter : public FWHActorSpawnParameter
-{
-	GENERATED_BODY()
-
-public:
-	FAbilityProjectileSpawnParameter() = default;
-
-	FAbilityProjectileSpawnParameter(
-		AActor* InOwner,
-		const FGameplayAbilitySpecHandle& InAbilityHandle)
-		: AbilityHandle(InAbilityHandle)
-	{
-		WorldContext = InOwner;
-		Owner = InOwner;
-	}
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FGameplayAbilitySpecHandle AbilityHandle;
 };
 
 DECLARE_PROPERTY_ROB_GETTER(FGameplayEffectModifierMagnitude, AttributeBasedMagnitude, FAttributeBasedFloat)

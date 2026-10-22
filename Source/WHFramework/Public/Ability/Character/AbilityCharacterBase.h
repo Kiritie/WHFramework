@@ -13,6 +13,7 @@
 #include "AbilityCharacterBase.generated.h"
 
 class UFSMComponent;
+class UAbilityControlComponent;
 class UInteractionComponent;
 class UAbilityInventoryBase;
 class UCharacterAttributeSetBase;
@@ -22,7 +23,6 @@ class UVoxel;
 class AController;
 class UAbilityBase;
 class UAbilitySystemComponentBase;
-class AAbilityProjectileBase;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FInventorySelectionChanged, const FInventorySlotKey&);
 
@@ -238,11 +238,10 @@ protected:
 
 	float DefaultAirControl;
 
-	FActiveGameplayEffectHandle StaticEffect;
-	FActiveGameplayEffectHandle InterruptEffect;
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UAbilityControlComponent> Control;
 	const FGuid BaseStatsSource = FGuid(0x74FD8520, 0xB13E40AF, 0x9A9EFD04, 0xD49EE5D2);
 	bool bBaseAttributeSourceReady = false;
-	const FGuid StaticMovementSource = FGuid(0x0A2C1130, 0x4E6D4D2D, 0x8BC804B6, 0x0431316E);
 
 public:
 	ATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Exp)

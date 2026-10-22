@@ -68,6 +68,9 @@ struct WHFRAMEWORK_API FAbilityActionRequest
 	FVector AimDirection = FVector::ForwardVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector MovementDirection = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGameplayTag Variant;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

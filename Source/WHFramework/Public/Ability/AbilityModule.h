@@ -14,7 +14,6 @@ class AAbilityVitalityBase;
 class AAbilityCharacterBase;
 class AAbilityActorBase;
 class AAbilityPawnBase;
-class AAbilityProjectileBase;
 
 UCLASS()
 class WHFRAMEWORK_API UAbilityModule : public UModuleBase
@@ -71,13 +70,7 @@ public:
 	virtual AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
-	// Projectile
-public:
-	virtual AAbilityProjectileBase* SpawnAbilityProjectile(const TSubclassOf<AAbilityProjectileBase>& InClass, AActor* InOwnerActor = nullptr, const FGameplayAbilitySpecHandle& InAbilityHandle = FGameplayAbilitySpecHandle());
-
-	//////////////////////////////////////////////////////////////////////////
 	// Actor
 public:
 	virtual AActor* SpawnAbilityActor(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr);
 };
-

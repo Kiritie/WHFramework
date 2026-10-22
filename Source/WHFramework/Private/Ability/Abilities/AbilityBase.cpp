@@ -1,6 +1,7 @@
 #include "Ability/Abilities/AbilityBase.h"
 
 #include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Ability/Components/AbilityControlComponent.h"
 #include "Ability/Effects/EffectBase.h"
 #include "Common/CommonModuleTypes.h"
 #include "Engine/World.h"
@@ -247,6 +248,16 @@ bool UAbilityBase::IsPredictionKeyValidForMorePrediction() const
 
 bool UAbilityBase::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, OUT FGameplayTagContainer* OptionalRelevantTags) const
 {
+	const AActor* Avatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+	const UAbilityControlComponent* Control = Avatar ? Avatar->FindComponentByClass<UAbilityControlComponent>() : nullptr;
+	if (Control && Control->IsActionBlocked(ActionTag))
+	{
+		if (OptionalRelevantTags)
+		{
+			OptionalRelevantTags->AddTag(AbilityActionTags::Blocked);
+		}
+		return false;
+	}
 	return Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
 }
 
@@ -476,7 +487,7 @@ bool UAbilityBase::RequestActionCancellation(FGameplayTag Reason)
 bool UAbilityBase::ValidateActionRequest(const FAbilityActionRequest& Request, FGameplayTag& OutReason) const
 {
 	const AActor* Avatar = GetAvatarActorFromActorInfo();
-	if (!IsValid(Avatar) || !Request.ActionTag.IsValid() || Request.ActionTag != ActionTag || Request.TargetLocation.ContainsNaN() || Request.AimDirection.ContainsNaN() || Request.AimDirection.IsNearlyZero() || Request.WeaponPart < 0 || Request.WeaponPart > 255 || Request.ComboIndex < INDEX_NONE || Request.ComboIndex > 255)
+	if (!IsValid(Avatar) || !Request.ActionTag.IsValid() || Request.ActionTag != ActionTag || Request.TargetLocation.ContainsNaN() || Request.AimDirection.ContainsNaN() || Request.MovementDirection.ContainsNaN() || Request.MovementDirection.SizeSquared() > 1.01f || Request.AimDirection.IsNearlyZero() || Request.WeaponPart < 0 || Request.WeaponPart > 255 || Request.ComboIndex < INDEX_NONE || Request.ComboIndex > 255)
 	{
 		OutReason = AbilityActionTags::InvalidRequest;
 		return false;

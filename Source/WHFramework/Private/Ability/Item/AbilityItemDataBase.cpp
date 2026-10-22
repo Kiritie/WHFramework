@@ -1,5 +1,6 @@
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "GameplayEffect.h"
+#include "Ability/Inventory/InventoryPickupActor.h"
 
 #include "Ability/Abilities/ItemAbilityBase.h"
 #include "Ability/Effects/EffectBase.h"
@@ -107,7 +108,7 @@ FString UAbilityItemDataBase::GetItemAbilityInfo(int32 InLevel) const
                 : NSLOCTEXT("WH.AbilityItem", "DynamicDuration", "持续时间取决于使用时状态。").ToString());
         }
     };
-    const UItemAbilityBase* Ability = AbilityClass.GetDefaultObject();
+    const UAbilityBase* Ability = AbilityClass.GetDefaultObject();
     if (Ability)
     {
         if (const UGameplayEffect* Cost = Ability->GetCostGameplayEffect(); Cost && !bEquipment)
@@ -155,6 +156,7 @@ FInventoryItemDefinition UAbilityItemDataBase::BuildInventoryDefinition() const
     Definition.StackPolicy = StackPolicy;
     Definition.UsePolicy = UsePolicy;
     Definition.AbilityClass = FSoftClassPath(AbilityClass.Get());
+    Definition.PickupActorClass = FSoftClassPath(PickUpClass.Get());
     Definition.ConsumableCount = ConsumableCount;
     Definition.bCanTrade = bCanTrade;
     Definition.bCanDrop = bCanDrop;

@@ -16,7 +16,6 @@
 #include "Ability/Item/Equip/AbilityEquipBase.h"
 #include "Ability/Item/Prop/AbilityPropBase.h"
 #include "Ability/Item/Raw/AbilityRawBase.h"
-#include "Ability/Projectile/AbilityProjectileBase.h"
 #include "Asset/AssetModuleStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"
@@ -149,13 +148,6 @@ AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, AActor* 
 }
 
 
-AAbilityProjectileBase* UAbilityModule::SpawnAbilityProjectile(const TSubclassOf<AAbilityProjectileBase>& InClass, AActor* InOwnerActor, const FGameplayAbilitySpecHandle& InAbilityHandle)
-{
-	return UObjectPoolModuleStatics::SpawnObject<AAbilityProjectileBase>(
-		FAbilityProjectileSpawnParameter(InOwnerActor, InAbilityHandle),
-		InClass);
-}
-
 AActor* UAbilityModule::SpawnAbilityActor(const FParameter& InSaveData, ISceneContainerInterface* InContainer)
 {
 	const FActorSaveData& SaveData = InSaveData.GetRef<FActorSaveData>();
@@ -184,4 +176,3 @@ AActor* UAbilityModule::SpawnAbilityActor(const FParameter& InSaveData, ISceneCo
 	}
 	return Actor;
 }
-
