@@ -3744,6 +3744,10 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 		ShardCount;
 
 	bool bRetirementLimited = false;
+#if !UE_BUILD_SHIPPING
+	static double NextPressureDiagnostic = 0.0;
+	const bool bLogPressure = bNaturalCapacityPressure && FPlatformTime::Seconds() >= NextPressureDiagnostic;
+#endif
 
 	{
 		FNaturalShard& Shard =
@@ -3987,6 +3991,53 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					&FVoxelGenerationCacheRetentionPoint::PlanRadiusCells);
 			});
 
+
+#if !UE_BUILD_SHIPPING
+		if (bLogPressure)
+		{
+			uint64 BodyBytes[7] = {};
+			int32 BodyCounts[7] = {};
+			int32 AdvancingRegions = 0;
+			uint64 MaximumBytes = 0;
+			int32 MaximumKind = INDEX_NONE;
+			const auto AddBody = [&](const int32 Kind, const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
+			{
+				if (!Lease) return;
+				const uint64 Bytes = Lease->Bytes();
+				BodyBytes[Kind] += Bytes;
+				++BodyCounts[Kind];
+				if (Bytes > MaximumBytes)
+				{
+					MaximumBytes = Bytes;
+					MaximumKind = Kind;
+				}
+			};
+			for (const auto& Pair : Shard.HydrologyBuilds)
+			{
+				const auto& Gate = *Pair.Value;
+				const auto& Owner = Gate.HydrologyOwner;
+				if (!Owner) continue;
+				AddBody(0, Owner->BodyLease);
+				if (Gate.bAdvancingHydrology) ++AdvancingRegions;
+				else if (Owner->CurrentComponent) AddBody(1, Owner->CurrentComponent->BodyLease);
+			}
+			for (const auto& Pair : Shard.HydrologyGraphBuilds)
+				if (Pair.Value->HydrologyGraphOwner) AddBody(2, Pair.Value->HydrologyGraphOwner->BodyLease);
+			const auto AddFacts = [&](const auto& Builds, const int32 Kind)
+			{
+				for (const auto& Pair : Builds)
+					if (Pair.Value->HydrologyFactOwner) AddBody(Kind, Pair.Value->HydrologyFactOwner->BodyLease);
+			};
+			AddFacts(Shard.HydrologyRunoff.Builds, 3);
+			AddFacts(Shard.HydrologySourceBucket.Builds, 4);
+			AddFacts(Shard.HydrologySources.Builds, 5);
+			AddFacts(Shard.HydrologyChannels.Builds, 6);
+			UE_LOG(LogTemp, Display, TEXT("Voxel fact build pressure: shard=%d region=%d/%llu component=%d/%llu graph=%d/%llu runoff=%d/%llu bucket=%d/%llu sources=%d/%llu channels=%d/%llu advancingRegions=%d topologyBuilders=%d maxKind=%d maxBytes=%llu"),
+				ShardIndex, BodyCounts[0], BodyBytes[0], BodyCounts[1], BodyBytes[1], BodyCounts[2], BodyBytes[2],
+				BodyCounts[3], BodyBytes[3], BodyCounts[4], BodyBytes[4], BodyCounts[5], BodyBytes[5], BodyCounts[6], BodyBytes[6],
+				AdvancingRegions, Shard.HydrologyTopologyBuilds.Num(), MaximumKind, MaximumBytes);
+		}
+#endif
 	}
 	if (!bRetirementLimited)
 	{
@@ -3994,8 +4045,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 	}
 	RetentionScope.Reset();
 #if !UE_BUILD_SHIPPING
-	static double NextPressureDiagnostic = 0.0;
-	if (bNaturalCapacityPressure && FPlatformTime::Seconds() >= NextPressureDiagnostic)
+	if (bLogPressure)
 	{
 		const auto State = Resources->Snapshot();
 		UE_LOG(LogTemp, Display, TEXT("Voxel natural cache pressure: epoch=%llu resident=%llu nativeLimit=%llu headroom=%llu checkedLimit=%d retiredBase=%d retiredNatural=%d shard=%d"),

@@ -396,12 +396,28 @@ void FVoxelCollisionPresenter::AdvanceBody(const FIntVector& InSection, FBodyRec
 		InBody.PreparingComponent->IsDetachedCookRunning()) return;
 	if (InBody.PreparingComponent->HasDetachedCookFailed())
 	{
-		InBody.FailedStamp = InBody.PreparedStamp;
-		InBody.bHasFailure = true;
+		const bool bCanceled = InBody.PreparingComponent->IsDetachedCookCanceled();
+		if (!bCanceled)
+		{
+			InBody.FailedStamp = InBody.PreparedStamp;
+			InBody.bHasFailure = true;
+		}
 		InBody.PreparingComponent->DestroyComponent();
 		InBody.PreparingComponent.Reset();
 		InBody.PreparingLease.Reset();
-		InBody.Prepared.Reset();
+		InBody.BoxCursor = 0;
+		if (bCanceled)
+		{
+			InBody.bHasFailure = false;
+			UE_LOG(LogTemp, Display, TEXT("Native collision cook canceled; retrying original prepared input: section=%s epoch=%llu token=%llu revision=%llu"),
+				*InSection.ToString(), WorldEpoch, InBody.PreparedStamp.Token, InBody.PreparedStamp.Revision);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("Native collision cook failed: section=%s epoch=%llu token=%llu revision=%llu"),
+				*InSection.ToString(), WorldEpoch, InBody.PreparedStamp.Token, InBody.PreparedStamp.Revision);
+			InBody.Prepared.Reset();
+		}
 		return;
 	}
 	FPhysScene* Scene = Module.GetWorld()->GetPhysicsScene();

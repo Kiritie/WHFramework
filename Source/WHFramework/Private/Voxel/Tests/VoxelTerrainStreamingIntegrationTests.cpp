@@ -25,14 +25,11 @@ bool FVoxelKnownInitialInterestIntegrationTest::RunTest(const FString& InParamet
 	Manifest.Settings.MinZ = -256;
 	Manifest.Settings.MaxZ = 256;
 	FVoxelViewSettings Settings;
-	Settings.Fine.InteractiveRadiusCells = 1;
-	Settings.Fine.InteractiveVerticalHalfExtentCells = 1;
-	Settings.Fine.CollisionGuardRadiusCells = 2;
-	Settings.Fine.ResidencyHorizontalHalfExtentCells = 64;
-	Settings.Fine.ResidencyVerticalHalfExtentCells = 64;
-	Settings.Fine.HorizontalShiftStepCells = 32;
-	Settings.Fine.VerticalShiftStepCells = 32;
-	Settings.Fine.GuardMarginCells = 0;
+	Settings.DefaultSourceView.FineLevel0RadiusCells = 1;
+	Settings.DefaultSourceView.FineLevel0VerticalHalfExtentCells = 1;
+	Settings.DefaultSourceView.CollisionGuardRadiusCells = 2;
+	Settings.DefaultSourceView.FineRadiusCells = 64;
+	Settings.DefaultSourceView.FineVerticalHalfExtentCells = 64;
 	Settings.Fine.MaximumPageLevel = 1;
 	Settings.Fine.FirstMergeDistanceCells = 32;
 	FVoxelStreamingSource Source;
@@ -41,8 +38,7 @@ bool FVoxelKnownInitialInterestIntegrationTest::RunTest(const FString& InParamet
 	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::FineVisual;
 	Source.bInheritWorldView = false;
 	Source.ExactRadius = -1;
-	Source.View.FineRadiusCells = 1;
-	Source.View.FineVerticalHalfExtentCells = 1;
+	Source.View = Settings.DefaultSourceView;
 	Source.CollisionRadius = 0;
 	Source.SimulationRadius = 0;
 	for (const int32 Initial : {16, 32})

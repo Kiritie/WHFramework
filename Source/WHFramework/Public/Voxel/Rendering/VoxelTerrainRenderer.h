@@ -95,6 +95,8 @@ struct WHFRAMEWORK_API FVoxelTerrainRenderAtom final : FVoxelTaskCustomPayload
 	TArray<TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>> Chunks;
 	TArray<FVoxelTerrainAtomDrawRange> DrawRanges;
 	TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> FineGeometry;
+	int32 SourceDrawRangeCount = 0;
+	uint8 SuppressedFaceMask = 0;
 	bool bUseDrawRanges = false;
 	TArray<TSharedPtr<const FVoxelFineBoundarySnapshot, ESPMode::ThreadSafe>> Boundaries;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
@@ -126,7 +128,7 @@ public:
 		TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe> InMesh,
 		int32 InBatch, const FVector& InWorldOrigin, double InWorldScale,
 		int32 InFirstTriangle = 0, int32 InTriangleCount = INDEX_NONE,
-		EVoxelTerrainResourceAdmission* OutAdmission = nullptr);
+		EVoxelTerrainResourceAdmission* OutAdmission = nullptr, bool bInRetainCpuSource = true);
 	void AppendSourceChunk(FVoxelTerrainRenderCoarse& InItem, int32 InBatch,
 		TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>& InOutLast,
 		TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe> InChunk);

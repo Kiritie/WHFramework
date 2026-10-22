@@ -6,6 +6,7 @@
 #include "Voxel/Rendering/VoxelCoveragePartition.h"
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 namespace
 {
@@ -96,8 +97,72 @@ bool FVoxelSectionMesher::IsKnownEmpty(const FVoxelSectionSnapshot& InSnapshot,
 }
 
 uint64 FVoxelMeshBuffers::Bytes()const
-{return uint64(Vertices.Num())*sizeof(FVector)+uint64(Normals.Num())*sizeof(FVector)+uint64(Triangles.Num())*4+
-    uint64(UV0.Num()+UV1.Num()+UV2.Num())*sizeof(FVector2D)+uint64(Colors.Num())*sizeof(FLinearColor)+uint64(Tangents.Num())*sizeof(FProcMeshTangent);}
+{return uint64(Vertices.Num())*sizeof(FVector)+Normals.Bytes()+uint64(Triangles.Num())*4+
+    uint64(UV0.Num())*sizeof(FVector2D)+UV1.Bytes()+UV2.Bytes()+Colors.Bytes()+Tangents.Bytes();}
+bool FVoxelMeshBuffers::CompactAttributes(const uint64 InWorkingBytes, const TAtomic<bool>* InCancel)
+{
+    return Normals.Compact(InWorkingBytes, InCancel) && UV1.Compact(InWorkingBytes, InCancel) &&
+        UV2.Compact(InWorkingBytes, InCancel) && Colors.Compact(InWorkingBytes, InCancel) &&
+        Tangents.Compact(InWorkingBytes, InCancel);
+}
+
+bool FVoxelSectionMeshResult::CompactAttributes(const uint64 InWorkingBytes, const TAtomic<bool>* InCancel)
+{
+    check(bValidated);
+    bool bComplete = true;
+    for (auto& Batch : Batches)
+    {
+        if (!Batch.Mesh.CompactAttributes(InWorkingBytes, InCancel)) { bComplete = false; break; }
+    }
+    MeshDataBytes = 0;
+    for (const auto& Batch : Batches) MeshDataBytes += Batch.Mesh.Bytes();
+    return bComplete;
+}
+
+bool FVoxelSectionMeshResult::TryCompactAttributes(const TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
+    const FVoxelGenerationConsumerKey& InConsumer, FString& OutError, const TAtomic<bool>* InCancel)
+{
+    TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_MeshAttributeStorage);
+    OutError.Reset();
+    if (!bValidated || !ResourceLease || !ResourceLease->IsOwnedBy(InResources.Get()))
+    {
+        OutError = TEXT("Invalid mesh attribute storage owner or validation");
+        return false;
+    }
+    if (InCancel && InCancel->Load()) { OutError = TEXT("Canceled"); return false; }
+    uint64 ScratchBytes = 0;
+    for (const auto& Batch : Batches)
+    {
+        const int32 Count = Batch.Mesh.Vertices.Num();
+        if (Count < 64) continue;
+        ScratchBytes = FMath::Max(ScratchBytes, VoxelBoundedAllocation::ArrayBytes<uint8>(Count) +
+            VoxelBoundedAllocation::ArrayBytes<FProcMeshTangent>(FMath::Min(256, Count)));
+    }
+    if (!ScratchBytes) return true;
+    FVoxelGenerationRequiredSourceScope OutputSource(&InResources.Get(), ResourceLease.Get());
+    FVoxelGenerationRequiredCapacity Required;
+    if (!FVoxelGenerationRequiredSourceScope::Collect(InResources.Get(), nullptr, Required, OutError)) return false;
+    TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ScratchLease;
+    const auto Admission = InResources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Working, ScratchBytes,
+        ScratchLease, 0, Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+    if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked) return true;
+    if (Admission != EVoxelTerrainResourceAdmission::Granted)
+    {
+        OutError = TEXT("Invalid mesh attribute storage scratch admission");
+        return false;
+    }
+    const uint64 Before = AllocatedBytes();
+    if (!CompactAttributes(ScratchLease->Bytes(), InCancel)) { OutError = TEXT("Canceled"); return false; }
+    const uint64 After = AllocatedBytes();
+    check(After <= Before);
+#if !UE_BUILD_SHIPPING
+    if (Before - After >= 1024 * 1024)
+        UE_LOG(LogTemp, Display, TEXT("Voxel mesh attribute storage: vertices=%llu before=%llu after=%llu scratch=%llu"),
+            VertexCount, Before, After, ScratchBytes);
+#endif
+    return true;
+}
+
 bool FVoxelMeshBuffers::Validate()const
 {
     int32 N=Vertices.Num();if(N!=Normals.Num()||N!=UV0.Num()||N!=UV1.Num()||N!=UV2.Num()||N!=Colors.Num()||N!=Tangents.Num()||Triangles.Num()%3)return false;
@@ -237,7 +302,7 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
     const int32 Side = S.GridSide;
     const bool bFrozenProxyBoundary = bBoundaryOnly && InTransition && InTransition->OwnerGeometry &&
         InTransition->OwnerGeometry->GridSide == Side;
-    const bool bFrozenFineBoundary = bBoundaryOnly && InTransition && InTransition->FineOwnerGeometry && Side == 16;
+    const bool bFrozenFineBoundary = bBoundaryOnly && InTransition && InTransition->FineOwnerSource.Boundary && Side == 16;
     if (!bFrozenProxyBoundary && !bFrozenFineBoundary && S.Blocks.Num() != Side * Side * Side) return false;
     for(uint32 P:S.Blocks)if(!R.IsValid(FVoxelBlockState::Unpack(P)))return false;
     if(InTransition && (!InTransition->Validate() ||
@@ -422,7 +487,7 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
                     FVoxelBlockState OwnerState;
                     if (bFrozenFineBoundary)
                     {
-                        if (!InTransition->FineOwnerGeometry->Boundary->SampleAtomFace(InTransition->Owner.Coordinate,
+                        if (!InTransition->FineOwnerSource.Boundary->SampleAtomFace(InTransition->Owner.Coordinate,
                             Face, false, OwnerBounds.Min + Local, OwnerState)) return false;
                     }
                     else OwnerState = bFrozenProxyBoundary ? InTransition->OwnerGeometry->Cells[OwnerIndex]

@@ -57,24 +57,34 @@ bool UVoxelMeshComponent::Apply(
 		FVector(
 			InBlockSize));
 
-	static const TArray<FVector2D>
-		EmptyUV3;
-
 	ClearAllMeshSections();
-
-	CreateMeshSection_LinearColor(
-		0,
-		InMesh.Vertices,
-		InMesh.Triangles,
-		InMesh.Normals,
-		InMesh.UV0,
-		InMesh.UV1,
-		InMesh.UV2,
-		EmptyUV3,
-		InMesh.Colors,
-		InMesh.Tangents,
-		false,
-		false);
+	SetProcMeshSection(0, FProcMeshSection());
+	FProcMeshSection& Section = *GetProcMeshSection(0);
+	Section.ProcVertexBuffer.SetNumUninitialized(InMesh.Vertices.Num());
+	for (int32 Index = 0; Index < InMesh.Vertices.Num(); ++Index)
+	{
+		FProcMeshVertex& Vertex = Section.ProcVertexBuffer[Index];
+		Vertex.Position = InMesh.Vertices[Index];
+		Vertex.Normal = InMesh.Normals[Index];
+		Vertex.UV0 = InMesh.UV0[Index];
+		Vertex.UV1 = InMesh.UV1[Index];
+		Vertex.UV2 = InMesh.UV2[Index];
+		Vertex.UV3 = FVector2D::ZeroVector;
+		Vertex.Color = InMesh.Colors[Index].ToFColor(false);
+		Vertex.Tangent = InMesh.Tangents[Index];
+		Section.SectionLocalBox += Vertex.Position;
+	}
+	Section.ProcIndexBuffer.Reserve(InMesh.Triangles.Num());
+	for (int32 Index = 0; Index < InMesh.Triangles.Num(); Index += 3)
+	{
+		const int32 First = InMesh.Triangles[Index];
+		const int32 Second = InMesh.Triangles[Index + 1];
+		const int32 Third = InMesh.Triangles[Index + 2];
+		if (First == Second || First == Third || Second == Third) continue;
+		Section.ProcIndexBuffer.Append({uint32(First), uint32(Second), uint32(Third)});
+	}
+	Section.bEnableCollision = false;
+	SetProcMeshSection(0, Section);
 
 	SetMaterial(
 		0,

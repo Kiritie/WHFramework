@@ -53,8 +53,8 @@ bool FVoxelKnownFineFamiliesTest::RunTest(const FString& InParameters)
 	Source.Center = FIntVector(1);
 	Source.bInheritWorldView = false;
 	Source.View.InitialChunkSideCells = 32;
-	Source.View.FineRadiusCells = 1;
-	Source.View.FineVerticalHalfExtentCells = 1;
+	Source.View.FineRadiusCells = 256;
+	Source.View.FineVerticalHalfExtentCells = 256;
 	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::FineVisual;
 	FVoxelInterestSet Interest;
 	const FVoxelInterestManager Manager;
@@ -64,7 +64,6 @@ bool FVoxelKnownFineFamiliesTest::RunTest(const FString& InParameters)
 	const int32 RuntimeSections = Interest.Exact.Num();
 	const int32 Shards32 = Interest.FineShardDemands.Num();
 	Settings.Fine.ShardSideCells = 64;
-	Settings.Fine.VerticalShiftStepCells = 64;
 	const FVoxelInterestSet Shards64 = Manager.Compute(Sources, Manifest, Settings);
 	TestTrue(TEXT("64-cell canonical shards plan"), Shards64.PlanningError.IsEmpty());
 	TestEqual(TEXT("Shard size cannot expand Runtime demand"), Shards64.Exact.Num(), RuntimeSections);

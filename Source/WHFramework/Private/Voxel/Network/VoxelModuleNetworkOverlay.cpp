@@ -737,16 +737,23 @@ void UVoxelModuleNetworkComponent::HandleOverlayMessage(const EVoxelMessage Kind
 		const FVector ObserverCell = GetAuthorizedObserver()->GetActorLocation() / WorldModule->BlockSize();
 		TArray<FVoxelStreamingSource> Authorized;
 		WorldModule->CollectStreamingSourcesForOwner(Controller(), Authorized);
-		const auto Window = WorldModule->GetViewSettings().Fine.WindowSettings();
-		const FVector HalfExtent(Window.RadiusCells + Window.ShiftStepCells + 128 + 16,
-			Window.RadiusCells + Window.ShiftStepCells + 128 + 16,
-			Window.VerticalHalfExtentCells + Window.VerticalShiftStepCells + 128 + 16);
+		const auto HalfExtentFor = [WorldModule](const FVoxelStreamingSourceView& View)
+		{
+			const auto Window = WorldModule->GetViewSettings().Fine.WindowSettings(View);
+			return FVector(double(Window.RadiusCells) + Window.ShiftStepCells + 128 + 16,
+				double(Window.RadiusCells) + Window.ShiftStepCells + 128 + 16,
+				double(Window.VerticalHalfExtentCells) + Window.VerticalShiftStepCells + 128 + 16);
+		};
+		const FVector HalfExtent = HalfExtentFor(WorldModule->GetViewSettings().DefaultSourceView);
 		for (const auto& Head : Message.Heads)
 		{
 			const FBox Bounds(FVector(Head.Region * 128), FVector((Head.Region + FIntVector(1)) * 128));
 			bool bAllowed = Bounds.Intersect(FBox(ObserverCell - HalfExtent, ObserverCell + HalfExtent));
 			for (const auto& Source : Authorized)
-				bAllowed |= Bounds.Intersect(FBox(FVector(Source.Center) - HalfExtent, FVector(Source.Center) + HalfExtent));
+			{
+				const FVector SourceExtent = HalfExtentFor(Source.View);
+				bAllowed |= Bounds.Intersect(FBox(FVector(Source.Center) - SourceExtent, FVector(Source.Center) + SourceExtent));
+			}
 			if (!bAllowed) { Fail(TEXT("Overlay 订阅超出已授权 Source 的当前或预热范围")); return; }
 		}
 		State.Identity.Subscription = Message.SubscriptionId;

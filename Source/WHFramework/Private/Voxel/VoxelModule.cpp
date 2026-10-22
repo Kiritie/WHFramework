@@ -889,7 +889,7 @@ bool UVoxelModule::StartWorld(
 		ViewSettings.Planning = ViewProfile->Planning;
 		ViewSettings.Budget = ViewProfile->Budget;
 		ViewSettings.MaximumTextureStretchCells = ViewProfile->MaximumTextureStretchCells;
-		if (!ViewSettings.Fine.Validate(OutError) || !VoxelViewLod::ValidateTopology(ViewSettings.Lod, OutError) ||
+		if (!ViewSettings.Fine.Validate(ViewSettings.DefaultSourceView, OutError) || !VoxelViewLod::ValidateTopology(ViewSettings.Lod, OutError) ||
 			!TerrainFrameContext.Configure(ViewSettings.FrameBudget, OutError) ||
 			!VoxelViewLod::ValidatePerformanceBudget(ViewSettings.Budget, OutError) ||
 			!FMath::IsFinite(ViewSettings.MaximumTextureStretchCells) ||
@@ -1975,26 +1975,37 @@ int32 UVoxelModule::ResolveDefaultWorldSeed() const
 FIntPoint UVoxelModule::GetLocalFineRadiusLimits() const
 {
 	const FVoxelStreamingSourceView& SourceView = ViewSettings.DefaultSourceView;
-	const int32 Minimum = FMath::Max(16, SourceView.FineLevel0RadiusCells);
-	return FIntPoint(Minimum, FMath::Max(Minimum, SourceView.VoxelProxyRadiusCells));
+	const int32 Minimum = ViewSettings.Fine.MinimumRadiusCells(SourceView);
+	const int32 Side = FMath::Max(1, ViewSettings.Fine.ShardSideCells);
+	return FIntPoint(Minimum, FMath::Max(Minimum, SourceView.VoxelProxyRadiusCells / Side * Side));
 }
 
-void UVoxelModule::SetLocalFineRadiusCells(int32 InRadiusCells)
+bool UVoxelModule::SetLocalFineRadiusCells(int32 InRadiusCells)
 {
-	check(InRadiusCells >= INDEX_NONE);
+	if (InRadiusCells < INDEX_NONE) return false;
+	FVoxelStreamingSourceView Candidate = ViewSettings.DefaultSourceView;
+	if (InRadiusCells >= 0)
+	{
+		const FIntPoint Limits = GetLocalFineRadiusLimits();
+		if (InRadiusCells < Limits.X || InRadiusCells > Limits.Y) return false;
+		Candidate.FineRadiusCells = InRadiusCells;
+	}
+	FString Error;
+	if (!ViewSettings.Fine.Validate(Candidate, Error)) return false;
 	if (LocalFineRadiusCells == InRadiusCells)
 	{
-		return;
+		return true;
 	}
 	LocalFineRadiusCells = InRadiusCells;
 	for (const auto& Pair : Sources)
 	{
 		const FVoxelStreamingSource Source = Pair.Value.Value;
-		if (Source.bInheritWorldView && Source.bLocalView && Source.Has(EVoxelStreamingCapability::FineVisual))
+		if (Pair.Value.Owner.IsValid() && Source.bInheritWorldView && Source.bLocalView && Source.Has(EVoxelStreamingCapability::FineVisual))
 		{
 			UpdateSource(Pair.Key, Source);
 		}
 	}
+	return true;
 }
 
 FVoxelStreamingSourceView UVoxelModule::ResolveSourceView(const FVoxelStreamingSource& InSource) const
@@ -2003,8 +2014,7 @@ FVoxelStreamingSourceView UVoxelModule::ResolveSourceView(const FVoxelStreamingS
 	if (LocalFineRadiusCells >= 0 && InSource.bInheritWorldView && InSource.bLocalView &&
 		InSource.Has(EVoxelStreamingCapability::FineVisual))
 	{
-		const FIntPoint Limits = GetLocalFineRadiusLimits();
-		Result.FineRadiusCells = FMath::Clamp(LocalFineRadiusCells, Limits.X, Limits.Y);
+		Result.FineRadiusCells = LocalFineRadiusCells;
 	}
 	return Result;
 }
@@ -2027,7 +2037,8 @@ FGuid UVoxelModule::RegisterSource(UObject* InOwner, const FVoxelStreamingSource
 	Source.Value.View = ResolveSourceView(Source.Value);
 	FString Error;
 	if (!VoxelStreamingGeometry::ValidateInitialSide(Source.Value.View.InitialChunkSideCells,
-		ViewSettings.Lod.MaximumFineLevel, Error))
+		ViewSettings.Lod.MaximumFineLevel, Error) ||
+		(Source.Value.Has(EVoxelStreamingCapability::FineVisual) && !ViewSettings.Fine.Validate(Source.Value.View, Error)))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Voxel source registration rejected: %s"), *Error);
 		return {};
@@ -2062,7 +2073,8 @@ bool UVoxelModule::UpdateSource(const FGuid& InId, const FVoxelStreamingSource& 
 	Updated.View = ResolveSourceView(Updated);
 	FString Error;
 	if (!VoxelStreamingGeometry::ValidateInitialSide(Updated.View.InitialChunkSideCells,
-		ViewSettings.Lod.MaximumFineLevel, Error))
+		ViewSettings.Lod.MaximumFineLevel, Error) ||
+		(Updated.Has(EVoxelStreamingCapability::FineVisual) && !ViewSettings.Fine.Validate(Updated.View, Error)))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Voxel source update rejected: id=%s error=%s"), *InId.ToString(), *Error);
 		return false;
@@ -3551,6 +3563,40 @@ UVoxelModule::NewWorldData(
 	}
 
 	return Result;
+}
+
+bool UVoxelModule::ValidateNewWorldData(const FParameter& InData, FString& OutError) const
+{
+	const FVoxelWorldSaveData* Data = InData.GetPtr<FVoxelWorldSaveData>();
+	if (!Data || Data->IsSaved() || !Data->ManifestBytes.IsEmpty())
+	{
+		OutError = TEXT("New voxel world validation requires unsaved data without a manifest");
+		return false;
+	}
+	const TSoftObjectPtr<UVoxelWorldGenerationProfile> ProfileAsset =
+		Data->GenerationProfile.IsNull() ? WorldGenerationProfileAsset : Data->GenerationProfile;
+	const UVoxelWorldGenerationProfile* Profile = ProfileAsset.LoadSynchronous();
+	const TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> RegistrySnapshot = Registry.GetSnapshot();
+	if (!IsAuthority() || !RegistrySnapshot || !Profile)
+	{
+		OutError = TEXT("New voxel world requires an authoritative initialized registry and generation profile");
+		return false;
+	}
+	FVoxelGenerationSettings Settings = Profile->Defaults;
+	Settings.Seed = Data->Seed;
+	FVoxelGenerationRuntimeConfig Config;
+	if (!FVoxelGenerationBinding::Build(*Profile, *RegistrySnapshot, Settings,
+		Profile->TargetCellCentimeters, Config, OutError))
+	{
+		return false;
+	}
+	if (!Config.Recipe)
+	{
+		OutError = TEXT("New voxel world generation binding has no frozen recipe");
+		return false;
+	}
+	OutError.Reset();
+	return true;
 }
 
 bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError) const

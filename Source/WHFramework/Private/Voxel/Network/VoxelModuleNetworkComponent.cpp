@@ -1418,7 +1418,7 @@ void UVoxelModuleNetworkComponent::Handle(
 		ServiceSource.Direction = Observer->GetActorForwardVector();
 		FVoxelTerrainServicePriority ServicePriority;
 		if (!FVoxelTerrainPriority::Resolve(Request.Geometry, {}, MakeArrayView(&ServiceSource, 1),
-			VoxelModule->GetViewSettings().Fine.InteractiveRadiusCells, ServicePriority, Error))
+			VoxelModule->GetViewSettings().DefaultSourceView.FineLevel0RadiusCells, ServicePriority, Error))
 		{
 			Fail(Error);
 			return;

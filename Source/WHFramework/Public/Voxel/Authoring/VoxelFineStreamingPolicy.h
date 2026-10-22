@@ -6,6 +6,7 @@
 #include "VoxelFineStreamingPolicy.generated.h"
 
 struct FVoxelTerrainResourceLimits;
+struct FVoxelStreamingSourceView;
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelFineStreamingPolicy
@@ -15,41 +16,14 @@ struct WHFRAMEWORK_API FVoxelFineStreamingPolicy
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int32 PolicyVersion = 1;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
-	int32 InteractiveRadiusCells = 32;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
-	int32 InteractiveVerticalHalfExtentCells = 64;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
-	int32 CollisionGuardRadiusCells = 80;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "32"))
-	int32 ResidencyHorizontalHalfExtentCells = 256;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "32"))
-	int32 ResidencyVerticalHalfExtentCells = 256;
-
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "32", ClampMax = "64"))
 	int32 ShardSideCells = 32;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "32"))
-	int32 HorizontalShiftStepCells = 128;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "32"))
-	int32 VerticalShiftStepCells = 32;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0"))
-	int32 GuardMarginCells = 32;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1", ClampMax = "4"))
 	uint8 MaximumPageLevel = 3;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "32"))
 	int32 FirstMergeDistanceCells = 64;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0"))
-	double PredictionSeconds = 0.75;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.05"))
 	double MinimumPreparationSeconds = 0.5;
@@ -87,8 +61,9 @@ struct WHFRAMEWORK_API FVoxelFineStreamingPolicy
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.01"))
 	double MaximumBackgroundWaitSeconds = 0.5;
 
-	FVoxelFineWindowSettings WindowSettings() const;
+	FVoxelFineWindowSettings WindowSettings(const FVoxelStreamingSourceView& InView) const;
+	int32 MinimumRadiusCells(const FVoxelStreamingSourceView& InView) const;
 	FVoxelTerrainResourceLimits GeometryLimits() const;
-	bool Validate(FString& OutError) const;
+	bool Validate(const FVoxelStreamingSourceView& InView, FString& OutError) const;
 	bool operator==(const FVoxelFineStreamingPolicy& InOther) const = default;
 };

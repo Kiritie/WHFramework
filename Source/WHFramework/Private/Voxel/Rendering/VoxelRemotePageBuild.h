@@ -153,7 +153,7 @@ struct FVoxelRemotePageBuild
 		Result.VoxelProxy = MoveTemp(Data.VoxelProxy); Result.Surface = MoveTemp(Data.Surface);
 		Result.Water = MoveTemp(Data.Water); Result.Macro = MoveTemp(Data.Macro);
 		Result.InputResourceLease = Storage->ResultInputLease;
-		Storage->SettleCompleted(Result);
+		Storage->SettleCompleted(Result, nullptr, 0, &Cancel);
 		return Result;
 	}
 };

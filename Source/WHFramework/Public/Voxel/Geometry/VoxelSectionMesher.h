@@ -5,6 +5,7 @@
 #include "Voxel/Runtime/VoxelRegistry.h"
 #include "Voxel/Geometry/VoxelShapeRegistry.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
+#include "Voxel/Geometry/VoxelMeshAttributeStream.h"
 struct FVoxelBoundaryTransitionContext;
 struct FVoxelFrozenHeightfieldInputs;
 struct FVoxelVoxelProxyData;
@@ -13,11 +14,13 @@ struct FVoxelMacroTileData;
 struct FVoxelWaterSurfaceTileData;
 struct WHFRAMEWORK_API FVoxelMeshBuffers
 {
-    TArray<FVector> Vertices,Normals;
+    TArray<FVector> Vertices;
+    TVoxelMeshAttributeStream<FVector> Normals;
     TArray<int32> Triangles;
-    TArray<FVector2D> UV0,UV1,UV2;
-    TArray<FLinearColor> Colors;
-    TArray<FProcMeshTangent> Tangents;
+    TArray<FVector2D> UV0;
+    TVoxelMeshAttributeStream<FVector2D> UV1,UV2;
+    TVoxelMeshAttributeStream<FLinearColor> Colors;
+    TVoxelMeshAttributeStream<FProcMeshTangent> Tangents;
     int32 PlannedVertices = 0;
     int32 PlannedIndices = 0;
     int32 CapacityPlanIndex = INDEX_NONE;
@@ -26,6 +29,7 @@ struct WHFRAMEWORK_API FVoxelMeshBuffers
     uint64 PlannedBytes() const;
     void ReservePlan(const FVoxelMeshBuffers& InPlan);
     bool Validate()const;
+    bool CompactAttributes(uint64 InWorkingBytes, const TAtomic<bool>* InCancel = nullptr);
 };
 struct WHFRAMEWORK_API FVoxelRenderBatch
 {
@@ -53,6 +57,9 @@ struct WHFRAMEWORK_API FVoxelSectionMeshResult
     uint64 AllocatedBytes() const;
     uint64 PlannedBytes() const;
 	bool ValidateAndCache();
+	bool CompactAttributes(uint64 InWorkingBytes, const TAtomic<bool>* InCancel = nullptr);
+	bool TryCompactAttributes(const TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe>& InResources,
+		const FVoxelGenerationConsumerKey& InConsumer, FString& OutError, const TAtomic<bool>* InCancel = nullptr);
 	FBox LocalBounds = FBox(ForceInit);
 	bool bValidated = false;
 	uint64 VertexCount = 0;

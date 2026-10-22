@@ -295,16 +295,29 @@ bool FVoxelGenerationPipeline::EnumerateCaveEntrances(
 		RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes);
 	TSet<FVoxelStableId> Seen;
 	TArray<FVoxelCaveEntrance> Entrances;
+	int32 MissingPlans = 0;
 	for (int64 Y = Ranges.TileMin.Y; Y <= Ranges.TileMax.Y; ++Y)
 	{
 		for (int64 X = Ranges.TileMin.X; X <= Ranges.TileMax.X; ++X)
 		{
+			if (!FVoxelGenerationPlanningReadScope::CanPublish() &&
+				FVoxelGenerationPlanningReadScope::PublishBlockError() == TEXT("Canceled"))
+			{
+				OutError = TEXT("Canceled");
+				return false;
+			}
 			const FVoxelGenerationTileKey Key{FIntVector(int32(X), int32(Y), 0)};
 			FVoxelCavePlanPtr Plan;
 			if (!Query.EnsureCavePlan(Key, Plan, OutError))
 			{
+				if (OutError.StartsWith(TEXT("DependencyNotReady")))
+				{
+					++MissingPlans;
+					continue;
+				}
 				return false;
 			}
+			if (MissingPlans) continue;
 			for (const FVoxelCaveEntrance& Entrance : Plan->Entrances)
 			{
 				const bool bMouth = Entrance.MouthCenter.X >= InMin.X && Entrance.MouthCenter.Y >= InMin.Y && Entrance.MouthCenter.X <= InMax.X && Entrance.MouthCenter.Y <= InMax.Y;
@@ -325,6 +338,13 @@ bool FVoxelGenerationPipeline::EnumerateCaveEntrances(
 				}
 			}
 		}
+	}
+	if (MissingPlans || !FVoxelGenerationPlanningReadScope::CanPublish())
+	{
+		if (MissingPlans)
+			UE_LOG(LogTemp, Display, TEXT("Voxel cave entrance dependencies: tiles=%d missing=%d"), Ranges.TileCount, MissingPlans);
+		OutError = FVoxelGenerationPlanningReadScope::PublishBlockError();
+		return false;
 	}
 	// 去重已结束，先释放表再退相应授额，为调用者的候选输出保留真实峰值空间。
 	Workspace.FreeSet(Seen);

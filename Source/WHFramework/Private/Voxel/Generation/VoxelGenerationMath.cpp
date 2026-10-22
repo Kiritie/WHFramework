@@ -254,12 +254,14 @@ int32 VoxelGeneration::Noise3D(
 			InPeriod);
 
 	int64 InterpolatedZ[2] = {0, 0};
+	const int32 ZSamples = AlphaZ == 0 ? 1 : 2;
+	const int32 YSamples = AlphaY == 0 ? 1 : 2;
 
-	for (int32 ZOffset = 0; ZOffset < 2; ++ZOffset)
+	for (int32 ZOffset = 0; ZOffset < ZSamples; ++ZOffset)
 	{
 		int64 InterpolatedY[2] = {0, 0};
 
-		for (int32 YOffset = 0; YOffset < 2; ++YOffset)
+		for (int32 YOffset = 0; YOffset < YSamples; ++YOffset)
 		{
 			// 格点是32位种子坐标，角点加法显式按无符号位模式进行，不受 world cell 域限制。
 			const FIntVector Cell0(
@@ -280,33 +282,23 @@ int32 VoxelGeneration::Noise3D(
 						InSalt) & 65535ull) -
 				32768;
 
-			const int64 Value1 =
-				static_cast<int64>(
-					MakeSeed(
-						InWorldSeed,
-						Cell1,
-						InSalt) & 65535ull) -
-				32768;
-
-			InterpolatedY[YOffset] =
-				VoxelGenerationLerp(
-					Value0,
-					Value1,
-					AlphaX);
+			if (AlphaX == 0)
+			{
+				InterpolatedY[YOffset] = Value0;
+			}
+			else
+			{
+				const int64 Value1 = static_cast<int64>(MakeSeed(InWorldSeed, Cell1, InSalt) & 65535ull) - 32768;
+				InterpolatedY[YOffset] = VoxelGenerationLerp(Value0, Value1, AlphaX);
+			}
 		}
 
-		InterpolatedZ[ZOffset] =
-			VoxelGenerationLerp(
-				InterpolatedY[0],
-				InterpolatedY[1],
-				AlphaY);
+		InterpolatedZ[ZOffset] = AlphaY == 0 ? InterpolatedY[0] :
+			VoxelGenerationLerp(InterpolatedY[0], InterpolatedY[1], AlphaY);
 	}
 
-	return static_cast<int32>(
-		VoxelGenerationLerp(
-			InterpolatedZ[0],
-			InterpolatedZ[1],
-			AlphaZ));
+	return static_cast<int32>(AlphaZ == 0 ? InterpolatedZ[0] :
+		VoxelGenerationLerp(InterpolatedZ[0], InterpolatedZ[1], AlphaZ));
 }
 
 int64 VoxelGeneration::Dot(

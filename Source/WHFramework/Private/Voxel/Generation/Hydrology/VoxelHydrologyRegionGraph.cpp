@@ -342,7 +342,6 @@ bool FVoxelHydrologyRegionGraphBuild::Allocate(FString& OutError)
 {
 	if (!VoxelGenerationAllocation::RetainArray(Cells, CellCount, OutError) ||
 		!VoxelGenerationAllocation::RetainArray(Candidates, CellCount * 2, OutError) ||
-		!VoxelGenerationAllocation::RetainArray(Leaves, CellCount, OutError) ||
 		!VoxelGenerationAllocation::RetainArray(Result.ForestNeighbors, CellCount, OutError) ||
 		!VoxelGenerationAllocation::RetainArray(Result.CellLocations, CellCount, OutError))
 	{
@@ -484,7 +483,6 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 		}
 		if (Stage == EStage::Allocate)
 		{
-			if (!Allocate(OutError)) return Failure(OutError);
 			Stage = EStage::Read;
 		}
 		else if (Stage == EStage::Read)
@@ -506,6 +504,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 				OutError = TEXT("Invalid hydrology region ground, rainfall or positive identified receiver");
 				return Failure(OutError);
 			}
+			if (Cursor == 0 && !Allocate(OutError)) return Failure(OutError);
 			FCell& Cell = Cells.AddDefaulted_GetRef();
 			Cell.Sample = Sample;
 			Cell.Parent = Cursor;
@@ -567,6 +566,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 		{
 			if (Cursor == Candidates.Num())
 			{
+				VoxelGenerationAllocation::FreeRetainedArray(Candidates);
 				Cursor = 0;
 				Stage = EStage::Leaves;
 				continue;
@@ -574,8 +574,8 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 			const int32 EdgeIndex = Cursor++;
 			const auto& Edge = Candidates[EdgeIndex];
 			if (!Edge.bKept) continue;
-			Cells[Edge.First].Head = Links.Add({Edge.Second, EdgeIndex, Cells[Edge.First].Head});
-			Cells[Edge.Second].Head = Links.Add({Edge.First, EdgeIndex, Cells[Edge.Second].Head});
+			Cells[Edge.First].Head = Links.Add({Edge.Second, Edge.BarrierZ, Cells[Edge.First].Head});
+			Cells[Edge.Second].Head = Links.Add({Edge.First, Edge.BarrierZ, Cells[Edge.Second].Head});
 			++Cells[Edge.First].Degree;
 			++Cells[Edge.Second].Degree;
 			if (Edge.Second == Edge.First + 1 && Edge.First % Result.Width + 1 < Result.Width)
@@ -592,13 +592,20 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 		}
 		else if (Stage == EStage::Leaves)
 		{
+			if (Cursor == 0 && !VoxelGenerationAllocation::RetainArray(Leaves, CellCount, OutError)) return Failure(OutError);
 			if (Cursor == CellCount) { Cursor = 0; Stage = EStage::Peel; continue; }
 			Cells[Cursor].bAnchor = !Cells[Cursor].Sample.IsReceiver() && FindRoot(Cursor) == Cursor;
 			QueueLeaf(Cursor++);
 		}
 		else if (Stage == EStage::Peel)
 		{
-			if (Cursor == Leaves.Num()) { Cursor = 0; Stage = EStage::CountNodes; continue; }
+			if (Cursor == Leaves.Num())
+			{
+				VoxelGenerationAllocation::FreeRetainedArray(Leaves);
+				Cursor = 0;
+				Stage = EStage::CountNodes;
+				continue;
+			}
 			const int32 Leaf = Leaves[Cursor];
 			FCell& Cell = Cells[Leaf];
 			if (Cell.bRemoved || IsTerminal(Leaf)) { ++Cursor; continue; }
@@ -728,7 +735,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 				while (NextLink != INDEX_NONE && (Cells[Links[NextLink].Neighbor].bRemoved ||
 					Links[NextLink].Neighbor == WalkPrevious)) NextLink = Links[NextLink].Next;
 				check(NextLink != INDEX_NONE);
-				WalkBarrierZ = FMath::Max(WalkBarrierZ, Candidates[Links[NextLink].Edge].BarrierZ);
+				WalkBarrierZ = FMath::Max(WalkBarrierZ, Links[NextLink].BarrierZ);
 				WalkPrevious = WalkCurrent;
 				WalkCurrent = Links[NextLink].Neighbor;
 				++WalkSteps;
@@ -743,7 +750,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 				WalkStart = Local.X + Local.Y * Result.Width;
 				WalkPrevious = WalkStart;
 				WalkCurrent = WalkFirst = Link.Neighbor;
-				WalkBarrierZ = Candidates[Link.Edge].BarrierZ;
+				WalkBarrierZ = Link.BarrierZ;
 				WalkSteps = 1;
 				WalkRainWeight = 0;
 				continue;
@@ -755,6 +762,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 				++Cursor;
 				continue;
 			}
+			VoxelGenerationAllocation::FreeRetainedArray(Links);
 			Cursor = 0;
 			Stage = EStage::Profiles;
 		}
@@ -889,6 +897,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 				OutError = TEXT("Invalid hydrology region component coverage");
 				return Failure(OutError);
 			}
+			VoxelGenerationAllocation::FreeRetainedArray(Cells);
 			SortRoot = Result.PrunedByParent.Num() / 2 - 1;
 			SortEnd = Result.PrunedByParent.Num() - 1;
 			Stage = EStage::SortPruned;

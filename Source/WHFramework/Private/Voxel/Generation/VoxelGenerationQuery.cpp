@@ -1336,7 +1336,8 @@ bool FVoxelGenerationQuery::ComputeBaseColumn(
 	const FVoxelMacroTerrainSample TerrainSample =
 		Terrain->SampleMacro(
 			InX,
-			InY);
+			InY,
+			Column.Climate);
 
 	Column.SurfaceZ =
 		TerrainSample.SurfaceZ;
@@ -1382,10 +1383,9 @@ bool FVoxelGenerationQuery::ComputeBaseColumn(
 		{
 			FIntPoint Neighbor;
 			if (!VoxelGeneration::TryWorldPoint(FInt64Vector2(int64(InX) + Offset.X, int64(InY) + Offset.Y), Neighbor)) continue;
-			if (Terrain->SampleMacro(
+			if (Terrain->SampleSurfaceHeight(
 				Neighbor.X,
-				Neighbor.Y).
-				SurfaceZ <=
+				Neighbor.Y) <=
 				SeaLevel)
 			{
 				Column.bCoast = true;

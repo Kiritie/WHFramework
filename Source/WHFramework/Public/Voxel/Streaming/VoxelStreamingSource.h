@@ -82,14 +82,19 @@ struct WHFRAMEWORK_API FVoxelStreamingSourceView
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "16", UIMin = "16"))
 	int32 InitialChunkSideCells = 16;
 
-	// Fine Page F0 的最小完整分辨率区域。
-	// 它不改变 Fine 数据范围，只决定靠近 Source 的 Section 不能被合并到 F1+ Page。
+	// F0 交互核心的名义水平半径；实际 Section 覆盖包含安全扩展与对齐。
 	UPROPERTY(
 		EditAnywhere,
 		BlueprintReadWrite,
 		Category = "Voxel|Streaming",
 		meta = (ClampMin = "0"))
-	int32 FineLevel0RadiusCells = 32;
+	int32 FineLevel0RadiusCells = 16;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1"))
+	int32 FineLevel0VerticalHalfExtentCells = 16;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1"))
+	int32 CollisionGuardRadiusCells = 32;
 
 	// Fine Representation 的水平外半径。
 	UPROPERTY(
@@ -97,7 +102,7 @@ struct WHFRAMEWORK_API FVoxelStreamingSourceView
 		BlueprintReadWrite,
 		Category = "Voxel|Streaming",
 		meta = (ClampMin = "0"))
-	int32 FineRadiusCells = 80;
+	int32 FineRadiusCells = 256;
 
 	// Fine Representation 的 Z 半高；不是三维球半径。
 	UPROPERTY(
@@ -105,7 +110,7 @@ struct WHFRAMEWORK_API FVoxelStreamingSourceView
 		BlueprintReadWrite,
 		Category = "Voxel|Streaming",
 		meta = (ClampMin = "0"))
-	int32 FineVerticalHalfExtentCells = 64;
+	int32 FineVerticalHalfExtentCells = 256;
 
 	// 移动预测时间。只用于前向 Critical / Prefetch，不扩大 Fine 显示域。
 	UPROPERTY(

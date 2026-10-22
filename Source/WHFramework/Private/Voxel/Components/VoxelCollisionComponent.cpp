@@ -350,7 +350,8 @@ bool UVoxelCollisionComponent::BeginDetachedCook(
 		if (Work->bPhysicsCommitted.Load()) Result.MarkWorkUsed();
 		if (Result.bCanceled || !Result.bSuccess)
 		{
-			Work->bCanceled.Store(true);
+			if (Result.bCanceled) Work->bCanceled.Store(true);
+			else Work->bFailed.Store(true);
 			Work->bComplete.Store(true);
 		}
 		Work->bApplied.Store(true);
@@ -406,6 +407,11 @@ bool UVoxelCollisionComponent::BeginDetachedCook(
 bool UVoxelCollisionComponent::IsDetachedCookRunning() const
 {
 	return Cook && !PendingCookTask.IsSet() && (!Cook->bComplete.Load() || !Cook->bApplied.Load());
+}
+
+bool UVoxelCollisionComponent::IsDetachedCookCanceled() const
+{
+	return Cook && Cook->bComplete.Load() && Cook->bApplied.Load() && Cook->bCanceled.Load();
 }
 
 bool UVoxelCollisionComponent::HasDetachedCookFailed() const

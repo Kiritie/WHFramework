@@ -27,12 +27,17 @@ int32 FVoxelTerrainGenerator::SampleSurfaceHeight(int32 InX, int32 InY) const
 FVoxelMacroTerrainSample FVoxelTerrainGenerator::SampleMacro(int32 InX, int32 InY) const
 {
     const FVoxelClimateSample ClimateSample = Climate->Sample(InX, InY);
-    const FVoxelLandformSample LandformSample = Landform.Sample(InX, InY, ClimateSample);
+    return SampleMacro(InX, InY, ClimateSample);
+}
+
+FVoxelMacroTerrainSample FVoxelTerrainGenerator::SampleMacro(int32 InX, int32 InY, const FVoxelClimateSample& InClimate) const
+{
+    const FVoxelLandformSample LandformSample = Landform.Sample(InX, InY, InClimate);
 
     FVoxelMacroTerrainSample Result;
-    Result.SurfaceZ = SampleRawHeight(InX, InY, ClimateSample, LandformSample);
+    Result.SurfaceZ = SampleRawHeight(InX, InY, InClimate, LandformSample);
     Result.DensityHeight = Result.SurfaceZ;
-    Result.SlopePermille = SampleSlopePermille(InX, InY);
+    Result.SlopePermille = SampleSlopePermille(InX, InY, Result.SurfaceZ);
     Result.Landform = LandformSample;
     return Result;
 }
@@ -111,12 +116,8 @@ int32 FVoxelTerrainGenerator::SampleRawHeight(
         Height + OceanBias, Settings.MinZ, static_cast<int64>(Settings.MaxZ) - 1));
 }
 
-int32 FVoxelTerrainGenerator::SampleSlopePermille(int32 InX, int32 InY) const
+int32 FVoxelTerrainGenerator::SampleSlopePermille(int32 InX, int32 InY, int32 InCenterHeight) const
 {
-    const FVoxelClimateSample CenterClimate = Climate->Sample(InX, InY);
-    const int32 CenterHeight = SampleRawHeight(
-        InX, InY, CenterClimate, Landform.Sample(InX, InY, CenterClimate));
-
     // 边缘使用相同距离的单侧差分，不把域外样本 Clamp 成重复边缘 cell。
     const int32 SampleX = static_cast<int32>(VoxelGeneration::IsWorldCell(int64(InX) + 4) ? int64(InX) + 4 : int64(InX) - 4);
     const int32 SampleY = static_cast<int32>(VoxelGeneration::IsWorldCell(int64(InY) + 4) ? int64(InY) + 4 : int64(InY) - 4);
@@ -129,8 +130,8 @@ int32 FVoxelTerrainGenerator::SampleSlopePermille(int32 InX, int32 InY) const
         InX, SampleY, YClimate, Landform.Sample(InX, SampleY, YClimate));
 
     const int64 Delta = FMath::Max(
-        FMath::Abs(int64(XHeight) - CenterHeight),
-        FMath::Abs(int64(YHeight) - CenterHeight));
+        FMath::Abs(int64(XHeight) - InCenterHeight),
+        FMath::Abs(int64(YHeight) - InCenterHeight));
 
     return int32(FMath::Clamp<int64>(Delta * 250, 0, 1000));
 }

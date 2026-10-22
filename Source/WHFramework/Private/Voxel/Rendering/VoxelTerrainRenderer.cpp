@@ -16,6 +16,7 @@
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "RenderCommandFence.h"
 #include "RenderGraphBuilder.h"
+#include "RenderUtils.h"
 #include "RenderingThread.h"
 #include "SceneView.h"
 #include "SceneViewExtension.h"
@@ -89,7 +90,7 @@ class FVoxelTerrainRenderChunk
 {
 public:
 	explicit FVoxelTerrainRenderChunk(const ERHIFeatureLevel::Type InFeatureLevel)
-		: VertexFactory(InFeatureLevel, "VoxelTerrainAtom")
+		: VertexFactory(InFeatureLevel, "VoxelTerrainAtom"), FeatureLevel(InFeatureLevel)
 	{
 	}
 
@@ -106,11 +107,13 @@ public:
 	FStaticMeshVertexBuffers VertexBuffers;
 	FDynamicMeshIndexBuffer32 IndexBuffer;
 	FLocalVertexFactory VertexFactory;
+	const ERHIFeatureLevel::Type FeatureLevel;
 	FMaterialRenderProxy* Material = nullptr;
 	FMaterialRelevance Relevance;
 	FBox WorldBounds = FBox(ForceInit);
 	FBox LocalBounds = FBox(ForceInit);
 	FMatrix LocalToWorld = FMatrix::Identity;
+	uint32 PrimitiveUniformHash = 0;
 	TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe> Source;
 	TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe> NextSourceChunk;
 	int32 FirstSourceTriangle = 0;
@@ -118,12 +121,29 @@ public:
 	int32 SourceTriangleCount = 0;
 	FVector3f FirstVertex = FVector3f::ZeroVector;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResidentLease;
+	bool bGPUSceneStreams = false;
 	TAtomic<bool> bReady{false};
 	mutable TAtomic<bool> bResidentResourcesReady{false};
 };
 
 namespace
 {
+	// 同次收集共用 Proxy/Scene 参数，逐块覆盖的变换和边界必须完全一致。
+	struct FVoxelTerrainUniformKeyFuncs : TDefaultMapKeyFuncs<const FVoxelTerrainRenderChunk*, FDynamicPrimitiveUniformBuffer*, false>
+	{
+		static bool Matches(const FVoxelTerrainRenderChunk* InFirst, const FVoxelTerrainRenderChunk* InSecond)
+		{
+			return InFirst == InSecond || (InFirst->PrimitiveUniformHash == InSecond->PrimitiveUniformHash &&
+				InFirst->WorldBounds == InSecond->WorldBounds && InFirst->LocalBounds == InSecond->LocalBounds &&
+				InFirst->LocalToWorld == InSecond->LocalToWorld);
+		}
+
+		static uint32 GetKeyHash(const FVoxelTerrainRenderChunk* InChunk)
+		{
+			return InChunk->PrimitiveUniformHash;
+		}
+	};
+
 	struct FVoxelReleaseRenderChunkCommand
 	{
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
@@ -239,6 +259,11 @@ namespace
 		Chunk->VertexBuffers.StaticMeshVertexBuffer.SetUseHighPrecisionTangentBasis(true);
 		Chunk->VertexBuffers.InitFromDynamicVertex(RHICmdList, &Chunk->VertexFactory, Vertices, 3);
 		Chunk->IndexBuffer.InitResource(RHICmdList);
+		const auto FeatureLevel = Chunk->FeatureLevel;
+		Chunk->bGPUSceneStreams =
+			Chunk->VertexFactory.GetPrimitiveIdStreamIndex(FeatureLevel, EVertexInputStreamType::Default) >= 0 &&
+			Chunk->VertexFactory.GetPrimitiveIdStreamIndex(FeatureLevel, EVertexInputStreamType::PositionOnly) >= 0 &&
+			Chunk->VertexFactory.GetPrimitiveIdStreamIndex(FeatureLevel, EVertexInputStreamType::PositionAndNormalOnly) >= 0;
 		// CreateBuffer 已消费上传数组；重建和接口裁切始终使用冻结的 Source，不读取上传副本。
 		Chunk->VertexBuffers.PositionVertexBuffer.CleanUp();
 		Chunk->VertexBuffers.StaticMeshVertexBuffer.CleanUp();
@@ -864,8 +889,11 @@ namespace
 			{
 				DiagnosticPhase.Store(Phase);
 				DiagnosticFineReused.Store(FineReused);
+				DiagnosticFineSourceRangesReused.Store(FineSourceRangesReused);
 				DiagnosticFinePrepared.Store(FinePrepared);
 				DiagnosticFineCompleted.Store(FineCompleted);
+				DiagnosticHeightfieldTiles.Store(HeightfieldTiles + (FineBuild ? FineBuild->HeightfieldTilesWithGeometry : 0));
+				DiagnosticHeightfieldPieces.Store(HeightfieldPieces + (FineBuild ? FineBuild->HeightfieldPieces : 0));
 				const FIntVector Section = FineBuild && FineBuild->Base ? FineBuild->Base->Section : FIntVector::ZeroValue;
 				DiagnosticFineSectionX.Store(Section.X);
 				DiagnosticFineSectionY.Store(Section.Y);
@@ -958,6 +986,7 @@ namespace
 					if (!Fine->Initialize(Frame.Node->Atom, Root, CoarseRoot, CellSize, Result.Error)) return Result;
 					Fine->bReuseNativeInterfaces = Fine->CanReuseNativeInterfaces(BaseSnapshot);
 					FineReused += Fine->bReuseNativeInterfaces ? 1 : 0;
+					FineSourceRangesReused += !Fine->bReuseNativeInterfaces && Fine->bReuseSourceRanges ? 1 : 0;
 					FinePrepared += Fine->bReuseNativeInterfaces ? 0 : 1;
 					if (LastFine) LastFine->Next = Fine; else FirstFine = Fine;
 					LastFine = MoveTemp(Fine);
@@ -973,6 +1002,8 @@ namespace
 					if (Progress != EVoxelFineBuildProgress::Complete)
 					{ Result.bCanceled = Progress == EVoxelFineBuildProgress::Canceled; return Result; }
 					++FineCompleted;
+					HeightfieldTiles += FineBuild->HeightfieldTilesWithGeometry;
+					HeightfieldPieces += FineBuild->HeightfieldPieces;
 					FineBuild->Upload = FineBuild->FirstPiece;
 					FineBuild = FineBuild->Next;
 					continue;
@@ -1139,13 +1170,19 @@ namespace
 		TAtomic<bool> bExecutionComplete{false};
 		TAtomic<int32> DiagnosticPhase{0};
 		TAtomic<int32> DiagnosticFineReused{0};
+		TAtomic<int32> DiagnosticFineSourceRangesReused{0};
 		TAtomic<int32> DiagnosticFinePrepared{0};
 		TAtomic<int32> DiagnosticFineCompleted{0};
+		TAtomic<int32> DiagnosticHeightfieldTiles{0};
+		TAtomic<int32> DiagnosticHeightfieldPieces{0};
 		TAtomic<int32> DiagnosticFineSectionX{0};
 		TAtomic<int32> DiagnosticFineSectionY{0};
 		TAtomic<int32> DiagnosticFineSectionZ{0};
 		int32 FineCompleted = 0;
+		int32 HeightfieldTiles = 0;
+		int32 HeightfieldPieces = 0;
 		int32 FineReused = 0;
+		int32 FineSourceRangesReused = 0;
 		int32 FinePrepared = 0;
 		TAtomic<uint32> DiagnosticFineProgress{MAX_uint32};
 		EVoxelTerrainResourceAdmission NativeAdmission = EVoxelTerrainResourceAdmission::Granted;
@@ -1775,23 +1812,41 @@ namespace
 		virtual void GetDynamicMeshElements(const TArray<const FSceneView*>& InViews,
 			const FSceneViewFamily& InFamily, uint32 InVisibilityMap, FMeshElementCollector& InCollector) const override
 		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainGatherDynamicMeshes);
 			const FFrameBinding* Binding = InFamily.GetExtentionData<FFrameBinding>();
 			if (!Binding || !Binding->Snapshot || Binding->Snapshot->WorldEpoch != State->Epoch) return;
 			const FSnapshotPtr Snapshot = Binding->Snapshot;
 			if (InVisibilityMap) Binding->bProxySubmitted.Store(true);
 			InCollector.AllocateOneFrameResource<FCollectorFrameLease>().Snapshot = Snapshot;
+			FPrimitiveUniformShaderParametersBuilder CommonUniformBuilder;
+			bool bCommonUniformReady = false;
+			TMap<const FVoxelTerrainRenderChunk*, FDynamicPrimitiveUniformBuffer*, FDefaultSetAllocator, FVoxelTerrainUniformKeyFuncs> Uniforms;
+			Uniforms.Reserve(256);
+			const auto FeatureLevel = InCollector.GetFeatureLevel();
+			const auto ShaderPlatform = GShaderPlatformForFeatureLevel[FeatureLevel];
+			const bool bGPUSceneContents = FeatureLevel != ERHIFeatureLevel::ES3_1 && UseGPUScene(ShaderPlatform) &&
+				!PlatformGPUSceneUsesUniformBufferView(ShaderPlatform);
 			for (int32 ViewIndex = 0; ViewIndex < InViews.Num(); ++ViewIndex)
 			{
 				if (!(InVisibilityMap & (1u << ViewIndex))) continue;
 				int32 DrawnTriangles = 0;
+				int32 DrawRanges = 0;
+				int32 SubmittedDraws = 0;
+				int32 UniformBuffers = 0;
+				int32 RHIUniforms = 0;
+				int32 GPUSceneDraws = 0;
+				int32 SourceChunkSteps = 0;
+				int32 ChunkFrustumTests = 0;
+				int32 ReusedChunkVisibility = 0;
 				FBox DrawnBounds(ForceInit);
 				const FVoxelTerrainRenderChunk* FirstDrawnChunk = nullptr;
-				const auto Draw = [&](const TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>& Chunk,
+				const FVoxelTerrainRenderChunk* PendingChunk = nullptr;
+				int32 PendingFirstTriangle = 0;
+				int32 PendingTriangleCount = 0;
+				const auto Submit = [&](const FVoxelTerrainRenderChunk* Chunk,
 					const int32 FirstTriangle, const int32 TriangleCount)
 				{
-					if (!Chunk || !Chunk->bReady.Load() || TriangleCount == 0 ||
-						!InViews[ViewIndex]->ViewFrustum.IntersectBox(Chunk->WorldBounds.GetCenter(), Chunk->WorldBounds.GetExtent())) return;
-					check(FirstTriangle >= 0 && int64(FirstTriangle) + TriangleCount <= Chunk->SourceTriangleCount);
+					TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainSubmitDraw);
 					FMeshBatch& Mesh = InCollector.AllocateMesh();
 					FMeshBatchElement& Element = Mesh.Elements[0];
 					Mesh.VertexFactory = &Chunk->VertexFactory;
@@ -1805,17 +1860,64 @@ namespace
 					Element.NumPrimitives = TriangleCount;
 					Element.MinVertexIndex = 0;
 					Element.MaxVertexIndex = Chunk->VertexBuffers.PositionVertexBuffer.GetNumVertices() - 1;
-					FPrimitiveUniformShaderParametersBuilder Builder;
-					BuildUniformShaderParameters(Builder);
-					Builder.LocalToWorld(Chunk->LocalToWorld).PreviousLocalToWorld(Chunk->LocalToWorld)
-						.WorldBounds(FBoxSphereBounds(Chunk->WorldBounds)).LocalBounds(FBoxSphereBounds(Chunk->LocalBounds));
-					auto& Uniform = InCollector.AllocateOneFrameResource<FDynamicPrimitiveUniformBuffer>();
-					Uniform.Set(InCollector.GetRHICommandList(), Builder);
-					Element.PrimitiveUniformBufferResource = &Uniform.UniformBuffer;
+					const bool bUsesGPUScene = bGPUSceneContents && Chunk->bGPUSceneStreams &&
+						FeatureLevel == Chunk->FeatureLevel;
+					auto& Uniform = Uniforms.FindOrAdd(Chunk);
+					if (!Uniform)
+					{
+						TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainCreatePrimitiveUniform);
+						if (!bCommonUniformReady)
+						{
+							TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainBuildCommonPrimitiveUniform);
+							BuildUniformShaderParameters(CommonUniformBuilder);
+							bCommonUniformReady = true;
+						}
+						FPrimitiveUniformShaderParametersBuilder Builder = CommonUniformBuilder;
+						Builder.LocalToWorld(Chunk->LocalToWorld).PreviousLocalToWorld(Chunk->LocalToWorld)
+							.WorldBounds(FBoxSphereBounds(Chunk->WorldBounds)).LocalBounds(FBoxSphereBounds(Chunk->LocalBounds));
+						Uniform = &InCollector.AllocateOneFrameResource<FDynamicPrimitiveUniformBuffer>();
+						Uniform->UniformBuffer.BufferUsage = UniformBuffer_SingleFrame;
+						Uniform->UniformBuffer.SetContents(InCollector.GetRHICommandList(), Builder.Build());
+						++UniformBuffers;
+					}
+					if (!bUsesGPUScene && !Uniform->UniformBuffer.IsInitialized())
+					{
+						Uniform->UniformBuffer.InitResource(InCollector.GetRHICommandList());
+						++RHIUniforms;
+					}
+					GPUSceneDraws += bUsesGPUScene ? 1 : 0;
+					Element.PrimitiveUniformBufferResource = &Uniform->UniformBuffer;
 					InCollector.AddMesh(ViewIndex, Mesh);
+					++SubmittedDraws;
 					DrawnTriangles += TriangleCount;
 					DrawnBounds += Chunk->WorldBounds;
-					if (!FirstDrawnChunk) FirstDrawnChunk = Chunk.Get();
+					if (!FirstDrawnChunk) FirstDrawnChunk = Chunk;
+				};
+				const auto Draw = [&](const FVoxelTerrainRenderChunk* Chunk,
+					const int32 FirstTriangle, const int32 TriangleCount)
+				{
+					if (!Chunk || TriangleCount == 0) return;
+					if (PendingChunk == Chunk)
+					{
+						++ReusedChunkVisibility;
+					}
+					else
+					{
+						if (!Chunk->bReady.Load()) return;
+						++ChunkFrustumTests;
+						if (!InViews[ViewIndex]->ViewFrustum.IntersectBox(Chunk->WorldBounds.GetCenter(), Chunk->WorldBounds.GetExtent())) return;
+					}
+					check(FirstTriangle >= 0 && int64(FirstTriangle) + TriangleCount <= Chunk->SourceTriangleCount);
+					++DrawRanges;
+					if (PendingChunk == Chunk && PendingFirstTriangle + PendingTriangleCount == FirstTriangle)
+					{
+						PendingTriangleCount += TriangleCount;
+						return;
+					}
+					if (PendingChunk) Submit(PendingChunk, PendingFirstTriangle, PendingTriangleCount);
+					PendingChunk = Chunk;
+					PendingFirstTriangle = FirstTriangle;
+					PendingTriangleCount = TriangleCount;
 				};
 				const auto FineVisit = [&](auto&& Self, const FAtomNodePtr& Node) -> void
 				{
@@ -1823,9 +1925,9 @@ namespace
 					if (Node->Atom)
 					{
 						if (Node->Atom->bUseDrawRanges)
-							for (const auto& Range : Node->Atom->DrawRanges) Draw(Range.Chunk, Range.FirstTriangle, Range.TriangleCount);
+							for (const auto& Range : Node->Atom->DrawRanges) Draw(Range.Chunk.Get(), Range.FirstTriangle, Range.TriangleCount);
 						else for (const auto& Chunk : Node->Atom->Chunks)
-							if (Chunk) Draw(Chunk, 0, Chunk->SourceTriangleCount);
+							if (Chunk) Draw(Chunk.Get(), 0, Chunk->SourceTriangleCount);
 					}
 					else for (const FAtomNodePtr& Child : Node->Children) Self(Self, Child);
 				};
@@ -1841,6 +1943,7 @@ namespace
 						return;
 					}
 					const auto& Item = *Node->Item;
+					const FVoxelTerrainRenderChunk* SourceCursor = nullptr;
 					const auto RangeVisit = [&](auto&& RangeSelf, const int32 RangeIndex,
 						const TSharedPtr<const FVoxelTerrainCoarseDrawNode, ESPMode::ThreadSafe>& Patch) -> void
 					{
@@ -1850,8 +1953,15 @@ namespace
 						if (!Patch)
 						{
 							const int32 End = Range.FirstTriangle + Range.TriangleCount;
-							for (auto Chunk = Item.SourceChunks[Range.Batch]; Chunk && Chunk->FirstSourceTriangle < End; Chunk = Chunk->NextSourceChunk)
+							while (SourceCursor && SourceCursor->FirstSourceTriangle + SourceCursor->SourceTriangleCount <= Range.FirstTriangle)
 							{
+								SourceCursor = SourceCursor->NextSourceChunk.Get();
+								++SourceChunkSteps;
+							}
+							for (const auto* Chunk = SourceCursor; Chunk && Chunk->FirstSourceTriangle < End; Chunk = Chunk->NextSourceChunk.Get())
+							{
+								SourceCursor = Chunk;
+								++SourceChunkSteps;
 								const int32 First = FMath::Max(Range.FirstTriangle, Chunk->FirstSourceTriangle);
 								const int32 Last = FMath::Min(End, Chunk->FirstSourceTriangle + Chunk->SourceTriangleCount);
 								if (Last > First) Draw(Chunk, First - Chunk->FirstSourceTriangle, Last - First);
@@ -1862,13 +1972,18 @@ namespace
 							RangeSelf(RangeSelf, Range.Children[0], Patch->Children[0]);
 							RangeSelf(RangeSelf, Range.Children[1], Patch->Children[1]);
 						}
-						else for (auto Piece = Patch->FirstPiece; Piece; Piece = Piece->Next)
-							Draw(Piece->Chunk, 0, Piece->Chunk->SourceTriangleCount);
+						else for (const auto* Piece = Patch->FirstPiece.Get(); Piece; Piece = Piece->Next.Get())
+							Draw(Piece->Chunk.Get(), 0, Piece->Chunk->SourceTriangleCount);
 					};
 					for (int32 Root = 0; Root < Item.Geometry->Roots.Num(); ++Root)
-						RangeVisit(RangeVisit, Item.Geometry->Roots[Root], Item.DrawRoots[Root]);
+					{
+						const int32 RangeIndex = Item.Geometry->Roots[Root];
+						SourceCursor = Item.SourceChunks[Item.Geometry->Ranges[RangeIndex].Batch].Get();
+						RangeVisit(RangeVisit, RangeIndex, Item.DrawRoots[Root]);
+					}
 				};
 				CoarseVisit(CoarseVisit, Snapshot->CoarseRoot);
+				if (PendingChunk) Submit(PendingChunk, PendingFirstTriangle, PendingTriangleCount);
 #if !UE_BUILD_SHIPPING
 				const double Now = FPlatformTime::Seconds();
 				if (Now - LastDrawDiagnosticSeconds >= 5.0)
@@ -1878,6 +1993,13 @@ namespace
 					UE_LOG(LogTemp, Display, TEXT("Voxel native draw: triangles=%d camera=%s bounds=%s main=%d opaque=%d masked=%d translucent=%d"),
 						DrawnTriangles, *InViews[ViewIndex]->ViewLocation.ToString(), *DrawnBounds.ToString(),
 						Relevance.bRenderInMainPass, Relevance.bOpaque, Relevance.bMasked, Relevance.HasTranslucency());
+					UE_LOG(LogTemp, Display, TEXT("Voxel native draw ranges: requested=%d submitted=%d merged=%d uniforms=%d reused=%d cacheEntries=%d cacheBytes=%llu"),
+						DrawRanges, SubmittedDraws, DrawRanges - SubmittedDraws, UniformBuffers, SubmittedDraws - UniformBuffers,
+						Uniforms.Num(), uint64(Uniforms.GetAllocatedSize()));
+					UE_LOG(LogTemp, Display, TEXT("Voxel native coarse draw traversal: sourceChunkSteps=%d"), SourceChunkSteps);
+					UE_LOG(LogTemp, Display, TEXT("Voxel native chunk visibility: tested=%d reused=%d"), ChunkFrustumTests, ReusedChunkVisibility);
+					UE_LOG(LogTemp, Display, TEXT("Voxel native uniform path: gpuSceneDraws=%d legacyDraws=%d rhiUniforms=%d"),
+						GPUSceneDraws, SubmittedDraws - GPUSceneDraws, RHIUniforms);
 					if (FirstDrawnChunk)
 					{
 						UE_LOG(LogTemp, Display, TEXT("Voxel native mesh: material=%s firstVertex=%s origin=%s"),
@@ -2080,7 +2202,7 @@ TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe> FVoxelTerrainRen
 	const FVoxelGenerationConsumerKey& InConsumer,
 	TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe> InMesh,
 	const int32 InBatch, const FVector& InWorldOrigin, const double InWorldScale,
-	const int32 InFirstTriangle, const int32 InTriangleCount, EVoxelTerrainResourceAdmission* OutAdmission)
+	const int32 InFirstTriangle, const int32 InTriangleCount, EVoxelTerrainResourceAdmission* OutAdmission, const bool bInRetainCpuSource)
 {
 	if (OutAdmission) *OutAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
 	if (!EnsureState())
@@ -2128,7 +2250,7 @@ TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe> FVoxelTerrainRen
 	auto Chunk = TSharedPtr<FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>(
 		new FVoxelTerrainRenderChunk(State->Module.GetWorld()->GetFeatureLevel()),
 		FVoxelRenderChunkDeleter{ResidentLease});
-	Chunk->Source = InMesh;
+	if (bInRetainCpuSource) Chunk->Source = InMesh;
 	Chunk->FirstSourceTriangle = InFirstTriangle;
 	Chunk->SourceBatch = InBatch;
 	Chunk->SourceTriangleCount = TriangleCount;
@@ -2138,6 +2260,14 @@ TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe> FVoxelTerrainRen
 	Chunk->LocalToWorld = FTransform(FQuat::Identity, InWorldOrigin).ToMatrixWithScale();
 	Chunk->LocalBounds = FBox(InMesh->LocalBounds.Min * InWorldScale, InMesh->LocalBounds.Max * InWorldScale);
 	Chunk->WorldBounds = FBox(InWorldOrigin + Chunk->LocalBounds.Min, InWorldOrigin + Chunk->LocalBounds.Max);
+	FVector UniformMin = Chunk->WorldBounds.Min;
+	FVector UniformMax = Chunk->WorldBounds.Max;
+	for (int32 Axis = 0; Axis < 3; ++Axis)
+	{
+		if (UniformMin[Axis] == 0.0) UniformMin[Axis] = 0.0;
+		if (UniformMax[Axis] == 0.0) UniformMax[Axis] = 0.0;
+	}
+	Chunk->PrimitiveUniformHash = HashCombineFast(GetTypeHash(UniformMin), GetTypeHash(UniformMax));
 	ENQUEUE_RENDER_COMMAND(VoxelPrepareAtomChunk)(FVoxelPrepareRenderChunkCommand{
 		MoveTemp(WorkingLease), Chunk, InMesh, InWorldScale, InBatch, InFirstTriangle, TriangleCount, VertexCount});
 	return Chunk;
@@ -2584,7 +2714,7 @@ bool FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 				EVoxelTerrainResourceAdmission ChunkAdmission = EVoxelTerrainResourceAdmission::None;
 				const uint64 Before = Work.Resources->ReleaseVersionExcludingOwner(Work.Consumer);
 				auto Chunk = Renderer.PrepareChunk(Work.Consumer, Mesh, Fine.UploadBatch,
-					Fine.Upload->Origin * Work.CellSize, Fine.Upload->Scale * Work.CellSize, Fine.UploadTriangle, Count, &ChunkAdmission);
+					Fine.Upload->Origin * Work.CellSize, Fine.Upload->Scale * Work.CellSize, Fine.UploadTriangle, Count, &ChunkAdmission, false);
 				if (!Chunk) { ObserveAdmission(ChunkAdmission, Before); return false; }
 				Fine.Item->DrawRanges.Add({MoveTemp(Chunk), 0, Count});
 				Fine.UploadTriangle += Count;
@@ -2844,16 +2974,17 @@ void FVoxelTerrainRendererState::AdvanceRootPreparations(const double InDeadline
 		for (const FRootPreparation* Work : ActivePreparations)
 		{
 			const FIntVector Section = Work->Publication->Atoms.IsEmpty() ? FIntVector::ZeroValue : Work->Publication->Atoms[0]->Section;
-			UE_LOG(LogTemp, Display, TEXT("Native active: request=%llu section=%s band=%d enqueued=%d executing=%d completed=%d applied=%d phase=%d fineProgress=%u fineReused=%d finePrepared=%d fineCompleted=%d fineSection=(%d,%d,%d) capacityWait=%d uploadComplete=%d uploadAdmission=%d fineUpload=%d batch=%d triangle=%d coarseRoot=%d merge=%d ready=%d active=%d"),
+			UE_LOG(LogTemp, Display, TEXT("Native active: request=%llu section=%s band=%d enqueued=%d executing=%d completed=%d applied=%d phase=%d fineProgress=%u fineReused=%d fineSourceRangesReused=%d finePrepared=%d fineCompleted=%d fineSection=(%d,%d,%d) capacityWait=%d uploadComplete=%d uploadAdmission=%d fineUpload=%d batch=%d triangle=%d coarseRoot=%d merge=%d ready=%d active=%d heightfieldTiles=%d heightfieldPieces=%d"),
 				Work->Consumer.RequestSerial, *Section.ToString(), int32(Work->SchedulingBand), Work->bEnqueued,
 				Work->bExecuting.Load(), Work->bExecutionComplete.Load(), Work->bDecodeComplete, Work->DiagnosticPhase.Load(),
-				Work->DiagnosticFineProgress.Load(), Work->DiagnosticFineReused.Load(), Work->DiagnosticFinePrepared.Load(),
+				Work->DiagnosticFineProgress.Load(), Work->DiagnosticFineReused.Load(), Work->DiagnosticFineSourceRangesReused.Load(), Work->DiagnosticFinePrepared.Load(),
 				Work->DiagnosticFineCompleted.Load(), Work->DiagnosticFineSectionX.Load(),
 				Work->DiagnosticFineSectionY.Load(), Work->DiagnosticFineSectionZ.Load(),
 				Work->bWaitingCapacity.Load(), Work->bUploadComplete, int32(Work->UploadAdmission),
 				bool(Work->FineUpload), Work->FineUpload ? Work->FineUpload->UploadBatch : -1,
 				Work->FineUpload ? Work->FineUpload->UploadTriangle : -1, Work->UploadRoot,
-				RootMerge && RootMerge->Preparation.Get() == Work, Ready.Num(), ActivePreparations.Num());
+				RootMerge && RootMerge->Preparation.Get() == Work, Ready.Num(), ActivePreparations.Num(),
+				Work->DiagnosticHeightfieldTiles.Load(), Work->DiagnosticHeightfieldPieces.Load());
 		}
 		int32 Logged = 0;
 		for (int32 Scan = 0; Scan < FMath::Min(32, Ready.Num()) && FPlatformTime::Seconds() < Deadline; ++Scan)

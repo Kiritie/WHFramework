@@ -36,6 +36,12 @@ namespace
 			for (const auto& Piece : Geometry->Pieces) if (Piece.Mesh) Mesh(*Piece.Mesh, &Current);
 		}
 
+		void FineBoundary(const FVoxelFineBoundarySource& Source) const
+		{
+			if (Source.Boundary) Lease(Source.Boundary->ResourceLease);
+			if (Source.OverlayVersion) Lease(Source.OverlayVersion->ResourceLease);
+		}
+
 		void Coarse(const FVoxelTerrainCoarseMesh* Geometry, const FVoxelRendererMeshSourcePath* Path) const
 		{
 			if (!Geometry || FVoxelRendererMeshSourcePath::Contains(Path, Geometry)) return;
@@ -57,11 +63,11 @@ namespace
 			{
 				Lease(Boundary->ResourceLease);
 				if (Boundary->OwnerGeometry) Lease(Boundary->OwnerGeometry->ResourceLease);
-				Fine(Boundary->FineOwnerGeometry.Get(), &Current);
+				FineBoundary(Boundary->FineOwnerSource);
 				for (const auto& Patch : Boundary->Patches)
 				{
 					if (Patch.Neighbor.ProxyGeometry) Lease(Patch.Neighbor.ProxyGeometry->ResourceLease);
-					Fine(Patch.Neighbor.FineGeometry.Get(), &Current);
+					FineBoundary(Patch.Neighbor.FineSource);
 				}
 				for (const auto& Source : Boundary->SuppressionSources) if (Source) Lease(Source->ResourceLease);
 			}
@@ -78,12 +84,15 @@ namespace
 			{
 				const auto Inputs = StaticCastSharedPtr<const FNativeHeightfieldInputs>(InMesh.FrozenNativeInterfaceInputs);
 				Lease(Inputs->Lease);
-				Fine(Inputs->FineGeometry.Get(), &Current);
-				Coarse(Inputs->CoarseGeometry.Get(), &Current);
+				FineBoundary(Inputs->FineSource);
+				if (Inputs->Surface) Lease(Inputs->Surface->ResourceLease);
+				if (Inputs->Macro) Lease(Inputs->Macro->ResourceLease);
+				if (Inputs->Water) Lease(Inputs->Water->ResourceLease);
 				if (Inputs->DistantSlice)
 				{
 					Lease(Inputs->DistantSlice->Lease);
-					Coarse(Inputs->DistantSlice->Geometry.Get(), &Current);
+					if (Inputs->DistantSlice->Surface) Lease(Inputs->DistantSlice->Surface->ResourceLease);
+					if (Inputs->DistantSlice->Macro) Lease(Inputs->DistantSlice->Macro->ResourceLease);
 				}
 			}
 		}

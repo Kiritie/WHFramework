@@ -133,7 +133,7 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 	if (!VoxelViewLod::ValidateTopology(InViewSettings.Lod, Prepared.PlanningError)) return Prepared;
 	FVoxelFinePageLayout Layout;
 	FVoxelFineResidencyLeases Leases;
-	if (!InViewSettings.Fine.Validate(Prepared.PlanningError) ||
+	if (!InViewSettings.Fine.Validate(InViewSettings.DefaultSourceView, Prepared.PlanningError) ||
 		!Layout.Initialize(InViewSettings.Fine.MaximumPageLevel, InViewSettings.Fine.ShardSideCells,
 			InViewSettings.Fine.FirstMergeDistanceCells, Prepared.PlanningError))
 	{
@@ -148,10 +148,11 @@ FVoxelInterestSet FVoxelInterestManager::Compute(
 		if (Source.Has(EVoxelStreamingCapability::FineVisual))
 		{
 			FVoxelFineMovementDelta Movement;
-			if (!Residency.Initialize(Source.Id, InViewSettings.Fine.WindowSettings(), Source.Center,
-				InViewSettings.Fine.InteractiveRadiusCells, InViewSettings.Fine.InteractiveVerticalHalfExtentCells,
-				InViewSettings.Fine.CollisionGuardRadiusCells, InManifest.Settings.MinZ, InManifest.Settings.MaxZ, Prepared.PlanningError) ||
-				!Residency.UpdateMovement(Source.Center, Source.VelocityCellsPerSecond, InViewSettings.Fine.PredictionSeconds,
+			if (!InViewSettings.Fine.Validate(Source.View, Prepared.PlanningError) ||
+				!Residency.Initialize(Source.Id, InViewSettings.Fine.WindowSettings(Source.View), Source.Center,
+				Source.View.FineLevel0RadiusCells, Source.View.FineLevel0VerticalHalfExtentCells,
+				Source.View.CollisionGuardRadiusCells, InManifest.Settings.MinZ, InManifest.Settings.MaxZ, Prepared.PlanningError) ||
+				!Residency.UpdateMovement(Source.Center, Source.VelocityCellsPerSecond, Source.View.FinePredictionSeconds,
 					Movement, Prepared.PlanningError) ||
 				!BuildFineShardDemand(Source, Residency, Prepared, Prepared.PlanningError) ||
 				!Layout.SetSource(Source.Id, Source.Center, Prepared.PlanningError) ||
@@ -536,7 +537,7 @@ FVoxelInterestSet FVoxelInterestManager::Finalize(TConstArrayView<FVoxelStreamin
 			}
 		}
 	}
-	if (!RefreshPriorities(InSources, InViewSettings.Fine.InteractiveRadiusCells, Result, Result.PlanningError, Resources, Consumer))
+	if (!RefreshPriorities(InSources, InViewSettings.DefaultSourceView.FineLevel0RadiusCells, Result, Result.PlanningError, Resources, Consumer))
 	{
 		return Result;
 	}
@@ -591,7 +592,7 @@ bool FVoxelInterestManager::RefreshPriorities(TConstArrayView<FVoxelStreamingSou
 			Role.bCollisionGuard = Contribution->CollisionSections.Contains(Section);
 			Role.bAheadPrefetch = Contribution->FineDataSections.Contains(Section) && !Contribution->F0CoreSections.Contains(Section);
 			FVoxelTerrainServicePriority Candidate;
-			if (!FVoxelTerrainPriority::Resolve(Geometry, Role, MakeArrayView(&Source, 1), InP0RadiusCells, Candidate, OutError)) return false;
+			if (!FVoxelTerrainPriority::Resolve(Geometry, Role, MakeArrayView(&Source, 1), Source.View.FineLevel0RadiusCells, Candidate, OutError)) return false;
 			if (!bFound || FVoxelTerrainWorkSelection::HigherPriority(Candidate, Demand.ServicePriority))
 			{
 				Demand.ServicePriority = Candidate;
@@ -672,7 +673,7 @@ bool FVoxelInterestManager::RefreshPriorities(TConstArrayView<FVoxelStreamingSou
 				}
 			}
 			FVoxelTerrainServicePriority Candidate;
-			if (!FVoxelTerrainPriority::Resolve(Geometry, Role, MakeArrayView(&Source, 1), InP0RadiusCells, Candidate, OutError)) return false;
+			if (!FVoxelTerrainPriority::Resolve(Geometry, Role, MakeArrayView(&Source, 1), Source.View.FineLevel0RadiusCells, Candidate, OutError)) return false;
 			if (!bFound || FVoxelTerrainWorkSelection::HigherPriority(Candidate, Pair.Value.ServicePriority))
 			{
 				Pair.Value.ServicePriority = Candidate;
@@ -914,7 +915,7 @@ void FVoxelInterestManager::AddExactSource(
 	else if (InSource.Has(EVoxelStreamingCapability::Collision) && InSource.CollisionRadius > 0)
 	{
 		const FVector Start(InSource.Center);
-		const FVector End = Start + InSource.VelocityCellsPerSecond * InViewSettings.Fine.PredictionSeconds;
+		const FVector End = Start + InSource.VelocityCellsPerSecond * InSource.View.FinePredictionSeconds;
 		if (!FVoxelFineSpatial::GatherSweptGuard(Start, End, InSource.CollisionRadius,
 			InManifest.Settings.MinZ, InManifest.Settings.MaxZ, 262144, Guard, Error, &GuardCapacity))
 		{

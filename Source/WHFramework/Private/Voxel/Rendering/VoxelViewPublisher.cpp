@@ -611,7 +611,6 @@ FVoxelViewPublisher::FGroupPriority FVoxelViewPublisher::BoundsPriority(const TC
 	FGroupPriority Result;
 	Result.TerrainStage = InStage;
 	const double CellSize = Module.BlockSize();
-	const auto& Policy = Module.GetViewSettings().Fine;
 	for (const FBox& WorldBounds : InBounds)
 	{
 		if (!WorldBounds.IsValid) continue;
@@ -637,9 +636,9 @@ FVoxelViewPublisher::FGroupPriority FVoxelViewPublisher::BoundsPriority(const TC
 			// 粗表示邻近观察源不构成 Core/Guard 依赖，不能因此抢占 Near 池。
 			const bool bLocalRefinement = Source.Has(EVoxelStreamingCapability::LocalRefinement) &&
 				!Source.Has(EVoxelStreamingCapability::WorldVisual);
-			const bool bNear = !bLocalRefinement && InStage == 0 && Candidate.Service.DistanceCells <= Policy.CollisionGuardRadiusCells;
+			const bool bNear = !bLocalRefinement && InStage == 0 && Candidate.Service.DistanceCells <= Source.View.CollisionGuardRadiusCells;
 			Candidate.Service.Band = bNear ?
-				(Candidate.Service.DistanceCells <= Policy.InteractiveRadiusCells ? EVoxelTerrainServiceBand::P0 : EVoxelTerrainServiceBand::P1) :
+				(Candidate.Service.DistanceCells <= Source.View.FineLevel0RadiusCells ? EVoxelTerrainServiceBand::P0 : EVoxelTerrainServiceBand::P1) :
 				(InStage == 0 ? EVoxelTerrainServiceBand::P2 : InStage == 1 ? EVoxelTerrainServiceBand::P3 :
 				 InStage == 2 ? EVoxelTerrainServiceBand::P4 : EVoxelTerrainServiceBand::P5);
 			Candidate.WorkClass = bNear ? EVoxelWorkClass::Critical : EVoxelWorkClass::Visible;

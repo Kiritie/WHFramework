@@ -92,7 +92,7 @@ bool FVoxelBoundaryFaceSnapshot::CaptureFineShardAtom(const FVoxelViewKey& InKey
 	Snapshot.SampleStepCells = 1;
 	Snapshot.GridSide = 16;
 	Snapshot.Revision = InGeometry->Attempt.Input.DataRevision;
-	Snapshot.FineGeometry = MoveTemp(InGeometry);
+	Snapshot.FineSource = FVoxelFineBoundarySource(*InGeometry);
 	uint32 Packed = 0;
 	if (!Snapshot.GetPackedState(0, Packed) || !Snapshot.GetPackedState(255, Packed)) return false;
 	OutSnapshot = MoveTemp(Snapshot);
@@ -128,16 +128,16 @@ int32 FVoxelBoundaryFaceSnapshot::GetStateCount() const
 bool FVoxelBoundaryFaceSnapshot::GetPackedState(const int32 InIndex, uint32& OutPacked) const
 {
 	if (InIndex < 0 || InIndex >= GetStateCount()) return false;
-	if (FineGeometry)
+	if (FineSource.Boundary)
 	{
-		if (!FineGeometry->Boundary || Key.Level != 0 || GridSide != 16 || SampleStepCells != 1 ||
-			FineGeometry->Boundary->Input != FineGeometry->Attempt.Input) return false;
+		if (!FineSource.GeometryIdentity.IsValid() || Key.Level != 0 || GridSide != 16 || SampleStepCells != 1 ||
+			!FVoxelFineSpatial::ContainsBounds(FineSource.Boundary->Input.Shard.Bounds(), Key.GetBounds())) return false;
 		FIntVector Cell = Key.GetBounds().Min;
 		const int32 Axis = Face / 2, U = (Axis + 1) % 3, V = (Axis + 2) % 3;
 		Cell[Axis] += (Face & 1) ? 0 : 15;
 		Cell[U] += InIndex % 16; Cell[V] += InIndex / 16;
 		FVoxelBlockState State;
-		if (!FineGeometry->Boundary->SampleAtomFace(Key.Coordinate, Face, false, Cell, State)) return false;
+		if (!FineSource.Boundary->SampleAtomFace(Key.Coordinate, Face, false, Cell, State)) return false;
 		OutPacked = State.Pack();
 		return true;
 	}
@@ -166,7 +166,7 @@ bool FVoxelBoundaryFaceSnapshot::Sample(const FIntVector& InWorldCell,
 	const int32 SectionSide = GridSide;
 	if (Step <= 0 || !FMath::IsPowerOfTwo(Step) || SectionSide <= 0 || SectionSide > 128 ||
 		(Key.Level == 0 ? Step != 1 : Step < 2) ||
-		int64(SectionSide) * Step != Key.GetSide() || Face >= 6 || (!FineGeometry && !ProxyGeometry &&
+		int64(SectionSide) * Step != Key.GetSide() || Face >= 6 || (!FineSource.Boundary && !ProxyGeometry &&
 			int64(States.Num()) != int64(SectionSide) * SectionSide)) return false;
 	const FVoxelGenerationBounds Bounds = Key.GetBounds();
 	const int32 Axis = Face / 2;
@@ -220,9 +220,8 @@ bool FVoxelBoundaryTransitionContext::CoversCell(const uint8 InFace,
 bool FVoxelBoundaryTransitionContext::Validate() const
 {
 	if (!FMath::IsFinite(MaximumTextureStretchCells) || MaximumTextureStretchCells < 1.0 ||
-		(FineOwnerGeometry && (Owner.Level != 0 || SampleStepCells != 1 || !FineOwnerGeometry->Boundary ||
-			FineOwnerGeometry->Boundary->Input != FineOwnerGeometry->Attempt.Input ||
-			!FVoxelFineSpatial::ContainsBounds(FineOwnerGeometry->Attempt.Input.Shard.Bounds(), Owner.GetBounds()))) ||
+		(FineOwnerSource.Boundary && (Owner.Level != 0 || SampleStepCells != 1 || !FineOwnerSource.GeometryIdentity.IsValid() ||
+			!FVoxelFineSpatial::ContainsBounds(FineOwnerSource.Boundary->Input.Shard.Bounds(), Owner.GetBounds()))) ||
 		SampleStepCells <= 0 || !FMath::IsPowerOfTwo(SampleStepCells) || Owner.GetSide() % SampleStepCells != 0 ||
 		(Owner.Level == 0 ? SampleStepCells != 1 : SampleStepCells < 2))
 	{
@@ -256,9 +255,9 @@ bool FVoxelBoundaryTransitionContext::Validate() const
 			Patch.Neighbor.SampleStepCells <= 0 || !FMath::IsPowerOfTwo(Patch.Neighbor.SampleStepCells) ||
 			Patch.Neighbor.GridSide <= 0 || Patch.Neighbor.GridSide > 128 || int64(Patch.Neighbor.GridSide) * Patch.Neighbor.SampleStepCells != Patch.Neighbor.Key.GetSide() ||
 			(Patch.Neighbor.Key.Level == 0 ? Patch.Neighbor.SampleStepCells != 1 : Patch.Neighbor.SampleStepCells < 2) ||
-			(Patch.Neighbor.FineGeometry && Patch.Neighbor.SampleStepCells != 1) ||
+			(Patch.Neighbor.FineSource.Boundary && (Patch.Neighbor.SampleStepCells != 1 || !Patch.Neighbor.FineSource.GeometryIdentity.IsValid())) ||
 			(Patch.Neighbor.ProxyGeometry && Patch.Neighbor.SampleStepCells < 2) ||
-			(!Patch.Neighbor.FineGeometry && !Patch.Neighbor.ProxyGeometry &&
+			(!Patch.Neighbor.FineSource.Boundary && !Patch.Neighbor.ProxyGeometry &&
 				int64(Patch.Neighbor.States.Num()) != int64(Patch.Neighbor.GridSide) * Patch.Neighbor.GridSide) ||
 			Patch.Face.Ratio < 1 || Patch.Face.Ratio > (1 << 20) ||
 			!FMath::IsPowerOfTwo(Patch.Face.Ratio) ||
@@ -303,14 +302,14 @@ bool FVoxelBoundaryFaceSnapshot::SameSource(const FVoxelBoundaryFaceSnapshot& In
 {
 	// 指针是冻结对象的精确身份；持有强引用防止地址回收造成 ABA。
 	return Key == InOther.Key && Face == InOther.Face && SampleStepCells == InOther.SampleStepCells &&
-		GridSide == InOther.GridSide && Revision == InOther.Revision && FineGeometry == InOther.FineGeometry &&
+		GridSide == InOther.GridSide && Revision == InOther.Revision && FineSource == InOther.FineSource &&
 		ProxyGeometry == InOther.ProxyGeometry && States == InOther.States;
 }
 
 bool FVoxelBoundaryTransitionContext::SameInputs(const FVoxelBoundaryTransitionContext& InOther) const
 {
 	if (Owner != InOther.Owner || SampleStepCells != InOther.SampleStepCells || OwnerGeometry != InOther.OwnerGeometry ||
-		FineOwnerGeometry != InOther.FineOwnerGeometry || MaximumTextureStretchCells != InOther.MaximumTextureStretchCells ||
+		FineOwnerSource != InOther.FineOwnerSource || MaximumTextureStretchCells != InOther.MaximumTextureStretchCells ||
 		WorldEpoch != InOther.WorldEpoch || GeneratorIdentity != InOther.GeneratorIdentity ||
 		RegistryRevision != InOther.RegistryRevision || ShapeRevision != InOther.ShapeRevision ||
 		SuppressionRevision != InOther.SuppressionRevision || Patches.Num() != InOther.Patches.Num() ||
@@ -345,6 +344,8 @@ uint64 FVoxelBoundaryTransitionContext::Signature(const uint64 InOwnerRevision) 
 	{ Mix(GetTypeHash(Face.Owner)); Mix(GetTypeHash(Face.Neighbor)); Mix(static_cast<uint8>(Face.Direction)); Mix(GetTypeHash(Face.Min)); Mix(GetTypeHash(Face.Max)); }
 	Mix(GetSampleStep());
 	Mix(reinterpret_cast<UPTRINT>(OwnerGeometry.Get()));
+	Mix(reinterpret_cast<UPTRINT>(FineOwnerSource.Boundary.Get()));
+	Mix(GetTypeHash(FineOwnerSource.GeometryIdentity));
 	for (const auto& Source : SuppressionSources) Mix(reinterpret_cast<UPTRINT>(Source.Get()));
 	for (const FVoxelBoundaryTransitionPatch& Patch : Patches)
 	{
@@ -353,7 +354,8 @@ uint64 FVoxelBoundaryTransitionContext::Signature(const uint64 InOwnerRevision) 
 		Mix(Patch.Face.Ratio);
 		Mix(Patch.Neighbor.Revision);
 		Mix(Patch.Neighbor.SampleStepCells);
-		Mix(reinterpret_cast<UPTRINT>(Patch.Neighbor.FineGeometry.Get()));
+		Mix(reinterpret_cast<UPTRINT>(Patch.Neighbor.FineSource.Boundary.Get()));
+		Mix(GetTypeHash(Patch.Neighbor.FineSource.GeometryIdentity));
 		Mix(reinterpret_cast<UPTRINT>(Patch.Neighbor.ProxyGeometry.Get()));
 	}
 	return Hash;

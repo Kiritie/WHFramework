@@ -215,7 +215,7 @@ private:
 	struct FLink
 	{
 		int32 Neighbor = INDEX_NONE;
-		int32 Edge = INDEX_NONE;
+		int32 BarrierZ = 0;
 		int32 Next = INDEX_NONE;
 	};
 

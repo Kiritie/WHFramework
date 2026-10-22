@@ -209,11 +209,27 @@ struct FVoxelCoarseBuildStorage
 	}
 
 	bool SettleCompleted(FVoxelTaskResult& InOutResult,
-		const FVoxelSectionMeshResult* InAdditionalMesh = nullptr, const uint64 InAdditionalObjectBytes = 0)
+		FVoxelSectionMeshResult* InAdditionalMesh = nullptr, const uint64 InAdditionalObjectBytes = 0,
+		const TAtomic<bool>* InCancel = nullptr)
 	{
 		if (!InOutResult.bSuccess || InOutResult.bContinue || InOutResult.bCanceled)
 		{
 			return false;
+		}
+		FVoxelSectionMeshResult* Meshes[] = {InOutResult.FineMesh.Get(), InOutResult.VoxelProxyMesh.Get(),
+			InOutResult.VolumeBoundaryMesh.Get(), InOutResult.SurfaceMesh.Get(), InOutResult.WaterMesh.Get(), InOutResult.MacroMesh.Get(), InAdditionalMesh};
+		for (int32 Index = 0; Index < UE_ARRAY_COUNT(Meshes); ++Index)
+		{
+			auto* Mesh = Meshes[Index];
+			if (!Mesh || !Mesh->bValidated || Mesh->ResourceLease.Get() != GeometryLease.Get()) continue;
+			bool bSeen = false;
+			for (int32 Previous = 0; Previous < Index; ++Previous) bSeen |= Meshes[Previous] == Mesh;
+			if (!bSeen && !Mesh->TryCompactAttributes(Resources, Consumer, InOutResult.Error, InCancel))
+			{
+				InOutResult.bSuccess = false;
+				InOutResult.bCanceled = InCancel && InCancel->Load();
+				return false;
+			}
 		}
 		FCompletedCapacity Capacity(GeometryLease.Get());
 		Capacity.Add(InAdditionalObjectBytes);
@@ -345,6 +361,12 @@ private:
 			AddArray(InData.SnowCoverage);
 			AddArray(InData.LargeStructures);
 			AddArray(InData.DistantCells);
+		}
+
+		template<typename ElementType>
+		void AddArray(const TVoxelMeshAttributeStream<ElementType>& InStream)
+		{
+			Add(InStream.GetAllocatedSize());
 		}
 
 		void AddAllocations(const FVoxelSectionMeshResult& InMesh)

@@ -75,6 +75,23 @@ EVoxelTerrainResourceAdmission VoxelFineShardCapacity::TryReserve(
 	return Admission;
 }
 
+FVoxelFineBoundarySource::FVoxelFineBoundarySource(const FVoxelFineShardGeometry& InGeometry)
+	: Boundary(InGeometry.Boundary), OverlayVersion(InGeometry.OverlayVersion), GeometryIdentity(InGeometry.GeometryIdentity)
+{
+}
+
+bool FVoxelFineBoundarySource::Matches(const FVoxelFineShardGeometry& InGeometry) const
+{
+	return Boundary && GeometryIdentity.IsValid() && Boundary == InGeometry.Boundary &&
+		GeometryIdentity == InGeometry.GeometryIdentity && OverlayVersion == InGeometry.OverlayVersion &&
+		Boundary->Input == InGeometry.Attempt.Input;
+}
+
+bool FVoxelFineBoundarySource::operator==(const FVoxelFineBoundarySource& InOther) const
+{
+	return Boundary == InOther.Boundary && OverlayVersion == InOther.OverlayVersion && GeometryIdentity == InOther.GeometryIdentity;
+}
+
 uint64 FVoxelFineShardGeometry::GetResourceAccountedBytes() const
 {
 	uint64 Bytes = MetadataLease ? MetadataLease->Bytes() : 0;

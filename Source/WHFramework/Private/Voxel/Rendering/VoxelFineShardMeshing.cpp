@@ -954,6 +954,13 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 		State = InCancel.Load() ? EVoxelFineBuildProgress::Canceled : EVoxelFineBuildProgress::Failed;
 		return State;
 	}
+	if (!Candidate->TryCompactAttributes(Resources, Consumer, OutError, &InCancel))
+	{
+		Abort();
+		State = InCancel.Load() ? EVoxelFineBuildProgress::Canceled : EVoxelFineBuildProgress::Failed;
+		return State;
+	}
+	ActualResult = WorkerSharedBytes<FVoxelSectionMeshResult>() + Candidate->AllocatedBytes();
 	verify(ResultLease->TryResize(ActualResult) == EVoxelTerrainResourceAdmission::Granted);
 	check(Geometry->Pieces.Num() < Geometry->Pieces.Max());
 	Geometry->Pieces.Add({Key, Candidate});

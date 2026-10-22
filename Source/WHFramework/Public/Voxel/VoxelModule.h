@@ -124,6 +124,7 @@ public:
 	bool StartWorld(const FVoxelWorldManifest& InManifest, bool bInRemote, FString& OutError);
 	bool StopWorld(bool bDiscardDirty, FString& OutError);
 	bool ValidateWorldData(const FParameter& InData, FString& OutError) const;
+	bool ValidateNewWorldData(const FParameter& InData, FString& OutError) const;
 
 	bool IsAuthority() const;
 	bool IsReady() const;
@@ -217,7 +218,7 @@ public:
 	FVoxelPrimaryFineReadiness QueryFineReadiness(TConstArrayView<FIntVector> InKeys) const;
 	const FVoxelViewSettings& GetViewSettings() const { return ViewSettings; }
 	FIntPoint GetLocalFineRadiusLimits() const;
-	void SetLocalFineRadiusCells(int32 InRadiusCells);
+	bool SetLocalFineRadiusCells(int32 InRadiusCells);
 	bool EnqueueProjectBackgroundTask(FVoxelTaskRequest&& InRequest);
 	void CancelProjectTasksByOwner(const FGuid& InOwnerId, uint64 InOwnerIncarnation);
 	void DonateProjectTaskPriority(const FVoxelTaskStamp& InStamp, EVoxelWorkClass InClass,

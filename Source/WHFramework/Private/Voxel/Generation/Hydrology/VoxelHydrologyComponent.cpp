@@ -103,6 +103,8 @@ EVoxelHydrologyComponentStep FVoxelHydrologyComponentBuild::Advance(FTileLookup 
         Result.ReceivedRainWeight = Local.ReceivedRainWeight;
         Result.ExportedRainWeight = Local.ExportedRainWeight;
         Result.Key = Local.Minimum;
+        Graph.Reset();
+        Runoff.Reset();
         bLocalReady = true;
     }
     if (!bNodesFiltered)
@@ -193,6 +195,8 @@ bool FVoxelHydrologyComponentBuild::ReadExteriorNode(const FIntPoint& InCell, FT
 bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVoxelHydrologyMacroInput::FRequestTile InRequestTile,
     FString& OutError, const TAtomic<bool>* InCancel)
 {
+    constexpr uint8 ActivePath = 1;
+    constexpr uint8 SelectedSource = 2;
     int32 Work = 256;
     const int32 Count = Local.Cells.Num();
     const auto CellAt = [&](int32 InIndex) { return Local.Minimum + FIntPoint(InIndex % Local.Width, InIndex / Local.Width); };
@@ -212,8 +216,7 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVox
         if (InCancel && InCancel->Load()) { OutError = TEXT("Canceled"); return false; }
         if (PrepareStage == 0)
         {
-            if (!VoxelGenerationAllocation::RetainArray(Nodes, Count, OutError) ||
-                !VoxelGenerationAllocation::RetainArray(PrepareChildren, Count, OutError) ||
+            if (!VoxelGenerationAllocation::RetainArray(PrepareChildren, Count, OutError) ||
                 !VoxelGenerationAllocation::RetainArray(PrepareQueue, Count, OutError) ||
                 !VoxelGenerationAllocation::RetainArray(PrepareRemap, Count, OutError) ||
                 !VoxelGenerationAllocation::RetainArray(PrepareActive, Count, OutError) ||
@@ -224,6 +227,62 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVox
         {
             if (PrepareCursor == Count) { PrepareCursor = 0; PrepareStage = 2; continue; }
             const int32 Index = PrepareCursor;
+            const auto& Cell = Local.Cells[Index];
+            PrepareChildren.Add(0);
+            PrepareActive.Add(0);
+            PrepareRemap.Add(Cell.bHasParent ? IndexOf(Cell.ParentCell) : INDEX_NONE);
+            // 所有权按X/Y排序生成，不把区外端点列为已生成格。
+            Result.DrainageCells.Add(Local.Minimum + FIntPoint(Index / Local.Height, Index % Local.Height));
+            ++PrepareCursor;
+        }
+        else if (PrepareStage == 2)
+        {
+            if (PrepareSourceCursor == Sources->Sources.Num()) { Sources.Reset(); PrepareStage = 3; continue; }
+            const int32 Index = IndexOf(Sources->Sources[PrepareSourceCursor++].Cell);
+            if (Index == INDEX_NONE) { OutError = TEXT("HydrologyComponentConflict: selected source is outside its region"); return false; }
+            PrepareActive[Index] |= ActivePath | SelectedSource;
+        }
+        else if (PrepareStage == 3)
+        {
+            if (PrepareCursor == Count) { Channels.Reset(); PrepareCursor = 0; PrepareStage = 4; continue; }
+            const int32 Index = PrepareCursor++;
+            if (PrepareRemap[Index] != INDEX_NONE) ++PrepareChildren[PrepareRemap[Index]];
+            const auto* Boundary = Channels->Find(CellAt(Index));
+            if (Boundary && Boundary->bIncomingActive) PrepareActive[Index] |= ActivePath;
+        }
+        else if (PrepareStage == 4)
+        {
+            if (PrepareCursor == Count) { PrepareCursor = 0; PrepareStage = 5; continue; }
+            if (PrepareChildren[PrepareCursor] == 0) PrepareQueue.Add(PrepareCursor);
+            ++PrepareCursor;
+        }
+        else if (PrepareStage == 5)
+        {
+            if (PrepareCursor == PrepareQueue.Num())
+            {
+                if (PrepareQueue.Num() != Count) { OutError = TEXT("HydrologyComponentConflict: local channel parent cycle"); return false; }
+                VoxelGenerationAllocation::FreeRetainedArray(PrepareChildren);
+                VoxelGenerationAllocation::FreeRetainedArray(PrepareQueue);
+                PrepareCursor = 0;
+                PrepareStage = 6;
+                continue;
+            }
+            const int32 Index = PrepareQueue[PrepareCursor++];
+            if (PrepareActive[Index] & ActivePath) ++PrepareActiveCount;
+            const int32 Parent = PrepareRemap[Index];
+            if (Parent != INDEX_NONE)
+            {
+                PrepareActive[Parent] |= PrepareActive[Index] & ActivePath;
+                if (--PrepareChildren[Parent] == 0) PrepareQueue.Add(Parent);
+            }
+        }
+        else if (PrepareStage == 6)
+        {
+            if (PrepareCursor == 0 && !VoxelGenerationAllocation::RetainArray(PrepareSelected,
+                PrepareActiveCount + 2 * (Local.Width + Local.Height), OutError)) return false;
+            if (PrepareCursor == Count) { PrepareCursor = 0; PrepareStage = 7; continue; }
+            const int32 Index = PrepareCursor;
+            if (!(PrepareActive[Index] & ActivePath)) { PrepareRemap[Index] = INDEX_NONE; ++PrepareCursor; continue; }
             const auto& Cell = Local.Cells[Index];
             const FIntPoint Position = CellAt(Index);
             FVoxelHydrologyComponentNode Node;
@@ -239,62 +298,8 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVox
             Node.ReceiverWaterZ = Cell.Sample.WaterZ;
             Node.ReceiverId = Cell.Sample.WaterId;
             Node.bChannelEligible = true;
+            Node.bSelected = (PrepareActive[Index] & SelectedSource) != 0;
             SetShape(Node);
-            Nodes.Add(Node);
-            PrepareChildren.Add(0);
-            PrepareActive.Add(0);
-            PrepareRemap.Add(INDEX_NONE);
-            // 所有权按X/Y排序生成，不把区外端点列为已生成格。
-            Result.DrainageCells.Add(Local.Minimum + FIntPoint(Index / Local.Height, Index % Local.Height));
-            ++PrepareCursor;
-        }
-        else if (PrepareStage == 2)
-        {
-            if (PrepareSourceCursor == Sources->Sources.Num()) { PrepareStage = 3; continue; }
-            const int32 Index = IndexOf(Sources->Sources[PrepareSourceCursor++].Cell);
-            if (Index == INDEX_NONE) { OutError = TEXT("HydrologyComponentConflict: selected source is outside its region"); return false; }
-            PrepareActive[Index] = 1;
-            Nodes[Index].bSelected = true;
-        }
-        else if (PrepareStage == 3)
-        {
-            if (PrepareCursor == Count) { PrepareCursor = 0; PrepareStage = 4; continue; }
-            const int32 Index = PrepareCursor++;
-            if (Nodes[Index].Parent != INDEX_NONE) ++PrepareChildren[Nodes[Index].Parent];
-            const auto* Boundary = Channels->Find(CellAt(Index));
-            if (Boundary && Boundary->bIncomingActive) PrepareActive[Index] = 1;
-        }
-        else if (PrepareStage == 4)
-        {
-            if (PrepareCursor == Count) { PrepareCursor = 0; PrepareStage = 5; continue; }
-            if (PrepareChildren[PrepareCursor] == 0) PrepareQueue.Add(PrepareCursor);
-            ++PrepareCursor;
-        }
-        else if (PrepareStage == 5)
-        {
-            if (PrepareCursor == PrepareQueue.Num())
-            {
-                if (PrepareQueue.Num() != Count) { OutError = TEXT("HydrologyComponentConflict: local channel parent cycle"); return false; }
-                if (!VoxelGenerationAllocation::RetainArray(PrepareSelected, PrepareActiveCount + 2 * (Local.Width + Local.Height), OutError)) return false;
-                PrepareCursor = 0;
-                PrepareStage = 6;
-                continue;
-            }
-            const int32 Index = PrepareQueue[PrepareCursor++];
-            if (PrepareActive[Index]) ++PrepareActiveCount;
-            const int32 Parent = Nodes[Index].Parent;
-            if (Parent != INDEX_NONE)
-            {
-                PrepareActive[Parent] |= PrepareActive[Index];
-                if (--PrepareChildren[Parent] == 0) PrepareQueue.Add(Parent);
-            }
-        }
-        else if (PrepareStage == 6)
-        {
-            if (PrepareCursor == Count) { PrepareCursor = 0; PrepareStage = 7; continue; }
-            const int32 Index = PrepareCursor;
-            if (!PrepareActive[Index]) { ++PrepareCursor; continue; }
-            auto Node = Nodes[Index];
             if (Node.bHasParent && Node.Parent == INDEX_NONE)
             {
                 const FIntPoint ParentCell = Local.Cells[Index].ParentCell;
@@ -316,9 +321,11 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVox
         {
             if (PrepareCursor == Count) { PrepareStage = 8; continue; }
             const int32 Index = PrepareCursor++;
-            if (PrepareRemap[Index] != INDEX_NONE && Nodes[Index].Parent != INDEX_NONE)
+            const auto& Cell = Local.Cells[Index];
+            const int32 OriginalParent = Cell.bHasParent ? IndexOf(Cell.ParentCell) : INDEX_NONE;
+            if (PrepareRemap[Index] != INDEX_NONE && OriginalParent != INDEX_NONE)
             {
-                const int32 Parent = PrepareRemap[Nodes[Index].Parent];
+                const int32 Parent = PrepareRemap[OriginalParent];
                 if (Parent == INDEX_NONE) { OutError = TEXT("HydrologyComponentConflict: active channel lost its real downstream"); return false; }
                 PrepareSelected[PrepareRemap[Index]].Parent = Parent;
             }

@@ -33,6 +33,7 @@ public:
 		const FVoxelTerrainServicePriority& InPriority, double InFirstQueuedSeconds,
 		TSharedPtr<FVoxelPhysicsRetirement, ESPMode::ThreadSafe> InRetirement);
 	bool IsDetachedCookRunning() const;
+	bool IsDetachedCookCanceled() const;
 	bool HasDetachedCookFailed() const;
 	bool PrepareNativeRetirement(TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> InInputWorkReceipt = nullptr);
 	TSharedPtr<FVoxelPhysicsRetirementTicket, ESPMode::ThreadSafe> CaptureNativeTicket() const;

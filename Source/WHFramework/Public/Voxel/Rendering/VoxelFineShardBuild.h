@@ -120,6 +120,21 @@ struct WHFRAMEWORK_API FVoxelFineBoundarySnapshot
 		const FIntVector& InWorldCell, FVoxelBlockState& OutState) const;
 };
 
+struct FVoxelFineShardGeometry;
+
+// 接口只持有其实际采样的边界与版本证明，不钉住几何正文。
+struct WHFRAMEWORK_API FVoxelFineBoundarySource
+{
+	FVoxelFineBoundarySource() = default;
+	explicit FVoxelFineBoundarySource(const FVoxelFineShardGeometry& InGeometry);
+	bool Matches(const FVoxelFineShardGeometry& InGeometry) const;
+	bool operator==(const FVoxelFineBoundarySource& InOther) const;
+	bool operator!=(const FVoxelFineBoundarySource& InOther) const { return !(*this == InOther); }
+	TSharedPtr<const FVoxelFineBoundarySnapshot, ESPMode::ThreadSafe> Boundary;
+	TSharedPtr<const FVoxelFineOverlayVersionProof, ESPMode::ThreadSafe> OverlayVersion;
+	FGuid GeometryIdentity;
+};
+
 struct WHFRAMEWORK_API FVoxelFineShardGeometry final : public FVoxelTaskCustomPayload
 {
 	FVoxelFineBuildAttempt Attempt;

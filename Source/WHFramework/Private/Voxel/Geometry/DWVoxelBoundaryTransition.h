@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Voxel/Rendering/DWVolumeTransitionPlanner.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
+#include "Voxel/Rendering/VoxelFineShardBuild.h"
 
 struct FVoxelSection;
 struct FVoxelVoxelProxyData;
@@ -18,7 +19,7 @@ struct FVoxelBoundaryFaceSnapshot
 	int32 GridSide = 0;
 	uint64 Revision = 0;
 	TArray<uint32> States;
-	TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> FineGeometry;
+	FVoxelFineBoundarySource FineSource;
 	TSharedPtr<const FVoxelVoxelProxyData, ESPMode::ThreadSafe> ProxyGeometry;
 	int32 GetStateCount() const;
 	bool GetPackedState(int32 InIndex, uint32& OutPacked) const;
@@ -61,7 +62,7 @@ struct FVoxelBoundaryTransitionContext
 	uint64 RegistryRevision = 0;
 	uint64 ShapeRevision = 0;
 	TSharedPtr<const FVoxelVoxelProxyData, ESPMode::ThreadSafe> OwnerGeometry;
-	TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> FineOwnerGeometry;
+	FVoxelFineBoundarySource FineOwnerSource;
 	double MaximumTextureStretchCells = 8.0;
 	TArray<TSharedPtr<const FVoxelVoxelProxyData, ESPMode::ThreadSafe>> SuppressionSources;
 

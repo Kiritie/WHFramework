@@ -1030,12 +1030,11 @@ bool FVoxelFineIndependentRadiusTest::RunTest(const FString& InParameters)
 	Manifest.Settings.MinZ = -256;
 	Manifest.Settings.MaxZ = 256;
 	FVoxelViewSettings Settings;
-	Settings.Fine.InteractiveVerticalHalfExtentCells = 32;
-	Settings.Fine.ResidencyVerticalHalfExtentCells = 192;
 	FVoxelStreamingSource Source;
 	Source.Id = FGuid::NewGuid();
-	Source.View.FineRadiusCells = 96;
-	Source.View.FineVerticalHalfExtentCells = 32;
+	Source.View.FineLevel0VerticalHalfExtentCells = 32;
+	Source.View.FineRadiusCells = 256;
+	Source.View.FineVerticalHalfExtentCells = 192;
 	Source.ExactRadius = 16;
 	Source.CollisionRadius = 16;
 	Source.SimulationRadius = 0;

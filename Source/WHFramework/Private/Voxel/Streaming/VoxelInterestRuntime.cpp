@@ -155,15 +155,23 @@ EVoxelSourceChange FVoxelInterestRuntime::ClassifySourceChange(const FVoxelStrea
 		return All;
 	}
 	EVoxelSourceChange Changed = EVoxelSourceChange::None;
+	if (A.FineLevel0RadiusCells != B.FineLevel0RadiusCells ||
+		A.FineLevel0VerticalHalfExtentCells != B.FineLevel0VerticalHalfExtentCells ||
+		A.CollisionGuardRadiusCells != B.CollisionGuardRadiusCells ||
+		A.FineRadiusCells != B.FineRadiusCells || A.FineVerticalHalfExtentCells != B.FineVerticalHalfExtentCells)
+	{
+		Changed |= EVoxelSourceChange::FineResidency | EVoxelSourceChange::RuntimeDemand |
+			EVoxelSourceChange::PageLayout | EVoxelSourceChange::CoarseTopology;
+	}
 	if (InA.Center != InB.Center || InA.Direction != InB.Direction || InA.Priority != InB.Priority ||
 		InA.GetSchedulingPriority() != InB.GetSchedulingPriority() || InA.bLocalView != InB.bLocalView ||
 		InA.VelocityCellsPerSecond != InB.VelocityCellsPerSecond)
 	{
 		Changed |= EVoxelSourceChange::Priority;
 	}
-	const auto PredictionAnchor = [&InSettings](const FVoxelStreamingSource& Source)
+	const auto PredictionAnchor = [](const FVoxelStreamingSource& Source)
 	{
-		const FVector Predicted = FVector(Source.Center) + Source.VelocityCellsPerSecond * InSettings.Fine.PredictionSeconds;
+		const FVector Predicted = FVector(Source.Center) + Source.VelocityCellsPerSecond * Source.View.FinePredictionSeconds;
 		return FIntVector(FMath::FloorToInt(Predicted.X / 16.0), FMath::FloorToInt(Predicted.Y / 16.0), FMath::FloorToInt(Predicted.Z / 16.0));
 	};
 	if (Snap3D(InA.Center, 16) != Snap3D(InB.Center, 16) || PredictionAnchor(InA) != PredictionAnchor(InB) ||
@@ -231,7 +239,7 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 	{
 		if (!bOutSnapshot && !ConfigurationError.IsEmpty()) LastPlanningError = ConfigurationError;
 	};
-	if (!VoxelViewLod::ValidateTopology(InSettings.Lod, ConfigurationError) || !InSettings.Fine.Validate(ConfigurationError))
+	if (!VoxelViewLod::ValidateTopology(InSettings.Lod, ConfigurationError) || !InSettings.Fine.Validate(InSettings.DefaultSourceView, ConfigurationError))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Invalid terrain policy; retaining previous interest: %s"), *ConfigurationError);
 		OutInterest.Reset();
@@ -364,12 +372,17 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 		const bool bFine = Source.Has(EVoxelStreamingCapability::FineVisual);
 		if (bFine)
 		{
-			FVoxelFineMovementDelta Movement;
-			if (bPolicyChanged || !State.bHasFineResidency)
+			if (!InSettings.Fine.Validate(Source.View, ConfigurationError))
 			{
-				if (!State.FineResidency.Initialize(Source.Id, InSettings.Fine.WindowSettings(), Source.Center,
-					InSettings.Fine.InteractiveRadiusCells, InSettings.Fine.InteractiveVerticalHalfExtentCells,
-					InSettings.Fine.CollisionGuardRadiusCells, InManifest.Settings.MinZ, InManifest.Settings.MaxZ, ConfigurationError))
+				OutInterest.Reset();
+				return false;
+			}
+			FVoxelFineMovementDelta Movement;
+			if (bPolicyChanged || !State.bHasFineResidency || EnumHasAnyFlags(Change, EVoxelSourceChange::FineResidency))
+			{
+				if (!State.FineResidency.Initialize(Source.Id, InSettings.Fine.WindowSettings(Source.View), Source.Center,
+					Source.View.FineLevel0RadiusCells, Source.View.FineLevel0VerticalHalfExtentCells,
+					Source.View.CollisionGuardRadiusCells, InManifest.Settings.MinZ, InManifest.Settings.MaxZ, ConfigurationError))
 				{
 					OutInterest.Reset();
 					return false;
@@ -378,7 +391,7 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 				bRuntimeChanged = true;
 				bResidencyChanged = true;
 			}
-			if (!State.FineResidency.UpdateMovement(Source.Center, Source.VelocityCellsPerSecond, InSettings.Fine.PredictionSeconds,
+			if (!State.FineResidency.UpdateMovement(Source.Center, Source.VelocityCellsPerSecond, Source.View.FinePredictionSeconds,
 				Movement, ConfigurationError, false))
 			{
 				OutInterest.Reset();
@@ -400,7 +413,7 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 				Safety.WorldEpoch = InFeedback->WorldEpoch;
 				Safety.CoverageRootSerial = InFeedback->CoverageRootSerial;
 				Safety.LastAcceptedPosition = InFeedback->LastAcceptedPositions.FindRef(Source.Id);
-				Safety.PredictionSeconds = InSettings.Fine.PredictionSeconds;
+				Safety.PredictionSeconds = Source.View.FinePredictionSeconds;
 				const auto Coverage = [InFeedback](const FIntVector& Key)
 				{
 					return InFeedback->Sections.FindRef(Key);
@@ -528,7 +541,7 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 		{
 			PriorityOnly.Sources.FindChecked(Source.Id).Source = Source;
 		}
-		if (!Manager.RefreshPriorities(InSources, InSettings.Fine.InteractiveRadiusCells, PriorityOnly,
+		if (!Manager.RefreshPriorities(InSources, InSettings.DefaultSourceView.FineLevel0RadiusCells, PriorityOnly,
 			ConfigurationError, PlanningResources, PlanningConsumer))
 		{
 			OutInterest.Reset();

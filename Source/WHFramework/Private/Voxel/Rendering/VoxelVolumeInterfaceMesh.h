@@ -45,7 +45,7 @@ public:
 		if (Scratch > PieceLimit) { OutError = TEXT("Oversized: volume interface Count metadata"); return false; }
 		FVoxelBoundaryTransitionContext Local;
 		Local.Owner = Inputs.Owner; Local.SampleStepCells = Inputs.SampleStepCells; Local.OwnerGeometry = Inputs.OwnerGeometry;
-		Local.FineOwnerGeometry = Inputs.FineOwnerGeometry; Local.MaximumTextureStretchCells = Inputs.MaximumTextureStretchCells;
+		Local.FineOwnerSource = Inputs.FineOwnerSource; Local.MaximumTextureStretchCells = Inputs.MaximumTextureStretchCells;
 		Local.WorldEpoch = Inputs.WorldEpoch; Local.GeneratorIdentity = Inputs.GeneratorIdentity;
 		Local.RegistryRevision = Inputs.RegistryRevision; Local.ShapeRevision = Inputs.ShapeRevision; Local.InputSerial = Inputs.InputSerial;
 		Local.Patches.Reserve(1); Local.Patches.Add(Original);
@@ -162,7 +162,7 @@ struct FVoxelVolumeTransitionBuild
 				Boundary->FrozenBoundaryInputs = Inputs; Boundary->FrozenVoxelProxy = Data;
 				Result.VoxelProxyMesh = MoveTemp(Body); Result.VolumeBoundaryMesh = MoveTemp(Boundary);
 				Result.InputResourceLease = Storage->ResultInputLease; Result.bSuccess = true;
-				Storage->SettleCompleted(Result);
+				Storage->SettleCompleted(Result, nullptr, 0, &Cancel);
 				return Result;
 			}
 		}

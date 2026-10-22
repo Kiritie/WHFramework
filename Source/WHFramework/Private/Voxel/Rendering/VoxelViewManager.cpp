@@ -287,7 +287,7 @@ struct FProxyMeshEstimate
 					Payload->Mesh->FrozenHeightfieldInputs = Inputs;
 					Result.bSuccess = true;
 					if (!Storage->SettleCompleted(Result, Payload->Mesh.Get(),
-						VoxelBoundedAllocation::WorkerSharedBytes<FHeightfieldTransitionTaskPayload>()))
+						VoxelBoundedAllocation::WorkerSharedBytes<FHeightfieldTransitionTaskPayload>(), &Cancel))
 					{
 						return Result;
 					}
@@ -2750,10 +2750,11 @@ bool FVoxelViewManager::AreBoundaryInputsCurrent(const FVoxelBoundaryTransitionC
 	if (!Desired || Desired->InputSerial != InContext.InputSerial || !Desired->SameInputs(InContext)) return false;
 	for (const auto& Patch : InContext.Patches)
 	{
-		if (Patch.Neighbor.FineGeometry)
+		if (Patch.Neighbor.FineSource.Boundary)
 		{
-			if (FindFineBoundaryGeometry(Patch.Face.Neighbor.Coordinate) != Patch.Neighbor.FineGeometry ||
-				!Module.IsOverlayVersionCurrent(Patch.Neighbor.FineGeometry->OverlayVersion)) return false;
+			const auto Geometry = FindFineBoundaryGeometry(Patch.Face.Neighbor.Coordinate);
+			if (!Geometry || !Patch.Neighbor.FineSource.Matches(*Geometry) ||
+				!Module.IsOverlayVersionCurrent(Patch.Neighbor.FineSource.OverlayVersion)) return false;
 		}
 		else if (!Patch.Neighbor.ProxyGeometry || VoxelProxyData.FindRef(Patch.Face.Neighbor) != Patch.Neighbor.ProxyGeometry) return false;
 	}
@@ -4164,7 +4165,7 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 				MeshEstimate->Data->EstimatedMeshBytes = MeshEstimate->Counter.GetEstimatedMeshBytes();
 				Result.VoxelProxy = MeshEstimate->Data;
 				Result.bKnownEmptyMesh = Result.VoxelProxy->EstimatedMeshBytes == 0;
-				BuildStorage->SettleCompleted(Result);
+				BuildStorage->SettleCompleted(Result, nullptr, 0, &InCancel);
 				return Result;
 			}
 			Result.VoxelProxy = BuildStorage->MakeResult<FVoxelVoxelProxyData>();
@@ -4212,7 +4213,7 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 		{
 			Result.VoxelProxyMesh->InputWorkReceipt = Prepared->WorkReceipt;
 			Result.VoxelProxyMesh->FrozenVoxelProxy = Prepared->VoxelProxy;
-			BuildStorage->SettleCompleted(Result);
+			BuildStorage->SettleCompleted(Result, nullptr, 0, &InCancel);
 		}
 		if (Result.bSuccess && !bComplete)
 		{
@@ -4472,7 +4473,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 				MeshEstimate->Surface->EstimatedMeshBytes = MeshEstimate->Counter.GetEstimatedMeshBytes();
 				Result.Surface = MeshEstimate->Surface;
 				Result.Water = MeshEstimate->Water;
-				BuildStorage->SettleCompleted(Result);
+				BuildStorage->SettleCompleted(Result, nullptr, 0, &InCancel);
 				return Result;
 			}
 			Result.Surface = BuildStorage->MakeResult<FVoxelSurfaceTileData>();
@@ -4522,7 +4523,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 			Result.SurfaceMesh->InputWorkReceipt = Prepared->WorkReceipt;
 			Result.SurfaceMesh->FrozenSurface = Prepared->Surface;
 			Result.SurfaceMesh->FrozenWater = Prepared->Water;
-			BuildStorage->SettleCompleted(Result);
+			BuildStorage->SettleCompleted(Result, nullptr, 0, &InCancel);
 		}
 		if (Result.bSuccess && !bComplete)
 		{
@@ -4784,7 +4785,7 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 				}
 				MeshEstimate->Macro->EstimatedMeshBytes = MeshEstimate->Counter.GetEstimatedMeshBytes();
 				Result.Macro = MeshEstimate->Macro;
-				BuildStorage->SettleCompleted(Result);
+				BuildStorage->SettleCompleted(Result, nullptr, 0, &InCancel);
 				return Result;
 			}
 			Result.Macro = BuildStorage->MakeResult<FVoxelMacroTileData>();
@@ -4821,7 +4822,7 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 		{
 			Result.MacroMesh->InputWorkReceipt = Prepared->WorkReceipt;
 			Result.MacroMesh->FrozenMacro = Prepared->Macro;
-			BuildStorage->SettleCompleted(Result);
+			BuildStorage->SettleCompleted(Result, nullptr, 0, &InCancel);
 		}
 		if (Result.bSuccess && !bComplete)
 		{

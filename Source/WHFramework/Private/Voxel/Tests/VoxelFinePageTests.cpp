@@ -30,9 +30,14 @@ bool FVoxelFinePageLayoutTest::RunTest(const FString& InParameters)
 	Source.Center = FIntVector(8);
 	Source.Capabilities = EVoxelStreamingCapability::FineVisual;
 	const auto Sources = MakeArrayView(&Source, 1);
+	TestEqual(TEXT("默认范围权威的F0半径为16格"), Source.View.FineLevel0RadiusCells, 16);
 	TestEqual(TEXT("Near band is F0"), FVoxelFinePagePlanner::ResolveDesiredLevel({1, 0, 0}, Sources, Settings), uint8(0));
-	TestEqual(TEXT("32 cells begins F1"), FVoxelFinePagePlanner::ResolveDesiredLevel({3, 0, 0}, Sources, Settings), uint8(1));
-	TestEqual(TEXT("64 cells begins F2"), FVoxelFinePagePlanner::ResolveDesiredLevel({5, 0, 0}, Sources, Settings), uint8(2));
+	TestEqual(TEXT("16格半径以外进入F1"), FVoxelFinePagePlanner::ResolveDesiredLevel({2, 0, 0}, Sources, Settings), uint8(1));
+	TestEqual(TEXT("32格半径以外进入F2"), FVoxelFinePagePlanner::ResolveDesiredLevel({3, 0, 0}, Sources, Settings), uint8(2));
+	Source.View.FineLevel0RadiusCells = 32;
+	TestEqual(TEXT("显式32格半径仍控制F1"), FVoxelFinePagePlanner::ResolveDesiredLevel({3, 0, 0}, Sources, Settings), uint8(1));
+	TestEqual(TEXT("显式32格半径对应64格F2"), FVoxelFinePagePlanner::ResolveDesiredLevel({5, 0, 0}, Sources, Settings), uint8(2));
+	Source.View.FineLevel0RadiusCells = 16;
 	const FVoxelFinePageKey Parent{{2, 0, 0}, 2};
 	TArray<FIntVector> Sections;
 	FVoxelFinePagePlanner::GatherSections(Parent, Sections);
@@ -197,8 +202,8 @@ bool FVoxelLodPolicyTest::RunTest(const FString& InParameters)
 	FVoxelInterestSet FineB;
 	FVoxelFineResidency FineResidency;
 	if (!TestTrue(TEXT("Fine demand owns its explicit residency window"), FineResidency.Initialize(Source.Id,
-		Settings.Fine.WindowSettings(), Source.Center, Settings.Fine.InteractiveRadiusCells,
-		Settings.Fine.InteractiveVerticalHalfExtentCells, Settings.Fine.CollisionGuardRadiusCells,
+		Settings.Fine.WindowSettings(Source.View), Source.Center, Settings.DefaultSourceView.FineLevel0RadiusCells,
+		Settings.DefaultSourceView.FineLevel0VerticalHalfExtentCells, Settings.DefaultSourceView.CollisionGuardRadiusCells,
 		Manifest.Settings.MinZ, Manifest.Settings.MaxZ, PlanningError)))
 	{
 		AddError(PlanningError);
