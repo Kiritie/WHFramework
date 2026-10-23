@@ -7,6 +7,7 @@
 #include "Voxel/Generation/Ecology/VoxelEcology.h"
 #include "Voxel/Generation/Hydrology/VoxelHydrology.h"
 #include "Voxel/Generation/Hydrology/VoxelHydrologyRegionGraph.h"
+#include "Voxel/Generation/Hydrology/VoxelHydrologyNetworkSearch.h"
 #include "Voxel/Generation/Hydrology/VoxelHydrologyChannelPlan.h"
 #include "Voxel/Generation/VoxelFeaturePlan.h"
 #include "Voxel/Generation/VoxelNaturalGenerationCache.h"
@@ -121,6 +122,7 @@ struct WHFRAMEWORK_API FVoxelGenerationCacheStats
 	int32 NaturalColumns = 0;
 	int32 Hydrology = 0;
 	int32 HydrologyGraphs = 0;
+	int32 HydrologyControls = 0;
 	int32 Caves = 0;
 	int32 Ecology = 0;
 	int32 Features = 0;
@@ -236,6 +238,15 @@ public:
 	void CancelHydrologyGraphBuild(const FVoxelHydrologyRegionKey& InKey, uint64 InWorldEpoch,
 		const FGuid& InOwnerId, uint64 InOwnerIncarnation, uint64 InAttemptId);
 
+	// 只借用已发布且实际覆盖请求节点的同代证明；不启动构建或建立第二份索引。
+	bool FindHydrologyControl(const FIntPoint& InCell, const FVoxelGenerationRuntimeConfig& InConfig, uint64 InGeneration,
+		TSharedPtr<const FVoxelHydrologyNetworkResult, ESPMode::ThreadSafe>& OutResult) const;
+	bool AdvanceHydrologyControl(const FVoxelHydrologyNetworkKey& InKey,
+		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+		FVoxelHydrologyMacroInput::FTileLookup InLookup, FVoxelHydrologyMacroInput::FRequestTile InRequestTile,
+		TSharedPtr<const FVoxelHydrologyNetworkResult, ESPMode::ThreadSafe>& OutResult,
+		FString& OutError, const TAtomic<bool>* InCancel = nullptr, double InDeadlineSeconds = 0.0);
+
 	bool AdvanceHydrologyRunoff(const FVoxelHydrologyRegionKey& InKey,
 		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 		FVoxelHydrologyMacroInput::FTileLookup InLookup, FVoxelHydrologyMacroInput::FRequestTile InRequestTile,
@@ -255,6 +266,11 @@ public:
 		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
 		FVoxelHydrologyMacroInput::FTileLookup InLookup, FVoxelHydrologyMacroInput::FRequestTile InRequestTile,
 		TSharedPtr<const FVoxelHydrologyChannelPlan, ESPMode::ThreadSafe>& OutResult,
+		FString& OutError, const TAtomic<bool>* InCancel = nullptr);
+	bool AdvanceHydrologyComponent(const FVoxelHydrologyRegionKey& InKey,
+		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
+		FVoxelHydrologyMacroInput::FTileLookup InLookup, FVoxelHydrologyMacroInput::FRequestTile InRequestTile,
+		TSharedPtr<const FVoxelHydrologyRiverComponent, ESPMode::ThreadSafe>& OutResult,
 		FString& OutError, const TAtomic<bool>* InCancel = nullptr);
 
 	bool FindCave(
@@ -374,7 +390,6 @@ private:
 
 	struct FBuildGate;
 	struct FHydrologyRegionOwner;
-	struct FHydrologyComponentOwner;
 	struct FHydrologyGraphOwner;
 	struct FHydrologyFactOwnerBase;
 	template<typename BuildType, typename ResultType> struct THydrologyFactOwner;
@@ -409,27 +424,28 @@ private:
 		int32 NaturalColumnCursor = 0;
 	};
 
-	template<typename ResultType>
+	template<typename ResultType, typename KeyType = FVoxelHydrologyRegionKey>
 	struct THydrologyFactStorage
 	{
 		FBackingReservation Backing;
-		TMap<FVoxelHydrologyRegionKey, TSharedPtr<const ResultType, ESPMode::ThreadSafe>> Values;
-		TMap<FVoxelHydrologyRegionKey, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> Builds;
-		TArray<FVoxelHydrologyRegionKey> Keys;
+		TMap<KeyType, TSharedPtr<const ResultType, ESPMode::ThreadSafe>> Values;
+		TMap<KeyType, TSharedPtr<FBuildGate, ESPMode::ThreadSafe>> Builds;
+		TArray<KeyType> Keys;
 		int32 Cursor = 0;
 	};
 
 	struct FPlanShard
 	{
 		mutable FRWLock Lock;
+		THydrologyFactStorage<FVoxelHydrologyNetworkResult, FVoxelHydrologyNetworkKey> HydrologyControls;
 		THydrologyFactStorage<FVoxelHydrologyNetworkRunoff> HydrologyRunoff;
 		THydrologyFactStorage<FVoxelHydrologySourceBucket> HydrologySourceBucket;
 		THydrologyFactStorage<FVoxelHydrologySourcePlan> HydrologySources;
 		THydrologyFactStorage<FVoxelHydrologyChannelPlan> HydrologyChannels;
+		THydrologyFactStorage<FVoxelHydrologyRiverComponent> RiverComponents;
 		FBackingReservation HydrologyBacking;
 		FBackingReservation HydrologyTopologyBacking;
 		FBackingReservation HydrologyGraphBacking;
-		FBackingReservation RiverComponentBacking;
 		FBackingReservation CaveBacking;
 		FBackingReservation EcologyBacking;
 		FBackingReservation FeatureBacking;
@@ -438,7 +454,6 @@ private:
 		TMap<FVoxelHydrologyRegionKey, FVoxelHydrologyPlanPtr> Hydrology;
 		TMap<FVoxelHydrologyRegionKey, FVoxelHydrologyPlanPtr> HydrologyTopology;
 		TMap<FVoxelHydrologyRegionKey, FVoxelHydrologyRegionGraphPtr> HydrologyGraphs;
-		TMap<FIntPoint, TSharedPtr<const FVoxelHydrologyRiverComponent, ESPMode::ThreadSafe>> RiverComponents;
 		TMap<FVoxelGenerationTileKey, FVoxelCavePlanPtr> Caves;
 		TMap<FVoxelEcologyTileKey, FVoxelEcologyPlanPtr> Ecology;
 		TMap<FVoxelGenerationTileKey, FVoxelFeaturePlanPtr> Features;
@@ -455,7 +470,6 @@ private:
 		TArray<FVoxelHydrologyRegionKey> HydrologyKeys;
 		TArray<FVoxelHydrologyRegionKey> HydrologyTopologyKeys;
 		TArray<FVoxelHydrologyRegionKey> HydrologyGraphKeys;
-		TArray<FIntPoint> RiverComponentKeys;
 		TArray<FVoxelGenerationTileKey> CaveKeys;
 		TArray<FVoxelEcologyTileKey> EcologyKeys;
 		TArray<FVoxelGenerationTileKey> FeatureKeys;
@@ -464,17 +478,16 @@ private:
 		int32 HydrologyCursor = 0;
 		int32 HydrologyTopologyCursor = 0;
 		int32 HydrologyGraphCursor = 0;
-		int32 RiverComponentCursor = 0;
 		int32 CaveCursor = 0;
 		int32 EcologyCursor = 0;
 		int32 FeatureCursor = 0;
 		int32 StructureCursor = 0;
 	};
 
-	template<typename BuildType, typename ResultType>
-	bool AdvanceHydrologyFact(const FVoxelHydrologyRegionKey& InKey,
+	template<typename BuildType, typename ResultType, typename KeyType>
+	bool AdvanceHydrologyFact(const KeyType& InKey,
 		TSharedRef<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> InConfig,
-		THydrologyFactStorage<ResultType> FPlanShard::* InStorage,
+		THydrologyFactStorage<ResultType, KeyType> FPlanShard::* InStorage,
 		TFunctionRef<bool(THydrologyFactOwner<BuildType, ResultType>&, FString&)> InInitialize,
 		TFunctionRef<EVoxelHydrologyRegionStep(THydrologyFactOwner<BuildType, ResultType>&, FString&)> InAdvance,
 		TSharedPtr<const ResultType, ESPMode::ThreadSafe>& OutResult, FString& OutError, const TAtomic<bool>* InCancel);
@@ -485,6 +498,7 @@ private:
 	int32 NaturalShardIndex(const FIntPoint& InKey) const;
 
 	int32 PlanShardIndex(const FVoxelHydrologyRegionKey& InKey) const;
+	int32 PlanShardIndex(const FVoxelHydrologyNetworkKey& InKey) const;
 	int32 PlanShardIndex(const FVoxelGenerationTileKey& InKey) const;
 	int32 PlanShardIndex(const FVoxelEcologyTileKey& InKey) const;
 

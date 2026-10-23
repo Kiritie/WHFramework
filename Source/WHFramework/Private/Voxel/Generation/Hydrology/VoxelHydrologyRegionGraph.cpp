@@ -617,7 +617,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 				const int32 Capacity = FMath::Max(4, Result.PrunedCells.Num() * 2);
 				if ((Required > Result.PrunedCells.Max() && !VoxelGenerationAllocation::RetainArray(Result.PrunedCells, Capacity, OutError)) ||
 					(Required > Result.PrunedByParent.Max() && !VoxelGenerationAllocation::RetainArray(Result.PrunedByParent, Capacity, OutError))) return Failure(OutError);
-				const int32 Pruned = Result.PrunedCells.Add({uint32(Links[Link].Neighbor), uint32(Leaf), Cell.RainWeight});
+				const int32 Pruned = Result.PrunedCells.Add({uint32(Links[Link].Neighbor), uint32(Leaf), Cell.RainWeight, Cell.Sample.GroundZ});
 				Result.PrunedByParent.Add(Pruned);
 				Result.CellLocations[Leaf] = (2u << 30) | uint32(Pruned);
 				Neighbor.RainWeight += Cell.RainWeight;
@@ -696,7 +696,9 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 				TraceBarrierZ = FMath::Max(TraceBarrierZ, Cell.Sample.GroundZ);
 				TraceRainWeight += Cell.RainWeight;
 				Result.CellLocations[TraceCurrent] = (1u << 30) | uint32(Result.Profiles.Num());
-				Result.Profiles.Add({uint32(TraceCurrent), Cell.Sample.GroundZ, TraceBarrierZ, MIN_int32, TraceRainWeight});
+				const int32 FirstMinimum = FMath::Min(Cell.Sample.GroundZ,
+					Result.Profiles.Num() > Edge.ProfileOffset ? Result.Profiles.Last().FirstMinimumGroundZ : MAX_int32);
+				Result.Profiles.Add({uint32(TraceCurrent), Cell.Sample.GroundZ, TraceBarrierZ, MIN_int32, TraceRainWeight, FirstMinimum});
 				int32 NextLink = Cell.Head;
 				while (NextLink != INDEX_NONE && (Cells[Links[NextLink].Neighbor].bRemoved ||
 					Links[NextLink].Neighbor == TracePrevious)) NextLink = Links[NextLink].Next;
@@ -783,6 +785,9 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 					auto& Profile = Result.Profiles[--SuffixCursor];
 					SuffixBarrierZ = FMath::Max(SuffixBarrierZ, Profile.GroundZ);
 					Profile.SecondBarrierZ = SuffixBarrierZ;
+					Profile.SecondMinimumGroundZ = FMath::Min(Profile.GroundZ,
+						SuffixCursor + 1 < Edge.ProfileOffset + Edge.ProfileCount
+						? Result.Profiles[SuffixCursor + 1].SecondMinimumGroundZ : MAX_int32);
 					continue;
 				}
 				bSuffixActive = false;
@@ -842,6 +847,8 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 			AddFingerprint(uint32(Profile.FirstBarrierZ));
 			AddFingerprint(uint32(Profile.SecondBarrierZ));
 			AddFingerprint(Profile.RainPrefix);
+			AddFingerprint(uint32(Profile.FirstMinimumGroundZ));
+			AddFingerprint(uint32(Profile.SecondMinimumGroundZ));
 			++Cursor;
 		}
 		else if (Stage == EStage::CheckEdges)
@@ -922,6 +929,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 				AddFingerprint(Pruned.Parent);
 				AddFingerprint(Pruned.CellIndex);
 				AddFingerprint(Pruned.RainWeight);
+				AddFingerprint(uint32(Pruned.GroundZ));
 				AddFingerprint(uint32(Result.PrunedByParent[Cursor++]));
 				continue;
 			}

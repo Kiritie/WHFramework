@@ -342,7 +342,16 @@ bool FVoxelEcologyFlowerPlanTest::RunTest(const FString& InParameters)
 	FVoxelEcologyPlan River;
 	TestTrue(TEXT("Dry bank flower plan builds"),
 		Build(Recipe, EVoxelRiverSurfaceZone::DryBank, 1, River));
-	TestEqual(TEXT("Dry bank contains no ordinary flowers"), River.FlowerWrites, 0);
+	TestTrue(TEXT("有效土壤的干岸生成花卉"), River.FlowerWrites > 0);
+	for (const EVoxelRiverSurfaceZone Zone : {EVoxelRiverSurfaceZone::ChannelBed, EVoxelRiverSurfaceZone::WetMargin})
+	{
+		FVoxelEcologyPlan Wet;
+		TestTrue(TEXT("水下河床与湿岸计划正常完成"), Build(Recipe, Zone, 1, Wet));
+		TestEqual(TEXT("水下河床与湿岸不生成普通花卉"), Wet.FlowerWrites, 0);
+	}
+	FVoxelEcologyPlan SandBank;
+	TestTrue(TEXT("沙质干岸计划正常完成"), Build(Recipe, EVoxelRiverSurfaceZone::DryBank, 2, SandBank));
+	TestEqual(TEXT("允许干岸花卉不绕过沙地拒绝规则"), SandBank.FlowerWrites, 0);
 	FVoxelEcologyPlan Sand;
 	TestTrue(TEXT("Sand flower plan builds"),
 		Build(Recipe, EVoxelRiverSurfaceZone::None, 2, Sand));

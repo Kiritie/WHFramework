@@ -2,6 +2,7 @@
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "HAL/PlatformTime.h"
+#include "Misc/ScopeExit.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 
 namespace
@@ -93,7 +94,17 @@ bool FVoxelHydrologyNetworkSearch::InitializeRegion(const FIntPoint& InSeedNode,
 EVoxelHydrologyClosureRead FVoxelHydrologyNetworkSearch::ReadRegion(const FIntPoint& InCoordinate, FReadRegion InRead,
 	int32& OutRegion, const FVoxelHydrologyRegionGraph*& OutGraph, FString& OutError)
 {
+	++RegionReadRequests;
 	OutGraph = nullptr;
+	const int32* Existing = ByRegion.Find(InCoordinate);
+	if (Existing && Regions[*Existing].SliceGraph)
+	{
+		++SliceGraphHits;
+		OutRegion = *Existing;
+		OutGraph = Regions[*Existing].SliceGraph;
+		OutError.Reset();
+		return EVoxelHydrologyClosureRead::Ready;
+	}
 	const auto Read = InRead(InCoordinate, OutGraph, OutError);
 	if (Read != EVoxelHydrologyClosureRead::Ready)
 	{
@@ -108,15 +119,16 @@ EVoxelHydrologyClosureRead FVoxelHydrologyNetworkSearch::ReadRegion(const FIntPo
 	{
 		return EVoxelHydrologyClosureRead::Failed;
 	}
-	if (const int32* Existing = ByRegion.Find(InCoordinate))
+	if (Existing)
 	{
-		const auto& Region = Regions[*Existing];
+		auto& Region = Regions[*Existing];
 		if (Region.Fingerprint != OutGraph->Fingerprint || Region.InputFingerprint != OutGraph->InputFingerprint)
 		{
 			OutError = TEXT("Hydrology network region changed after admission");
 			return EVoxelHydrologyClosureRead::Failed;
 		}
 		OutRegion = *Existing;
+		Region.SliceGraph = OutGraph;
 		return EVoxelHydrologyClosureRead::Ready;
 	}
 	if (Regions.Num() == MAX_int32)
@@ -137,7 +149,7 @@ EVoxelHydrologyClosureRead FVoxelHydrologyNetworkSearch::ReadRegion(const FIntPo
 		}
 		RegionMapCapacity = Capacity;
 	}
-	OutRegion = Regions.Add({InCoordinate, OutGraph->InputFingerprint, OutGraph->Fingerprint});
+	OutRegion = Regions.Add({InCoordinate, OutGraph->InputFingerprint, OutGraph->Fingerprint, OutGraph});
 	ByRegion.Add(InCoordinate, OutRegion);
 	Result.InputFingerprint ^= VoxelGeneration::Mix(OutGraph->Fingerprint ^ OutGraph->InputFingerprint ^
 		VoxelGeneration::Mix((uint64(uint32(InCoordinate.X)) << 32) | uint32(InCoordinate.Y)));
@@ -147,6 +159,14 @@ EVoxelHydrologyClosureRead FVoxelHydrologyNetworkSearch::ReadRegion(const FIntPo
 EVoxelHydrologyClosureRead FVoxelHydrologyNetworkSearch::ReadKnownRegion(const int32 InRegion, FReadRegion InRead,
 	const FVoxelHydrologyRegionGraph*& OutGraph, FString& OutError)
 {
+	if (const auto* Graph = Regions[InRegion].SliceGraph)
+	{
+		++RegionReadRequests;
+		++SliceGraphHits;
+		OutGraph = Graph;
+		OutError.Reset();
+		return EVoxelHydrologyClosureRead::Ready;
+	}
 	const FIntPoint Coordinate = Regions[InRegion].Coordinate;
 	int32 Found = INDEX_NONE;
 	return ReadRegion(Coordinate, InRead, Found, OutGraph, OutError);
@@ -369,17 +389,22 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::ReadFailure(const EVoxe
 }
 
 EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 InGeneration, FReadRegion InReadRegion,
-	int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel)
+	int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel, const double InDeadlineSeconds)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_HydrologyControlSearch);
+	// 原读取者只保证本次 Advance 的冻结图有效；所有返回路径都归还借用指针。
+	ON_SCOPE_EXIT
+	{
+		for (FRegion& Region : Regions) Region.SliceGraph = nullptr;
+	};
 	// 续跑可能更换 Worker；跨线程共享的节流仅限制日志，不参与求解状态。
 	static TAtomic<uint64> NextDiagnosticMilliseconds{0};
 	const uint64 Now = uint64(FPlatformTime::Seconds() * 1000.0);
 	uint64 Expected = NextDiagnosticMilliseconds.Load();
 	if (Now >= Expected && NextDiagnosticMilliseconds.CompareExchange(Expected, Now + 5000))
 	{
-		UE_LOG(LogTemp, Display, TEXT("Voxel macro control progress: generation=%llu seed=(%d,%d) stage=%d lower=%d nodes=%d regions=%d cursor=%d frontier=%d"),
-			Result.Generation, Seed.X, Seed.Y, int32(Stage), bSolvingLower ? 1 : 0, Nodes.Num(), Regions.Num(), Cursor, Frontier.Num());
+		UE_LOG(LogTemp, Display, TEXT("Voxel macro control progress: generation=%llu seed=(%d,%d) stage=%d lower=%d nodes=%d regions=%d cursor=%d frontier=%d directionExpansions=%d receiverExpansions=%d regionReadRequests=%llu sliceGraphHits=%llu"),
+			Result.Generation, Seed.X, Seed.Y, int32(Stage), bSolvingLower ? 1 : 0, Nodes.Num(), Regions.Num(), Cursor, Frontier.Num(), DirectionProofExpansions, ReceiverProofExpansions, RegionReadRequests, SliceGraphHits);
 	}
 	OutError.Reset();
 	if (Stage == EStage::None || Stage == EStage::Taken || InGeneration != Result.Generation)
@@ -392,8 +417,10 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 		OutError = TEXT("Canceled");
 		return Failure(OutError);
 	}
+	int32 DeadlineCheck = 0;
 	while (InWorkBudget-- > 0)
 	{
+		if (InDeadlineSeconds > 0.0 && (DeadlineCheck++ & 31) == 0 && FPlatformTime::Seconds() >= InDeadlineSeconds) break;
 		if (InCancel && InCancel->Load())
 		{
 			OutError = TEXT("Canceled");
@@ -450,6 +477,11 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 			Node.ParentCell = FIntPoint::ZeroValue;
 			Node.bHasParent = false;
 			Node.bIncluded = false;
+			Node.ParentIndex = INDEX_NONE;
+			Node.ReceiverFloorZ = MIN_int32;
+			Node.ReceiverBlocker = INDEX_NONE;
+			Node.ReceiverCaller = INDEX_NONE;
+			Node.ReceiverState = 0;
 			++Cursor;
 		}
 		else if (Stage == EStage::SpillSeeds)
@@ -617,6 +649,7 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 					if ((bDescending || bPlateauParent) && (!Node.bHasParent || HydrologyNetworkCellLess(Connection.FirstStep, Node.ParentCell)))
 					{
 						Node.ParentCell = Connection.FirstStep;
+						Node.ParentIndex = Connection.Neighbor;
 						Node.bHasParent = true;
 					}
 				}
@@ -661,7 +694,8 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 				if (!VoxelGenerationAllocation::RetainArray(Result.Cells, IncludedCount, OutError)) return Failure(OutError);
 				Result.Threshold = Nodes[ByCell.FindChecked(Seed)].Potential.SpillZ;
 				Cursor = 0;
-				Stage = EStage::Emit;
+				Current = INDEX_NONE;
+				Stage = EStage::ReceiverProof;
 				continue;
 			}
 			if (Nodes[TargetIndex].LowerPotential.SpillZ == MAX_int32)
@@ -669,6 +703,7 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 				OutError = TEXT("Hydrology network component has no physical wet receiver");
 				return EVoxelHydrologyNetworkStep::NoReceiver;
 			}
+			++DirectionProofExpansions;
 			Current = TargetIndex;
 			Slot = 0;
 			TraceSteps = 0;
@@ -712,6 +747,85 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 			}
 			else ++Slot;
 		}
+		else if (Stage == EStage::ReceiverProof)
+		{
+			// Follow only certified parents in the existing proof graph. An uncertified
+			// downstream node must expand the proof, never become an invented outlet.
+			if (Current == INDEX_NONE)
+			{
+				if (Cursor == Nodes.Num())
+				{
+					Cursor = 0;
+					Stage = EStage::ReceiverValidate;
+					continue;
+				}
+				Current = Cursor++;
+			}
+			auto& Node = Nodes[Current];
+			if (Node.ReceiverState == 0)
+			{
+				if (!Node.bIncluded)
+				{
+					Node.ReceiverBlocker = Current;
+					Node.ReceiverState = 2;
+				}
+				else if (Node.IsReceiver())
+				{
+					Node.ReceiverFloorZ = Node.WaterZ;
+					Node.ReceiverState = 2;
+				}
+				else
+				{
+					if (!Node.bHasParent || Node.ParentIndex == INDEX_NONE || Nodes[Node.ParentIndex].ReceiverState == 1)
+					{
+						OutError = TEXT("Hydrology network receiver proof has an invalid or cyclic parent");
+						return Failure(OutError);
+					}
+					Node.ReceiverState = 1;
+					if (Nodes[Node.ParentIndex].ReceiverState == 0)
+					{
+						Nodes[Node.ParentIndex].ReceiverCaller = Current;
+						Current = Node.ParentIndex;
+						continue;
+					}
+				}
+			}
+			if (Node.ReceiverState == 1)
+			{
+				const auto& Parent = Nodes[Node.ParentIndex];
+				check(Parent.ReceiverState == 2);
+				Node.ReceiverFloorZ = Parent.ReceiverFloorZ;
+				Node.ReceiverBlocker = Parent.ReceiverBlocker;
+				Node.ReceiverState = 2;
+			}
+			Current = Node.ReceiverCaller;
+			Node.ReceiverCaller = INDEX_NONE;
+		}
+		else if (Stage == EStage::ReceiverValidate)
+		{
+			if (Cursor == Nodes.Num())
+			{
+				Cursor = 0;
+				Stage = EStage::Emit;
+				continue;
+			}
+			const int32 Index = Cursor++;
+			const auto& Node = Nodes[Index];
+			if ((bEntireRegion ? Node.Region == 0 : Node.Cell == Seed) && Node.ReceiverFloorZ == MIN_int32)
+			{
+				if (Node.ReceiverBlocker == INDEX_NONE)
+				{
+					OutError = TEXT("Hydrology network receiver proof has no unresolved dependency");
+					return Failure(OutError);
+				}
+				++ReceiverProofExpansions;
+				TargetIndex = Node.ReceiverBlocker;
+				Current = TargetIndex;
+				Slot = 0;
+				TraceSteps = 0;
+				Stage = EStage::TraceBoundary;
+			}
+		}
 		else if (Stage == EStage::Emit)
 		{
 			if (Cursor == Nodes.Num())
@@ -722,9 +836,9 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 				continue;
 			}
 			const auto& Node = Nodes[Cursor++];
-			if (Node.bIncluded)
+			if (Node.bIncluded && Node.ReceiverFloorZ != MIN_int32)
 			{
-				Result.Cells.Add({Node.Cell, Node.Potential, Node.ParentCell, Node.bHasParent});
+				Result.Cells.Add({Node.Cell, Node.Potential, Node.ParentCell, Node.bHasParent, Node.ReceiverFloorZ});
 			}
 		}
 		else if (Stage == EStage::Sort)
@@ -752,6 +866,7 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 				const auto& Cell = Result.Cells[Cursor++];
 				Result.Fingerprint = VoxelGeneration::Mix(Result.Fingerprint ^ ((uint64(uint32(Cell.Cell.X)) << 32) | uint32(Cell.Cell.Y)));
 				Result.Fingerprint = VoxelGeneration::Mix(Result.Fingerprint ^ uint64(uint32(Cell.Potential.SpillZ)) ^ uint64(Cell.Potential.PlateauDistance));
+				Result.Fingerprint = VoxelGeneration::Mix(Result.Fingerprint ^ uint32(Cell.ReceiverFloorZ));
 				Result.Fingerprint = VoxelGeneration::Mix(Result.Fingerprint ^ ((uint64(uint32(Cell.ParentCell.X)) << 32) | uint32(Cell.ParentCell.Y)) ^ uint64(Cell.bHasParent));
 				continue;
 			}

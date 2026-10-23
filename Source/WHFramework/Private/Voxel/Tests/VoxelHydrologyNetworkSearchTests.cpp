@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Voxel/Generation/Hydrology/VoxelHydrologyNetworkSearch.h"
 #include "Voxel/Generation/Hydrology/VoxelHydrologyLocalRunoff.h"
+#include "Voxel/Generation/Hydrology/VoxelHydrologyComponent.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Generation/VoxelGenerationBinding.h"
 #include "Voxel/Tests/VoxelTestUtilities.h"
@@ -300,6 +301,16 @@ bool FVoxelHydrologyNetworkPathsTest::RunTest(const FString& Parameters)
 					}
 					Controls.Add(Cell.Cell, Cell);
 					const int32 Dense = Index(Cell.Cell);
+					int32 Receiver = Dense;
+					int32 ReceiverSteps = 0;
+					while (!Expanded.Wet[Receiver] && ReceiverSteps++ < Expanded.Parents.Num())
+					{
+						if (!Expanded.Parents.IsValidIndex(Expanded.Parents[Receiver])) return false;
+						Receiver = Expanded.Parents[Receiver];
+					}
+					if (!TestTrue(TEXT("独立逐格父链必须终止于真实湿根"), Expanded.Wet[Receiver] != 0) ||
+						!TestEqual(TEXT("受纳水位来自独立逐格父链终点，而非本地溢流势值"),
+							Cell.ReceiverFloorZ, Expanded.Potentials[Receiver].SpillZ)) return false;
 					if (!TestEqual(TEXT("跨区最低水位等于逐格展开图"), Cell.Potential.SpillZ, Expanded.Potentials[Dense].SpillZ) ||
 						!TestEqual(TEXT("平台距离使用实际边长，而非一条边计一步"), Cell.Potential.PlateauDistance, Expanded.Potentials[Dense].PlateauDistance)) return false;
 					if (!TestTrue(TEXT("发布索引能够找回原格控制"), Result.Find(Cell.Cell) == &Cell)) return false;
@@ -810,6 +821,8 @@ bool FVoxelHydrologyMacroPipelineConservationTest::RunTest(const FString& Parame
             for (const auto& Channel : Channels->Cells)
             {
                 const int32 Expected = Index(Channel.Cell);
+                if (!TestEqual(TEXT("粗网格河道保留实际终端受纳水位"), Channel.ReceiverFloorZ, 0) ||
+                    !TestTrue(TEXT("活动河道不低于实际受纳水位"), !Channel.bActive || Channel.WaterZ >= Channel.ReceiverFloorZ)) return false;
                 bool bIncoming = false;
                 for (int32 Child = 0; Child < Count; ++Child)
                 {
@@ -822,6 +835,25 @@ bool FVoxelHydrologyMacroPipelineConservationTest::RunTest(const FString& Parame
                 ++ComparedChannels;
                 if (bIncoming) ++ComparedInlets;
             }
+            TSharedPtr<const FVoxelHydrologyRiverComponent, ESPMode::ThreadSafe> Component;
+            for (int32 Attempt = 0; Attempt < 300000 && !Component; ++Attempt)
+            {
+                if (!Cache.AdvanceHydrologyComponent({Region.Coordinate}, Config, Lookup, Request, Component, Error) && !Error.StartsWith(TEXT("Yielded")))
+                { AddError(Error); return false; }
+            }
+            if (!TestTrue(TEXT("共享区域组件消费已独立验证的正式宏观链"), Component.IsValid())) return false;
+            FVoxelHydrologyComponentBuild Direct(Config, Cache, Region.Coordinate * Side + FIntPoint(1, 1));
+            EVoxelHydrologyComponentStep ComponentStep = EVoxelHydrologyComponentStep::None;
+            for (int32 Attempt = 0; Attempt < 300000; ++Attempt)
+            {
+                ComponentStep = Direct.Advance(Lookup, Variant % 2 ? 1 : 97, Error);
+                if (ComponentStep != EVoxelHydrologyComponentStep::Yielded) break;
+            }
+            if (!TestTrue(TEXT("原直接构建在不同种子与预算下仍有界完成"), ComponentStep == EVoxelHydrologyComponentStep::Ready))
+            { AddError(Error); return false; }
+            if (!TestTrue(TEXT("共享调度不改变河道水位、河岸、曲线、瀑布或指纹"), Component->HasEquivalentOutput(Direct.GetResult()))) return false;
+            TestEqual(TEXT("共享组件雨量守恒"), Component->TotalRainWeight + Component->IncomingRainWeight,
+                Component->ReceivedRainWeight + Component->ExportedRainWeight);
         }
         Cache.Reset();
     }
@@ -829,6 +861,90 @@ bool FVoxelHydrologyMacroPipelineConservationTest::RunTest(const FString& Parame
     TestTrue(TEXT("实际覆盖跨区摘要控制"), ComparedChannels > 0);
     TestTrue(TEXT("夹具必须真实产生跨区入境河道"), ComparedInlets > 0);
     return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHydrologyRunoffControlBorrowTest,
+	"WHFramework.Voxel.Hydrology.Macro.ControlBorrowingAndWetRoots",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHydrologyRunoffControlBorrowTest::RunTest(const FString& Parameters)
+{
+	(void)Parameters;
+	constexpr int32 RegionSide = 4;
+	constexpr uint64 Generation = 419;
+	const FIntPoint DryCell(1, 1);
+	FString Error;
+	TMap<FIntPoint, FVoxelHydrologyRegionGraphPtr> Graphs;
+	const auto ReadGraph = [&](const FIntPoint& Coordinate, const FVoxelHydrologyRegionGraph*& OutGraph, FString& OutError)
+	{
+		if (const auto* Existing = Graphs.Find(Coordinate))
+		{
+			OutGraph = Existing->Get();
+			return EVoxelHydrologyClosureRead::Ready;
+		}
+		FVoxelHydrologyRegionGraphBuild GraphBuild;
+		if (!GraphBuild.Initialize(Coordinate * RegionSide, RegionSide, RegionSide, 32, Generation, OutError))
+			return EVoxelHydrologyClosureRead::Failed;
+		const auto Sample = [&](const FIntPoint& Cell, FVoxelHydrologyRegionSample& OutSample, FString& SampleError)
+		{
+			OutSample.GroundZ = Cell == DryCell ? 8 : -4;
+			OutSample.RainWeight = Cell == DryCell ? 2 : 0;
+			if (Cell != DryCell)
+			{
+				OutSample.WaterZ = 0;
+				OutSample.WaterId = {17, 19};
+			}
+			SampleError.Reset();
+			return EVoxelHydrologyClosureRead::Ready;
+		};
+		EVoxelHydrologyRegionStep Step = EVoxelHydrologyRegionStep::None;
+		for (int32 Attempt = 0; Attempt < 10000; ++Attempt)
+		{
+			Step = GraphBuild.Advance(Generation, Sample, 17, OutError);
+			if (Step != EVoxelHydrologyRegionStep::Yielded) break;
+		}
+		if (Step != EVoxelHydrologyRegionStep::Ready) return EVoxelHydrologyClosureRead::Failed;
+		TSharedPtr<const FVoxelHydrologyRegionGraph, ESPMode::ThreadSafe> Graph =
+			MakeShared<const FVoxelHydrologyRegionGraph, ESPMode::ThreadSafe>(GraphBuild.TakeResult());
+		OutGraph = Graph.Get();
+		Graphs.Add(Coordinate, Graph);
+		return EVoxelHydrologyClosureRead::Ready;
+	};
+	int32 DryReads = 0;
+	int32 WetReads = 0;
+	const auto ReadControl = [&](const FIntPoint& Cell, FVoxelHydrologyNetworkCell& OutControl, FString& OutError)
+	{
+		if (Cell != DryCell)
+		{
+			++WetReads;
+			OutError = TEXT("A frozen physical wet root must not require a control search");
+			return EVoxelHydrologyClosureRead::Failed;
+		}
+		++DryReads;
+		OutControl = {Cell, {8, 0}, FIntPoint(0, 1), true, 0};
+		OutError.Reset();
+		return EVoxelHydrologyClosureRead::Ready;
+	};
+	FVoxelHydrologyNetworkRunoffBuild Build;
+	if (!Build.Initialize(FIntPoint::ZeroValue, 32, RegionSide, Generation, Error)) return false;
+	EVoxelHydrologyRegionStep Step = EVoxelHydrologyRegionStep::None;
+	for (int32 Attempt = 0; Attempt < 100000; ++Attempt)
+	{
+		// 每片只执行一个步骤，强制控制查询与多个父子边读取跨片发生。
+		Step = Build.Advance(Generation, ReadGraph, ReadControl, 1, Error);
+		if (Step != EVoxelHydrologyRegionStep::Yielded) break;
+	}
+	if (!TestTrue(TEXT("含真实湿根与干地的正式汇水完成"), Step == EVoxelHydrologyRegionStep::Ready)) { AddError(Error); return false; }
+	TestEqual(TEXT("真实湿根不启动任何外部控制证明"), WetReads, 0);
+	TestEqual(TEXT("同一实际干地控制跨片只读取一次"), DryReads, 1);
+	const auto* Dry = Build.GetResult().Find(DryCell);
+	const auto* Receiver = Build.GetResult().Find(FIntPoint(0, 1));
+	TestTrue(TEXT("已消费的控制保留父方向与真实受纳水位"), Dry && Dry->Control.ParentCell == FIntPoint(0, 1) && Dry->Control.ReceiverFloorZ == 0);
+	if (!Dry || !Receiver) return false;
+	// 夹具只有一格干地贡献2；湿格不产生陆地汇水，不能额外加2。
+	TestEqual(TEXT("唯一干地的全部雨量保持为2"), Dry->Accumulation, uint64(2));
+	TestEqual(TEXT("湿根精确收到全部上游雨量且不重复计算湿格自身"), Receiver->Accumulation, uint64(2));
+	return true;
 }
 
 #endif

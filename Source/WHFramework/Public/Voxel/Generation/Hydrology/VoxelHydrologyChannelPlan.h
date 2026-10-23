@@ -7,6 +7,8 @@ struct WHFRAMEWORK_API FVoxelHydrologyChannelCell
 	FIntPoint Cell = FIntPoint::ZeroValue;
 	bool bActive = false;
 	bool bIncomingActive = false;
+	int32 WaterZ = MAX_int32;
+	int32 ReceiverFloorZ = MIN_int32;
 };
 
 struct WHFRAMEWORK_API FVoxelHydrologyChannelPlan
@@ -76,6 +78,11 @@ private:
 		bool bActive = false;
 		bool bIncomingActive = false;
 		bool bExternalChild = false;
+		int32 WaterZ = MAX_int32;
+		int32 GroundCap = MAX_int32;
+		int32 ReceiverWaterZ = MIN_int32;
+		int32 ChildWaterCap = MAX_int32;
+		int32 ReceiverFloorZ = MIN_int32;
 	};
 	struct FContribution
 	{
@@ -85,6 +92,8 @@ private:
 		bool bHasChild = false;
 		bool bExternal = false;
 		bool bAtEnd = false;
+		int32 WaterCap = MAX_int32;
+		int32 ChildWaterCap = MAX_int32;
 	};
 
 	FIntPoint RegionFor(const FIntPoint& InCell) const;

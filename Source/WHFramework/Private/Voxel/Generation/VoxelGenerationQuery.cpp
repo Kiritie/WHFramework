@@ -562,6 +562,10 @@ bool FVoxelGenerationQuery::SamplePlanSymbol(
 	const int32 Density = Terrain->SampleDensityQ16(InPosition,
 		{ Column.SurfaceZ, Column.DensityHeight, Column.SlopePermille });
 	OutSymbol = Density > 0 ? Config->Recipe->Palette.Stone : Config->Recipe->Palette.Air;
+	if (Density > 0 && InPosition.Z == Column.SurfaceZ)
+	{
+		OutSymbol = Column.SurfaceMaterial;
+	}
 	return true;
 }
 

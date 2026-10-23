@@ -211,6 +211,9 @@ private:
 		int32 ConsumersCapacity = 0;
 		int32 FactsCapacity = 0;
 		int32 EnvironmentCapacity = 0;
+		uint64 SubscriptionCancellations = 0;
+		uint64 ForgottenInFlight = 0;
+		uint64 CanceledResults = 0;
 	};
 	struct FDonationGrowth
 	{

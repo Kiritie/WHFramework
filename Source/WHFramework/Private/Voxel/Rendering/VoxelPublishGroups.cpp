@@ -72,8 +72,15 @@ void FVoxelPublishGroupContinuation::RefreshInterval(const int32 InNode)
 {
 	auto& Node = Intervals[InNode];
 	Node.MaximumEnd = Footprints[Node.Footprint].Bounds.Max.X;
-	if (Node.Left != INDEX_NONE) Node.MaximumEnd = FMath::Max(Node.MaximumEnd, Intervals[Node.Left].MaximumEnd);
-	if (Node.Right != INDEX_NONE) Node.MaximumEnd = FMath::Max(Node.MaximumEnd, Intervals[Node.Right].MaximumEnd);
+	Node.MinimumY = Footprints[Node.Footprint].Bounds.Min.Y;
+	Node.MaximumY = Footprints[Node.Footprint].Bounds.Max.Y;
+	for (const int32 Child : {Node.Left, Node.Right})
+	{
+		if (Child == INDEX_NONE) continue;
+		Node.MaximumEnd = FMath::Max(Node.MaximumEnd, Intervals[Child].MaximumEnd);
+		Node.MinimumY = FMath::Min(Node.MinimumY, Intervals[Child].MinimumY);
+		Node.MaximumY = FMath::Max(Node.MaximumY, Intervals[Child].MaximumY);
+	}
 }
 
 int32 FVoxelPublishGroupContinuation::InsertInterval(const int32 InRoot, const int32 InNode)
@@ -131,6 +138,8 @@ bool FVoxelPublishGroupContinuation::Add(const FVoxelPublishFootprint& InFootpri
 		Priority *= 0x846ca68bu;
 		Node.Priority = Priority ^ (Priority >> 16);
 		Node.MaximumEnd = InFootprint.Bounds.Max.X;
+		Node.MinimumY = InFootprint.Bounds.Min.Y;
+		Node.MaximumY = InFootprint.Bounds.Max.Y;
 		const int32 NodeIndex = Intervals.Add(Node);
 		IntervalRoot = InsertInterval(IntervalRoot, NodeIndex);
 	}
@@ -169,7 +178,8 @@ bool FVoxelPublishGroupContinuation::Advance(const int32 InMaximumOperations, co
 			}
 			if (QueryStack.IsEmpty()) { ++Cursor; bQueryStarted = false; continue; }
 			const auto& Node = Intervals[QueryStack.Pop(EAllowShrinking::No)];
-			if (Node.MaximumEnd < Current.Bounds.Min.X) continue;
+			if (Node.MaximumEnd < Current.Bounds.Min.X || Node.MaximumY < Current.Bounds.Min.Y ||
+				Node.MinimumY > Current.Bounds.Max.Y) continue;
 			const auto& Other = Footprints[Node.Footprint];
 			if (Node.Left != INDEX_NONE) QueryStack.Add(Node.Left);
 			if (Other.Bounds.Min.X > Current.Bounds.Max.X) continue;

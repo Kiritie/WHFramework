@@ -20,6 +20,32 @@ uint64 FVoxelHydrologySourcePlan::GetAllocatedBytes() const
 	return VoxelGenerationAllocation::AllocatedBytes(Sources);
 }
 
+int32 FVoxelHydrologySourcePlan::GetSourceWaterCap(const uint32 InFirst, const uint32 InEndExclusive,
+	const FVoxelHydrologyRegionGraph& InGraph, const bool bTowardFirst) const
+{
+	int32 Lower = 0;
+	int32 Upper = Sources.Num();
+	while (Lower < Upper)
+	{
+		const int32 Middle = Lower + (Upper - Lower) / 2;
+		if (Sources[Middle].Location < InFirst) Lower = Middle + 1;
+		else Upper = Middle;
+	}
+	int32 Cap = MAX_int32;
+	while (Sources.IsValidIndex(Lower) && Sources[Lower].Location < InEndExclusive)
+	{
+		const auto& Source = Sources[Lower++];
+		int32 SourceCap = Source.AttachmentWaterCap;
+		if (Source.Location & (1u << 30))
+		{
+			const auto& Profile = InGraph.Profiles[int32(Source.Location & ((1u << 30) - 1))];
+			SourceCap = FMath::Min(SourceCap, bTowardFirst ? Profile.FirstMinimumGroundZ : Profile.SecondMinimumGroundZ);
+		}
+		Cap = FMath::Min(Cap, SourceCap);
+	}
+	return Cap;
+}
+
 FVoxelHydrologySourcePlanBuild::FVoxelHydrologySourcePlanBuild()
 {
 }
@@ -75,8 +101,18 @@ void FVoxelHydrologySourcePlanBuild::Sift(int32 InRoot, const int32 InEnd)
 	}
 }
 
-EVoxelHydrologyRegionStep FVoxelHydrologySourcePlanBuild::Advance(const FVoxelHydrologyRegionGraph& InGraph,
-	const FVoxelHydrologyNetworkRunoff& InRunoff, FReadBucket InReadBucket, int32 InWorkBudget,
+bool FVoxelHydrologySourcePlanBuild::NeedsGraph() const
+{
+	return Stage == EStage::Scan || Stage == EStage::Attach;
+}
+
+bool FVoxelHydrologySourcePlanBuild::NeedsRunoff() const
+{
+	return Stage == EStage::Scan;
+}
+
+EVoxelHydrologyRegionStep FVoxelHydrologySourcePlanBuild::Advance(const uint64 InGeneration, const FVoxelHydrologyRegionGraph* InGraph,
+	const FVoxelHydrologyNetworkRunoff* InRunoff, FReadBucket InReadBucket, int32 InWorkBudget,
 	FString& OutError, const TAtomic<bool>* InCancel)
 {
 	OutError.Reset();
@@ -85,8 +121,10 @@ EVoxelHydrologyRegionStep FVoxelHydrologySourcePlanBuild::Advance(const FVoxelHy
 		OutError = TEXT("Canceled");
 		return EVoxelHydrologyRegionStep::Canceled;
 	}
-	if (Stage == EStage::None || Stage == EStage::Taken || InGraph.Generation != Result.Generation ||
-		InGraph.Fingerprint != Result.GraphFingerprint || InRunoff.Generation != Result.Generation || InRunoff.Fingerprint != Result.RunoffFingerprint)
+	if (Stage == EStage::None || Stage == EStage::Taken || InGeneration != Result.Generation ||
+		(NeedsGraph() && !InGraph) || (NeedsRunoff() && !InRunoff) ||
+		(InGraph && (InGraph->Generation != Result.Generation || InGraph->Fingerprint != Result.GraphFingerprint)) ||
+		(InRunoff && (InRunoff->Generation != Result.Generation || InRunoff->Fingerprint != Result.RunoffFingerprint)))
 	{
 		OutError = TEXT("Hydrology source plan frozen inputs changed");
 		return Failure(OutError);
@@ -98,19 +136,41 @@ EVoxelHydrologyRegionStep FVoxelHydrologySourcePlanBuild::Advance(const FVoxelHy
 			OutError = TEXT("Canceled");
 			return EVoxelHydrologyRegionStep::Canceled;
 		}
+		if ((NeedsGraph() && !InGraph) || (NeedsRunoff() && !InRunoff)) return EVoxelHydrologyRegionStep::Yielded;
 		if (Stage == EStage::Scan)
 		{
 			if (Cursor == CellCount)
 			{
+				Cursor = 0;
+				Stage = EStage::Select;
+				continue;
+			}
+			const FIntPoint Cell = InGraph->Minimum + FIntPoint(Cursor % InGraph->Width, Cursor / InGraph->Width);
+			FVoxelHydrologySourceCell Facts;
+			if (!InRunoff->SampleSourceCell(*InGraph, Cell, Facts, OutError)) return Failure(OutError);
+			if (Facts.IsQualified(Threshold))
+			{
+				if (Candidates.Num() == Candidates.Max())
+				{
+					const int32 Capacity = int32(FMath::Min<int64>(MAX_int32, FMath::Max<int64>(4, int64(Candidates.Num()) * 2)));
+					if (Candidates.Num() == MAX_int32 || !VoxelGenerationAllocation::RetainArray(Candidates, Capacity, OutError)) return Failure(OutError);
+				}
+				Candidates.Add({Cell, Facts.Accumulation, Facts.MaxChildRainWeight});
+			}
+			++Cursor;
+		}
+		else if (Stage == EStage::Select)
+		{
+			if (Cursor == Candidates.Num())
+			{
+				VoxelGenerationAllocation::FreeRetainedArray(Candidates);
 				SortRoot = Result.Sources.Num() / 2 - 1;
 				SortEnd = Result.Sources.Num() - 1;
 				Stage = EStage::Sort;
 				continue;
 			}
-			const FIntPoint Cell = InGraph.Minimum + FIntPoint(Cursor % InGraph.Width, Cursor / InGraph.Width);
-			FVoxelHydrologySourceCell Facts;
-			if (!InRunoff.SampleSourceCell(InGraph, Cell, Facts, OutError)) return Failure(OutError);
-			if (!Facts.IsQualified(Threshold)) { ++Cursor; continue; }
+			const FCandidate& Facts = Candidates[Cursor];
+			const FIntPoint Cell = Facts.Cell;
 			const FIntPoint Bucket(VoxelGeneration::FloorDivide(Cell.X, Spacing), VoxelGeneration::FloorDivide(Cell.Y, Spacing));
 			const FVoxelHydrologySourceBucket* Winner = nullptr;
 			const auto Read = InReadBucket(Bucket, Winner, OutError);
@@ -131,6 +191,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologySourcePlanBuild::Advance(const FVoxelHy
 			Pending.Cell = Cell;
 			Pending.Id = Winner->WinnerId;
 			Pending.Accumulation = Facts.Accumulation;
+			Pending.AttachmentWaterCap = MAX_int32;
 			Attachment = Cell;
 			WalkSteps = 0;
 			Stage = EStage::Attach;
@@ -138,7 +199,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologySourcePlanBuild::Advance(const FVoxelHy
 		else if (Stage == EStage::Attach)
 		{
 			int32 Location = INDEX_NONE;
-			const auto Kind = InGraph.FindCellLocation(Attachment, Location);
+			const auto Kind = InGraph->FindCellLocation(Attachment, Location);
 			if (Kind == EVoxelHydrologyRegionCellKind::Pruned)
 			{
 				if (++WalkSteps > CellCount)
@@ -146,8 +207,10 @@ EVoxelHydrologyRegionStep FVoxelHydrologySourcePlanBuild::Advance(const FVoxelHy
 					OutError = TEXT("Hydrology source attachment has a cycle");
 					return Failure(OutError);
 				}
-				const uint32 Parent = InGraph.PrunedCells[Location].Parent;
-				Attachment = InGraph.Minimum + FIntPoint(Parent % InGraph.Width, Parent / InGraph.Width);
+				const auto& Branch = InGraph->PrunedCells[Location];
+				Pending.AttachmentWaterCap = FMath::Min(Pending.AttachmentWaterCap, Branch.GroundZ);
+				const uint32 Parent = Branch.Parent;
+				Attachment = InGraph->Minimum + FIntPoint(Parent % InGraph->Width, Parent / InGraph->Width);
 				continue;
 			}
 			if (Kind != EVoxelHydrologyRegionCellKind::Node && Kind != EVoxelHydrologyRegionCellKind::Profile)
@@ -156,6 +219,8 @@ EVoxelHydrologyRegionStep FVoxelHydrologySourcePlanBuild::Advance(const FVoxelHy
 				return Failure(OutError);
 			}
 			Pending.Location = (Kind == EVoxelHydrologyRegionCellKind::Profile ? 1u << 30 : 0) | uint32(Location);
+			Pending.AttachmentWaterCap = FMath::Min(Pending.AttachmentWaterCap,
+				Kind == EVoxelHydrologyRegionCellKind::Profile ? InGraph->Profiles[Location].GroundZ : InGraph->Nodes[Location].GroundZ);
 			if (Result.Sources.Num() == Result.Sources.Max())
 			{
 				const int32 Capacity = int32(FMath::Min<int64>(MAX_int32, FMath::Max<int64>(4, int64(Result.Sources.Num()) * 2)));
@@ -163,7 +228,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologySourcePlanBuild::Advance(const FVoxelHy
 			}
 			Result.Sources.Add(Pending);
 			++Cursor;
-			Stage = EStage::Scan;
+			Stage = EStage::Select;
 		}
 		else if (Stage == EStage::Sort)
 		{
@@ -177,6 +242,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologySourcePlanBuild::Advance(const FVoxelHy
 			{
 				const auto& Source = Result.Sources[Cursor++];
 				Result.Fingerprint = VoxelGeneration::Mix(Result.Fingerprint ^ Source.Id.High ^ Source.Id.Low ^ Source.Accumulation ^ Source.Location);
+				Result.Fingerprint = VoxelGeneration::Mix(Result.Fingerprint ^ uint32(Source.AttachmentWaterCap));
 				continue;
 			}
 			if (!Result.Fingerprint) Result.Fingerprint = 1;
@@ -203,5 +269,5 @@ FVoxelHydrologySourcePlan FVoxelHydrologySourcePlanBuild::TakeResult()
 
 uint64 FVoxelHydrologySourcePlanBuild::GetAllocatedBytes() const
 {
-	return Result.GetAllocatedBytes();
+	return Result.GetAllocatedBytes() + VoxelGenerationAllocation::AllocatedBytes(Candidates);
 }

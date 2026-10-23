@@ -48,8 +48,18 @@ bool FVoxelHydrologyComponentBuild::BuildGeometry(FString& OutError, const TAtom
         const int64 OwnerSpan = int64(Recipe->Settings.HydrologyCellSize) * Recipe->Settings.HydrologyRegionSide;
         River.OwnerRegion.Coordinate = FIntPoint(int32(VoxelGeneration::FloorDivideWide(Node.Cell.X, OwnerSpan)),
             int32(VoxelGeneration::FloorDivideWide(Node.Cell.Y, OwnerSpan)));
-        River.Points.Add(Node.RoutePoint);
-        River.Points.Add(Parent.RoutePoint);
+        const auto Midpoint = [](const FIntPoint& First, const FIntPoint& Second)
+        {
+            return FIntPoint(int32((int64(First.X) + Second.X) / 2), int32((int64(First.Y) + Second.Y) / 2));
+        };
+        FVoxelRiverRoutePoint Start = Node.RoutePoint;
+        FVoxelRiverRoutePoint End = Parent.RoutePoint;
+        // A selected source may also receive an existing river. Only a true headwater
+        // starts at its cell; internal selected sources must retain the shared joint.
+        if (!Node.bHeadwater) Start.Position = Midpoint(Node.Cell, Parent.Cell);
+        if (Parent.bHasParent && !Parent.bReceiver) End.Position = Midpoint(Parent.Cell, Parent.ParentCell);
+        River.Points.Add(Start);
+        River.Points.Add(End);
         bCertifiedGeometryRouteStarted = false;
         ++CertifiedGeometryNode;
     }
@@ -58,8 +68,21 @@ bool FVoxelHydrologyComponentBuild::BuildGeometry(FString& OutError, const TAtom
     // 每段只从宏观端点生成确定性曲线；不读取细地表，也不重求水位或河网。
     if (MacroGeometryIndex < Plan.Rivers.Num())
     {
-        if (!Plan.BuildRiverGeometry(MacroGeometryIndex, OutError, InCancel)) return false;
+        while (MacroGeometryNode < Nodes.Num() &&
+            (Nodes[MacroGeometryNode].bReceiver || Nodes[MacroGeometryNode].bGhost))
+        {
+            ++MacroGeometryNode;
+        }
+        if (!Nodes.IsValidIndex(MacroGeometryNode) ||
+            !Nodes.IsValidIndex(Nodes[MacroGeometryNode].Parent))
+        {
+            OutError = TEXT("HydrologyComponentConflict: missing macro curve parent");
+            return false;
+        }
+        const auto& Parent = Nodes[Nodes[MacroGeometryNode].Parent];
+        if (!Plan.BuildRiverGeometry(MacroGeometryIndex, OutError, InCancel, &Parent.Cell)) return false;
         ++MacroGeometryIndex;
+        ++MacroGeometryNode;
         if (MacroGeometryIndex < Plan.Rivers.Num())
         { OutError = TEXT("Yielded: macro river curves"); return false; }
     }

@@ -944,6 +944,12 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 	}
 	DisplacedIndices.Reset();
 	uint64 RemainingInput = QueuedInputBytes + RunningContinuationInputBytes;
+	const double AdmissionNow = FPlatformTime::Seconds();
+	const auto HasAgePriority = [AdmissionNow](const FVoxelTaskRequest& First, const FVoxelTaskRequest& Second)
+	{
+		return AdmissionNow - First.QueuedAt >= 0.5 && First.Sequence < Second.Sequence &&
+			Second.WorkClass != EVoxelWorkClass::Critical;
+	};
 	while (Pending.Num() - DisplacedIndices.Num() >= PendingLimit ||
 		RemainingInput > Budget.MaxInputBytes ||
 		InRequest.InputBytes > Budget.MaxInputBytes - FMath::Min(RemainingInput, Budget.MaxInputBytes))
@@ -959,8 +965,8 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 				continue;
 			const bool bExistingBackground = IsBackgroundTerrainWork(Existing.Kind, Existing.WorkClass, Existing.TerrainStage);
 			const bool bMayReplace = (!bBackground && bExistingBackground) ||
-				(bBackground == bExistingBackground && (IsHigherPriority(InRequest, Existing) ||
-					(FPlatformTime::Seconds() - InRequest.QueuedAt >= 0.5 && InRequest.Sequence < Existing.Sequence && Existing.WorkClass != EVoxelWorkClass::Critical) ||
+				(bBackground == bExistingBackground && ((IsHigherPriority(InRequest, Existing) && !HasAgePriority(Existing, InRequest)) ||
+					HasAgePriority(InRequest, Existing) ||
 					(Counts[Lane] == 0 && Counts[ExistingLane] > Reserve)));
 			if (bMayReplace && (Worst == INDEX_NONE || IsHigherPriority(Pending[Worst], Existing))) Worst = Index;
 		}
@@ -988,6 +994,16 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 	for (const int32 Index : DisplacedIndices)
 	{
 		FVoxelTaskRequest Displaced = MoveTemp(Pending[Index]);
+		++Diagnostics.PendingDisplacements;
+		Diagnostics.ResumedPendingDisplacements += Displaced.AccumulatedExecuteMilliseconds > 0.0 ? 1 : 0;
+		Diagnostics.DisplacedExecuteMilliseconds += Displaced.AccumulatedExecuteMilliseconds;
+		if (Diagnostics.PendingDisplacements <= 8 || Diagnostics.PendingDisplacements % 1024 == 0)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Voxel task pending displacement: count=%llu kind=%d token=%llu incomingKind=%d incomingToken=%llu executeMs=%.3f pending=%d limit=%d input=%llu incomingInput=%llu"),
+				Diagnostics.PendingDisplacements, int32(Displaced.Kind), Displaced.Stamp.Token,
+				int32(InRequest.Kind), InRequest.Stamp.Token, Displaced.AccumulatedExecuteMilliseconds,
+				Pending.Num(), PendingLimit, QueuedInputBytes + RunningContinuationInputBytes, InRequest.InputBytes);
+		}
 		Pending.RemoveAtSwap(Index, 1, EAllowShrinking::No);
 		QueuedInputBytes -= Displaced.InputBytes;
 		const FVoxelTaskKey DisplacedKey{Displaced.Kind, Displaced.Stamp};
@@ -1408,6 +1424,7 @@ void FVoxelTaskScheduler::Tick(
 			Sample.Stamp = Completed.Result.Stamp;
 			Sample.bCanceled = Completed.Result.bCanceled;
 			Sample.bSuccess = Completed.Result.bSuccess;
+			Sample.ExecuteMilliseconds = Completed.Result.ExecuteMilliseconds;
 			LogFailure(Completed.Result);
 
 #if !UE_BUILD_SHIPPING
@@ -2411,6 +2428,7 @@ void FVoxelTaskScheduler::QueueCanceled(
 {
 	FCompleted Completed;
 	Completed.Result.WorkReceipt = InRequest.WorkReceipt;
+	Completed.Result.ExecuteMilliseconds = InRequest.AccumulatedExecuteMilliseconds;
 	if (Completed.Result.WorkReceipt) Completed.Result.WorkReceipt->Complete(InRequest.AccumulatedExecuteMilliseconds);
 	Completed.WorkClass = InRequest.WorkClass;
 	Completed.TerrainStage = InRequest.TerrainStage;

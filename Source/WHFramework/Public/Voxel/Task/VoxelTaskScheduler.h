@@ -572,6 +572,9 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 	uint64 DuplicateRequests = 0;
 	uint64 OversizedRequests = 0;
 	uint64 CapacityDeferrals = 0;
+	uint64 PendingDisplacements = 0;
+	uint64 ResumedPendingDisplacements = 0;
+	double DisplacedExecuteMilliseconds = 0.0;
 	FKindBlockCounts AdmissionBlockedByKind;
 	int32 AdmissionBlockedRequests = 0;
 	double OldestAdmissionWaitSeconds = 0.0;

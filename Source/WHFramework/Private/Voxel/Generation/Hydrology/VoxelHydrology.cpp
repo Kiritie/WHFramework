@@ -1046,6 +1046,9 @@ bool VoxelHydrology::EvaluateRiverSection(
     const int32 WetEnd = InShape.WaterHalfWidth;
     const int32 BankEnd = WetEnd + InShape.BankWidth;
     const int32 ShoreEnd = BankEnd + InShape.ShoreWidth;
+    const int32 WetEdgePlane = WetEnd == InShape.BedHalfWidth ? Section.BedPlane : InWaterPlane - 1;
+    const int32 BankPlane = FMath::Max(InWaterPlane,
+        FMath::Min(InOriginalGround, InWaterPlane + InShape.Depth / 2));
     auto Blend = [](const int32 A, const int32 B,
         const int32 Position, const int32 Start, const int32 End)
     {
@@ -1070,17 +1073,13 @@ bool VoxelHydrology::EvaluateRiverSection(
     }
     else if (InDistanceCells <= BankEnd)
     {
-        const int32 TargetGround = FMath::Max(InWaterPlane,
-            FMath::Min(InOriginalGround, InWaterPlane + InShape.Depth / 2));
-        Section.GroundPlane = Blend(InWaterPlane, TargetGround,
+        Section.GroundPlane = Blend(WetEdgePlane, BankPlane,
             InDistanceCells, WetEnd, BankEnd);
         Section.Zone = EVoxelRiverSurfaceZone::DryBank;
     }
     else if (InDistanceCells <= ShoreEnd)
     {
-        const int32 StartGround = FMath::Min(InOriginalGround,
-            InWaterPlane + InShape.Depth / 2);
-        Section.GroundPlane = Blend(StartGround, InOriginalGround,
+        Section.GroundPlane = Blend(BankPlane, InOriginalGround,
             InDistanceCells, BankEnd, ShoreEnd);
         Section.Zone = EVoxelRiverSurfaceZone::Floodplain;
     }
@@ -1092,12 +1091,6 @@ bool VoxelHydrology::EvaluateRiverSection(
     if (FMath::Abs(Delta) > InShape.MaxCutFill)
     {
         Section.bExceededCutFill = true;
-        if (!Section.bWet)
-        {
-            Section.GroundPlane = InOriginalGround +
-                static_cast<int32>(FMath::Clamp<int64>(Delta,
-                    -InShape.MaxCutFill, InShape.MaxCutFill));
-        }
     }
     OutSection = Section;
     OutError.Reset();

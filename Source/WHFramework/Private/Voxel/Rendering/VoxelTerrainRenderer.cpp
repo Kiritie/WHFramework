@@ -241,7 +241,7 @@ namespace
 			{
 				FDynamicMeshVertex Vertex;
 				Vertex.Position = FVector3f(Input.Vertices[Index] * WorldScale);
-				Vertex.Color = Input.Colors[Index].ToFColor(true);
+				Vertex.Color = Input.Colors[Index].ToFColor(false);
 				Vertex.TextureCoordinate[0] = FVector2f(Input.UV0[Index]);
 				Vertex.TextureCoordinate[1] = FVector2f(Input.UV1[Index]);
 				Vertex.TextureCoordinate[2] = FVector2f(Input.UV2[Index]);
@@ -1832,6 +1832,7 @@ namespace
 				int32 DrawnTriangles = 0;
 				int32 DrawRanges = 0;
 				int32 SubmittedDraws = 0;
+				int32 SubmittedBatches = 0;
 				int32 UniformBuffers = 0;
 				int32 RHIUniforms = 0;
 				int32 GPUSceneDraws = 0;
@@ -1843,11 +1844,35 @@ namespace
 				const FVoxelTerrainRenderChunk* PendingChunk = nullptr;
 				int32 PendingFirstTriangle = 0;
 				int32 PendingTriangleCount = 0;
+				FMeshBatch* PendingMesh = nullptr;
+				const FVoxelTerrainRenderChunk* PendingMeshChunk = nullptr;
+				const auto FlushMesh = [&]()
+				{
+					if (!PendingMesh) return;
+					InCollector.AddMesh(ViewIndex, *PendingMesh);
+					++SubmittedBatches;
+					PendingMesh = nullptr;
+					PendingMeshChunk = nullptr;
+				};
 				const auto Submit = [&](const FVoxelTerrainRenderChunk* Chunk,
 					const int32 FirstTriangle, const int32 TriangleCount)
 				{
 					TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainSubmitDraw);
+					if (PendingMesh && (PendingMeshChunk != Chunk || PendingMesh->Elements.Num() == 32)) FlushMesh();
+					if (PendingMesh)
+					{
+						FMeshBatchElement Element = PendingMesh->Elements[0];
+						Element.FirstIndex = FirstTriangle * 3;
+						Element.NumPrimitives = TriangleCount;
+						PendingMesh->Elements.Add(Element);
+						GPUSceneDraws += bGPUSceneContents && Chunk->bGPUSceneStreams && FeatureLevel == Chunk->FeatureLevel ? 1 : 0;
+						++SubmittedDraws;
+						DrawnTriangles += TriangleCount;
+						return;
+					}
 					FMeshBatch& Mesh = InCollector.AllocateMesh();
+					PendingMesh = &Mesh;
+					PendingMeshChunk = Chunk;
 					FMeshBatchElement& Element = Mesh.Elements[0];
 					Mesh.VertexFactory = &Chunk->VertexFactory;
 					Mesh.MaterialRenderProxy = Chunk->Material;
@@ -1887,11 +1912,13 @@ namespace
 					}
 					GPUSceneDraws += bUsesGPUScene ? 1 : 0;
 					Element.PrimitiveUniformBufferResource = &Uniform->UniformBuffer;
-					InCollector.AddMesh(ViewIndex, Mesh);
 					++SubmittedDraws;
 					DrawnTriangles += TriangleCount;
 					DrawnBounds += Chunk->WorldBounds;
 					if (!FirstDrawnChunk) FirstDrawnChunk = Chunk;
+					if (!(Chunk->Relevance.bOpaque || Chunk->Relevance.bMasked) ||
+						Chunk->Relevance.bNormalTranslucency || Chunk->Relevance.bSeparateTranslucency ||
+						Chunk->Relevance.bPostMotionBlurTranslucency) FlushMesh();
 				};
 				const auto Draw = [&](const FVoxelTerrainRenderChunk* Chunk,
 					const int32 FirstTriangle, const int32 TriangleCount)
@@ -1984,6 +2011,7 @@ namespace
 				};
 				CoarseVisit(CoarseVisit, Snapshot->CoarseRoot);
 				if (PendingChunk) Submit(PendingChunk, PendingFirstTriangle, PendingTriangleCount);
+				FlushMesh();
 #if !UE_BUILD_SHIPPING
 				const double Now = FPlatformTime::Seconds();
 				if (Now - LastDrawDiagnosticSeconds >= 5.0)
@@ -1996,6 +2024,8 @@ namespace
 					UE_LOG(LogTemp, Display, TEXT("Voxel native draw ranges: requested=%d submitted=%d merged=%d uniforms=%d reused=%d cacheEntries=%d cacheBytes=%llu"),
 						DrawRanges, SubmittedDraws, DrawRanges - SubmittedDraws, UniformBuffers, SubmittedDraws - UniformBuffers,
 						Uniforms.Num(), uint64(Uniforms.GetAllocatedSize()));
+					UE_LOG(LogTemp, Display, TEXT("Voxel native mesh batches: batches=%d elements=%d grouped=%d"),
+						SubmittedBatches, SubmittedDraws, SubmittedDraws - SubmittedBatches);
 					UE_LOG(LogTemp, Display, TEXT("Voxel native coarse draw traversal: sourceChunkSteps=%d"), SourceChunkSteps);
 					UE_LOG(LogTemp, Display, TEXT("Voxel native chunk visibility: tested=%d reused=%d"), ChunkFrustumTests, ReusedChunkVisibility);
 					UE_LOG(LogTemp, Display, TEXT("Voxel native uniform path: gpuSceneDraws=%d legacyDraws=%d rhiUniforms=%d"),

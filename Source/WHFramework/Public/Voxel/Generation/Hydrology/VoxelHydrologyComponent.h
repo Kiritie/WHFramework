@@ -26,6 +26,7 @@ struct WHFRAMEWORK_API FVoxelHydrologyRiverComponent
 {
     TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
     FIntPoint Key = FIntPoint::ZeroValue;
+    uint64 Generation = 0;
     uint64 Fingerprint = 0;
     uint64 TotalRainWeight = 0;
     uint64 IncomingRainWeight = 0;
@@ -56,6 +57,7 @@ struct WHFRAMEWORK_API FVoxelHydrologyComponentNode
     FVoxelStableId ReceiverId;
     bool bHasParent = false;
     bool bSelected = false;
+    bool bHeadwater = false;
     bool bReceiver = false;
     bool bGhost = false;
 };
@@ -112,6 +114,7 @@ private:
     bool bCertifiedGeometryInitialized = false, bCertifiedGeometryRouteStarted = false;
     int32 CertifiedGeometryNode = 0, CertifiedGeometryRiver = INDEX_NONE, CertifiedGeometryPoint = 0;
     int32 MacroGeometryIndex = 0;
+    int32 MacroGeometryNode = 0;
     int32 CertifiedFinalStage = 0, CertifiedIndexRiver = 0, CertifiedIndexPoint = 0;
     int32 CertifiedFallStart = 0, CertifiedFallEnd = 1, CertifiedIndexCapacity = 0, CertifiedHashCursor = 0;
     FIntPoint CertifiedIndexMin, CertifiedIndexMax, CertifiedIndexCell;

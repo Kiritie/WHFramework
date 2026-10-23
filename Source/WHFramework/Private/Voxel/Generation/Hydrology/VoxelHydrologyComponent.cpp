@@ -22,6 +22,7 @@ FVoxelHydrologyComponentBuild::FVoxelHydrologyComponentBuild(
     const int32 Side = Recipe->Settings.HydrologyRegionSide;
     Region.Coordinate = FIntPoint(VoxelGeneration::FloorDivide(SeedCell.X, Side), VoxelGeneration::FloorDivide(SeedCell.Y, Side));
     Generation = Cache.GetHydrologyGeneration();
+    Result.Generation = Generation;
 }
 
 FVoxelHydrologyComponentBuild::~FVoxelHydrologyComponentBuild()
@@ -115,6 +116,7 @@ EVoxelHydrologyComponentStep FVoxelHydrologyComponentBuild::Advance(FTileLookup 
     if (!bGeometryBuilt)
     {
         if (!BuildGeometry(OutError, InCancel)) return Failure();
+        VoxelGenerationAllocation::FreeRetainedArray(Nodes);
         bGeometryBuilt = true;
     }
     if (!FinalizeProfileResult(OutError, InCancel)) return Failure();
@@ -184,8 +186,24 @@ bool FVoxelHydrologyComponentBuild::ReadExteriorNode(const FIntPoint& InCell, FT
     Node.bReceiver = Sample.IsReceiver();
     Node.ReceiverWaterZ = Sample.WaterZ;
     Node.ReceiverId = Sample.WaterId;
-    Node.RoutePoint.WaterZ = Control->Control.Potential.SpillZ;
+    TSharedPtr<const FVoxelHydrologyChannelPlan, ESPMode::ThreadSafe> OutsideChannels;
+    if (!Cache.AdvanceHydrologyChannels(Key, Config, InLookup, InRequestTile, OutsideChannels, OutError, InCancel)) return false;
+    const auto* Channel = OutsideChannels->Find(InCell);
+    if (!Channel || !Channel->bActive || Channel->WaterZ == MAX_int32)
+    {
+        OutError = TEXT("HydrologyComponentConflict: exterior channel has no canonical water profile");
+        return false;
+    }
+    Node.RoutePoint.WaterZ = Channel->WaterZ;
     Node.RoutePoint.Accumulation = Control->Accumulation;
+    Node.bHasParent = Control->Control.bHasParent;
+    if (Node.bHasParent)
+    {
+        const int64 CellSize = Recipe->Settings.HydrologyCellSize;
+        Node.ParentCell = FIntPoint(
+            int32(FMath::Max(VoxelGeneration::WorldCellMin, int64(Control->Control.ParentCell.X) * CellSize)),
+            int32(FMath::Max(VoxelGeneration::WorldCellMin, int64(Control->Control.ParentCell.Y) * CellSize)));
+    }
     Node.bGhost = true;
     SetShape(Node);
     OutNode = Node;
@@ -197,6 +215,7 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVox
 {
     constexpr uint8 ActivePath = 1;
     constexpr uint8 SelectedSource = 2;
+    constexpr uint8 IncomingChannel = 4;
     int32 Work = 256;
     const int32 Count = Local.Cells.Num();
     const auto CellAt = [&](int32 InIndex) { return Local.Minimum + FIntPoint(InIndex % Local.Width, InIndex / Local.Width); };
@@ -229,6 +248,8 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVox
             const int32 Index = PrepareCursor;
             const auto& Cell = Local.Cells[Index];
             PrepareChildren.Add(0);
+            Local.Cells[Index].ChannelWaterZ = Cell.Sample.IsReceiver() ? Cell.Sample.WaterZ : Cell.Sample.GroundZ;
+            Local.Cells[Index].ReceiverFloorZ = Cell.Sample.IsReceiver() ? Cell.Sample.WaterZ : MIN_int32;
             PrepareActive.Add(0);
             PrepareRemap.Add(Cell.bHasParent ? IndexOf(Cell.ParentCell) : INDEX_NONE);
             // 所有权按X/Y排序生成，不把区外端点列为已生成格。
@@ -244,11 +265,13 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVox
         }
         else if (PrepareStage == 3)
         {
-            if (PrepareCursor == Count) { Channels.Reset(); PrepareCursor = 0; PrepareStage = 4; continue; }
+            if (PrepareCursor == Count) { PrepareCursor = 0; PrepareStage = 4; continue; }
             const int32 Index = PrepareCursor++;
             if (PrepareRemap[Index] != INDEX_NONE) ++PrepareChildren[PrepareRemap[Index]];
             const auto* Boundary = Channels->Find(CellAt(Index));
-            if (Boundary && Boundary->bIncomingActive) PrepareActive[Index] |= ActivePath;
+            if (Boundary) Local.Cells[Index].ReceiverFloorZ = Boundary->ReceiverFloorZ;
+            if (Boundary && Boundary->bIncomingActive) PrepareActive[Index] |= ActivePath | IncomingChannel;
+            if (Boundary && Boundary->bActive) Local.Cells[Index].ChannelWaterZ = Boundary->WaterZ;
         }
         else if (PrepareStage == 4)
         {
@@ -262,18 +285,73 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVox
             {
                 if (PrepareQueue.Num() != Count) { OutError = TEXT("HydrologyComponentConflict: local channel parent cycle"); return false; }
                 VoxelGenerationAllocation::FreeRetainedArray(PrepareChildren);
+                PrepareCursor = PrepareQueue.Num();
+                PrepareStage = 10;
+                continue;
+            }
+            const int32 Index = PrepareQueue[PrepareCursor++];
+            if (PrepareActive[Index] & ActivePath)
+            {
+                ++PrepareActiveCount;
+            }
+            const int32 Parent = PrepareRemap[Index];
+            if (Parent != INDEX_NONE)
+            {
+                if (PrepareActive[Index] & ActivePath)
+                {
+                    Local.Cells[Parent].ChannelWaterZ = FMath::Min(Local.Cells[Parent].ChannelWaterZ, Local.Cells[Index].ChannelWaterZ);
+                    PrepareActive[Parent] |= IncomingChannel;
+                }
+                PrepareActive[Parent] |= PrepareActive[Index] & ActivePath;
+                if (--PrepareChildren[Parent] == 0) PrepareQueue.Add(Parent);
+            }
+        }
+        else if (PrepareStage == 10)
+        {
+            if (PrepareCursor == 0)
+            {
                 VoxelGenerationAllocation::FreeRetainedArray(PrepareQueue);
+                PrepareStage = 11;
+                continue;
+            }
+            const int32 Index = PrepareQueue[--PrepareCursor];
+            auto& Cell = Local.Cells[Index];
+            const int32 Parent = PrepareRemap[Index];
+            if (Parent != INDEX_NONE)
+            {
+                const int32 Floor = Local.Cells[Parent].ReceiverFloorZ;
+                if (Floor == MIN_int32 || (Cell.ReceiverFloorZ != MIN_int32 && Cell.ReceiverFloorZ != Floor))
+                {
+                    OutError = TEXT("HydrologyComponentConflict: local receiver levels disagree");
+                    return false;
+                }
+                Cell.ReceiverFloorZ = Floor;
+            }
+            if (Cell.ReceiverFloorZ == MIN_int32)
+            {
+                OutError = TEXT("HydrologyComponentConflict: local drainage has no receiver level");
+                return false;
+            }
+            Cell.ChannelWaterZ = FMath::Max(Cell.ChannelWaterZ, Cell.ReceiverFloorZ);
+        }
+        else if (PrepareStage == 11)
+        {
+            if (PrepareCursor == Count)
+            {
+                Channels.Reset();
                 PrepareCursor = 0;
                 PrepareStage = 6;
                 continue;
             }
-            const int32 Index = PrepareQueue[PrepareCursor++];
-            if (PrepareActive[Index] & ActivePath) ++PrepareActiveCount;
-            const int32 Parent = PrepareRemap[Index];
-            if (Parent != INDEX_NONE)
+            const int32 Index = PrepareCursor++;
+            if (!(PrepareActive[Index] & ActivePath)) continue;
+            const auto& Cell = Local.Cells[Index];
+            const auto* Boundary = Channels->Find(CellAt(Index));
+            if ((Boundary && (!Boundary->bActive || Cell.ChannelWaterZ != Boundary->WaterZ)) ||
+                (Cell.Sample.IsReceiver() && Cell.ChannelWaterZ != Cell.Sample.WaterZ))
             {
-                PrepareActive[Parent] |= PrepareActive[Index] & ActivePath;
-                if (--PrepareChildren[Parent] == 0) PrepareQueue.Add(Parent);
+                OutError = TEXT("HydrologyComponentConflict: local river profile disagrees with canonical control");
+                return false;
             }
         }
         else if (PrepareStage == 6)
@@ -288,7 +366,7 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVox
             FVoxelHydrologyComponentNode Node;
             Node.Cell = WorldAt(Position);
             Node.RoutePoint.Position = Node.Cell;
-            Node.RoutePoint.WaterZ = Cell.Potential.SpillZ;
+            Node.RoutePoint.WaterZ = Cell.ChannelWaterZ;
             Node.RoutePoint.Accumulation = Cell.Accumulation;
             Node.ParentCell = Cell.bHasParent ? WorldAt(Cell.ParentCell) : FIntPoint::ZeroValue;
             Node.Parent = Cell.bHasParent ? IndexOf(Cell.ParentCell) : INDEX_NONE;
@@ -299,6 +377,7 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVox
             Node.ReceiverId = Cell.Sample.WaterId;
             Node.bChannelEligible = true;
             Node.bSelected = (PrepareActive[Index] & SelectedSource) != 0;
+            Node.bHeadwater = Node.bSelected && !(PrepareActive[Index] & IncomingChannel);
             SetShape(Node);
             if (Node.bHasParent && Node.Parent == INDEX_NONE)
             {

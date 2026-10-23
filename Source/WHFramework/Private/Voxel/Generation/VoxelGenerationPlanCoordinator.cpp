@@ -1204,6 +1204,16 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 					return;
 				}
 				State->bInFlight = false;
+				if (Result.bCanceled)
+				{
+					const uint64 Count = ++Storage->CanceledResults;
+					if (Count <= 8 || Count % 1024 == 0)
+					{
+						UE_LOG(LogTemp, Display, TEXT("Voxel plan canceled result: count=%llu kind=%d key=%s attempt=%llu cached=%d executeMs=%.3f subscriptions=%d parents=%d"),
+							Count, int32(Dependency.Kind), *Dependency.Coordinate().ToString(), Result.Stamp.Token,
+							IsCached(Dependency), Result.ExecuteMilliseconds, State->Donations.Num(), PriorityGraph.HasConsumers(State->PriorityNode));
+					}
+				}
 
 				if (!Result.bCanceled && Result.Error.StartsWith(TEXT("DependencyNotReady")))
 				{
@@ -1273,7 +1283,8 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 				{
 					WakeConsumers(Dependency);
 					const FState* Current = Storage->States.Find(Dependency);
-					if (Current && Current->Donations.IsEmpty() && Current->State != EVoxelPlanDependencyState::Queued)
+					if (Current && Current->Donations.IsEmpty() && Current->State != EVoxelPlanDependencyState::Queued &&
+						!PriorityGraph.HasConsumers(Current->PriorityNode))
 					{
 						ForgetFact(Dependency);
 					}
@@ -1690,7 +1701,7 @@ void FVoxelGenerationPlanCoordinator::RemoveSubscription(const FVoxelGenerationP
 	State->Donations.Remove(InConsumer);
 	ResolveDonations(*State);
 	PriorityGraph.SetPriority(State->PriorityNode, State->ServicePriority);
-	if (!State->Donations.IsEmpty())
+	if (!State->Donations.IsEmpty() || PriorityGraph.HasConsumers(State->PriorityNode))
 	{
 		return;
 	}
@@ -1698,6 +1709,13 @@ void FVoxelGenerationPlanCoordinator::RemoveSubscription(const FVoxelGenerationP
 	{
 		const uint64 Attempt = State->AttemptId;
 		const FVoxelTaskStamp Stamp = MakeTaskStamp(InDependency, Attempt);
+		const uint64 Count = ++Storage->SubscriptionCancellations;
+		if (Count <= 8 || Count % 1024 == 0)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Voxel plan subscription cancellation: count=%llu kind=%d key=%s attempt=%llu consumerKind=%d cached=%d prerequisites=%d"),
+				Count, int32(InDependency.Kind), *InDependency.Coordinate().ToString(), Attempt, int32(InConsumer.Kind),
+				IsCached(InDependency), State->Prerequisites.Num());
+		}
 		if (InDependency.Kind == EVoxelGenerationPlanKind::Hydrology)
 		{
 			Cache->CancelHydrologyBuild(InDependency.HydrologyKey, WorldEpoch, EnvironmentOwnerId,
@@ -2088,6 +2106,16 @@ void FVoxelGenerationPlanCoordinator::ForgetFact(const FVoxelGenerationPlanDepen
 		const auto Node = State->PriorityNode;
 		const uint64 Attempt = State->AttemptId;
 		const FVoxelTaskStamp Stamp = MakeTaskStamp(InDependency, Attempt);
+		if (State->bInFlight)
+		{
+			const uint64 Count = ++Storage->ForgottenInFlight;
+			if (Count <= 8 || Count % 1024 == 0)
+			{
+				UE_LOG(LogTemp, Display, TEXT("Voxel plan forgotten in-flight: count=%llu kind=%d key=%s attempt=%llu cached=%d subscriptions=%d parents=%d"),
+					Count, int32(InDependency.Kind), *InDependency.Coordinate().ToString(), Attempt, IsCached(InDependency),
+					State->Donations.Num(), PriorityGraph.HasConsumers(Node));
+			}
+		}
 		if (InDependency.Kind == EVoxelGenerationPlanKind::Hydrology && Attempt)
 		{
 			Cache->CancelHydrologyBuild(InDependency.HydrologyKey, WorldEpoch, EnvironmentOwnerId,

@@ -250,6 +250,32 @@ bool FVoxelHydrologyLocalShoreTest::RunTest(const FString& InParameters)
 	TestFalse(TEXT("宏观湖体中的高列保持干地"), Plan.SampleBaseWater(-1, -1, 13, Influence));
 	TestEqual(TEXT("高列没有河床覆盖"), Influence.GroundOverrideZ, MIN_int32);
 	TestEqual(TEXT("高列没有湖水"), Influence.SurfaceWaterZ, MIN_int32);
+	FVoxelHydrologyPlan RiverPlan;
+	RiverPlan.Grid.CellSize = 8;
+	RiverPlan.CoreMin = FIntPoint(-64, -64);
+	RiverPlan.CoreMax = FIntPoint(64, 64);
+	RiverPlan.bCompleteRiverIndex = true;
+	RiverPlan.bMacroAuthoritative = true;
+	auto& River = RiverPlan.Rivers.AddDefaulted_GetRef();
+	for (const int32 X : {-32, 32})
+	{
+		auto& Point = River.Points.AddDefaulted_GetRef();
+		Point.Position = FIntPoint(X, 0);
+		Point.WaterZ = 10;
+		Point.BedHalfWidth = 2;
+		Point.WaterHalfWidth = 4;
+		Point.BankWidth = 4;
+		Point.ShoreWidth = 8;
+		Point.Depth = 4;
+	}
+	if (!TestTrue(TEXT("回水河段建立正式曲线"), RiverPlan.BuildRiverGeometry(0, Error)) ||
+		!TestTrue(TEXT("回水河段建立正式空间索引"), RiverPlan.BuildSpatialIndex(Error))) return false;
+	for (const int32 Distance : {0, 3, 6, 10})
+	{
+		TestTrue(TEXT("宏观河段采样成功"), RiverPlan.SampleRiverInfluence(0, Distance, -5, Influence));
+		TestTrue(TEXT("受纳水位高于地面也不得填造高架河床或岸墙"), Influence.GroundOverrideZ <= -5);
+		if (Distance == 0) TestEqual(TEXT("深槽保留受纳水位"), Influence.SurfaceWaterZ, 10);
+	}
 	return true;
 }
 

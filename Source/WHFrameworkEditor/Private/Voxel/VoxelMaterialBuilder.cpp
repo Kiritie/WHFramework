@@ -18,6 +18,17 @@
 #include "Materials/MaterialExpressionCameraPositionWS.h"
 namespace
 {
+    const TCHAR* VoxelPaletteShadingCode = TEXT(
+        "float3 cellPosition=P/25.0; "
+        "float3 cell=floor(cellPosition); "
+        "float variation=frac(sin(dot(cell,float3(17.13,43.71,11.97)))*43758.5453); "
+        "float footprint=max(length(ddx(cellPosition)),length(ddy(cellPosition))); "
+        "float detailWeight=1.0-smoothstep(0.2,1.0,footprint); "
+        "float2 patch=abs(frac(float2(dot(P.xy,float2(0.00059,0.00034)),dot(P.xy,float2(-0.00027,0.00043))))*2.0-1.0); "
+        "patch=patch*patch*(3.0-2.0*patch); "
+        "float shade=lerp(0.78,1.0,patch.x*0.65+patch.y*0.35); "
+        "float cellShade=1.0+(variation*2.0-1.0)*0.08*detailWeight; "
+        "return saturate(Tex.rgb*Tint.rgb*shade*cellShade);");
     template<class T> T* Node(UMaterial* M,int32 X,int32 Y)
     {return CastChecked<T>(UMaterialEditingLibrary::CreateMaterialExpression(M,T::StaticClass(),X,Y));}
     void AddInput(UMaterialExpressionCustom* C,const TCHAR* Name,UMaterialExpression* E,int32 Output=0)
@@ -97,7 +108,7 @@ UMaterial* FVoxelMaterialBuilder::BuildMaster(const FString& Path,EVoxelRenderGr
         auto* Stylized=Node<UMaterialExpressionCustom>(M,-100,0);
         Stylized->OutputType=CMOT_Float3;
         Stylized->Description=TEXT("World palette tint and restrained per-cell color variation");
-		Stylized->Code=TEXT("float3 cell=floor(P/25.0); float h=frac(sin(dot(cell,float3(17.13,43.71,11.97)))*43758.5453); return saturate(Tex.rgb*Tint.rgb*lerp(0.96,1.04,h));");
+		Stylized->Code = VoxelPaletteShadingCode;
         AddInput(Stylized,TEXT("Tex"),Sample);
         AddInput(Stylized,TEXT("Tint"),Color);
         AddInput(Stylized,TEXT("P"),Pos);
@@ -168,4 +179,42 @@ UMaterialInstanceConstant* FVoxelMaterialBuilder::BuildInstance(const FString& P
     MI->SetTextureParameterValueEditorOnly(FMaterialParameterInfo(TEXT("VoxelArray")),Array);
     UMaterialEditingLibrary::UpdateMaterialInstance(MI);
     return FVoxelEditorAssetIO::Save(MI,Error)?MI:nullptr;
+}
+
+bool FVoxelMaterialBuilder::UpdatePaletteShading(UMaterial* InMaterial, const bool bWrite, FString& OutError)
+{
+    if (!InMaterial)
+    {
+        OutError = TEXT("Palette shading requires an existing material");
+        return false;
+    }
+    const FExpressionInput* BaseColorInput = InMaterial->GetExpressionInputForProperty(MP_BaseColor);
+    auto* Palette = BaseColorInput ? Cast<UMaterialExpressionCustom>(BaseColorInput->Expression) : nullptr;
+    if (!Palette || Palette->Description != TEXT("World palette tint and restrained per-cell color variation"))
+    {
+        OutError = TEXT("Palette shading expression is not connected to BaseColor: ") + InMaterial->GetPathName();
+        return false;
+    }
+    for (const FName InputName : {FName(TEXT("Tex")), FName(TEXT("Tint")), FName(TEXT("P"))})
+    {
+        if (!Palette->Inputs.ContainsByPredicate([InputName](const FCustomInput& Input)
+            { return Input.InputName == InputName && Input.Input.Expression; }))
+        {
+            OutError = TEXT("Palette shading input is disconnected: ") + InputName.ToString();
+            return false;
+        }
+    }
+    if (Palette->Code == VoxelPaletteShadingCode) return true;
+    if (!bWrite)
+    {
+        OutError = TEXT("Palette shading asset has not been updated: ") + InMaterial->GetPathName();
+        return false;
+    }
+    InMaterial->Modify();
+    Palette->Modify();
+    InMaterial->PreEditChange(nullptr);
+    Palette->Code = VoxelPaletteShadingCode;
+    InMaterial->PostEditChange();
+    UMaterialEditingLibrary::RecompileMaterial(InMaterial);
+    return FVoxelEditorAssetIO::Save(InMaterial, OutError);
 }

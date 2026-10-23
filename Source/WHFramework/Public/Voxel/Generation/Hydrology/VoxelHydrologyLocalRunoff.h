@@ -9,6 +9,8 @@ struct WHFRAMEWORK_API FVoxelHydrologyLocalCell
 	FIntPoint ParentCell = FIntPoint::ZeroValue;
 	uint64 Accumulation = 0;
 	bool bHasParent = false;
+	int32 ChannelWaterZ = MAX_int32;
+	int32 ReceiverFloorZ = MIN_int32;
 };
 
 struct WHFRAMEWORK_API FVoxelHydrologyLocalRunoff

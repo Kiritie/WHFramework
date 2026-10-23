@@ -318,7 +318,8 @@ struct WHFRAMEWORK_API FVoxelHydrologyPlan
 	bool HasSelectedRiverCell(const FIntPoint& InCell) const;
 	void VisitHydrologyLeases(TFunctionRef<void(const FVoxelTerrainResourceLease*)> InVisit) const;
 	bool BuildGeometry(FString& OutError, const TAtomic<bool>* InCancel = nullptr);
-	bool BuildRiverGeometry(int32 InRiverIndex, FString& OutError, const TAtomic<bool>* InCancel = nullptr);
+	bool BuildRiverGeometry(int32 InRiverIndex, FString& OutError, const TAtomic<bool>* InCancel = nullptr,
+		const FIntPoint* InCurveControl = nullptr);
 	bool BuildSpatialIndex(FString& OutError, const TAtomic<bool>* InCancel = nullptr);
 	const FVoxelLakePlan* FindLakeAtOrigin(const FIntPoint& InOrigin) const;
 	bool SampleBaseWater(int32 InWorldX, int32 InWorldY, int32 InOriginalGround, FVoxelHydrologyInfluence& OutInfluence) const;

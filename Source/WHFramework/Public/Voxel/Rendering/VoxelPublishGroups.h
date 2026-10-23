@@ -55,6 +55,8 @@ private:
 		int32 Right = INDEX_NONE;
 		uint32 Priority = 0;
 		double MaximumEnd = -MAX_dbl;
+		double MinimumY = MAX_dbl;
+		double MaximumY = -MAX_dbl;
 	};
 	int32 FindRoot(int32 InIndex);
 	int32 InsertInterval(int32 InRoot, int32 InNode);

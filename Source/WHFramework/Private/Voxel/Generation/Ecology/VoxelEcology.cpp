@@ -160,7 +160,7 @@ FVoxelEcologySample FVoxelEcologyGenerator::Sample(const FVoxelColumnSample& InC
 		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Biome;
 	}
 	else if (InColumn.bOcean || InColumn.bLake || InColumn.bRiver || InColumn.bCoast ||
-		bRiverBed || bWetMargin || bDryBank)
+		bRiverBed || bWetMargin)
 	{
 		Result.FlowerRejectReason = EVoxelEcologyRejectReason::Water;
 	}

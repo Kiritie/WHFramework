@@ -50,10 +50,9 @@ public:
 	FVoxelHydrologyNetworkRunoffBuild(const FVoxelHydrologyNetworkRunoffBuild&) = delete;
 	FVoxelHydrologyNetworkRunoffBuild& operator=(const FVoxelHydrologyNetworkRunoffBuild&) = delete;
 	bool Initialize(const FIntPoint& InCoordinate, int32 InCellSize, int32 InRegionSide, uint64 InGeneration, FString& OutError);
+	// 截止点贯穿汇水、嵌套控制证明及复制，不因跨阶段重新获得时间片。
 	EVoxelHydrologyRegionStep Advance(uint64 InGeneration, FReadRegion InReadRegion, FReadControl InReadControl,
-		int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel = nullptr);
-	EVoxelHydrologyRegionStep Advance(uint64 InGeneration, FReadRegion InReadRegion,
-		int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel = nullptr);
+		int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel = nullptr, double InDeadlineSeconds = 0.0);
 	const FVoxelHydrologyNetworkRunoff& GetResult() const;
 	FVoxelHydrologyNetworkRunoff TakeResult();
 	uint64 GetAllocatedBytes() const;
@@ -107,13 +106,11 @@ private:
 	EVoxelHydrologyClosureRead ReadGraph(const FIntPoint& InCoordinate, FReadRegion InRead,
 		const FVoxelHydrologyRegionGraph*& OutGraph, FString& OutError) const;
 	EVoxelHydrologyClosureRead ReadControl(const FIntPoint& InCell, FReadRegion InReadRegion, FReadControl InReadControl,
-		FVoxelHydrologyNetworkCell& OutControl, uint64& OutGraphFingerprint, FString& OutError) const;
+		FVoxelHydrologyNetworkCell& OutControl, uint64& OutGraphFingerprint, FString& OutError);
 	EVoxelHydrologyClosureRead ReadContribution(int32 InNode, FReadRegion InReadRegion, FReadControl InReadControl,
-		FContribution& OutContribution, FString& OutError) const;
+		FContribution& OutContribution, FString& OutError);
 	bool AppendNode(const FIntPoint& InCell, int32& OutIndex, FString& OutError);
 	bool ReserveStack(FString& OutError);
-	EVoxelHydrologyClosureRead ResolveControl(const FIntPoint& InCell, FReadRegion InReadRegion,
-		int32 InWorkBudget, FVoxelHydrologyNetworkCell& OutControl, FString& OutError, const TAtomic<bool>* InCancel);
 	void FreeScratch();
 	EVoxelHydrologyRegionStep Failure(FString& OutError) const;
 	EVoxelHydrologyRegionStep ReadFailure(EVoxelHydrologyClosureRead InRead, FString& OutError) const;
@@ -122,7 +119,6 @@ private:
 	TVoxelGenerationPagedArray<FNode> Nodes;
 	TMap<FIntPoint, int32> ByCell;
 	TArray<int32> Stack;
-	TOptional<FVoxelHydrologyNetworkSearch> ControlSearch;
 	FIntPoint Minimum = FIntPoint::ZeroValue;
 	FIntPoint Maximum = FIntPoint::ZeroValue;
 	EStage Stage = EStage::None;
@@ -132,5 +128,4 @@ private:
 	int32 SeedCursor = 0;
 	int32 Root = INDEX_NONE;
 	int32 HashCursor = 0;
-	int32 ControlCopyCursor = 0;
 };

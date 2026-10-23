@@ -41,6 +41,10 @@ struct WHFRAMEWORK_API FVoxelHydrologyRegionProfile
 	int32 FirstBarrierZ = MIN_int32;
 	int32 SecondBarrierZ = MIN_int32;
 	uint64 RainPrefix = 0;
+	// Minimum original ground along each prefix/suffix, excluding the critical endpoint.
+	// Spill barriers determine routing; they are not river surface elevations.
+	int32 FirstMinimumGroundZ = MAX_int32;
+	int32 SecondMinimumGroundZ = MAX_int32;
 	bool operator==(const FVoxelHydrologyRegionProfile& InOther) const = default;
 };
 
@@ -86,6 +90,7 @@ struct WHFRAMEWORK_API FVoxelHydrologyRegionPrunedCell
 	uint32 Parent = 0;
 	uint32 CellIndex = 0;
 	uint64 RainWeight = 0;
+	int32 GroundZ = 0;
 	bool operator==(const FVoxelHydrologyRegionPrunedCell& InOther) const = default;
 };
 

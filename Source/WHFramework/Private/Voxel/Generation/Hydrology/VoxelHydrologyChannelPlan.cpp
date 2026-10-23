@@ -82,9 +82,9 @@ EVoxelHydrologyClosureRead FVoxelHydrologyChannelPlanBuild::ReadInputs(const FIn
 	}
 	if (!OutInputs.Graph->ValidateCore(InCoordinate, CellSize, RegionSide, Result.Generation, OutError)) return EVoxelHydrologyClosureRead::Failed;
 	if (OutInputs.Runoff->Generation != Result.Generation || OutInputs.Runoff->GraphFingerprint != OutInputs.Graph->Fingerprint ||
-		!OutInputs.Runoff->Fingerprint || OutInputs.Sources->Generation != Result.Generation ||
+		!OutInputs.Runoff->Fingerprint || (OutInputs.Sources->Generation != Result.Generation ||
 		OutInputs.Sources->GraphFingerprint != OutInputs.Graph->Fingerprint || OutInputs.Sources->RunoffFingerprint != OutInputs.Runoff->Fingerprint ||
-		!OutInputs.Sources->Fingerprint)
+		!OutInputs.Sources->Fingerprint))
 	{
 		OutError = TEXT("Hydrology channel plan regional input identities disagree");
 		return EVoxelHydrologyClosureRead::Failed;
@@ -133,14 +133,22 @@ EVoxelHydrologyClosureRead FVoxelHydrologyChannelPlanBuild::ReadContribution(con
 			{
 				if (Facts.Edges[Previous] == EdgeIndex) return EVoxelHydrologyClosureRead::Ready;
 			}
-			OutContribution.bActive = Inputs.Sources->HasSourceInRange((1u << 30) + uint32(Edge.ProfileOffset),
-				(1u << 30) + uint32(Edge.ProfileOffset + Edge.ProfileCount));
+			const uint32 Begin = (1u << 30) + uint32(Edge.ProfileOffset);
+			const uint32 SplitLocation = Begin + uint32(Split.FirstProfileCount);
+			const uint32 End = Begin + uint32(Edge.ProfileCount);
+			OutContribution.WaterCap = FMath::Min(
+				Inputs.Sources->GetSourceWaterCap(Begin, SplitLocation, *Inputs.Graph, true),
+				Inputs.Sources->GetSourceWaterCap(SplitLocation, End, *Inputs.Graph, false));
+			OutContribution.bActive = OutContribution.WaterCap != MAX_int32;
 			return EVoxelHydrologyClosureRead::Ready;
 		}
 		const int32 Begin = bFirst ? 0 : Split.FirstProfileCount;
 		const int32 End = bFirst ? Split.FirstProfileCount : Edge.ProfileCount;
-		OutContribution.bActive = Inputs.Sources->HasSourceInRange((1u << 30) + uint32(Edge.ProfileOffset + Begin),
-			(1u << 30) + uint32(Edge.ProfileOffset + End));
+		OutContribution.WaterCap = Inputs.Sources->GetSourceWaterCap((1u << 30) + uint32(Edge.ProfileOffset + Begin),
+			(1u << 30) + uint32(Edge.ProfileOffset + End), *Inputs.Graph, bFirst);
+		OutContribution.bActive = OutContribution.WaterCap != MAX_int32;
+		OutContribution.ChildWaterCap = Edge.ProfileCount > 0
+			? Inputs.Graph->Profiles[Edge.ProfileOffset + Edge.ProfileCount - 1].FirstMinimumGroundZ : MAX_int32;
 		OutContribution.bHasChild = Other->Control.bHasParent && Other->Control.ParentCell == (bFirst ? Edge.LastStep : Edge.FirstStep);
 		OutContribution.Child = OtherCell;
 		OutContribution.Fingerprint = VoxelGeneration::Mix(Inputs.Sources->Fingerprint ^ uint64(EdgeIndex));
@@ -252,7 +260,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyChannelPlanBuild::Advance(const uint64 
 			{
 				const auto& Node = Nodes[Root];
 				check(Node.State == ENodeState::Done && Result.Cells.Num() < Result.Cells.Max());
-				Result.Cells.Add({Node.Cell, Node.bActive, Node.bIncomingActive});
+				Result.Cells.Add({Node.Cell, Node.bActive, Node.bIncomingActive, Node.WaterZ, Node.ReceiverFloorZ});
 				Root = INDEX_NONE;
 				++SeedCursor;
 				Stage = EStage::Seeds;
@@ -274,10 +282,21 @@ EVoxelHydrologyRegionStep FVoxelHydrologyChannelPlanBuild::Advance(const uint64 
 					return Failure(OutError);
 				}
 				Node.Control = Flow->Control;
+				if (Node.Control.ReceiverFloorZ == MIN_int32 ||
+					(Node.ReceiverFloorZ != MIN_int32 && Node.ReceiverFloorZ != Node.Control.ReceiverFloorZ))
+				{
+					OutError = TEXT("HydrologyComponentConflict: canonical receiver floor is missing or inconsistent");
+					return Failure(OutError);
+				}
+				Node.ReceiverFloorZ = Node.Control.ReceiverFloorZ;
 				Node.GraphFingerprint = Inputs.Graph->Fingerprint;
 				Node.RunoffFingerprint = Inputs.Runoff->Fingerprint;
 				Node.SourceFingerprint = Inputs.Sources->Fingerprint;
-				Node.bActive = Inputs.Sources->HasSourceInRange(uint32(Node.LocalIndex), uint32(Node.LocalIndex + 1));
+				const auto& Facts = Inputs.Graph->Nodes[Node.LocalIndex];
+				Node.GroundCap = Facts.IsReceiver() ? Facts.WaterZ : Facts.GroundZ;
+				Node.ReceiverWaterZ = Facts.WaterZ;
+				Node.WaterZ = Inputs.Sources->GetSourceWaterCap(uint32(Node.LocalIndex), uint32(Node.LocalIndex + 1), *Inputs.Graph, false);
+				Node.bActive = Node.WaterZ != MAX_int32;
 				Node.State = ENodeState::Visiting;
 				Result.Fingerprint = VoxelGeneration::Mix(Result.Fingerprint ^ Node.SourceFingerprint ^ Node.RunoffFingerprint ^
 					((uint64(uint32(Node.Cell.X)) << 32) | uint32(Node.Cell.Y)));
@@ -289,6 +308,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyChannelPlanBuild::Advance(const uint64 
 				const auto& Child = Nodes[Node.Child];
 				check(Child.State == ENodeState::Done);
 				Node.bActive |= Child.bActive;
+				if (Child.bActive) Node.WaterZ = FMath::Min(Node.WaterZ, FMath::Min(Child.WaterZ, Node.ChildWaterCap));
 				if (Node.bExternalChild) Node.bIncomingActive |= Child.bActive;
 				Node.Child = INDEX_NONE;
 				Node.bExternalChild = false;
@@ -298,7 +318,29 @@ EVoxelHydrologyRegionStep FVoxelHydrologyChannelPlanBuild::Advance(const uint64 
 			FContribution Contribution;
 			const auto Read = ReadContribution(Current, InReadRegion, Contribution, OutError);
 			if (Read != EVoxelHydrologyClosureRead::Ready) return ReadFailure(Read, OutError);
-			if (Contribution.bAtEnd) { Nodes[Current].State = ENodeState::Done; Stack.Pop(EAllowShrinking::No); continue; }
+			if (Contribution.bAtEnd)
+			{
+				auto& Node = Nodes[Current];
+				if (Node.bActive)
+				{
+					Node.WaterZ = FMath::Min(Node.WaterZ, Node.GroundCap);
+					if (Node.ReceiverFloorZ == MIN_int32)
+					{
+						OutError = TEXT("HydrologyComponentConflict: active channel has no receiver level");
+						return Failure(OutError);
+					}
+					Node.WaterZ = FMath::Max(Node.WaterZ, Node.ReceiverFloorZ);
+					if (Node.ReceiverWaterZ != MIN_int32 && Node.WaterZ != Node.ReceiverWaterZ)
+					{
+						OutError = FString::Printf(TEXT("HydrologyComponentConflict: channel (%d,%d) ground cap %d is below fixed receiver %d"),
+							Node.Cell.X, Node.Cell.Y, Node.WaterZ, Node.ReceiverWaterZ);
+						return Failure(OutError);
+					}
+				}
+				Node.State = ENodeState::Done;
+				Stack.Pop(EAllowShrinking::No);
+				continue;
+			}
 			int32 Child = INDEX_NONE;
 			if (Contribution.bHasChild)
 			{
@@ -312,11 +354,19 @@ EVoxelHydrologyRegionStep FVoxelHydrologyChannelPlanBuild::Advance(const uint64 
 			}
 			auto& Node = Nodes[Current];
 			Node.bActive |= Contribution.bActive;
+			Node.WaterZ = FMath::Min(Node.WaterZ, Contribution.WaterCap);
 			Result.Fingerprint = VoxelGeneration::Mix(Result.Fingerprint ^ Contribution.Fingerprint);
 			if (Child != INDEX_NONE)
 			{
+				if (Nodes[Child].ReceiverFloorZ != MIN_int32 && Nodes[Child].ReceiverFloorZ != Node.ReceiverFloorZ)
+				{
+					OutError = TEXT("HydrologyComponentConflict: upstream and downstream receivers disagree");
+					return Failure(OutError);
+				}
+				Nodes[Child].ReceiverFloorZ = Node.ReceiverFloorZ;
 				Node.Child = Child;
 				Node.bExternalChild = Contribution.bExternal;
+				Node.ChildWaterCap = Contribution.ChildWaterCap;
 				Stack.Add(Child);
 			}
 			else ++Node.Slot;
@@ -328,6 +378,8 @@ EVoxelHydrologyRegionStep FVoxelHydrologyChannelPlanBuild::Advance(const uint64 
 				const auto& Cell = Result.Cells[HashCursor++];
 				Result.Fingerprint = VoxelGeneration::Mix(Result.Fingerprint ^ ((uint64(uint32(Cell.Cell.X)) << 32) |
 					uint32(Cell.Cell.Y)) ^ uint64(Cell.bActive) ^ (uint64(Cell.bIncomingActive) << 1));
+				Result.Fingerprint = VoxelGeneration::Mix(Result.Fingerprint ^ uint32(Cell.WaterZ));
+				Result.Fingerprint = VoxelGeneration::Mix(Result.Fingerprint ^ uint32(Cell.ReceiverFloorZ));
 				continue;
 			}
 			if (!Result.Fingerprint) Result.Fingerprint = 1;

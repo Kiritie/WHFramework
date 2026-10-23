@@ -8,6 +8,7 @@ struct WHFRAMEWORK_API FVoxelHydrologySelectedSource
 	FVoxelStableId Id;
 	uint64 Accumulation = 0;
 	uint32 Location = 0;
+	int32 AttachmentWaterCap = MAX_int32;
 };
 
 struct WHFRAMEWORK_API FVoxelHydrologySourcePlan
@@ -20,6 +21,7 @@ struct WHFRAMEWORK_API FVoxelHydrologySourcePlan
 	TArray<FVoxelHydrologySelectedSource> Sources;
 
 	bool HasSourceInRange(uint32 InFirst, uint32 InEndExclusive) const;
+	int32 GetSourceWaterCap(uint32 InFirst, uint32 InEndExclusive, const FVoxelHydrologyRegionGraph& InGraph, bool bTowardFirst) const;
 	uint64 GetAllocatedBytes() const;
 };
 
@@ -33,7 +35,9 @@ public:
 	~FVoxelHydrologySourcePlanBuild();
 	bool Initialize(const FVoxelHydrologyRegionGraph& InGraph, const FVoxelHydrologyNetworkRunoff& InRunoff,
 		const FVoxelGenerationSettings& InSettings, FString& OutError);
-	EVoxelHydrologyRegionStep Advance(const FVoxelHydrologyRegionGraph& InGraph, const FVoxelHydrologyNetworkRunoff& InRunoff,
+	bool NeedsGraph() const;
+	bool NeedsRunoff() const;
+	EVoxelHydrologyRegionStep Advance(uint64 InGeneration, const FVoxelHydrologyRegionGraph* InGraph, const FVoxelHydrologyNetworkRunoff* InRunoff,
 		FReadBucket InReadBucket, int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel = nullptr);
 	const FVoxelHydrologySourcePlan& GetResult() const;
 	FVoxelHydrologySourcePlan TakeResult();
@@ -44,6 +48,7 @@ private:
 	{
 		None,
 		Scan,
+		Select,
 		Attach,
 		Sort,
 		Hash,
@@ -54,6 +59,13 @@ private:
 	EVoxelHydrologyRegionStep Failure(FString& OutError) const;
 
 	FVoxelHydrologySourcePlan Result;
+	struct FCandidate
+	{
+		FIntPoint Cell = FIntPoint::ZeroValue;
+		uint64 Accumulation = 0;
+		uint64 MaxChildRainWeight = 0;
+	};
+	TArray<FCandidate> Candidates;
 	FVoxelHydrologySelectedSource Pending;
 	FIntPoint Attachment = FIntPoint::ZeroValue;
 	EStage Stage = EStage::None;

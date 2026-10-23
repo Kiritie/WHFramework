@@ -1,6 +1,7 @@
 #include "Voxel/Generation/Hydrology/VoxelHydrologyNetworkRunoff.h"
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
+#include "HAL/PlatformTime.h"
 
 namespace
 {
@@ -8,6 +9,7 @@ namespace
 	{
 		uint64 Fingerprint = VoxelGeneration::Mix((uint64(uint32(InControl.Cell.X)) << 32) | uint32(InControl.Cell.Y));
 		Fingerprint = VoxelGeneration::Mix(Fingerprint ^ uint64(uint32(InControl.Potential.SpillZ)) ^ uint64(InControl.Potential.PlateauDistance));
+		Fingerprint = VoxelGeneration::Mix(Fingerprint ^ uint32(InControl.ReceiverFloorZ));
 		return VoxelGeneration::Mix(Fingerprint ^ ((uint64(uint32(InControl.ParentCell.X)) << 32) |
 			uint32(InControl.ParentCell.Y)) ^ uint64(InControl.bHasParent));
 	}
@@ -202,7 +204,7 @@ EVoxelHydrologyClosureRead FVoxelHydrologyNetworkRunoffBuild::ReadGraph(const FI
 
 EVoxelHydrologyClosureRead FVoxelHydrologyNetworkRunoffBuild::ReadControl(const FIntPoint& InCell,
 	FReadRegion InReadRegion, FReadControl InReadControl, FVoxelHydrologyNetworkCell& OutControl,
-	uint64& OutGraphFingerprint, FString& OutError) const
+	uint64& OutGraphFingerprint, FString& OutError)
 {
 	const FVoxelHydrologyRegionGraph* Graph = nullptr;
 	const auto GraphRead = ReadGraph(RegionFor(InCell), InReadRegion, Graph, OutError);
@@ -235,8 +237,21 @@ EVoxelHydrologyClosureRead FVoxelHydrologyNetworkRunoffBuild::ReadControl(const 
 		}
 	}
 	FVoxelHydrologyNetworkCell Control;
-	const auto Read = InReadControl(InCell, Control, OutError);
-	if (Read != EVoxelHydrologyClosureRead::Ready) return Read;
+	const int32* CachedIndex = ByCell.Find(InCell);
+	if (CachedIndex && Nodes[*CachedIndex].bControlReady)
+	{
+		Control = Nodes[*CachedIndex].Control;
+	}
+	else if (Facts.IsReceiver())
+	{
+		// 冻结输入已证明的真实湿根无父方向，不需要再搜索其受纳水位。
+		Control = {InCell, {Facts.WaterZ, 0}, FIntPoint::ZeroValue, false, Facts.WaterZ};
+	}
+	else
+	{
+		const auto Read = InReadControl(InCell, Control, OutError);
+		if (Read != EVoxelHydrologyClosureRead::Ready) return Read;
+	}
 	const int64 Distance = FMath::Abs(int64(Control.ParentCell.X) - InCell.X) + FMath::Abs(int64(Control.ParentCell.Y) - InCell.Y);
 	bool bForestParent = false;
 	for (int32 Option = 0; Option < ParentCount; ++Option)
@@ -254,19 +269,27 @@ EVoxelHydrologyClosureRead FVoxelHydrologyNetworkRunoffBuild::ReadControl(const 
 	if (const int32* Existing = ByCell.Find(InCell))
 	{
 		const auto& Node = Nodes[*Existing];
-		if (Node.State != ENodeState::None && (Node.Control != Control || Node.GraphFingerprint != Fingerprint))
+		if (Node.bControlReady && (Node.Control != Control || Node.GraphFingerprint != Fingerprint))
 		{
 			OutError = TEXT("Hydrology runoff control changed after admission");
 			return EVoxelHydrologyClosureRead::Failed;
 		}
 	}
+	int32 Index = INDEX_NONE;
+	if (!AppendNode(InCell, Index, OutError)) return EVoxelHydrologyClosureRead::Failed;
+	// 只保存实际查询过的规范控制；不复制证明覆盖的全部附带节点。
+	auto& Node = Nodes[Index];
+	Node.Control = Control;
+	Node.GraphFingerprint = Fingerprint;
+	Node.bControlReady = true;
 	OutControl = Control;
 	OutGraphFingerprint = Fingerprint;
+	OutError.Reset();
 	return EVoxelHydrologyClosureRead::Ready;
 }
 
 EVoxelHydrologyClosureRead FVoxelHydrologyNetworkRunoffBuild::ReadContribution(const int32 InNode,
-	FReadRegion InReadRegion, FReadControl InReadControl, FContribution& OutContribution, FString& OutError) const
+	FReadRegion InReadRegion, FReadControl InReadControl, FContribution& OutContribution, FString& OutError)
 {
 	OutContribution = {};
 	const FNode Node = Nodes[InNode];
@@ -410,109 +433,7 @@ EVoxelHydrologyRegionStep FVoxelHydrologyNetworkRunoffBuild::ReadFailure(const E
 }
 
 EVoxelHydrologyRegionStep FVoxelHydrologyNetworkRunoffBuild::Advance(const uint64 InGeneration,
-	FReadRegion InReadRegion, const int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel)
-{
-	const auto ReadCanonical = [&](const FIntPoint& InCell, FVoxelHydrologyNetworkCell& OutControl, FString& InError)
-	{
-		return ResolveControl(InCell, InReadRegion, FMath::Min(256, FMath::Max(1, InWorkBudget)), OutControl, InError, InCancel);
-	};
-	return Advance(InGeneration, InReadRegion, ReadCanonical, InWorkBudget, OutError, InCancel);
-}
-
-EVoxelHydrologyClosureRead FVoxelHydrologyNetworkRunoffBuild::ResolveControl(const FIntPoint& InCell,
-	FReadRegion InReadRegion, int32 InWorkBudget, FVoxelHydrologyNetworkCell& OutControl,
-	FString& OutError, const TAtomic<bool>* InCancel)
-{
-	if (const int32* Existing = ByCell.Find(InCell))
-	{
-		if (Nodes[*Existing].bControlReady)
-		{
-			OutControl = Nodes[*Existing].Control;
-			OutError.Reset();
-			return EVoxelHydrologyClosureRead::Ready;
-		}
-	}
-	if (!ControlSearch.IsSet())
-	{
-		const FVoxelHydrologyRegionGraph* Graph = nullptr;
-		const auto Read = ReadGraph(RegionFor(InCell), InReadRegion, Graph, OutError);
-		if (Read != EVoxelHydrologyClosureRead::Ready) return Read;
-		const int32 Index = Graph->FindNodeIndex(InCell);
-		if (!Graph->Nodes.IsValidIndex(Index))
-		{
-			OutError = TEXT("Hydrology macro control requires a retained frozen node");
-			return EVoxelHydrologyClosureRead::Failed;
-		}
-		const auto& Facts = Graph->Nodes[Index];
-		if (Facts.IsReceiver())
-		{
-			OutControl = {InCell, {Facts.WaterZ, 0}, FIntPoint::ZeroValue, false};
-			OutError.Reset();
-			return EVoxelHydrologyClosureRead::Ready;
-		}
-		ControlSearch.Emplace();
-		const bool bInitialized = RegionFor(InCell) == Result.Coordinate
-			? ControlSearch->InitializeRegion(InCell, CellSize, RegionSide, Result.Generation, OutError)
-			: ControlSearch->Initialize(InCell, CellSize, RegionSide, Result.Generation, OutError);
-		if (!bInitialized)
-		{
-			ControlSearch.Reset();
-			return EVoxelHydrologyClosureRead::Failed;
-		}
-		ControlCopyCursor = 0;
-	}
-	const auto Step = ControlSearch->Advance(Result.Generation, InReadRegion, InWorkBudget, OutError, InCancel);
-	if (Step == EVoxelHydrologyNetworkStep::Yielded || Step == EVoxelHydrologyNetworkStep::NeedInput)
-	{
-		return EVoxelHydrologyClosureRead::Pending;
-	}
-	if (Step != EVoxelHydrologyNetworkStep::Ready)
-	{
-		if (Step == EVoxelHydrologyNetworkStep::NoReceiver)
-		{
-			OutError = TEXT("HydrologyComponentConflict: no physical receiver for macro upstream control");
-		}
-		return EVoxelHydrologyClosureRead::Failed;
-	}
-	const auto& Controls = ControlSearch->GetResult().Cells;
-	while (ControlCopyCursor < Controls.Num() && InWorkBudget-- > 0)
-	{
-		const FVoxelHydrologyNetworkCell Control = Controls[ControlCopyCursor];
-		int32 Index = INDEX_NONE;
-		if (!AppendNode(Control.Cell, Index, OutError)) return EVoxelHydrologyClosureRead::Failed;
-		auto& Node = Nodes[Index];
-		if (Node.bControlReady && Node.Control != Control)
-		{
-			OutError = TEXT("HydrologyComponentConflict: overlapping macro network controls disagree");
-			return EVoxelHydrologyClosureRead::Failed;
-		}
-		Node.Control = Control;
-		Node.bControlReady = true;
-		++ControlCopyCursor;
-	}
-	if (ControlCopyCursor != Controls.Num())
-	{
-		OutError = TEXT("Yielded: macro network control publication");
-		return EVoxelHydrologyClosureRead::Pending;
-	}
-	const uint64 Bytes = ControlSearch->GetAllocatedBytes();
-	ControlSearch.Reset();
-	if (auto* Allocation = FVoxelGenerationAllocationScope::Get()) Allocation->ReleaseRetainedBytes(Bytes);
-	if (const int32* Existing = ByCell.Find(InCell))
-	{
-		if (Nodes[*Existing].bControlReady)
-		{
-			OutControl = Nodes[*Existing].Control;
-			OutError.Reset();
-			return EVoxelHydrologyClosureRead::Ready;
-		}
-	}
-	OutError = TEXT("Yielded: another macro control requires its own physical outlet closure");
-	return EVoxelHydrologyClosureRead::Pending;
-}
-
-EVoxelHydrologyRegionStep FVoxelHydrologyNetworkRunoffBuild::Advance(const uint64 InGeneration,
-	FReadRegion InReadRegion, FReadControl InReadControl, int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel)
+	FReadRegion InReadRegion, FReadControl InReadControl, int32 InWorkBudget, FString& OutError, const TAtomic<bool>* InCancel, const double InDeadlineSeconds)
 {
 	OutError.Reset();
 	if (InCancel && InCancel->Load())
@@ -525,8 +446,10 @@ EVoxelHydrologyRegionStep FVoxelHydrologyNetworkRunoffBuild::Advance(const uint6
 		OutError = TEXT("Invalid hydrology runoff generation or lifetime");
 		return Failure(OutError);
 	}
+	int32 DeadlineCheck = 0;
 	while (InWorkBudget-- > 0)
 	{
+		if (InDeadlineSeconds > 0.0 && (DeadlineCheck++ & 31) == 0 && FPlatformTime::Seconds() >= InDeadlineSeconds) break;
 		if (InCancel && InCancel->Load())
 		{
 			OutError = TEXT("Canceled");
@@ -687,12 +610,6 @@ EVoxelHydrologyRegionStep FVoxelHydrologyNetworkRunoffBuild::Advance(const uint6
 
 void FVoxelHydrologyNetworkRunoffBuild::FreeScratch()
 {
-	if (ControlSearch.IsSet())
-	{
-		const uint64 Bytes = ControlSearch->GetAllocatedBytes();
-		ControlSearch.Reset();
-		if (auto* Allocation = FVoxelGenerationAllocationScope::Get()) Allocation->ReleaseRetainedBytes(Bytes);
-	}
 	Nodes.FreeBacking();
 	VoxelGenerationAllocation::FreeRetainedMap(ByCell);
 	VoxelGenerationAllocation::FreeRetainedArray(Stack);
@@ -714,7 +631,7 @@ FVoxelHydrologyNetworkRunoff FVoxelHydrologyNetworkRunoffBuild::TakeResult()
 
 uint64 FVoxelHydrologyNetworkRunoffBuild::GetAllocatedBytes() const
 {
-	return Result.GetAllocatedBytes() + Nodes.GetAllocatedBytes() + (ControlSearch.IsSet() ? ControlSearch->GetAllocatedBytes() : 0) +
+	return Result.GetAllocatedBytes() + Nodes.GetAllocatedBytes() +
 		VoxelGenerationAllocation::AllocatedBytes(ByCell) +
 		VoxelGenerationAllocation::AllocatedBytes(Stack);
 }

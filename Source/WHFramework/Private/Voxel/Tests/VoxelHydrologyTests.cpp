@@ -599,6 +599,8 @@ bool FVoxelRiverSurfaceKeepsSubsoilTest::RunTest(const FString& InParameters)
 	Column.RiverZone = EVoxelRiverSurfaceZone::DryBank;
 	Column.RiverDistanceCells = 6;
 	Column.BankDistanceCells = 5;
+	Column.SignedWetEdgeDistanceCells = 2;
+	Column.RiverWaterPlane = Column.SurfaceZ;
 	int32 SandCount = 0;
 	int32 GrassCount = 0;
 	for (int32 X = -1024; X < 1024; ++X)
@@ -612,6 +614,12 @@ bool FVoxelRiverSurfaceKeepsSubsoilTest::RunTest(const FString& InParameters)
 	}
 	TestTrue(TEXT("Dry bank contains some sand"), SandCount > 0);
 	TestTrue(TEXT("Dry bank retains ordinary ground between sand patches"), GrassCount > 0);
+	Column.RiverWaterPlane = MIN_int32;
+	Surface.ResolveColumn(16, 0, Column);
+	TestEqual(TEXT("缺少真实水位时不推造河岸沙地"), Column.SurfaceMaterial, uint16(3));
+	Column.RiverWaterPlane = Column.SurfaceZ - 3;
+	Surface.ResolveColumn(16, 0, Column);
+	TestEqual(TEXT("高于沉积高程的干岸保留原地表"), Column.SurfaceMaterial, uint16(3));
 	Column.BankDistanceCells = 2;
 	Column.RiverZone = EVoxelRiverSurfaceZone::Floodplain;
 	Surface.ResolveColumn(16, 0, Column);

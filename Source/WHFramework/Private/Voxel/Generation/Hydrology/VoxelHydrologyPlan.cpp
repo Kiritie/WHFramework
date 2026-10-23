@@ -759,7 +759,8 @@ bool FVoxelHydrologyPlan::BuildGeometry(FString& OutError, const TAtomic<bool>* 
     return true;
 }
 
-bool FVoxelHydrologyPlan::BuildRiverGeometry(int32 InRiverIndex, FString& OutError, const TAtomic<bool>* InCancel)
+bool FVoxelHydrologyPlan::BuildRiverGeometry(int32 InRiverIndex, FString& OutError, const TAtomic<bool>* InCancel,
+    const FIntPoint* InCurveControl)
 {
 	const auto* Allocation = FVoxelGenerationAllocationScope::Get();
 	if (!(Allocation ? Allocation->Check(OutError) : FVoxelGenerationAllocationScope::AllowPassive(OutError)))
@@ -777,10 +778,44 @@ bool FVoxelHydrologyPlan::BuildRiverGeometry(int32 InRiverIndex, FString& OutErr
 		OutError = TEXT("Canceled");
 		return false;
 	}
+	bool bHasCurve = false;
+	if (InCurveControl && River.Points.Num() == 2)
+	{
+		const auto& Start = River.Points[0].Position;
+		const auto& End = River.Points[1].Position;
+		const int64 ChordX = int64(End.X) - Start.X;
+		const int64 ChordY = int64(End.Y) - Start.Y;
+		bHasCurve = double(ChordX) * (int64(InCurveControl->Y) - Start.Y) !=
+			double(ChordY) * (int64(InCurveControl->X) - Start.X);
+	}
 	if (!BuildShapeRoute(River.Points, CoreMin, CoreMax,
-		RiverShapeSmoothingPasses,
-		River.ShapePoints, OutError) ||
-		!BuildMeanderRoute(River.ShapePoints, RiverSeed,
+		bHasCurve ? FMath::Max(2, RiverShapeSmoothingPasses) : RiverShapeSmoothingPasses,
+		River.ShapePoints, OutError))
+	{
+		return false;
+	}
+    if (bHasCurve)
+    {
+        const FIntPoint Start = River.Points[0].Position;
+        const FIntPoint End = River.Points[1].Position;
+        const FVector2D Chord(double(int64(End.X) - Start.X), double(int64(End.Y) - Start.Y));
+        const double LengthSquared = Chord.SizeSquared();
+        if (LengthSquared > 0.0)
+        {
+            const FVector2D Control(double(int64(InCurveControl->X) - Start.X), double(int64(InCurveControl->Y) - Start.Y));
+            for (auto& Point : River.ShapePoints)
+            {
+                if (Point.bAnchor) continue;
+                const FVector2D Relative(double(int64(Point.Position.X) - Start.X),
+                    double(int64(Point.Position.Y) - Start.Y));
+                const double Alpha = FMath::Clamp(FVector2D::DotProduct(Relative, Chord) / LengthSquared, 0.0, 1.0);
+                const FVector2D Position = Control * (2.0 * Alpha * (1.0 - Alpha)) + Chord * (Alpha * Alpha);
+                Point.Position.X = int32(int64(Start.X) + FMath::RoundToInt64(Position.X));
+                Point.Position.Y = int32(int64(Start.Y) + FMath::RoundToInt64(Position.Y));
+            }
+        }
+    }
+	if (!BuildMeanderRoute(River.ShapePoints, RiverSeed,
 		RiverMeanderStrength, RiverMeanderFrequency,
 		RiverMeanderOctaves, RiverMaxMeanderAngle,
 		FMath::Clamp(Grid.CellSize / 2, 2, 4),
@@ -1347,7 +1382,7 @@ bool FVoxelHydrologyPlan::SampleRiverInfluence(int32 InWorldX, int32 InWorldY, i
 					Section,
 					Error))
 			{
-                if (bCompleteRiverIndex && !bMacroAuthoritative) Section.GroundPlane = FMath::Min(InOriginalGround,Section.GroundPlane);
+                if (bCompleteRiverIndex) Section.GroundPlane = FMath::Min(InOriginalGround,Section.GroundPlane);
 				BestDistance =
 					Distance;
 				BestBankExtent = Shape.WaterHalfWidth + Shape.BankWidth;
