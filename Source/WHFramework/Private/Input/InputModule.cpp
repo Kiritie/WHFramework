@@ -75,7 +75,7 @@ void UInputModule::OnInitialize()
 	BuildInputCaches();
 
 	FInputManager::Get().OnInputModeChanged.AddUObject(this, &ThisClass::HandleGlobalInputModeChanged);
-	FInputManager::Get().SetDefaultInputMode(DefaultInputMode);
+
 }
 
 void UInputModule::OnPreparatory(EPhase InPhase)
@@ -123,11 +123,18 @@ void UInputModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 
 	if(bInEditor) return;
 
-	for(FInputPlayerRuntime& Runtime : PlayerRuntimes)
+	for(int32 PlayerIndex = 0; PlayerIndex < PlayerRuntimes.Num(); ++PlayerIndex)
 	{
+		FInputPlayerRuntime& Runtime = PlayerRuntimes[PlayerIndex];
 		APlayerController* PlayerController = Runtime.LocalPlayer
 			? Runtime.LocalPlayer->GetPlayerController(GetWorld())
 			: nullptr;
+		if (Runtime.PlayerController != PlayerController)
+		{
+			FInputManager::Get().ReleasePlayerInputMode(Runtime.PlayerController.Get());
+			Runtime.PlayerController = PlayerController;
+			RefreshCommonUIInputMode(PlayerIndex);
+		}
 		UInputComponentBase* InputComponent = PlayerController
 			? Cast<UInputComponentBase>(PlayerController->InputComponent)
 			: nullptr;
@@ -194,10 +201,11 @@ void UInputModule::OnTermination(EPhase InPhase)
 	if(PHASEC(InPhase, EPhase::Final))
 	{
 		FInputManager::Get().OnInputModeChanged.RemoveAll(this);
-		FInputManager::Get().SetCommonUIInputMode(TOptional<EInputMode>());
+
 
 		for(FInputPlayerRuntime& Runtime : PlayerRuntimes)
 		{
+			FInputManager::Get().ReleasePlayerInputMode(Runtime.PlayerController.Get());
 			for(UInputBindingBase* InputBinding : Runtime.InputBindings)
 			{
 				if(InputBinding)
@@ -214,6 +222,7 @@ void UInputModule::OnTermination(EPhase InPhase)
 			if(Runtime.CommonUIActionRouter)
 			{
 				Runtime.CommonUIActionRouter->OnActiveInputConfigChanged().RemoveAll(this);
+				Runtime.CommonUIActionRouter->OnBoundActionsUpdated().RemoveAll(this);
 			}
 		}
 		PlayerRuntimes.Reset();
@@ -339,6 +348,7 @@ void UInputModule::BuildPlayerRuntimes()
 {
 	for(FInputPlayerRuntime& Runtime : PlayerRuntimes)
 	{
+		FInputManager::Get().ReleasePlayerInputMode(Runtime.PlayerController.Get());
 		for(UInputBindingBase* InputBinding : Runtime.InputBindings)
 		{
 			if(InputBinding)
@@ -353,6 +363,7 @@ void UInputModule::BuildPlayerRuntimes()
 		if(Runtime.CommonUIActionRouter)
 		{
 			Runtime.CommonUIActionRouter->OnActiveInputConfigChanged().RemoveAll(this);
+			Runtime.CommonUIActionRouter->OnBoundActionsUpdated().RemoveAll(this);
 		}
 	}
 	PlayerRuntimes.Reset();
@@ -389,6 +400,7 @@ void UInputModule::BuildPlayerRuntimes()
 
 		if(APlayerController* PlayerController = LocalPlayer->GetPlayerController(GetWorld()))
 		{
+			Runtime.PlayerController = PlayerController;
 			Runtime.InputComponent = Cast<UInputComponentBase>(PlayerController->InputComponent);
 		}
 
@@ -402,6 +414,10 @@ void UInputModule::BuildPlayerRuntimes()
 				this,
 				&ThisClass::HandleCommonUIInputConfigChanged,
 				PlayerIndex);
+		}
+		if (Runtime.CommonUIActionRouter)
+		{
+			Runtime.CommonUIActionRouter->OnBoundActionsUpdated().AddUObject(this, &ThisClass::RefreshCommonUIInputMode, PlayerIndex);
 		}
 
 		for(UInputBindingBase* InputBindingTemplate : InputBindings)
@@ -423,7 +439,7 @@ void UInputModule::BuildPlayerRuntimes()
 		}
 	}
 
-	RefreshCommonUIInputMode(0);
+	for (int32 PlayerIndex = 0; PlayerIndex < PlayerRuntimes.Num(); ++PlayerIndex) RefreshCommonUIInputMode(PlayerIndex);
 }
 
 void UInputModule::HandleInputMethodChanged(ECommonInputType InInputType, int32 InPlayerIndex)
@@ -434,21 +450,23 @@ void UInputModule::HandleInputMethodChanged(ECommonInputType InInputType, int32 
 
 void UInputModule::HandleCommonUIInputConfigChanged(FUIInputConfig InInputConfig, int32 InPlayerIndex)
 {
-	if(InPlayerIndex != 0 || !PlayerRuntimes.IsValidIndex(InPlayerIndex))
+	if(!PlayerRuntimes.IsValidIndex(InPlayerIndex))
 	{
 		return;
 	}
 
 	const UCommonUIActionRouterBase* ActionRouter = PlayerRuntimes[InPlayerIndex].CommonUIActionRouter;
-	ApplyCommonUIInputConfig(ActionRouter && ActionRouter->GetLeafmostActivatableWidget() ? &InInputConfig : nullptr);
+	ApplyCommonUIInputConfig(ActionRouter && ActionRouter->GetLeafmostActivatableWidget() ? &InInputConfig : nullptr, InPlayerIndex);
 }
 
-void UInputModule::HandleGlobalInputModeChanged(EInputMode InPreviousInputMode, EInputMode InInputMode)
+void UInputModule::HandleGlobalInputModeChanged(APlayerController* InController, EInputMode InPreviousInputMode, EInputMode InInputMode)
 {
+	if (!InController || InController->GetWorld() != GetWorld()) return;
+	const FScopedWorldContext WorldContext(GetWorld());
 	UEventModuleStatics::BroadcastEvent<FEventInputModeChanged>(this, { InInputMode, InPreviousInputMode });
 }
 
-void UInputModule::ApplyCommonUIInputConfig(const FUIInputConfig* InInputConfig)
+void UInputModule::ApplyCommonUIInputConfig(const FUIInputConfig* InInputConfig, int32 InPlayerIndex)
 {
 	TOptional<EInputMode> InputMode;
 	if(InInputConfig)
@@ -469,24 +487,25 @@ void UInputModule::ApplyCommonUIInputConfig(const FUIInputConfig* InInputConfig)
 		}
 	}
 
-	FInputManager::Get().SetCommonUIInputMode(InputMode);
+	FInputManager::Get().SetPlayerInputMode(PlayerRuntimes[InPlayerIndex].PlayerController.Get(), DefaultInputMode, InputMode);
 }
 
 void UInputModule::RefreshCommonUIInputMode(int32 InPlayerIndex)
 {
-	if(InPlayerIndex != 0 || !PlayerRuntimes.IsValidIndex(InPlayerIndex))
+	if(!PlayerRuntimes.IsValidIndex(InPlayerIndex))
 	{
 		return;
 	}
 
-	const UCommonUIActionRouterBase* ActionRouter = PlayerRuntimes[InPlayerIndex].CommonUIActionRouter;
+	UCommonUIActionRouterBase* ActionRouter = PlayerRuntimes[InPlayerIndex].CommonUIActionRouter;
 	const UCommonActivatableWidget* ActiveWidget = ActionRouter
 		? ActionRouter->GetLeafmostActivatableWidget()
 		: nullptr;
 	const TOptional<FUIInputConfig> InputConfig = ActiveWidget
 		? ActiveWidget->GetDesiredInputConfig()
 		: TOptional<FUIInputConfig>();
-	ApplyCommonUIInputConfig(InputConfig.IsSet() ? &InputConfig.GetValue() : nullptr);
+	if (ActionRouter && InputConfig.IsSet()) ActionRouter->SetActiveUIInputConfig(InputConfig.GetValue(), ActiveWidget);
+	ApplyCommonUIInputConfig(InputConfig.IsSet() ? &InputConfig.GetValue() : nullptr, InPlayerIndex);
 }
 
 void UInputModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
@@ -540,7 +559,7 @@ FString UInputModule::GetModuleDebugMessage()
 void UInputModule::SetDefaultInputMode(EInputMode InInputMode)
 {
 	DefaultInputMode = InInputMode;
-	FInputManager::Get().SetDefaultInputMode(InInputMode);
+	for (int32 PlayerIndex = 0; PlayerIndex < PlayerRuntimes.Num(); ++PlayerIndex) RefreshCommonUIInputMode(PlayerIndex);
 }
 
 UInputBindingBase* UInputModule::GetInputBinding(TSubclassOf<UInputBindingBase> InClass, int32 InPlayerIndex) const

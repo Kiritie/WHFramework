@@ -179,7 +179,7 @@ bool UInputModuleStatics::IsUsingTouch(int32 InPlayerIndex)
 
 EInputMode UInputModuleStatics::GetGlobalInputMode()
 {
-	return FInputManager::Get().GetGlobalInputMode();
+	return FInputManager::Get().GetGlobalInputMode(UCommonModuleStatics::GetLocalPlayerController());
 }
 
 void UInputModuleStatics::UpdateGlobalInputMode()

@@ -146,7 +146,7 @@ public:
 	bool TurnInTask(UTaskBase* InTask, AActor* InTarget);
 
 	UFUNCTION(BlueprintCallable)
-	void ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount = 1, FPrimaryAssetId InTargetAssetID = FPrimaryAssetId(), FName InTargetName = NAME_None, FGuid InOwnerActorID = FGuid());
+	void ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount = 1, FPrimaryAssetId InTargetAssetID = FPrimaryAssetId(), FName InTargetName = NAME_None, FGuid InOwnerActorID = FGuid(), ETaskEventScope InScope = ETaskEventScope::Personal);
 
 	UFUNCTION(BlueprintCallable)
 	void RefreshMarkers() { RequestTaskMarkersRefresh(); }

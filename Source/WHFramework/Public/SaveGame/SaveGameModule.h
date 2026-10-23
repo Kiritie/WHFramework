@@ -8,6 +8,8 @@
 
 #include "SaveGameModule.generated.h"
 
+class FSaveGameLocalContext;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FWorldSaveFinished, FGuid, SaveId, const FSaveOperationResult&, Result);
 
 using FSaveWorldLoadGuard = TFunction<bool(const FGuid&, const TMap<FName, FParameter>&, EPhase, FString&)>;
@@ -32,6 +34,8 @@ public:
 	bool RegisterWorldStoreParticipant(FName InName, FSaveWorldStoreParticipant InParticipant);
 	void UnregisterWorldStoreParticipant(FName InName);
 	FString GetStorageRoot() const;
+	FString GetUnboundInventoryRoot() const;
+	static bool IsStepTimeLimitEnforced();
 	~USaveGameModule();
 
 	//////////////////////////////////////////////////////////////////////////
@@ -193,6 +197,7 @@ private:
 	FSaveOperationResult LoadOperationResult;
 
 	TUniquePtr<FSaveGameStorage> Storage;
+	TSharedPtr<const FSaveGameLocalContext, ESPMode::ThreadSafe> LocalSaveContext;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> AsyncExecutorLease;
 	TUniquePtr<FSaveGameAsyncExecutor> AsyncSave;
 	UE::Tasks::FTask AsyncCreatedSlotCleanup;

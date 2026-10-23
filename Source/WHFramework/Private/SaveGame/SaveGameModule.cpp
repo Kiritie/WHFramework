@@ -4,6 +4,7 @@
 #include "Event/Events/Common/Game/Event_GameExited.h"
 #include "Gameplay/WHGameInstance.h"
 #include "HAL/FileManager.h"
+#include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "GameFramework/PlayerController.h"
@@ -27,6 +28,9 @@ IMPLEMENTATION_MODULE(USaveGameModule)
 
 namespace
 {
+TAutoConsoleVariable<int32> CVarSaveStepTimeLimit(TEXT("wh.SaveGame.EnforceStepTimeLimit"), 1,
+	TEXT("Reject save steps that exceed the configured time limit. 0 records overruns without rejecting saves."), ECVF_Default);
+
 struct FCreatedSlotCleanupTask
 {
 	TSharedPtr<const FSaveGenerationPlan, ESPMode::ThreadSafe> Plan;
@@ -131,7 +135,16 @@ void USaveGameModule::RestoreLastActiveSave()
 void USaveGameModule::OnInitialize()
 {
 	Super::OnInitialize();
-	Storage = MakeUnique<FSaveGameStorage>(UserIndex);
+	if (const UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
+	{
+		LocalSaveContext = GameInstance->GetLocalSaveContext();
+		if (!LocalSaveContext)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Local save module rejected: %s"), *GameInstance->GetLocalSaveContextError());
+			return;
+		}
+	}
+	Storage = MakeUnique<FSaveGameStorage>(UserIndex, LocalSaveContext ? LocalSaveContext->GetStorageRoot() : FString());
     Storage->EnsureRoot();
     TArray<FString> RecoveryErrors;
     Storage->RecoverPendingWorlds(RecoveryErrors);
@@ -198,6 +211,7 @@ void USaveGameModule::OnTermination(EPhase InPhase)
 			AsyncExecutorLease.Reset();
 			LoadSnapshot = FSaveGameLoadSnapshot();
 			Storage.Reset();
+			LocalSaveContext.Reset();
 		}
 		DeferredSaveTermination = EPhase(uint8(DeferredSaveTermination) & ~uint8(InPhase));
 	}
@@ -235,9 +249,10 @@ void USaveGameModule::SetUserIndex(int32 InUserIndex)
 	{
 		return;
 	}
+	if (!LocalSaveContext && GetWorld() && Cast<UWHGameInstance>(GetWorld()->GetGameInstance())) return;
 	DetachActiveSave();
 	UserIndex = InUserIndex;
-	Storage = MakeUnique<FSaveGameStorage>(UserIndex);
+	Storage = MakeUnique<FSaveGameStorage>(UserIndex, LocalSaveContext ? LocalSaveContext->GetStorageRoot() : FString());
     Storage->EnsureRoot();
     TArray<FString> RecoveryErrors;
     Storage->RecoverPendingWorlds(RecoveryErrors);
@@ -356,6 +371,7 @@ FSaveOperationResult USaveGameModule::SaveSlotAsync(FGuid SaveId)
 	Plan.TransactionId = OperationId;
 	Plan.UserIndex = UserIndex;
 	Plan.StorageRoot = Storage->GetRootDir();
+	Plan.LocalSaveContext = LocalSaveContext;
     Plan.Manifest = TargetManifest;
     Plan.OperationId = OperationId;
     Plan.bCreateSlotAtWrite = bCreateAtWrite;
@@ -472,6 +488,15 @@ void USaveGameModule::AdvanceAsyncSaveCapture(FVoxelTerrainFrameContext* InFrame
 	FSaveOperationResult Failure = FSaveOperationResult::Success();
 	FString Error;
 	bool bCapacityBlocked = false;
+	const FGuid CaptureOperation = AsyncOperationId;
+	const int32 CapturePhase = AsyncModuleCapturePhase;
+	const int32 CaptureIndex = bPreparationPending ? AsyncPrepareCount : AsyncBuildCursor;
+	const UModuleBase* CaptureModule = AsyncCaptured.IsValidIndex(CaptureIndex) ? AsyncCaptured[CaptureIndex] : nullptr;
+	const FName CaptureModuleName = ::IsValid(CaptureModule) ? CaptureModule->GetModuleName() : NAME_None;
+	const TCHAR* CaptureStage = bPreparationPending ? TEXT("BeforeSaveData") :
+		VoxelOwner && !AsyncPlan->Voxel.IsSet() ? TEXT("CopyVoxelSnapshot") :
+		VoxelOwner && !AsyncPlan->Voxel->Voxels.Completion->ExpectedStorageRoot ? TEXT("BindVoxelCommitOwner") :
+		AsyncBuildCursor < AsyncCaptured.Num() ? TEXT("ModuleFile") : TEXT("StartWorker");
 	if (bPreparationPending)
 	{
 		UModuleBase* Module = AsyncCaptured[AsyncPrepareCount];
@@ -485,7 +510,7 @@ void USaveGameModule::AdvanceAsyncSaveCapture(FVoxelTerrainFrameContext* InFrame
 			Module->OnBeforeSaveData();
 		}
 	}
-	if (!bPreparationPending && VoxelOwner && !AsyncPlan->Voxel.IsSet())
+	else if (VoxelOwner && !AsyncPlan->Voxel.IsSet())
 	{
 		FVoxelModuleSaveCapture Capture;
 		if (!VoxelOwner->CopySaveCapture(Capture, Error))
@@ -496,20 +521,22 @@ void USaveGameModule::AdvanceAsyncSaveCapture(FVoxelTerrainFrameContext* InFrame
 			AsyncPlan->Voxel = MoveTemp(Capture);
 		}
 	}
-	if (!bPreparationPending && Failure && VoxelOwner && AsyncPlan->Voxel.IsSet() &&
-		!AsyncPlan->Voxel->Voxels.Completion->ExpectedStorageRoot &&
-		!VoxelOwner->BindSaveCommitOwner(AsyncSaveId, AsyncPlan->StorageRoot, Error))
+	else if (Failure && VoxelOwner && AsyncPlan->Voxel.IsSet() &&
+		!AsyncPlan->Voxel->Voxels.Completion->ExpectedStorageRoot)
 	{
-		bCapacityBlocked = Error.StartsWith(TEXT("CapacityBlocked:"));
-		if (!bCapacityBlocked) Failure = FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed, FText::FromString(Error));
+		if (!VoxelOwner->BindSaveCommitOwner(AsyncSaveId, AsyncPlan->StorageRoot, Error))
+		{
+			bCapacityBlocked = Error.StartsWith(TEXT("CapacityBlocked:"));
+			if (!bCapacityBlocked) Failure = FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed, FText::FromString(Error));
+		}
 	}
-	if (!bPreparationPending && Failure && !bCapacityBlocked && AsyncBuildCursor < AsyncCaptured.Num())
+	else if (Failure && !bCapacityBlocked && AsyncBuildCursor < AsyncCaptured.Num())
 	{
 		TGuardValue<bool> Applying(bApplyingSaveCallbacks, true);
 		if (!AdvanceModuleFileCapture(Error, bCapacityBlocked) && !bCapacityBlocked)
 			Failure = FSaveOperationResult::Failed(ESaveResultCode::SerializeFailed, FText::FromString(Error));
 	}
-	else if (!bPreparationPending && Failure && !bCapacityBlocked)
+	else if (Failure && !bCapacityBlocked)
 	{
 		if (!AsyncSave)
 		{
@@ -543,14 +570,23 @@ void USaveGameModule::AdvanceAsyncSaveCapture(FVoxelTerrainFrameContext* InFrame
 	}
 	const double Finished = FPlatformTime::Seconds();
 	const double Actual = (Finished - Started) * 1000.0;
+	if (Actual >= 0.25 || !Failure)
+	{
+		UE_LOG(LogTemp, Display, TEXT("Save capture slice: operation=%s stage=%s module=%s phase=%d duration=%.3fms capacityBlocked=%s"),
+			*CaptureOperation.ToString(), CaptureStage, *CaptureModuleName.ToString(), CapturePhase, Actual,
+			bCapacityBlocked ? TEXT("true") : TEXT("false"));
+	}
 	AsyncCaptureCostMilliseconds = FMath::Lerp(AsyncCaptureCostMilliseconds, Actual, 0.15);
 	if (InFrame)
 	{
 		InFrame->GetPublishBudget().Finish(EVoxelPublishPhase::Prepare, Started, Finished);
 		if (VoxelOwner && Actual > VoxelOwner->GetMaximumSceneCaptureStepMilliseconds() && AsyncPlan)
 		{
-			Failure = FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed, FText::FromString(FString::Printf(
-				TEXT("Save module capture step capability error: %.3fms exceeds %.3fms"), Actual, VoxelOwner->GetMaximumSceneCaptureStepMilliseconds())));
+			const FString TimingError = FString::Printf(
+				TEXT("Save module capture step capability error: stage=%s module=%s phase=%d %.3fms exceeds %.3fms"),
+				CaptureStage, *CaptureModuleName.ToString(), CapturePhase, Actual, VoxelOwner->GetMaximumSceneCaptureStepMilliseconds());
+			if (IsStepTimeLimitEnforced()) Failure = FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed, FText::FromString(TimingError));
+			else UE_LOG(LogTemp, Warning, TEXT("Save timing limit disabled: %s"), *TimingError);
 		}
 	}
 	if (!Failure) CompleteAsyncSave(Failure);
@@ -734,6 +770,9 @@ void USaveGameModule::AdvanceAsyncSaveCompletion(FVoxelTerrainFrameContext* InFr
 	if (!AsyncCompletionResult.IsSet() || bApplyingSaveCallbacks) return;
 	UVoxelModule* const VoxelOwner = AsyncVoxelOwner;
 	if (!bForce && VoxelOwner && (!InFrame || !InFrame->IsActive())) return;
+	const int32 CompletionCursor = AsyncCompletionCursor;
+	const FString CompletionStage = CompletionCursor < 0 ? TEXT("ReleaseCapture") :
+		CompletionCursor < AsyncPrepareCount ? GetNameSafe(AsyncCaptured[CompletionCursor]) : TEXT("FinalizeSave");
 	const double Started = FPlatformTime::Seconds();
 	if (!bForce && InFrame &&
 		!InFrame->GetPublishBudget().TryStart(EVoxelPublishPhase::Retire, Started, AsyncCompletionCostMilliseconds))
@@ -778,15 +817,21 @@ void USaveGameModule::AdvanceAsyncSaveCompletion(FVoxelTerrainFrameContext* InFr
 	else FinalizeAsyncSave();
 	const double Finished = FPlatformTime::Seconds();
 	const double Actual = (Finished - Started) * 1000.0;
+	UE_LOG(LogTemp, Display, TEXT("Save completion slice: operation=%s stage=%s cursor=%d duration=%.3fms committed=%s"),
+		*AsyncOperationId.ToString(), *CompletionStage, CompletionCursor, Actual, bAsyncCompletionFilesCommitted ? TEXT("true") : TEXT("false"));
 	AsyncCompletionCostMilliseconds = FMath::Lerp(AsyncCompletionCostMilliseconds, Actual, 0.15);
 	if (!bForce && InFrame)
 	{
 		InFrame->GetPublishBudget().Finish(EVoxelPublishPhase::Retire, Started, Finished);
 		if (VoxelOwner && Actual > VoxelOwner->GetMaximumSceneCaptureStepMilliseconds())
 		{
-			const FString Error = FString::Printf(TEXT("Save completion capability error: %.3fms exceeds %.3fms"),
-				Actual, VoxelOwner->GetMaximumSceneCaptureStepMilliseconds());
-			if (AsyncCompletionResult.IsSet())
+			const FString Error = FString::Printf(TEXT("Save completion capability error: %s[%d] %.3fms exceeds %.3fms"),
+				*CompletionStage, CompletionCursor, Actual, VoxelOwner->GetMaximumSceneCaptureStepMilliseconds());
+			if (!IsStepTimeLimitEnforced())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Save timing limit disabled: %s"), *Error);
+			}
+			else if (AsyncCompletionResult.IsSet())
 			{
 				AsyncCompletionResult->bSuccess = false;
 				AsyncCompletionResult->Code = ESaveResultCode::CommitFailed;
@@ -1756,6 +1801,17 @@ void USaveGameModule::UnregisterWorldStoreParticipant(FName InName)
 FString USaveGameModule::GetStorageRoot() const
 {
     return Storage ? Storage->GetRootDir() : FString();
+}
+
+bool USaveGameModule::IsStepTimeLimitEnforced()
+{
+	return CVarSaveStepTimeLimit.GetValueOnGameThread() != 0;
+}
+
+FString USaveGameModule::GetUnboundInventoryRoot() const
+{
+	return LocalSaveContext ? LocalSaveContext->GetUnboundInventoryRoot() :
+		FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Inventory"), TEXT("Unbound"));
 }
 
 bool USaveGameModule::BeginExternalStore(FSaveWorldCaptureContext InContext,

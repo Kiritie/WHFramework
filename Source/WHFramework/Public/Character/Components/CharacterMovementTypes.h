@@ -19,7 +19,8 @@ enum class ECharacterTraversalMode : uint8
 {
 	None,
 	Climb,
-	Fly
+	Fly,
+	Glide
 };
 
 UENUM(BlueprintType)
@@ -27,7 +28,8 @@ enum class ECharacterCustomMovementMode : uint8
 {
 	None,
 	Climb,
-	Float
+	Float,
+	Glide
 };
 
 USTRUCT(BlueprintType)

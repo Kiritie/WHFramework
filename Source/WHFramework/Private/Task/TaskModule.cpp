@@ -815,7 +815,7 @@ bool UTaskModule::TurnInTask(UTaskBase* InTask, AActor* InTarget)
 	return InTask->TaskState == ETaskState::Leaved;
 }
 
-void UTaskModule::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount, FPrimaryAssetId InTargetAssetID, FName InTargetName, FGuid InOwnerActorID)
+void UTaskModule::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount, FPrimaryAssetId InTargetAssetID, FName InTargetName, FGuid InOwnerActorID, ETaskEventScope InScope)
 {
 	if (!InEventTag.IsValid() || InCount <= 0 || bLoadingTasks || ModuleState == EModuleState::Paused) return;
 	BeginTaskMutation();
@@ -831,7 +831,7 @@ void UTaskModule::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTarget
 	}
 	for (UTaskBase* Task : ExecutingTasks)
 	{
-		if (ResolveRuntimeTask(Task)) Task->ApplyObjectiveEvent(InEventTag, InTargetTag, InCount, InTargetAssetID, InTargetName);
+		if (ResolveRuntimeTask(Task)) Task->ApplyObjectiveEvent(InEventTag, InTargetTag, InCount, InTargetAssetID, InTargetName, InScope);
 	}
 	RequestTaskMarkersRefresh();
 }

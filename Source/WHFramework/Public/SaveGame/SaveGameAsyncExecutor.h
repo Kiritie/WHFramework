@@ -5,6 +5,7 @@
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "SaveGame/SaveGameExternalStore.h"
 #include "Voxel/VoxelModule.h"
+class FSaveGameLocalContext;
 struct WHFRAMEWORK_API FSaveModuleBytes
 {
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
@@ -14,6 +15,7 @@ struct WHFRAMEWORK_API FSaveModuleBytes
 };
 struct WHFRAMEWORK_API FSaveGenerationPlan
 {
+	TSharedPtr<const FSaveGameLocalContext, ESPMode::ThreadSafe> LocalSaveContext;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
 	int32 UserIndex = 0;
 	FString StorageRoot;

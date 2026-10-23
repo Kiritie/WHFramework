@@ -215,7 +215,8 @@ public:
 	UFUNCTION(BlueprintPure)
 	bool ArePrerequisitesMet() const;
 
-	virtual void ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTag, int32 Count, FPrimaryAssetId TargetAssetID, FName TargetName);
+	virtual ETaskEventScope GetObjectiveCreditScope(const FTaskObjective& InObjective) const;
+	virtual void ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTag, int32 Count, FPrimaryAssetId TargetAssetID, FName TargetName, ETaskEventScope InScope = ETaskEventScope::Personal);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintPure)
 	bool CanTurnIn(AActor* InTarget, FText& OutReason) const;

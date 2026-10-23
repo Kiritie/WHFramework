@@ -89,6 +89,9 @@ struct WHFRAMEWORK_API FInputPlayerRuntime
 	TObjectPtr<ULocalPlayer> LocalPlayer = nullptr;
 
 	UPROPERTY(Transient)
+	TWeakObjectPtr<APlayerController> PlayerController;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UEnhancedInputLocalPlayerSubsystem> EnhancedInputSubsystem = nullptr;
 
 	UPROPERTY(Transient)

@@ -130,7 +130,7 @@ bool UTaskModuleStatics::TurnInTask(UTaskBase* InTask, AActor* InTarget)
 	return UTaskModule::Get().TurnInTask(InTask, InTarget);
 }
 
-void UTaskModuleStatics::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount, FPrimaryAssetId InTargetAssetID, FName InTargetName, FGuid InOwnerActorID)
+void UTaskModuleStatics::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount, FPrimaryAssetId InTargetAssetID, FName InTargetName, FGuid InOwnerActorID, ETaskEventScope InScope)
 {
-	UTaskModule::Get().ReportTaskEvent(InEventTag, InTargetTag, InCount, InTargetAssetID, InTargetName, InOwnerActorID);
+	UTaskModule::Get().ReportTaskEvent(InEventTag, InTargetTag, InCount, InTargetAssetID, InTargetName, InOwnerActorID, InScope);
 }

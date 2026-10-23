@@ -15,6 +15,7 @@ class FInventoryTransactionService;
 class FInventoryCommitCoordinator;
 
 using FInventoryAccessValidator = TFunction<EInventoryResultCode(APlayerController*, const FGuid&, bool)>;
+using FInventoryMutationValidator = TFunction<EInventoryResultCode(APlayerController*, const FGuid&, const FInventorySnapshot&, const FInventorySnapshot&)>;
 using FInventorySnapshotProjector = TFunction<bool(const FInventoryPlan&, TArray<FInventoryDomainRedo>&, FString&)>;
 
 struct WHFRAMEWORK_API FInventoryAccessBinding
@@ -25,6 +26,7 @@ struct WHFRAMEWORK_API FInventoryAccessBinding
     float MaximumDistance = 350.f;
     bool bDistanceLimited = true;
     FInventoryAccessValidator Validator;
+    FInventoryMutationValidator MutationValidator;
 };
 
 UCLASS()

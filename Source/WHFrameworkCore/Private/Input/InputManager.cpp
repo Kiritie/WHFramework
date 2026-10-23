@@ -39,9 +39,8 @@ IMPLEMENTATION_MANAGER(FInputManager)
 FInputManager::FInputManager() : FManagerBase(Type)
 {
 	DefaultInputMode = EInputMode::GameOnly;
-	
-	GlobalInputMode = EInputMode::None;
-	CommonUIInputMode.Reset();
+
+	PlayerInputModes.Reset();
 	InputModeRequests.Reset();
 }
 
@@ -65,9 +64,8 @@ void FInputManager::OnPreparatory()
 void FInputManager::OnReset()
 {
 	FManagerBase::OnReset();
-	
-	GlobalInputMode = EInputMode::None;
-	CommonUIInputMode.Reset();
+
+	PlayerInputModes.Reset();
 	InputModeRequests.Reset();
 	UpdateInputMode();
 }
@@ -85,80 +83,78 @@ void FInputManager::OnTermination()
 
 void FInputManager::UpdateInputMode()
 {
-	UWorld* World = nullptr;
-	if(GEngine)
+	TArray<TWeakObjectPtr<APlayerController>> Controllers;
+	PlayerInputModes.GenerateKeyArray(Controllers);
+	for (const TWeakObjectPtr<APlayerController>& Controller : Controllers)
 	{
-		for(const FWorldContext& WorldContext : GEngine->GetWorldContexts())
+		APlayerController* PlayerController = Controller.Get();
+		if (!PlayerController)
 		{
-			if(WorldContext.WorldType == EWorldType::PIE || WorldContext.WorldType == EWorldType::Game)
+			PlayerInputModes.Remove(Controller);
+			continue;
+		}
+		FPlayerInputMode* CurrentMode = PlayerInputModes.Find(Controller);
+		if (!CurrentMode) continue;
+		FPlayerInputMode& PlayerMode = *CurrentMode;
+		EInputMode InputMode = PlayerMode.CommonUIMode.Get(PlayerMode.DefaultMode);
+		int32 InputPriority = MIN_int32;
+		int32 InputModeRank = MIN_int32;
+		for(const TPair<const void*, FInputModeRequest>& Pair : InputModeRequests)
+		{
+			const FInputModeRequest& Request = Pair.Value;
+			const int32 CandidateModeRank = GetInputModeRank(Request.InputMode);
+			if(Request.Priority > InputPriority
+				|| (Request.Priority == InputPriority && CandidateModeRank > InputModeRank))
 			{
-				World = WorldContext.World();
-				if(World) break;
+				InputPriority = Request.Priority;
+				InputModeRank = CandidateModeRank;
+				InputMode = Request.InputMode;
 			}
 		}
-	}
-	APlayerController* PlayerController = World ? UGameplayStatics::GetPlayerController(World, 0) : nullptr;
 
-	if(!PlayerController) return;
-	
-	EInputMode InputMode = CommonUIInputMode.Get(DefaultInputMode);
-	int32 InputPriority = MIN_int32;
-	int32 InputModeRank = MIN_int32;
-	for(const TPair<const void*, FInputModeRequest>& Pair : InputModeRequests)
-	{
-		const FInputModeRequest& Request = Pair.Value;
-		const int32 CandidateModeRank = GetInputModeRank(Request.InputMode);
-		if(Request.Priority > InputPriority
-			|| (Request.Priority == InputPriority && CandidateModeRank > InputModeRank))
+		const bool bIsCommonUIControlled = PlayerMode.CommonUIMode.IsSet() && InputModeRequests.IsEmpty();
+		if(!bIsCommonUIControlled)
 		{
-			InputPriority = Request.Priority;
-			InputModeRank = CandidateModeRank;
-			InputMode = Request.InputMode;
+			PlayerController->ResetIgnoreMoveInput();
+			PlayerController->ResetIgnoreLookInput();
+			switch(InputMode)
+			{
+				case EInputMode::None:
+					PlayerController->SetInputMode(FInputModeNone());
+					PlayerController->bShowMouseCursor = false;
+					break;
+				case EInputMode::GameOnly:
+					PlayerController->SetInputMode(FInputModeGameOnly());
+					PlayerController->bShowMouseCursor = false;
+					break;
+				case EInputMode::GameOnly_NotHideCursor:
+					PlayerController->SetInputMode(FInputModeGameOnly_NotHideCursor());
+					PlayerController->bShowMouseCursor = true;
+					break;
+				case EInputMode::GameAndUI:
+					PlayerController->SetInputMode(FInputModeGameAndUI());
+					PlayerController->bShowMouseCursor = true;
+					break;
+				case EInputMode::GameAndUI_NotHideCursor:
+					PlayerController->SetInputMode(FInputModeGameAndUI_NotHideCursor());
+					PlayerController->bShowMouseCursor = true;
+					break;
+				case EInputMode::UIOnly:
+					PlayerController->SetInputMode(FInputModeUIOnly());
+					PlayerController->bShowMouseCursor = true;
+					break;
+				default:
+					break;
+			}
 		}
-	}
 
-	const bool bIsCommonUIControlled = CommonUIInputMode.IsSet() && InputModeRequests.IsEmpty();
-	if(!bIsCommonUIControlled)
-	{
-		PlayerController->ResetIgnoreMoveInput();
-		PlayerController->ResetIgnoreLookInput();
-		switch(InputMode)
+		const EInputMode PreviousInputMode = PlayerMode.ResolvedMode;
+		PlayerMode.ResolvedMode = InputMode;
+
+		if(PreviousInputMode != InputMode)
 		{
-			case EInputMode::None:
-				PlayerController->SetInputMode(FInputModeNone());
-				PlayerController->bShowMouseCursor = false;
-				break;
-			case EInputMode::GameOnly:
-				PlayerController->SetInputMode(FInputModeGameOnly());
-				PlayerController->bShowMouseCursor = false;
-				break;
-			case EInputMode::GameOnly_NotHideCursor:
-				PlayerController->SetInputMode(FInputModeGameOnly_NotHideCursor());
-				PlayerController->bShowMouseCursor = true;
-				break;
-			case EInputMode::GameAndUI:
-				PlayerController->SetInputMode(FInputModeGameAndUI());
-				PlayerController->bShowMouseCursor = true;
-				break;
-			case EInputMode::GameAndUI_NotHideCursor:
-				PlayerController->SetInputMode(FInputModeGameAndUI_NotHideCursor());
-				PlayerController->bShowMouseCursor = true;
-				break;
-			case EInputMode::UIOnly:
-				PlayerController->SetInputMode(FInputModeUIOnly());
-				PlayerController->bShowMouseCursor = true;
-				break;
-			default:
-				break;
+			OnInputModeChanged.Broadcast(PlayerController, PreviousInputMode, InputMode);
 		}
-	}
-	
-	const EInputMode PreviousInputMode = GlobalInputMode;
-	GlobalInputMode = InputMode;
-
-	if(PreviousInputMode != GlobalInputMode)
-	{
-		OnInputModeChanged.Broadcast(PreviousInputMode, GlobalInputMode);
 	}
 }
 
@@ -182,8 +178,22 @@ void FInputManager::SetDefaultInputMode(EInputMode InInputMode)
 	UpdateInputMode();
 }
 
-void FInputManager::SetCommonUIInputMode(TOptional<EInputMode> InInputMode)
+void FInputManager::SetPlayerInputMode(APlayerController* InController, EInputMode InDefaultInputMode, TOptional<EInputMode> InCommonUIInputMode)
 {
-	CommonUIInputMode = InInputMode;
+	if (!InController) return;
+	FPlayerInputMode& Mode = PlayerInputModes.FindOrAdd(InController);
+	Mode.DefaultMode = InDefaultInputMode;
+	Mode.CommonUIMode = InCommonUIInputMode;
 	UpdateInputMode();
+}
+
+void FInputManager::ReleasePlayerInputMode(APlayerController* InController)
+{
+	if (InController) PlayerInputModes.Remove(InController);
+}
+
+EInputMode FInputManager::GetGlobalInputMode(APlayerController* InController) const
+{
+	const FPlayerInputMode* Mode = InController ? PlayerInputModes.Find(InController) : nullptr;
+	return Mode ? Mode->ResolvedMode : DefaultInputMode;
 }

@@ -4260,10 +4260,15 @@ void UVoxelModule::AdvanceSaveCapture()
 		TerrainFrameContext.GetPublishBudget().Finish(EVoxelPublishPhase::Prepare, Started, Finished);
 		if (Actual > MaximumSceneCaptureStepMilliseconds)
 		{
-			LastSaveError = FString::Printf(TEXT("Scene capture capability error: indivisible step %.3fms exceeds configured %.3fms"),
+			const FString TimingError = FString::Printf(TEXT("Scene capture capability error: indivisible step %.3fms exceeds configured %.3fms"),
 				Actual, MaximumSceneCaptureStepMilliseconds);
-			CapturedSceneSave.Reset();
-			Step = EVoxelSceneCaptureStep::Failed;
+			if (USaveGameModule::IsStepTimeLimitEnforced())
+			{
+				LastSaveError = TimingError;
+				CapturedSceneSave.Reset();
+				Step = EVoxelSceneCaptureStep::Failed;
+			}
+			else UE_LOG(LogTemp, Warning, TEXT("Save timing limit disabled: %s"), *TimingError);
 		}
 		if (Step == EVoxelSceneCaptureStep::Complete) SceneSaveBuilder.Reset();
 		if (Step == EVoxelSceneCaptureStep::Complete || Step == EVoxelSceneCaptureStep::Failed ||

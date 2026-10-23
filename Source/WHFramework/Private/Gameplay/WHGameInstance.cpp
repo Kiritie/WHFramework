@@ -3,6 +3,9 @@
 #include "Gameplay/WHGameInstance.h"
 #include "Engine/Engine.h"
 #include "SaveGame/SaveGameModule.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Misc/Paths.h"
 
 UWHGameInstance::UWHGameInstance()
 {
@@ -12,6 +15,16 @@ UWHGameInstance::UWHGameInstance()
 void UWHGameInstance::Init()
 {
 	Super::Init();
+	FString RequestedNamespace;
+	FParse::Value(FCommandLine::Get(), TEXT("LocalDataId="), RequestedNamespace);
+	auto Context = MakeShared<FSaveGameLocalContext, ESPMode::ThreadSafe>();
+	if (Context->Acquire(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames")), RequestedNamespace, LocalSaveContextError))
+	{
+		LocalSaveContext = MoveTemp(Context);
+		UE_LOG(LogTemp, Display, TEXT("Local save instance acquired: namespace=%s root=%s"),
+			*LocalSaveContext->GetNamespace(), *LocalSaveContext->GetStorageRoot());
+	}
+	else UE_LOG(LogTemp, Error, TEXT("Local save instance rejected: %s"), *LocalSaveContextError);
 	if (GEngine)
 	{
 		SaveLoadTravelFailureHandle = GEngine->OnTravelFailure().AddUObject(this, &ThisClass::OnSaveLoadTravelFailure);
@@ -38,6 +51,7 @@ void UWHGameInstance::Shutdown()
 	PendingSaveLoad = FSaveGameLoadSnapshot();
 	PendingLoadSource.Reset();
 	Super::Shutdown();
+	LocalSaveContext.Reset();
 }
 
 bool UWHGameInstance::SetPendingSaveLoad(FSaveGameLoadSnapshot InSnapshot, USaveGameModule* InSource)

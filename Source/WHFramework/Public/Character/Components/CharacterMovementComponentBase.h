@@ -37,6 +37,7 @@ public:
 	void SetBaseMovementSettings(float InWalkSpeed, float InSwimSpeed, float InFlySpeed, float InRotationSpeed, float InJumpVelocity);
 	bool IsClimbing() const;
 	bool IsFloating() const;
+	bool IsGliding() const;
 	bool IsSprinting() const;
 	bool IsWaitingForTerrain() const;
 	bool IsHeadUnderWater() const;
@@ -62,6 +63,15 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1.0"))
 	float ClimbSpeed = 180.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1.0"))
+	float GlideSpeed = 900.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1.0"))
+	float GlideDescentSpeed = 160.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1.0"))
+	float GlideTurnAcceleration = 700.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "0.0"))
 	float WaterFriction = 2.f;
@@ -90,6 +100,7 @@ private:
 	void SetMovementEnvironment(const FCharacterMovementEnvironment& InEnvironment);
 	void SelectEnvironmentMovement();
 	void PhysClimbing(float InDeltaSeconds, int32 InIterations);
+	void PhysGliding(float InDeltaSeconds, int32 InIterations);
 	void PhysWater(float InDeltaSeconds, int32 InIterations, bool bInFloat);
 	void MoveWithCollision(float InDeltaSeconds);
 	enum class EWaterExitStepResult : uint8
@@ -113,6 +124,7 @@ private:
 	bool bNetworkSprintIntent = false;
 	bool bNetworkClimbIntent = false;
 	bool bNetworkFlyIntent = false;
+	bool bNetworkGlideIntent = false;
 	bool bWaitingForTerrain = false;
 	bool bTrackingFall = false;
 	double FallApexZ = 0.0;

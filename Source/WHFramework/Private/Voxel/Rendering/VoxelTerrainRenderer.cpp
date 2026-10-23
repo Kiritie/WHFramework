@@ -687,6 +687,7 @@ namespace
 	struct FRenderSnapshot
 	{
 		uint64 WorldEpoch = 0;
+		FGuid RendererOwner;
 		uint64 Serial = 0;
 		uint64 FrameCounter = 0;
 		FAtomNodePtr Root;
@@ -1693,8 +1694,10 @@ namespace
 
 		virtual void PostRenderViewFamily_RenderThread(FRDGBuilder& InGraph, FSceneViewFamily& InFamily) override
 		{
+			if (InFamily.Scene != Scene) return;
 			const FFrameBinding* Binding = InFamily.GetExtentionData<FFrameBinding>();
-			if (!Binding || !Binding->Snapshot || !Binding->bProxySubmitted.Load() || Binding->Snapshot->WorldEpoch != State->Epoch) return;
+			if (!Binding || !Binding->Snapshot || !Binding->bProxySubmitted.Load() ||
+				Binding->Snapshot->WorldEpoch != State->Epoch || Binding->Snapshot->RendererOwner != State->OwnerId) return;
 			const FSnapshotPtr Snapshot = Binding->Snapshot;
 			const auto PinnedState = State;
 			InGraph.AddPass(RDG_EVENT_NAME("VoxelTerrainRenderReceipt"), ERDGPassFlags::NeverCull,
@@ -1799,9 +1802,11 @@ namespace
 			Relevance.bRenderInMainPass = ShouldRenderInMainPass();
 			const FFrameBinding* Binding = InView->Family->GetExtentionData<FFrameBinding>();
 			FMaterialRelevance Materials;
-			if (Binding && Binding->Snapshot && Binding->Snapshot->Root)
+			const bool bOwnSnapshot = Binding && Binding->Snapshot && Binding->Snapshot->WorldEpoch == State->Epoch &&
+				Binding->Snapshot->RendererOwner == State->OwnerId;
+			if (bOwnSnapshot && Binding->Snapshot->Root)
 				Materials |= Binding->Snapshot->Root->MaterialRelevance;
-			if (Binding && Binding->Snapshot && Binding->Snapshot->CoarseRoot)
+			if (bOwnSnapshot && Binding->Snapshot->CoarseRoot)
 				Materials |= Binding->Snapshot->CoarseRoot->MaterialRelevance;
 			Materials.SetPrimitiveViewRelevance(Relevance);
 			// UE 的速度预通道可能同时负责深度；必须与代理的速度资格同步声明。
@@ -1814,7 +1819,8 @@ namespace
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainGatherDynamicMeshes);
 			const FFrameBinding* Binding = InFamily.GetExtentionData<FFrameBinding>();
-			if (!Binding || !Binding->Snapshot || Binding->Snapshot->WorldEpoch != State->Epoch) return;
+			if (!Binding || !Binding->Snapshot || Binding->Snapshot->WorldEpoch != State->Epoch ||
+				Binding->Snapshot->RendererOwner != State->OwnerId) return;
 			const FSnapshotPtr Snapshot = Binding->Snapshot;
 			if (InVisibilityMap) Binding->bProxySubmitted.Store(true);
 			InCollector.AllocateOneFrameResource<FCollectorFrameLease>().Snapshot = Snapshot;
@@ -3533,6 +3539,7 @@ FSnapshotPtr FVoxelTerrainRendererState::SealFrameSnapshot(const uint64 InFrameC
 	Snapshot->Retirement.ReceiptScratch.Reserve(ReceiptAtomCount);
 	Snapshot->Retirement.SettledTransactions.Reserve(IssuedCapacity);
 	Snapshot->WorldEpoch = Epoch;
+	Snapshot->RendererOwner = OwnerId;
 	Snapshot->Serial = ++NextPresentation;
 	Snapshot->FrameCounter = InFrameCounter;
 	Snapshot->Root = LastSealedSnapshot ? LastSealedSnapshot->Root : nullptr;
@@ -3576,6 +3583,10 @@ FSnapshotPtr FVoxelTerrainRendererState::SealFrameSnapshot(const uint64 InFrameC
 			break;
 		}
 		Pending.Resources->Stamp = Stamp;
+		checkf(Pending.Resources->PendingIssuedIndex == INDEX_NONE && !Pending.Resources->bReceiptSettled.Load(),
+			TEXT("Publication issued twice: epoch=%llu owner=%s transaction=%s previousIndex=%d pending=%d frame=%llu receiptOwner=%llu"),
+			Epoch, *OwnerId.ToString(), *Pending.Resources->Transaction.ToString(), Pending.Resources->PendingIssuedIndex,
+			PendingIssued.Num(), Snapshot->Serial, Pending.Resources->ReceiptOwnerFrameSerial);
 		Snapshot->Issued.Add({Frozen, Pending.Resources});
 		Pending.Resources->PendingIssuedIndex = PendingIssued.Add({Frozen, Pending.Resources});
 		SubmittedCallbacks.Add(Pending.Id, MoveTemp(Pending.OnSubmitted));
@@ -3925,7 +3936,7 @@ void FVoxelTerrainRenderer::AdvanceRetirement(TFunction<void(const FIntVector&)>
 FRetiringFrame& FVoxelTerrainRendererState::RegisterFrameSubmission(const FSnapshotPtr& InSnapshot,
 	const FFrameSubmissionData& InData)
 {
-	check(IsInGameThread() && InSnapshot && InSnapshot->WorldEpoch == Epoch);
+	check(IsInGameThread() && InSnapshot && InSnapshot->WorldEpoch == Epoch && InSnapshot->RendererOwner == OwnerId);
 	auto& Frame = InSnapshot->Retirement;
 	if (!InSnapshot->bRetirementRegistered)
 	{
@@ -3970,7 +3981,8 @@ void FVoxelTerrainRendererState::RemoveRetiringFrame(const FRenderSnapshot& InSn
 
 void FVoxelTerrainRendererState::AdvanceFrameReceipt(FRetiringFrame& Retiring, const bool bInClosing)
 {
-	check(IsInGameThread() && Retiring.bHasReceipts && Retiring.Snapshot->WorldEpoch == Epoch);
+	check(IsInGameThread() && Retiring.bHasReceipts && Retiring.Snapshot->WorldEpoch == Epoch &&
+		Retiring.Snapshot->RendererOwner == OwnerId);
 	const auto& Frame = Retiring.Snapshot;
 	const auto& Frozen = Frame->Issued[Retiring.ReceiptCursor];
 	if (!bInClosing && PresentedSnapshot && Frame->Serial == PresentedSnapshot->PresentationSerial)
@@ -4033,7 +4045,11 @@ void FVoxelTerrainRendererState::AdvanceFrameReceipt(FRetiringFrame& Retiring, c
 	if (!bInClosing)
 	{
 		const int32 PendingIndex = Frozen.Resources->PendingIssuedIndex;
-		check(PendingIssued.IsValidIndex(PendingIndex) && PendingIssued[PendingIndex].Resources == Frozen.Resources);
+		checkf(PendingIssued.IsValidIndex(PendingIndex) && PendingIssued[PendingIndex].Resources == Frozen.Resources,
+			TEXT("Publication receipt owner mismatch: epoch=%llu owner=%s frame=%llu cursor=%d transaction=%s index=%d pending=%d receiptOwner=%llu actualTransaction=%s"),
+			Epoch, *OwnerId.ToString(), Frame->Serial, Retiring.ReceiptCursor, *Transaction.ToString(), PendingIndex,
+			PendingIssued.Num(), Frozen.Resources->ReceiptOwnerFrameSerial,
+			PendingIssued.IsValidIndex(PendingIndex) ? *PendingIssued[PendingIndex].Resources->Transaction.ToString() : TEXT("none"));
 		PendingIssued.RemoveAtSwap(PendingIndex, 1, EAllowShrinking::No);
 		if (PendingIssued.IsValidIndex(PendingIndex))
 			PendingIssued[PendingIndex].Resources->PendingIssuedIndex = PendingIndex;
@@ -4263,3 +4279,5 @@ void FVoxelTerrainRenderer::Reset()
 		TUniqueFunction<bool(float)>(FVoxelRendererRetirement{State}));
 	State.Reset();
 }
+
+#include "../Tests/VoxelTerrainRendererSceneIsolationTests.inl"

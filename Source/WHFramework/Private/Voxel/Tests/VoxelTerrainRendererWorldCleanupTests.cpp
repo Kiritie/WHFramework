@@ -52,7 +52,7 @@ bool FVoxelTerrainRendererWorldCleanupTest::RunTest(const FString&)
 		if (It->GetWorld() == World) Component = *It;
 	}
 	if (!TestTrue(TEXT("Renderer creates and registers its native primitive"), Component.IsValid())) return false;
-	TestTrue(TEXT("Retirement material holder has a world-independent outer"), Component->GetOuter() == GetTransientPackage());
+	TestTrue(TEXT("Registered primitive belongs to the original rendering world"), Component->GetWorld() == World);
 	TWeakObjectPtr<UMaterialInstanceDynamic> HeldMaterial;
 	for (int32 Index = 0; Index < 2; ++Index)
 	{
@@ -87,9 +87,27 @@ bool FVoxelTerrainRendererWorldCleanupTest::RunTest(const FString&)
 			TerrainResources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)], uint64(0));
 	}
 	auto PendingRenderReference = Component->TerrainState;
+	UVoxelTerrainPrimitiveComponent* OriginalPrimitive = Component.Get();
+	const FVoxelTerrainResourceLease* MaterialLeaseIdentity = OriginalPrimitive->GetNativeMaterialLease().Get();
 	Renderer.Reset();
-	TestFalse(TEXT("Shutdown unregisters the primitive before world collection"), Component->IsRegistered());
-	TestNull(TEXT("Unregistered primitive no longer belongs to the ended world"), Component->GetWorld());
+	TestFalse(TEXT("Shutdown unregisters the primitive before world collection"), OriginalPrimitive->IsRegistered());
+	TestFalse(TEXT("Original primitive is destroyed after material ownership is detached"), Component.IsValid());
+	TWeakObjectPtr<UVoxelTerrainPrimitiveComponent> MaterialKeeper;
+	int32 KeeperCount = 0;
+	for (TObjectIterator<UVoxelTerrainPrimitiveComponent> It; It; ++It)
+	{
+		if (It->GetNativeMaterialLease().Get() == MaterialLeaseIdentity)
+		{
+			MaterialKeeper = *It;
+			++KeeperCount;
+		}
+	}
+	if (!TestEqual(TEXT("The original material lease has one detached keeper"), KeeperCount, 1)) return false;
+	TestTrue(TEXT("Retirement material holder has a world-independent outer"), MaterialKeeper->GetOuter() == GetTransientPackage());
+	TestNull(TEXT("Detached material keeper has no world"), MaterialKeeper->GetWorld());
+	TestFalse(TEXT("Detached material keeper is not registered in a scene"), MaterialKeeper->IsRegistered());
+	TestEqual(TEXT("Detached keeper retains both exact original material slots"), MaterialKeeper->GetNumMaterials(), 2);
+	TestTrue(TEXT("Detached keeper retains the original final material"), MaterialKeeper->GetMaterial(1) == HeldMaterial.Get());
 	const TWeakObjectPtr<UWorld> EndedWorld = World;
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
@@ -97,14 +115,14 @@ bool FVoxelTerrainRendererWorldCleanupTest::RunTest(const FString&)
 	FlushRenderingCommands();
 	CollectGarbage(RF_NoFlags);
 	TestFalse(TEXT("An outstanding native render reference cannot retain the ended world"), EndedWorld.IsValid());
-	TestTrue(TEXT("Material holder survives until its native retirement references finish"), Component.IsValid());
+	TestTrue(TEXT("Material holder survives until its native retirement references finish"), MaterialKeeper.IsValid());
 	TestTrue(TEXT("Retained material survives GC while original retirement references remain"), HeldMaterial.IsValid());
 	PendingRenderReference.Reset();
 	FTSTicker::GetCoreTicker().Tick(0.0f);
 	FlushRenderingCommands();
 	FTSTicker::GetCoreTicker().Tick(0.0f);
 	CollectGarbage(RF_NoFlags);
-	TestFalse(TEXT("Final retirement releases the material holder"), Component.IsValid());
+	TestFalse(TEXT("Final retirement releases the material holder"), MaterialKeeper.IsValid());
 	TestFalse(TEXT("Final retirement also releases the actual retained material"), HeldMaterial.IsValid());
 	return true;
 }

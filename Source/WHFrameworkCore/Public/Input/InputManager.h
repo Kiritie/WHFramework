@@ -6,8 +6,11 @@
 #include "Main/MainTypes.h"
 #include "Main/Base/ManagerBase.h"
 
-DECLARE_MULTICAST_DELEGATE_TwoParams(
+class APlayerController;
+
+DECLARE_MULTICAST_DELEGATE_ThreeParams(
 	FOnGlobalInputModeChanged,
+	APlayerController*,
 	EInputMode,
 	EInputMode);
 
@@ -44,6 +47,10 @@ public:
 
 	virtual void ReleaseInputMode(const void* InOwner);
 
+	void SetPlayerInputMode(APlayerController* InController, EInputMode InDefaultInputMode, TOptional<EInputMode> InCommonUIInputMode);
+
+	void ReleasePlayerInputMode(APlayerController* InController);
+
 protected:
 	struct FInputModeRequest
 	{
@@ -53,9 +60,14 @@ protected:
 
 	EInputMode DefaultInputMode;
 	
-	EInputMode GlobalInputMode;
+	struct FPlayerInputMode
+	{
+		EInputMode DefaultMode = EInputMode::GameOnly;
+		EInputMode ResolvedMode = EInputMode::None;
+		TOptional<EInputMode> CommonUIMode;
+	};
 
-	TOptional<EInputMode> CommonUIInputMode;
+	TMap<TWeakObjectPtr<APlayerController>, FPlayerInputMode> PlayerInputModes;
 
 	TMap<const void*, FInputModeRequest> InputModeRequests;
 
@@ -67,7 +79,5 @@ public:
 
 	virtual void SetDefaultInputMode(EInputMode InInputMode);
 
-	virtual EInputMode GetGlobalInputMode() const { return GlobalInputMode; }
-
-	virtual void SetCommonUIInputMode(TOptional<EInputMode> InInputMode);
+	virtual EInputMode GetGlobalInputMode(APlayerController* InController = nullptr) const;
 };

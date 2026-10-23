@@ -276,6 +276,32 @@ FInventoryCommandResult FInventoryTransactionService::ExecuteNew(const FInventor
             return Result;
         }
     }
+    if(!InAuthority.bServerDomain)
+    {
+        for(const FInventorySnapshot& Before : Plan.Before)
+        {
+            const FInventorySnapshot* After = Plan.After.FindByPredicate([&](const FInventorySnapshot& Candidate)
+            {
+                return Candidate.InventoryId == Before.InventoryId;
+            });
+            const FInventoryAccessBinding* Binding = World.AccessBindings.Find(Before.InventoryId);
+            if(!After || !Binding || !Binding->LifetimeOwner.IsValid())
+            {
+                Result.Code = EInventoryResultCode::NotInteractable;
+                return Result;
+            }
+            const FInventoryMutationValidator Validator = Binding->MutationValidator;
+            if(Validator)
+            {
+                const EInventoryResultCode Access = Validator(InAuthority.Controller.Get(), InAuthority.ActorId, Before, *After);
+                if(Access != EInventoryResultCode::Success)
+                {
+                    Result.Code = Access;
+                    return Result;
+                }
+            }
+        }
+    }
     for(const FInventorySnapshot& Snapshot : States)
     {
         FInventorySnapshot* After = Plan.After.FindByPredicate([&Snapshot](const FInventorySnapshot& Candidate)

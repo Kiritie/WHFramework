@@ -609,7 +609,7 @@ bool AAbilityCharacterBase::IsClimbing() const
 
 bool AAbilityCharacterBase::IsFlying(bool bReally) const
 {
-	return GetCharacterMovement()->IsFlying();
+	return GetCharacterMovement()->IsFlying() || CastChecked<UCharacterMovementComponentBase>(GetCharacterMovement())->IsGliding();
 }
 
 bool AAbilityCharacterBase::IsTargetAble_Implementation(APawn* InPlayerPawn) const

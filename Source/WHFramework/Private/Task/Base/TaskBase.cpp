@@ -761,12 +761,18 @@ bool UTaskBase::AreObjectivesCompleted() const
 	return true;
 }
 
-void UTaskBase::ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTag, int32 Count, FPrimaryAssetId TargetAssetID, FName TargetName)
+ETaskEventScope UTaskBase::GetObjectiveCreditScope(const FTaskObjective& InObjective) const
+{
+	return InObjective.CreditScope == ETaskEventScope::None ? ETaskEventScope::Personal : InObjective.CreditScope;
+}
+
+void UTaskBase::ApplyObjectiveEvent(FGameplayTag EventTag, FGameplayTag TargetTag, int32 Count, FPrimaryAssetId TargetAssetID, FName TargetName, ETaskEventScope InScope)
 {
 	if (!IsExecuting() || Count <= 0) return;
 	bool bChanged = false;
 	for (const FTaskObjective& Objective : Objectives)
 	{
+		if (GetObjectiveCreditScope(Objective) != InScope) continue;
 		if (Objective.EventTag != EventTag || (Objective.TargetTag.IsValid() && !TargetTag.MatchesTag(Objective.TargetTag))) continue;
 		if (Objective.TargetAssetID.IsValid() && Objective.TargetAssetID != TargetAssetID) continue;
 		if (!Objective.TargetName.IsNone() && Objective.TargetName != TargetName) continue;

@@ -34,6 +34,10 @@ public:
 		{
 			Flags |= FLAG_Custom_2;
 		}
+		if (Constraint.Traversal == ECharacterTraversalMode::Glide)
+		{
+			Flags |= FLAG_Custom_3;
+		}
 		return Flags;
 	}
 
@@ -209,6 +213,7 @@ void UCharacterMovementComponentBase::ResetMovementSources()
 	bNetworkSprintIntent = false;
 	bNetworkClimbIntent = false;
 	bNetworkFlyIntent = false;
+	bNetworkGlideIntent = false;
 	ResetFallTracking();
 }
 
@@ -280,7 +285,8 @@ FCharacterMovementConstraint UCharacterMovementComponentBase::GetSimulationConst
 	{
 		Result.bSprint &= bNetworkSprintIntent;
 		if ((Result.Traversal == ECharacterTraversalMode::Climb && !bNetworkClimbIntent) ||
-			(Result.Traversal == ECharacterTraversalMode::Fly && !bNetworkFlyIntent))
+			(Result.Traversal == ECharacterTraversalMode::Fly && !bNetworkFlyIntent) ||
+			(Result.Traversal == ECharacterTraversalMode::Glide && !bNetworkGlideIntent))
 		{
 			Result.Traversal = ECharacterTraversalMode::None;
 		}
@@ -300,7 +306,7 @@ float UCharacterMovementComponentBase::GetMaxSpeed() const
 	{
 		return 0.f;
 	}
-	const float BaseSpeed = IsClimbing() ? ClimbSpeed : (IsFloating() ? MaxSwimSpeed : Super::GetMaxSpeed());
+	const float BaseSpeed = IsGliding() ? GlideSpeed : (IsClimbing() ? ClimbSpeed : (IsFloating() ? MaxSwimSpeed : Super::GetMaxSpeed()));
 	return BaseSpeed * Constraint.SpeedMultiplier * (Constraint.bSprint ? SprintMultiplier : 1.f);
 }
 
@@ -331,6 +337,7 @@ void UCharacterMovementComponentBase::UpdateFromCompressedFlags(uint8 InFlags)
 	bNetworkSprintIntent = (InFlags & FSavedMove_Character::FLAG_Custom_0) != 0;
 	bNetworkClimbIntent = (InFlags & FSavedMove_Character::FLAG_Custom_1) != 0;
 	bNetworkFlyIntent = (InFlags & FSavedMove_Character::FLAG_Custom_2) != 0;
+	bNetworkGlideIntent = (InFlags & FSavedMove_Character::FLAG_Custom_3) != 0;
 }
 
 ICharacterMovementEnvironmentInterface* UCharacterMovementComponentBase::GetEnvironmentProvider() const
@@ -399,7 +406,13 @@ void UCharacterMovementComponentBase::SelectEnvironmentMovement()
 		SetMovementMode(MOVE_Custom, static_cast<uint8>(ECharacterCustomMovementMode::Float));
 		return;
 	}
-	if (MovementMode == MOVE_Swimming || MovementMode == MOVE_Flying || IsClimbing() || IsFloating())
+	if (Constraint.Traversal == ECharacterTraversalMode::Glide && !Environment.bBodyInWater &&
+		!Constraint.bBlockMovement && (IsFalling() || IsGliding()))
+	{
+		SetMovementMode(MOVE_Custom, static_cast<uint8>(ECharacterCustomMovementMode::Glide));
+		return;
+	}
+	if (MovementMode == MOVE_Swimming || MovementMode == MOVE_Flying || IsClimbing() || IsFloating() || IsGliding())
 	{
 		SetMovementMode(MOVE_Falling);
 	}
@@ -511,7 +524,7 @@ void UCharacterMovementComponentBase::OnMovementModeChanged(EMovementMode InPrev
 		bTrackingFall = true;
 		FallApexZ = UpdatedComponent->GetComponentLocation().Z;
 	}
-	else if (MovementMode == MOVE_Swimming || IsFloating() || IsClimbing() || MovementMode == MOVE_Flying || MovementMode == MOVE_None)
+	else if (MovementMode == MOVE_Swimming || IsFloating() || IsClimbing() || IsGliding() || MovementMode == MOVE_Flying || MovementMode == MOVE_None)
 	{
 		ResetFallTracking();
 	}
@@ -584,7 +597,11 @@ void UCharacterMovementComponentBase::PhysicsRotation(float InDeltaSeconds)
 
 void UCharacterMovementComponentBase::PhysCustom(float InDeltaSeconds, int32 InIterations)
 {
-	if (IsClimbing())
+	if (IsGliding())
+	{
+		PhysGliding(InDeltaSeconds, InIterations);
+	}
+	else if (IsClimbing())
 	{
 		PhysClimbing(InDeltaSeconds, InIterations);
 	}
@@ -595,6 +612,42 @@ void UCharacterMovementComponentBase::PhysCustom(float InDeltaSeconds, int32 InI
 	else
 	{
 		Super::PhysCustom(InDeltaSeconds, InIterations);
+	}
+}
+
+bool UCharacterMovementComponentBase::IsGliding() const
+{
+	return MovementMode == MOVE_Custom && CustomMovementMode == static_cast<uint8>(ECharacterCustomMovementMode::Glide);
+}
+
+void UCharacterMovementComponentBase::PhysGliding(float InDeltaSeconds, int32 InIterations)
+{
+	if (bWaitingForTerrain || InDeltaSeconds < MIN_TICK_TIME || !HasValidData())
+	{
+		return;
+	}
+	const FVector Input = Acceleration.GetSafeNormal2D();
+	const FVector Heading = Input.IsNearlyZero() ? UpdatedComponent->GetForwardVector().GetSafeNormal2D() : Input;
+	const FVector Desired = Heading * GetMaxSpeed();
+	const FVector Horizontal = FMath::VInterpConstantTo(FVector(Velocity.X, Velocity.Y, 0.f), Desired,
+		InDeltaSeconds, GlideTurnAcceleration);
+	Velocity = FVector(Horizontal.X, Horizontal.Y, -GlideDescentSpeed);
+	FHitResult Hit;
+	SafeMoveUpdatedComponent(Velocity * InDeltaSeconds, UpdatedComponent->GetComponentQuat(), true, Hit);
+	if (bWaitingForTerrain)
+	{
+		Velocity = FVector::ZeroVector;
+		return;
+	}
+	if (Hit.IsValidBlockingHit())
+	{
+		if (IsValidLandingSpot(UpdatedComponent->GetComponentLocation(), Hit))
+		{
+			ProcessLanded(Hit, InDeltaSeconds * (1.f - Hit.Time), InIterations);
+			return;
+		}
+		HandleImpact(Hit, InDeltaSeconds, Velocity * InDeltaSeconds);
+		SlideAlongSurface(Velocity * InDeltaSeconds, 1.f - Hit.Time, Hit.Normal, Hit, true);
 	}
 }
 

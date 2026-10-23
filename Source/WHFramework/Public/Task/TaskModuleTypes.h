@@ -193,6 +193,15 @@ struct WHFRAMEWORK_API FTaskMarkerData
 	bool bOnlyShowNavigationWhenTracked = true;
 };
 
+UENUM(BlueprintType)
+enum class ETaskEventScope : uint8
+{
+	None,
+	Personal,
+	Cooperative,
+	WorldFact
+};
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FTaskObjective
 {
@@ -206,6 +215,9 @@ struct WHFRAMEWORK_API FTaskObjective
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FGameplayTag EventTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	ETaskEventScope CreditScope = ETaskEventScope::None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FGameplayTag TargetTag;

@@ -74,9 +74,9 @@ protected:
 
 	void HandleCommonUIInputConfigChanged(FUIInputConfig InInputConfig, int32 InPlayerIndex);
 
-	void HandleGlobalInputModeChanged(EInputMode InPreviousInputMode, EInputMode InInputMode);
+	void HandleGlobalInputModeChanged(APlayerController* InController, EInputMode InPreviousInputMode, EInputMode InInputMode);
 
-	void ApplyCommonUIInputConfig(const FUIInputConfig* InInputConfig);
+	void ApplyCommonUIInputConfig(const FUIInputConfig* InInputConfig, int32 InPlayerIndex);
 
 	void RefreshCommonUIInputMode(int32 InPlayerIndex);
 
