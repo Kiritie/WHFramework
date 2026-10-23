@@ -268,6 +268,7 @@ struct WHFRAMEWORK_API FVoxelHydrologyInfluence
     int32 RiverWaterPlane = MIN_int32;
 	int32 FloodplainStrengthQ15 = 0;
 	FVoxelStableId RiverId;
+	FVoxelStableId LakeId;
 	EVoxelRiverSurfaceZone RiverZone = EVoxelRiverSurfaceZone::None;
 
     bool bRiver = false;

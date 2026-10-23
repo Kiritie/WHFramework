@@ -542,6 +542,7 @@ struct WHFRAMEWORK_API FVoxelColumnSample
     int32 RiverWaterPlane = MIN_int32;
 	int32 FloodplainStrengthQ15 = 0;
 	FVoxelStableId RiverId;
+	FVoxelStableId LakeId;
 	EVoxelRiverSurfaceZone RiverZone = EVoxelRiverSurfaceZone::None;
 	uint16 BiomeIndex = MAX_uint16;
 	uint16 SurfaceMaterial = 0;

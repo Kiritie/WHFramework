@@ -1276,6 +1276,7 @@ bool FVoxelHydrologyPlan::SampleBaseWater(int32 InWorldX, int32 InWorldY, int32 
 				Lake->WaterZ - 1);
 
 		Result.bLake = true;
+		Result.LakeId = Lake->Id;
 		Result.bOcean = false;
 	}
 
@@ -1286,6 +1287,7 @@ bool FVoxelHydrologyPlan::SampleBaseWater(int32 InWorldX, int32 InWorldY, int32 
 			Result.bCoast |= Result.bOcean;
 			Result.bOcean = false;
 			Result.bLake = false;
+			Result.LakeId = FVoxelStableId();
 			Result.SurfaceWaterZ = MIN_int32;
 			Result.GroundOverrideZ = MIN_int32;
 		}
@@ -1572,6 +1574,7 @@ void VoxelHydrology::ApplyInfluenceToColumn(const FVoxelHydrologyInfluence& Infl
     Column.RiverWaterPlane = Influence.RiverWaterPlane;
     Column.FloodplainStrengthQ15 = Influence.FloodplainStrengthQ15;
     Column.RiverId = Influence.RiverId;
+    Column.LakeId = Influence.LakeId;
     Column.RiverZone = Influence.RiverZone;
     Column.bRiver = Influence.bRiver;
     Column.bLake = Influence.bLake;

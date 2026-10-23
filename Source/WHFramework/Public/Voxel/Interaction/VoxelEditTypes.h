@@ -60,6 +60,7 @@ struct WHFRAMEWORK_API FVoxelInteractionPlan
     FIntVector ObjectAnchor = FIntVector::ZeroValue;
     FName ObjectAction;
     FGuid InteractionInventoryId;
+    FInventorySlotState InteractionItem;
     TArray<FVoxelCellEdit> Cells;
     TArray<FVoxelEntityEdit> Entities;
     int32 Cost = 0;
