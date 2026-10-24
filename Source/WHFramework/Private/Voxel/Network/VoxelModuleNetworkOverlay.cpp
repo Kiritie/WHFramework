@@ -377,6 +377,36 @@ bool UVoxelModuleNetworkComponent::EnsureNetworkState(FString& OutError)
 	return true;
 }
 
+FVoxelTerrainNetworkStatus UVoxelModuleNetworkComponent::GetTerrainNetworkStatus() const
+{
+	FVoxelTerrainNetworkStatus Status;
+	if (!OverlayNetwork) return Status;
+	const auto& State = *OverlayNetwork;
+	Status.bActive = true;
+	Status.Phase = State.AdvancePhase;
+	Status.Regions = State.Regions.Num();
+	Status.BuildSerial = State.BuildSerial;
+	Status.PacketBytes = State.PacketBytes;
+	Status.EnvelopeBytes = State.EnvelopeBytes;
+	Status.InboundBytes = State.InboundBytes;
+	Status.bSubscriptionPending = State.bSubscriptionAttempt;
+	Status.bBuilding = State.bBuild || State.SnapshotBuildHead.IsValid();
+	Status.bEncoding = State.bEncode || State.SnapshotEncoder.IsValid() || State.DeltaEncoder.IsValid();
+	Status.bDecoding = State.bDecode || State.bEnvelopeDecode;
+	Status.bNeedsSnapshot = State.bNeedsSnapshot;
+	Status.bSnapshotTerminalFailure = State.bSnapshotTerminalFailure;
+	Status.SubscriptionAdmission = int32(State.SubscriptionAdmission.Admission);
+	Status.SnapshotAdmission = int32(State.SnapshotFactoryAdmission.Admission);
+	Status.EncoderAdmission = int32(State.EncoderFactoryAdmission.Admission);
+	Status.OutboundAdmission = int32(State.OutboundFactoryAdmission.Admission);
+	Status.AuthorityEpoch = State.Identity.WorldEpoch;
+	Status.DirectoryEpoch = State.Identity.DirectoryEpoch;
+	Status.Session = Session;
+	Status.Subscription = State.Identity.Subscription;
+	Status.Ticket = State.Identity.Ticket;
+	return Status;
+}
+
 void UVoxelModuleNetworkComponent::AdvanceTerrainNetwork(FVoxelTerrainFrameContext& Frame)
 {
 	auto* WorldModule = Module.Get();
@@ -390,51 +420,73 @@ void UVoxelModuleNetworkComponent::AdvanceTerrainNetwork(FVoxelTerrainFrameConte
 	ReserveRepresentationTables(); // 扩容失败保留原容量，控制流和旧请求继续服务。
 	const double Now = FPlatformTime::Seconds();
 	const double Deadline = Frame.Deadline(0.1);
-	if (FPlatformTime::Seconds() < Deadline) ApplyDecodedEnvelope(false);
-	if (!OverlayNetwork || bRejected) return;
-	if (FPlatformTime::Seconds() < Deadline)
-		Transfer.Tick(Now, [this](TArray<uint8>&& Fragment)
-		{
-			FVoxelRPCPacket Packet;
-			Packet.Bytes = MoveTemp(Fragment);
-			if (GetOwner() && GetOwner()->HasAuthority()) ClientReceive(Packet);
-			else ServerReceive(Packet);
-		}, Deadline);
-	if (!OverlayNetwork || bRejected || !WorldModule->IsReady() || Frame.GetWorldEpoch() != WorldModule->GetWorldEpoch()) return;
-	if (Transfer.ConsumeReceiveGap())
+	const auto StateOwner = OverlayNetwork;
+	// 每阶段先交接游标，预算耗尽后下帧从未服务阶段继续。
+	for (int32 Count = 0; Count < 9 && FPlatformTime::Seconds() < Deadline; ++Count)
 	{
-		DeferIngressResync(NetworkTransferConsumer, 0, GetOwner() && GetOwner()->HasAuthority(), false);
-	}
-	for (int32 Count = 0; Count < 4 && FPlatformTime::Seconds() < Deadline; ++Count)
-	{
-		const auto StateOwner = OverlayNetwork;
-		if (!StateOwner->PacketHead.IsSet())
+		const int32 Phase = StateOwner->AdvancePhase;
+		StateOwner->AdvancePhase = (Phase + 1) % 9;
+		switch (Phase)
 		{
-			FVoxelOverlayQueuedPacket Packet;
-			if (!StateOwner->Packets.Dequeue(Packet)) break;
-			StateOwner->PacketHead.Emplace(MoveTemp(Packet));
+		case 0:
+			ApplyDecodedEnvelope(false);
+			break;
+		case 1:
+			Transfer.Tick(Now, [this](TArray<uint8>&& Fragment)
+			{
+				FVoxelRPCPacket Packet;
+				Packet.Bytes = MoveTemp(Fragment);
+				if (GetOwner() && GetOwner()->HasAuthority()) ClientReceive(Packet);
+				else ServerReceive(Packet);
+			}, Deadline);
+			if (OverlayNetwork != StateOwner || bRejected) return;
+			if (Transfer.ConsumeReceiveGap())
+			{
+				DeferIngressResync(NetworkTransferConsumer, 0, GetOwner() && GetOwner()->HasAuthority(), false);
+			}
+			break;
+		case 2:
+			for (int32 PacketCount = 0; PacketCount < 4 && FPlatformTime::Seconds() < Deadline; ++PacketCount)
+			{
+				if (!StateOwner->PacketHead.IsSet())
+				{
+					FVoxelOverlayQueuedPacket Packet;
+					if (!StateOwner->Packets.Dequeue(Packet)) break;
+					StateOwner->PacketHead.Emplace(MoveTemp(Packet));
+				}
+				if (!ProcessPacket(StateOwner->PacketHead.GetValue())) break;
+				if (OverlayNetwork != StateOwner || bRejected) return;
+				StateOwner->PacketBytes -= StateOwner->PacketHead->ResourceLease->Bytes();
+				StateOwner->PacketHead.Reset();
+				StateOwner->bPacketHeadWaitingCapacity = false;
+			}
+			break;
+		case 3:
+			AdvanceEnvelopeDecode(Now);
+			break;
+		case 4:
+			if (GetOwner() && !GetOwner()->HasAuthority() && !bWelcomed && !bPendingReady && Now - LastHello >= 1.0)
+				SendHello(Now);
+			break;
+		case 5:
+			if (bReady && GetOwner()) AdvancePendingRepresentations(Deadline);
+			break;
+		case 6:
+			if (bReady && GetOwner())
+			{
+				if (!GetOwner()->HasAuthority()) RefreshOverlaySubscription(Now);
+				else AdvanceRepresentationSubscriptions(Now, Deadline);
+			}
+			break;
+		case 7:
+			if (bReady && GetOwner() && GetOwner()->HasAuthority() && Now - LastInterest >= 0.25) RefreshInterest(Now);
+			break;
+		case 8:
+			if (bReady && GetOwner()) AdvanceOverlayProtocol(Now, Deadline);
+			break;
 		}
-		if (!ProcessPacket(StateOwner->PacketHead.GetValue())) break;
-		if (OverlayNetwork != StateOwner || bRejected) return;
-		StateOwner->PacketBytes -= StateOwner->PacketHead->ResourceLease->Bytes();
-		StateOwner->PacketHead.Reset();
-		StateOwner->bPacketHeadWaitingCapacity = false;
+		if (OverlayNetwork != StateOwner || bRejected || !WorldModule->IsReady() || Frame.GetWorldEpoch() != WorldModule->GetWorldEpoch()) return;
 	}
-	if (FPlatformTime::Seconds() < Deadline) AdvanceEnvelopeDecode(Now);
-	if (!GetOwner()) return;
-	if (!bWelcomed && !bPendingReady && !GetOwner()->HasAuthority() && Now - LastHello >= 1.0 && FPlatformTime::Seconds() < Deadline)
-	{
-		SendHello(Now);
-	}
-	if (!bReady) return;
-	if (FPlatformTime::Seconds() < Deadline) AdvancePendingRepresentations(Deadline);
-	if (GetOwner()->HasAuthority())
-	{
-		if (FPlatformTime::Seconds() < Deadline) AdvanceRepresentationSubscriptions(Now, Deadline);
-		if (Now - LastInterest >= 0.25 && FPlatformTime::Seconds() < Deadline) RefreshInterest(Now);
-	}
-	else if (FPlatformTime::Seconds() < Deadline) RefreshOverlaySubscription(Now);
-	if (FPlatformTime::Seconds() < Deadline) AdvanceOverlayProtocol(Now, Deadline);
 }
 
 bool UVoxelModuleNetworkComponent::SendOverlayControl(const EVoxelMessage Kind, TConstArrayView<FIntVector> Regions)
@@ -618,7 +670,8 @@ void UVoxelModuleNetworkComponent::RefreshOverlaySubscription(const double Now)
 	Scope.Sort(LessRegion);
 	if (Scope.IsEmpty())
 	{
-		Attempt.Admission = EVoxelTerrainResourceAdmission::InvalidRequest;
+		// 出生范围尚未发布时没有订阅请求，等待原兴趣范围推进。
+		CancelAttempt();
 		return;
 	}
 	if (Scope == State.Regions && bSamePublishedIdentity)
@@ -714,18 +767,32 @@ void UVoxelModuleNetworkComponent::HandleOverlayMessage(const EVoxelMessage Kind
 	if (!OverlayNetwork || !WorldModule) return;
 	auto& State = *OverlayNetwork;
 	if (Message.WorldEpoch != State.Identity.WorldEpoch || Message.ManifestIdentity != State.Identity.Manifest ||
-		Message.DirectoryEpoch != State.Identity.DirectoryEpoch) return;
+		Message.DirectoryEpoch != State.Identity.DirectoryEpoch)
+	{
+		if (Message.SubscriptionId == State.Identity.Subscription && Message.CoverageTicket == State.Identity.Ticket)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Voxel overlay current ticket identity rejected: controller=%s epoch=%llu/%llu directory=%s/%s manifestMatches=%d"),
+				*GetPathNameSafe(GetOwner()), Message.WorldEpoch, State.Identity.WorldEpoch,
+				*Message.DirectoryEpoch.ToString(), *State.Identity.DirectoryEpoch.ToString(), Message.ManifestIdentity == State.Identity.Manifest);
+		}
+		return;
+	}
 	if (!bServer)
 	{
 		FString Error;
 		if (auto* Replica = WorldModule->GetOverlayReplica())
-			if (!Replica->Receive(Kind, MoveTemp(Message), Error)) State.LastRetry = -10.0;
+		{
+			if (!Replica->Receive(Kind, MoveTemp(Message), Error))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Voxel overlay receive rejected: controller=%s kind=%d reason=%s"),
+					*GetPathNameSafe(GetOwner()), int32(Kind), *Error);
+				State.LastRetry = -10.0;
+			}
+		}
 		return;
 	}
 	if (Kind == EVoxelMessage::SubscribeRegion || Kind == EVoxelMessage::ResyncRequest)
 	{
-		if (Kind == EVoxelMessage::ResyncRequest && State.Identity.Ticket == Message.CoverageTicket &&
-			(State.bBuild || State.SnapshotEncoder) && FPlatformTime::Seconds() - State.LastRetry < 2.0) return;
 		if (Message.Heads.IsEmpty() || Message.Heads.Num() > FVoxelOverlayRegionCodec::MaximumRegions || !GetAuthorizedObserver()) return;
 		if (State.Identity.Subscription == Message.SubscriptionId && State.Identity.Ticket == Message.CoverageTicket && !State.Regions.IsEmpty())
 		{
@@ -733,6 +800,9 @@ void UVoxelModuleNetworkComponent::HandleOverlayMessage(const EVoxelMessage Kind
 			if (Message.Heads.Num() != State.Regions.Num()) return;
 			for (const auto& Region : State.Regions)
 				if (!Message.Heads.ContainsByPredicate([&Region](const auto& Head) { return Head.Region == Region; })) return;
+			// 同 Ticket 的可靠重传复用在途切点；客户端重试间隔不能取消合法长任务。
+			if (State.bNeedsSnapshot || State.bBuild || State.bEncode || State.SnapshotBuildHead || State.DeltaBuildHead ||
+				State.Snapshot || State.EncodingDelta || State.SnapshotEncoder || State.DeltaEncoder || State.Outbound) return;
 		}
 		const FVector ObserverCell = GetAuthorizedObserver()->GetActorLocation() / WorldModule->BlockSize();
 		TArray<FVoxelStreamingSource> Authorized;
@@ -1006,6 +1076,8 @@ void UVoxelModuleNetworkComponent::BeginOverlaySnapshot()
 		State.LastRetry = FPlatformTime::Seconds();
 		State.bBuild = true;
 		State.bNeedsSnapshot = false;
+		UE_LOG(LogTemp, Display, TEXT("Voxel overlay snapshot admitted: controller=%s serial=%llu regions=%d transferQueuedBytes=%llu"),
+			*GetPathNameSafe(GetOwner()), State.BuildSerial, State.Regions.Num(), Transfer.QueuedBytes());
 		for (int32 Index = State.Edits.Num() - 1; Index >= 0; --Index)
 			if (State.Edits[Index].Cut <= Identity.Cut) State.Edits.RemoveAt(Index, 1, EAllowShrinking::No);
 		State.Replay.Reset();

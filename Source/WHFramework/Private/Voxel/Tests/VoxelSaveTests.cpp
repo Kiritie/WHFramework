@@ -16,6 +16,7 @@
 #include "SaveGame/SaveGameStorage.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Generation/VoxelManifestCodec.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Save/VoxelRegionStore.h"
 #include "Voxel/Save/VoxelSceneColumnCodec.h"
 #include "Voxel/Save/VoxelSceneColumnCapture.h"
@@ -1066,6 +1067,7 @@ bool FVoxelDirectoryBootstrapIsolationTest::RunTest(const FString& InParameters)
 	Store.AdvanceDirectoryLoad(Scheduler, 83, [&](auto Directory)
 	{
 		++SecondApplied;
+		TestTrue(TEXT("Directory receipt observes the current source as ready before restoring runtime owners"), Store.IsDirectoryReady());
 		Index.SetBaseline(MoveTemp(Directory));
 	});
 	TestFalse(TEXT("New source does not inherit old pending readiness"), Store.IsDirectoryReady());
@@ -1302,6 +1304,28 @@ bool FVoxelSaveCoordinatorTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("ToData termination preserves the callback frame until original capture cleanup finishes"),
 		Save->GetWorldSaveResult(CaptureAccepted.OperationId).Code != ESaveResultCode::Accepted &&
 		Producer->AfterCount == 4 && !Producer->bAfterSucceeded && !Save->Storage && !Save->bSaveOperationRunning);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelSceneActorDirectoryCapacityTest,
+	"WHFramework.Voxel.Save.SceneActorDirectoryCapacity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelSceneActorDirectoryCapacityTest::RunTest(const FString& InParameters)
+{
+	for (const int32 Count : {0, 1, 2, 3, 7, 8, 16, 31, 64, 129, 1024})
+	{
+		TMap<FGuid, FParameter> Actors;
+		const uint64 Bytes = VoxelBoundedAllocation::MapBytes<FGuid, FParameter>(Count);
+		Actors.Reserve(Count);
+		TestTrue(FString::Printf(TEXT("Actual reserved scene directory fits: compact=%d count=%d native=%llu heap=%llu bytes=%llu"),
+			UE_USE_COMPACT_SET_AS_DEFAULT, Count, uint64(Actors.GetAllocatedSize()), VoxelGenerationAllocation::AllocatedBytes(Actors), Bytes),
+			VoxelGenerationAllocation::AllocatedBytes(Actors) <= Bytes);
+		for (int32 Index = 0; Index < Count; ++Index) Actors.Add(FGuid(0, 0, 0, Index + 1), FParameter());
+		TestTrue(FString::Printf(TEXT("Actual filled scene directory fits: count=%d native=%llu heap=%llu bytes=%llu"),
+			Count, uint64(Actors.GetAllocatedSize()), VoxelGenerationAllocation::AllocatedBytes(Actors), Bytes),
+			VoxelGenerationAllocation::AllocatedBytes(Actors) <= Bytes);
+	}
 	return true;
 }
 

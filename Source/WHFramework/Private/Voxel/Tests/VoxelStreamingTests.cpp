@@ -1110,19 +1110,33 @@ bool FVoxelSchedulerAdmissionTest::RunTest(const FString& InParameters)
 	FVoxelTaskRequest Far = MakeRequest(2, EVoxelWorkClass::Visible, 1000.0);
 	const FVoxelTaskStamp FarStamp = Far.Stamp;
 	int32 CanceledCallbacks = 0;
-	Far.Apply = [&CanceledCallbacks](FVoxelTaskResult&& Result)
+	bool bAdmissionDisplaced = false;
+	Far.Apply = [&CanceledCallbacks, &bAdmissionDisplaced](FVoxelTaskResult&& Result)
 	{
 		CanceledCallbacks += Result.bCanceled ? 1 : 0;
+		bAdmissionDisplaced = Result.bAdmissionDisplaced;
 	};
 	TestTrue(TEXT("Far work fills the pending queue"), Scheduler.Enqueue(MoveTemp(Far)));
 	FVoxelTaskRequest Critical = MakeRequest(3, EVoxelWorkClass::Critical, 10.0);
 	const FVoxelTaskStamp CriticalStamp = Critical.Stamp;
+	int32 ExplicitCancellations = 0;
+	bool bExplicitWasDisplaced = false;
+	Critical.Apply = [&ExplicitCancellations, &bExplicitWasDisplaced](FVoxelTaskResult&& Result)
+	{
+		ExplicitCancellations += Result.bCanceled ? 1 : 0;
+		bExplicitWasDisplaced = Result.bAdmissionDisplaced;
+	};
 	TestTrue(TEXT("Critical work can enter a full queue"), Scheduler.Enqueue(MoveTemp(Critical)));
 	TestFalse(TEXT("Displaced work is removed from active bookkeeping"), Scheduler.Has(FarStamp, EVoxelTaskKind::GenerateExactBase));
 	TestTrue(TEXT("Critical work remains queued"), Scheduler.Has(CriticalStamp, EVoxelTaskKind::GenerateExactBase));
 	Scheduler.Tick([](FVoxelTaskResult&&) {});
 	TestEqual(TEXT("Displaced owner receives cancellation exactly once"), CanceledCallbacks, 1);
+	TestTrue(TEXT("Owner can distinguish capacity displacement from explicit cancellation"), bAdmissionDisplaced);
 	TestEqual(TEXT("Pending queue stays bounded"), Scheduler.GetDiagnostics().Pending, 1);
+	Scheduler.CancelTask(EVoxelTaskKind::GenerateExactBase, CriticalStamp);
+	Scheduler.Tick([](FVoxelTaskResult&&) {});
+	TestEqual(TEXT("Explicit cancellation reaches its owner exactly once"), ExplicitCancellations, 1);
+	TestFalse(TEXT("Explicit cancellation does not retain an admission retry"), bExplicitWasDisplaced);
 	Scheduler.StopAndJoin();
 	return true;
 }

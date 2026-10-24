@@ -974,6 +974,8 @@ void UInventoryNetworkComponent::SendSnapshot(const FServerSession& InSession)
     if(!World->GetSnapshot(Session.InventoryId, Snapshot, Error) || Snapshot.Generation != Session.Generation ||
        !FInventorySnapshotCodec::Encode(Snapshot, World->GetRegistry(), World->GetProfiles(), Bytes, Error))
     {
+        UE_LOG(LogTemp, Warning, TEXT("Inventory snapshot encode rejected: owner=%s inventory=%s profile=%s error=%s"),
+            *GetPathNameSafe(GetOwner()), *Session.InventoryId.ToString(), *Snapshot.ProfileId.ToString(), *Error);
         CloseServerSession(Session.InventoryId, EInventoryResultCode::InvalidState);
         return;
     }
@@ -1191,6 +1193,10 @@ void UInventoryNetworkComponent::ClientSnapshot_Implementation(const FInventoryS
        InChunk.Count != FMath::DivideAndRoundUp(InChunk.TotalBytes, InventoryNetworkFormat::ChunkBytes) ||
        InChunk.Index < 0 || InChunk.Index >= InChunk.Count)
     {
+        UE_LOG(LogTemp, Warning, TEXT("Inventory snapshot ingress rejected: owner=%s begunPlay=%d world=%d connectionValid=%d connectionMatches=%d storeMatches=%d epochMatches=%d sessionValid=%d sessionClosed=%d transferValid=%d bytes=%d count=%d index=%d"),
+            *GetPathNameSafe(GetOwner()), HasBegunPlay(), World != nullptr, ConnectionId.IsValid(), InChunk.ConnectionId == ConnectionId,
+            InChunk.StoreId == ConnectionStoreId, InChunk.WorldEpoch == WorldEpoch, InChunk.SessionId.IsValid(),
+            LocallyClosedSessions.Contains(InChunk.SessionId), InChunk.TransferId.IsValid(), InChunk.TotalBytes, InChunk.Count, InChunk.Index);
         return;
     }
     const int32 Offset = InChunk.Index * InventoryNetworkFormat::ChunkBytes;
@@ -1260,6 +1266,9 @@ void UInventoryNetworkComponent::ClientSnapshot_Implementation(const FInventoryS
     Assemblies.Remove(InChunk.TransferId);
     if(!bDecoded)
     {
+        UE_LOG(LogTemp, Warning, TEXT("Inventory snapshot decode rejected: owner=%s inventory=%s profile=%s profiles=%d error=%s decodedWorld=%s expectedWorld=%s"),
+            *GetPathNameSafe(GetOwner()), *InChunk.InventoryId.ToString(), *Snapshot.ProfileId.ToString(), World->GetProfiles().Num(), *Error,
+            *Snapshot.WorldId.ToString(), *ConnectionWorldId.ToString());
         ClientClosed_Implementation(InChunk.ConnectionId, InChunk.InventoryId, InChunk.SessionId, EInventoryResultCode::InvalidItem);
         return;
     }
@@ -1388,6 +1397,11 @@ void UInventoryNetworkComponent::ClientResult_Implementation(FGuid InConnectionI
 void UInventoryNetworkComponent::ClientClosed_Implementation(FGuid InConnectionId, FGuid InInventoryId, FGuid InSessionId, EInventoryResultCode InReason)
 {
     if(!ConnectionId.IsValid() || InConnectionId != ConnectionId) return;
+    if(InInventoryId == OwnerInventoryId && InReason != EInventoryResultCode::Success)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Owner inventory session closed: owner=%s inventory=%s session=%s reason=%d"),
+            *GetPathNameSafe(GetOwner()), *InInventoryId.ToString(), *InSessionId.ToString(), int32(InReason));
+    }
     const uint64 ContextRevision = ClientContextRevision;
     const bool bLocallyClosed = LocallyClosedSessions.Remove(InSessionId) > 0;
     const FClientView* View = Views.Find(InInventoryId);

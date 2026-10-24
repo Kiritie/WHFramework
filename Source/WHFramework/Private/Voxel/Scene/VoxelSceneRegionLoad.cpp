@@ -1,6 +1,7 @@
 ﻿#include "Voxel/Scene/VoxelSceneRegion.h"
 
 #include "SaveGame/SaveDataSerializer.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 #include "Voxel/Save/VoxelSceneColumnRead.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
@@ -200,7 +201,7 @@ void UVoxelSceneRegion::AdvanceSceneLoad(FVoxelTaskScheduler& InScheduler)
 		}
 		if (!PendingActorStorageLease)
 		{
-			const uint64 Bytes = VoxelBoundedAllocation::MapBytes<FGuid, FParameter>(Read->Actors.Num());
+			const uint64 Bytes = VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FGuid, FParameter>>(PendingActors, Read->Actors.Num());
 			uint64 Version = 0;
 			if (!State->Resources->TryGetReleaseVersionExcludingOwner(State->Consumer, Version)) return;
 			uint64 InputFloor = 0;
@@ -233,7 +234,9 @@ void UVoxelSceneRegion::AdvanceSceneLoad(FVoxelTaskScheduler& InScheduler)
 			{ Fail(Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
 				TEXT("CapacityUnachievable: Scene restore actor directory") : TEXT("InvalidRequest: Scene restore actor directory")); return; }
 			PendingActors.Reserve(Read->Actors.Num());
-			check(PendingActors.GetAllocatedSize() <= Bytes);
+			checkf(VoxelGenerationAllocation::AllocatedBytes(PendingActors) <= Bytes,
+				TEXT("Scene actor directory capacity: saved=%d pending=%d native=%llu heap=%llu granted=%llu"),
+				Read->Actors.Num(), PendingActors.Num(), uint64(PendingActors.GetAllocatedSize()), VoxelGenerationAllocation::AllocatedBytes(PendingActors), Bytes);
 		}
 		FString Error;
 		if (State->ActorCursor < Read->Actors.Num())

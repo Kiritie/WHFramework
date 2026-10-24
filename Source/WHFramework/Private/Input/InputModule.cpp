@@ -20,6 +20,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedPlayerInput.h"
 #include "Engine/GameInstance.h"
+#include "Engine/GameViewportClient.h"
 #include "Input/InputManager.h"
 #include "Input/Base/InputActionBase.h"
 #include "Input/InputModuleStatics.h"
@@ -504,7 +505,19 @@ void UInputModule::RefreshCommonUIInputMode(int32 InPlayerIndex)
 	const TOptional<FUIInputConfig> InputConfig = ActiveWidget
 		? ActiveWidget->GetDesiredInputConfig()
 		: TOptional<FUIInputConfig>();
-	if (ActionRouter && InputConfig.IsSet()) ActionRouter->SetActiveUIInputConfig(InputConfig.GetValue(), ActiveWidget);
+	if(ActionRouter && InputConfig.IsSet())
+	{
+		ActionRouter->SetActiveUIInputConfig(InputConfig.GetValue(), ActiveWidget);
+		const APlayerController* Controller = PlayerRuntimes[InPlayerIndex].PlayerController.Get();
+		const UGameViewportClient* Viewport = Controller ? Controller->GetWorld()->GetGameViewport() : nullptr;
+		const EMouseCaptureMode ExpectedCapture = ActionRouter->GetActiveMouseCaptureMode();
+		if(Controller && Viewport &&
+			(Viewport->GetMouseCaptureMode() != ExpectedCapture ||
+				(ExpectedCapture == EMouseCaptureMode::NoCapture && !Controller->bShowMouseCursor)))
+		{
+			ActionRouter->RefreshUIInputConfig();
+		}
+	}
 	ApplyCommonUIInputConfig(InputConfig.IsSet() ? &InputConfig.GetValue() : nullptr, InPlayerIndex);
 }
 

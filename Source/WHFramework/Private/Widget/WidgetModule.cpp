@@ -859,6 +859,7 @@ void UWidgetModule::UnMountUserWidget(UUserWidgetBase* InWidget)
 
 UUserWidgetBase* UWidgetModule::CreateUserWidgetByTag(FGameplayTag InWidgetTag, const FParameter& InParam, TSubclassOf<UUserWidgetBase> InClass)
 {
+	const FScopedWorldContext WorldContextScope(GetWorld());
 	if(UUserWidgetBase* Existing = GetUserWidgetByTag(InWidgetTag))
 	{
 		return Existing;
@@ -918,6 +919,7 @@ UUserWidgetBase* UWidgetModule::CreateUserWidgetByTag(FGameplayTag InWidgetTag, 
 
 bool UWidgetModule::OpenUserWidgetByTag(FGameplayTag InWidgetTag, const FParameter& InParam, bool bInstant, bool bForce, TSubclassOf<UUserWidgetBase> InClass)
 {
+	const FScopedWorldContext WorldContextScope(GetWorld());
 	const FParameter OpenParam = MakeWidgetOpenParam(InParam);
 	const FParameter SpawnOwnerParam = MakeWidgetSpawnOwnerParam(OpenParam);
 	const FScreenWidgetConfig* Config = GetUserWidgetConfig(InWidgetTag);
@@ -989,6 +991,7 @@ bool UWidgetModule::OpenUserWidgetByTag(FGameplayTag InWidgetTag, const FParamet
 
 bool UWidgetModule::CloseUserWidgetByTag(FGameplayTag InWidgetTag, bool bInstant)
 {
+	const FScopedWorldContext WorldContextScope(GetWorld());
 	if(UUserWidgetBase* Widget = GetUserWidgetByTag(InWidgetTag))
 	{
 		if(const FScreenWidgetConfig* Config = GetUserWidgetConfig(InWidgetTag); Config && Config->WidgetType == EWidgetType::Temporary)
@@ -1034,6 +1037,7 @@ bool UWidgetModule::CloseActiveTemporaryWidget(const FWidgetMountContext& InCont
 
 void UWidgetModule::HandleTemporaryWidgetClosed(bool bInstant, FWidgetMountContext InContext, UUserWidgetBase* InWidget)
 {
+	const FScopedWorldContext WorldContextScope(GetWorld());
 	InWidget->OnClosed.RemoveAll(this);
 	if(ActiveTemporaryWidgets.Contains(InContext))
 	{
@@ -1082,6 +1086,7 @@ void UWidgetModule::CloseTemporaryWidgetsForParent(FGameplayTag InParentWidgetTa
 
 bool UWidgetModule::DestroyUserWidgetByTag(FGameplayTag InWidgetTag, EObjectDespawnMode InMode)
 {
+	const FScopedWorldContext WorldContextScope(GetWorld());
 	if(UUserWidgetBase* Widget = GetUserWidgetByTag(InWidgetTag))
 	{
 		UserWidgetByTag.Remove(InWidgetTag);
@@ -1283,6 +1288,7 @@ TArray<UWorldWidgetBase*> UWidgetModule::GetWorldWidgetsByTag(FGameplayTag InWid
 
 UWorldWidgetBase* UWidgetModule::CreateWorldWidgetByTag(FGameplayTag InWidgetTag, FWorldWidgetMapping InMapping, const FParameter& InParam, TSubclassOf<UWorldWidgetBase> InClass)
 {
+	const FScopedWorldContext WorldContextScope(GetWorld());
 	const FParameter SpawnParam = MakeWidgetSpawnParam(InParam);
 	const FWorldWidgetConfig* Config = GetWorldWidgetConfig(InWidgetTag);
 	if(!Config)
@@ -1309,6 +1315,7 @@ UWorldWidgetBase* UWidgetModule::CreateWorldWidgetByTag(FGameplayTag InWidgetTag
 
 bool UWidgetModule::DestroyWorldWidgetByTag(FGameplayTag InWidgetTag, UWorldWidgetBase* InWidget, EObjectDespawnMode InMode)
 {
+	const FScopedWorldContext WorldContextScope(GetWorld());
 	FWorldWidgets* Widgets = WorldWidgetByTag.Find(InWidgetTag);
 	if(!Widgets || !InWidget)
 	{
@@ -1396,6 +1403,7 @@ void UWidgetModule::DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, E
 
 void UWidgetModule::ClearAllWorldWidget(EObjectDespawnMode InMode)
 {
+	const FScopedWorldContext WorldContextScope(GetWorld());
 	TArray<UWorldWidgetBase*> WidgetsToDestroy;
 	for(const auto& Iter : WorldWidgetByTag)
 	{

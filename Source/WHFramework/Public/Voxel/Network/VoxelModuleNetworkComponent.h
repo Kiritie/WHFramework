@@ -22,6 +22,32 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FVoxelIntentReplyReceived, const FVoxelEditR
 DECLARE_MULTICAST_DELEGATE_OneParam(FVoxelRepresentationReplyReceived, const FVoxelRepresentationReply&);
 DECLARE_MULTICAST_DELEGATE_OneParam(FVoxelRepresentationInvalidated, const FVoxelRepresentationInvalidate&);
 
+struct WHFRAMEWORK_API FVoxelTerrainNetworkStatus
+{
+	bool bActive = false;
+	int32 Phase = 0;
+	int32 Regions = 0;
+	uint64 BuildSerial = 0;
+	uint64 PacketBytes = 0;
+	uint64 EnvelopeBytes = 0;
+	uint64 InboundBytes = 0;
+	bool bSubscriptionPending = false;
+	bool bBuilding = false;
+	bool bEncoding = false;
+	bool bDecoding = false;
+	bool bNeedsSnapshot = false;
+	bool bSnapshotTerminalFailure = false;
+	int32 SubscriptionAdmission = 0;
+	int32 SnapshotAdmission = 0;
+	int32 EncoderAdmission = 0;
+	int32 OutboundAdmission = 0;
+	uint64 AuthorityEpoch = 0;
+	FGuid DirectoryEpoch;
+	FGuid Session;
+	FGuid Subscription;
+	FGuid Ticket;
+};
+
 UCLASS()
 class WHFRAMEWORK_API UVoxelModuleNetworkComponent : public UModuleNetworkComponentBase
 {
@@ -48,6 +74,7 @@ public:
 		const FVoxelRepresentationWireKey& InKey,
 		uint64 InKnownRevision);
 	bool IsSessionReady() const;
+	FVoxelTerrainNetworkStatus GetTerrainNetworkStatus() const;
 	void AdvanceTerrainNetwork(FVoxelTerrainFrameContext& InFrame);
 	bool AdvanceDeferredWorldControl();
 	void OnTerrainWorldStopping();

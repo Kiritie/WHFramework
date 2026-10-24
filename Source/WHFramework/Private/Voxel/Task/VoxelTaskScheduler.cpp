@@ -1003,13 +1003,22 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 				Diagnostics.PendingDisplacements, int32(Displaced.Kind), Displaced.Stamp.Token,
 				int32(InRequest.Kind), InRequest.Stamp.Token, Displaced.AccumulatedExecuteMilliseconds,
 				Pending.Num(), PendingLimit, QueuedInputBytes + RunningContinuationInputBytes, InRequest.InputBytes);
+			for (const FVoxelTaskRequest* Request : {&Displaced, &InRequest})
+			{
+				const auto Priority = ResolveServicePriority(*Request);
+				UE_LOG(LogTemp, Display, TEXT("Voxel displacement priority: incoming=%d token=%llu sequence=%llu class=%d band=%d distance=%.3f forward=%.3f source=%s queuedAge=%.3f runnableAge=%.3f blocked=%u resumable=%d executeMs=%.3f running=%d awaitingApply=%d"),
+					Request == &InRequest, Request->Stamp.Token, Request->Sequence, int32(Request->WorkClass), int32(Priority.Band),
+					Priority.DistanceCells, Priority.ForwardScore, *Priority.SourceStableKey.ToString(),
+					AdmissionNow - Request->QueuedAt, AdmissionNow - Request->FirstRunnableSeconds, uint32(Request->Blocked),
+					Request->bResumable, Request->AccumulatedExecuteMilliseconds, Running.Num(), AwaitingApply.Num());
+			}
 		}
 		Pending.RemoveAtSwap(Index, 1, EAllowShrinking::No);
 		QueuedInputBytes -= Displaced.InputBytes;
 		const FVoxelTaskKey DisplacedKey{Displaced.Kind, Displaced.Stamp};
 		RemoveActive(Displaced.Stamp, Displaced.Kind, Displaced.WorkClass, false);
 		AdmissionAttempts.FindChecked(DisplacedKey).Blocked = EVoxelTaskBlockReason::PendingCapacity;
-		QueueCanceled(MoveTemp(Displaced));
+		QueueCanceled(MoveTemp(Displaced), EVoxelTaskBlockReason::None, true);
 	}
 
 	AdmissionAttempts.FindChecked(AttemptKey).Blocked = EVoxelTaskBlockReason::None;
@@ -1161,6 +1170,12 @@ void FVoxelTaskScheduler::UpdateTerrainStages(TFunctionRef<void(EVoxelTaskKind, 
 	});
 }
 
+void FVoxelTaskScheduler::SetPaused(bool bInPaused)
+{
+	check(IsInGameThread());
+	bPaused = bInPaused;
+}
+
 void FVoxelTaskScheduler::Tick(
 	TFunctionRef<void(FVoxelTaskResult&&)> InApply,
 	const double InMaxApplyMilliseconds)
@@ -1168,7 +1183,7 @@ void FVoxelTaskScheduler::Tick(
 	check(IsInGameThread());
 
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TaskSchedulerTick);
-	if (bTicking) return;
+	if (bTicking || bPaused) return;
 	TGuardValue<bool> TickGuard(bTicking, true);
 	Diagnostics.LastAdmissionMilliseconds = 0.0;
 	Diagnostics.LastResultApplyMilliseconds = 0.0;
@@ -1884,6 +1899,9 @@ FVoxelTaskScheduler::GetDiagnostics() const
 	Result.Running = 0;
 	Result.NativeInFlight = 0;
 	Result.CompletedAwaitingApply = AwaitingApply.Num();
+	Result.bWorkerSelectionFault = WorkerSelection.HasAccountingFault();
+	Result.bCompletedSelectionFault = CompletedSelection.HasAccountingFault();
+	Result.CompletedSelectionAdmission = CompletedSelection.GetLastResourceAdmission();
 	Result.CriticalAdmissionDeferrals = CriticalAdmissionDeferrals;
 	Result.CriticalPending = 0;
 	for (const FVoxelTaskRequest& Request : Pending)
@@ -2165,6 +2183,7 @@ void FVoxelTaskScheduler::RetireCompletedTasks()
 
 void FVoxelTaskScheduler::Pump()
 {
+	if (bPaused) return;
 	if (EnqueueBatchDepth > 0)
 	{
 		bBatchPumpRequested = true;
@@ -2424,7 +2443,7 @@ void FVoxelTaskScheduler::EndEnqueueBatch()
 }
 
 void FVoxelTaskScheduler::QueueCanceled(
-	FVoxelTaskRequest&& InRequest, const EVoxelTaskBlockReason InFailure)
+	FVoxelTaskRequest&& InRequest, const EVoxelTaskBlockReason InFailure, const bool bInAdmissionDisplaced)
 {
 	FCompleted Completed;
 	Completed.Result.WorkReceipt = InRequest.WorkReceipt;
@@ -2441,6 +2460,7 @@ void FVoxelTaskScheduler::QueueCanceled(
 
 	Completed.Result.bCanceled =
 		InFailure == EVoxelTaskBlockReason::None;
+	Completed.Result.bAdmissionDisplaced = bInAdmissionDisplaced;
 	if (!Completed.Result.bCanceled)
 	{
 		const TCHAR* Error = InFailure == EVoxelTaskBlockReason::Oversized ? TaskReceiptCapacityError : TaskReceiptRequestError;

@@ -2724,7 +2724,7 @@ bool FWidgetThemeEditorService::RenameTag(FGameplayTag Old, FGameplayTag New, FS
 	FScopedTransaction Transaction(NSLOCTEXT("WidgetTheme", "RenameTag", "Rename theme Tag"));
 	for (UObject* O : Objects)
 	{
-		O->Modify();
+		O->Modify(false);
 		bool Changed = false;
 		for (TFieldIterator<FProperty> P(O->GetClass()); P; ++P)
 		{

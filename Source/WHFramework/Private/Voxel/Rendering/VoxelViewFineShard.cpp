@@ -871,8 +871,12 @@ void FVoxelViewManager::OnContentChanged(const FIntVector& InSection)
 		if (auto* Slot = FineShardSlots.Find(Key))
 		{
 			const uint64 Revision = Module.GetRuntime()->GetChangeHierarchy().GetFineShardRevision(Key);
-			Slot->Build.NotifyDataChanged(Revision, Revision);
-			CancelFineShardAdmission(Key);
+			const auto Input = Slot->Build.GetInput();
+			if (Slot->Build.NotifyContentChanged(Input.GeneratorIdentity, Input.RegistryRevision, Input.ShapeRevision,
+				Revision, Revision))
+			{
+				CancelFineShardAdmission(Key);
+			}
 		}
 	});
 }

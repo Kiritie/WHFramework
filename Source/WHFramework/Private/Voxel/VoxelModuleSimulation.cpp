@@ -482,12 +482,16 @@ void UVoxelModule::AdvanceSceneRegions()
 {
 	const double Deadline = TerrainFrameContext.Deadline(0.25);
 	const int32 Count = FMath::Min(4, SceneRegions.Num());
+	bool bAdvancedRegion = false;
+	// 场景恢复至少推进一个有界步骤，避免持续呈现耗尽预算后阻塞出生接管。
 	for (int32 Step = 0; Step < Count && SceneRegionHead &&
-		FPlatformTime::Seconds() < Deadline; ++Step)
+		(!bAdvancedRegion || FPlatformTime::Seconds() < Deadline); ++Step)
 	{
 		const double Started = FPlatformTime::Seconds();
-		if (TerrainFrameContext.IsActive() && !TerrainFrameContext.GetPublishBudget().TryStart(EVoxelPublishPhase::Prepare,
-			Started, SceneRegionCostMilliseconds)) break;
+		const bool bWithinBudget = !TerrainFrameContext.IsActive() ||
+			TerrainFrameContext.GetPublishBudget().TryStart(EVoxelPublishPhase::Prepare, Started, SceneRegionCostMilliseconds);
+		if (!bWithinBudget && bAdvancedRegion) break;
+		bAdvancedRegion = true;
 		if (!SceneRegionCursor) SceneRegionCursor = SceneRegionHead;
 		auto* Region = SceneRegionCursor;
 		TGuardValue<bool> Transition(bSceneTransitionActive, true);
@@ -499,7 +503,7 @@ void UVoxelModule::AdvanceSceneRegions()
 		// 保存失败可能影响多个局部 Section；恢复只消费该区域保留的票据。
 		auto* Waiting = Region->SimulationFailureCursor ? Region->SimulationFailureCursor : Region->SimulationFailureHead;
 		for (int32 Wake = 0; Wake < 16 && Waiting && Region->bSceneReady && !Region->bSceneFailed &&
-			FPlatformTime::Seconds() < Deadline; ++Wake)
+			(Wake == 0 || FPlatformTime::Seconds() < Deadline); ++Wake)
 		{
 			auto* Section = Waiting;
 			Waiting = Section->SimulationFailureNext;

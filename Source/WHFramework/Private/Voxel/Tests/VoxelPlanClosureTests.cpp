@@ -26,7 +26,22 @@ bool FVoxelLocalPlanClosureTest::RunTest(const FString& InParameters)
 	FString Error;
 	TestTrue(TEXT("近处事实具有独立闭包"), Coordinator.GatherPrerequisites(Near, NearReads, Error));
 	TestTrue(TEXT("远处事实具有独立闭包"), Coordinator.GatherPrerequisites(Far, FarReads, Error));
-	TestEqual(TEXT("结构只采样所属瓦片水文"), NearReads.Values.Num(), 1);
+	TSet<FVoxelHydrologyRegionKey> ExpectedHydrology;
+	for (int32 CellY = 0; CellY < FVoxelGenerationQuery::GenerationPlanTileSide; ++CellY)
+	{
+		for (int32 CellX = 0; CellX < FVoxelGenerationQuery::GenerationPlanTileSide; ++CellX)
+		{
+			ExpectedHydrology.Add(FVoxelGenerationQuery::HydrologyKeyForVoxel(CellX, CellY,
+				Config->Recipe->Settings, Config->Recipe->AlgorithmVersion));
+		}
+	}
+	TestEqual(TEXT("结构闭包覆盖所属瓦片的全部水文键"), NearReads.Values.Num(), ExpectedHydrology.Num());
+	for (const auto& Read : NearReads.Values)
+	{
+		TestTrue(TEXT("结构闭包不包含瓦片外水文键"), Read.Kind == EVoxelGenerationPlanKind::Hydrology &&
+			ExpectedHydrology.Remove(Read.HydrologyKey) == 1);
+	}
+	TestTrue(TEXT("结构闭包没有遗漏水文键"), ExpectedHydrology.IsEmpty());
 	TestFalse(TEXT("远处闭包不别名近处水文"), NearReads.Values.Contains(FarReads.Values[0]));
 	for (const auto& Read : NearReads.Values)
 	{
@@ -47,8 +62,82 @@ bool FVoxelLocalPlanClosureTest::RunTest(const FString& InParameters)
 	const auto* Donated = Coordinator.PriorityGraph.Find(Coordinator.Storage->States.FindChecked(FarReads.Values[0]).PriorityNode);
 	TestTrue(TEXT("生产依赖图将完整 Source 优先级送至事实叶子"), Donated && Donated->SourceStableKey == Consumer.OwnerId &&
 		Donated->Band == EVoxelTerrainServiceBand::P0);
+	const auto PartialKey = FarReads.Values.Last().HydrologyKey;
+	Cache->StoreHydrology(PartialKey, MakeShared<FVoxelHydrologyPlan, ESPMode::ThreadSafe>());
+	FVoxelGenerationCacheRetention EmptyStreaming;
+	EmptyStreaming.Revision = 1;
+	Cache->UpdateRetention(EmptyStreaming);
+	for (int32 Index = 0; Index < FVoxelGenerationPlanCache::ShardCount * 2; ++Index)
+	{
+		Cache->TickMaintenance(256);
+	}
+	{
+		FVoxelHydrologyPlanPtr Partial;
+		TestTrue(TEXT("等待其他依赖期间，已完成的部分闭包不能被维护回收"), Cache->FindHydrology(PartialKey, Partial));
+	}
 	Coordinator.ReleaseConsumer(Consumer);
+	const double RetirementDeadline = FPlatformTime::Seconds() + 2.;
+	do
+	{
+		Scheduler.Tick([](FVoxelTaskResult&&) {});
+		if (Scheduler.ActiveCount()) FPlatformProcess::Sleep(.001f);
+	} while (Scheduler.ActiveCount() && FPlatformTime::Seconds() < RetirementDeadline);
+	Scheduler.Tick([](FVoxelTaskResult&&) {});
 	Scheduler.StopAndJoin();
+	for (int32 Index = 0; Index < FVoxelGenerationPlanCache::ShardCount * 2; ++Index)
+	{
+		Cache->TickMaintenance(256);
+	}
+	{
+		FVoxelHydrologyPlanPtr Partial;
+		TestFalse(TEXT("消费者释放且任务退休后，部分闭包恢复正常回收"), Cache->FindHydrology(PartialKey, Partial));
+	}
+	// 容量置换不是事实撤销；重试必须使用调度器保留年龄的原尝试。
+	{
+		FVoxelTaskScheduler AdmissionScheduler(true);
+		FVoxelTaskBudget Budget;
+		Budget.MaxConcurrentTasks = 1;
+		Budget.MaxPendingTasks = 1;
+		AdmissionScheduler.SetBudget(Budget);
+		FVoxelTaskRequest Occupied;
+		Occupied.Kind = EVoxelTaskKind::GenerateExactBase;
+		Occupied.WorkClass = EVoxelWorkClass::Visible;
+		Occupied.Stamp.WorldEpoch = 19;
+		Occupied.Stamp.Token = 1;
+		Occupied.ReservedBytes = 1024;
+		Occupied.Execute = [](const TAtomic<bool>& Cancel)
+		{
+			while (!Cancel.Load()) FPlatformProcess::Sleep(.001f);
+			return FVoxelTaskResult();
+		};
+		TestTrue(TEXT("占据唯一执行槽"), AdmissionScheduler.Enqueue(MoveTemp(Occupied)));
+		const auto AdmissionCache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+		FVoxelGenerationPlanCoordinator AdmissionCoordinator(AdmissionScheduler, Config, AdmissionCache, 19);
+		FVoxelGenerationPlanDependency Hydro;
+		Hydro.Kind = EVoxelGenerationPlanKind::Hydrology;
+		const auto AdmissionConsumer = FVoxelGenerationConsumerKey::Section(19, FGuid::NewGuid(), 1, {}, 1);
+		const FVoxelGenerationPlanDependency Reads[] = {Hydro};
+		AdmissionCoordinator.Ensure(MakeArrayView(Reads), EVoxelWorkClass::Visible, 3, 1000., 0., AdmissionConsumer);
+		const uint64 OriginalAttempt = AdmissionCoordinator.Storage->States.FindChecked(Hydro).AttemptId;
+		FVoxelTaskRequest Urgent;
+		Urgent.Kind = EVoxelTaskKind::GenerateExactBase;
+		Urgent.WorkClass = EVoxelWorkClass::Critical;
+		Urgent.Stamp.WorldEpoch = 19;
+		Urgent.Stamp.Token = 2;
+		Urgent.ReservedBytes = 1024;
+		Urgent.Execute = [](const TAtomic<bool>&) { return FVoxelTaskResult(); };
+		const FVoxelTaskStamp UrgentStamp = Urgent.Stamp;
+		TestTrue(TEXT("紧急任务置换等待中的原生事实"), AdmissionScheduler.Enqueue(MoveTemp(Urgent)));
+		AdmissionScheduler.Tick([](FVoxelTaskResult&&) {});
+		TestTrue(TEXT("置换保留事实的原尝试身份"), AdmissionCoordinator.Storage->States.FindChecked(Hydro).bAttemptPendingAdmission);
+		AdmissionScheduler.CancelTask(EVoxelTaskKind::GenerateExactBase, UrgentStamp);
+		AdmissionScheduler.Tick([](FVoxelTaskResult&&) {});
+		AdmissionCoordinator.Ensure(MakeArrayView(Reads), EVoxelWorkClass::Visible, 3, 1000., 0., AdmissionConsumer);
+		TestEqual(TEXT("置换重试不产生新token或遗留旧准入记录"), AdmissionCoordinator.Storage->States.FindChecked(Hydro).AttemptId, OriginalAttempt);
+		TestTrue(TEXT("原事实重新进入有界队列"), AdmissionCoordinator.Storage->States.FindChecked(Hydro).bInFlight);
+		AdmissionCoordinator.ReleaseConsumer(AdmissionConsumer);
+		AdmissionScheduler.StopAndJoin();
+	}
 	return true;
 }
 

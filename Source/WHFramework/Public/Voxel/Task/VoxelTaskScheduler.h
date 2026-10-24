@@ -163,6 +163,8 @@ struct WHFRAMEWORK_API FVoxelTaskResult
 
 	bool bSuccess = false;
 	bool bCanceled = false;
+	// 队列容量置换保留准入年龄；生产者可沿原 Stamp 重试，区别于主动撤销。
+	bool bAdmissionDisplaced = false;
 	bool bKnownEmptyMesh = false;
 	bool bContinue = false;
 	// Worker 已证明下一片不需要主线程或外部准入；仅在同一有界执行时间片内续跑。
@@ -558,6 +560,9 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 	uint64 CriticalAdmissionDeferrals = 0;
 	double LastAdmissionMilliseconds = 0.0;
 	double LastResultApplyMilliseconds = 0.0;
+	bool bWorkerSelectionFault = false;
+	bool bCompletedSelectionFault = false;
+	EVoxelTerrainResourceAdmission CompletedSelectionAdmission = EVoxelTerrainResourceAdmission::Granted;
 
 	uint64 ReservedBytes = 0;
 	uint64 QueuedInputBytes = 0;
@@ -629,6 +634,8 @@ public:
 	FVoxelTaskScheduler& operator=(const FVoxelTaskScheduler&) = delete;
 
 	bool Enqueue(FVoxelTaskRequest&& InRequest);
+	void SetPaused(bool bInPaused);
+	bool IsPaused() const { return bPaused; }
 	bool ObserveDemand(EVoxelTaskKind InKind, const FVoxelTaskStamp& InStamp,
 		EVoxelTaskBlockReason InReason, uint64 InInputBytes = 0, uint64 InResultBytes = 0);
 	bool IsTerminal(const FVoxelTaskKey& InKey) const;
@@ -790,7 +797,7 @@ private:
 	void Pump();
 	void BeginEnqueueBatch();
 	void EndEnqueueBatch();
-	void QueueCanceled(FVoxelTaskRequest&& InRequest, EVoxelTaskBlockReason InFailure = EVoxelTaskBlockReason::None);
+	void QueueCanceled(FVoxelTaskRequest&& InRequest, EVoxelTaskBlockReason InFailure = EVoxelTaskBlockReason::None, bool bInAdmissionDisplaced = false);
 	void CancelAttempt(const FVoxelTaskKey& InKey, uint64 InSequence);
 
 	void AddActive(
@@ -910,6 +917,7 @@ private:
 	double AdmissionStallStarted = -1.0;
 	double LastAdmissionStallLog = -15.0;
 	bool bStopped = false;
+	bool bPaused = false;
 	bool bAllowPassive = false;
 	bool bPumping = false;
 	int32 EnqueueBatchDepth = 0;

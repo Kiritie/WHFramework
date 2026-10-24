@@ -116,6 +116,8 @@ public:
 	virtual void OnInitialize() override;
 	virtual void OnPreparatory(EPhase InPhase) override;
 	virtual void OnRefresh(float InDeltaSeconds, bool bInEditor) override;
+	virtual void OnPause() override;
+	virtual void OnUnPause() override;
 	virtual void OnTermination(EPhase InPhase) override;
 	virtual bool IsSaveEnabled() const override;
 

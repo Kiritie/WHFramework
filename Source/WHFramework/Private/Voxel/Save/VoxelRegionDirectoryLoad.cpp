@@ -210,8 +210,8 @@ void FVoxelRegionStore::AdvanceDirectoryLoad(FVoxelTaskScheduler& InScheduler, c
 		}
 		const auto Payload = StaticCastSharedPtr<const FDirectoryLoadPayload>(Result.CustomPayload);
 		Owner->Directory = Payload->Directory;
-		if (State->OnReady) State->OnReady(Owner->Directory);
 		Owner->bDirectoryReady = true;
+		if (State->OnReady) State->OnReady(Owner->Directory);
 		Result.MarkWorkUsed();
 		State->SourceLease.Reset();
 		Owner->DirectoryLoadAttempt.Reset();

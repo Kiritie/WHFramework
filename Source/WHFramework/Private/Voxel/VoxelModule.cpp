@@ -335,7 +335,7 @@ void UVoxelModule::OnRefresh(
 		return;
 	}
 	USaveGameModule* SaveCleanupOwner = nullptr;
-	const bool bTerrainReady = IsReady();
+	const bool bTerrainReady = Runtime && (WorldState == EVoxelWorldState::Running || WorldState == EVoxelWorldState::Initializing);
 	if (!bTerrainReady)
 	{
 		SaveCleanupOwner = USaveGameModule::GetPtr(GetWorld());
@@ -393,6 +393,11 @@ void UVoxelModule::OnRefresh(
 			{
 				Runtime->GetChangeIndex().SetBaseline(MoveTemp(InDirectory));
 				bInterestDirty = true;
+				if (WorldState == EVoxelWorldState::Initializing)
+				{
+					WorldState = EVoxelWorldState::Running;
+					OnWorldInitialized.Broadcast();
+				}
 			}
 		});
 	Scheduler->Tick(
@@ -410,17 +415,27 @@ void UVoxelModule::OnRefresh(
 		TerrainFrameContext.End(FPlatformTime::Seconds());
 		return;
 	}
+	if (WorldState != EVoxelWorldState::Running)
+	{
+		TerrainFrameContext.End(FPlatformTime::Seconds());
+		return;
+	}
 	const double AfterScheduler = FPlatformTime::Seconds();
 	const double NetworkDeadline = TerrainFrameContext.Deadline(0.1);
-	for (int32 Count = 0; Count < TerrainNetworkComponents.Num() && FPlatformTime::Seconds() < NetworkDeadline; ++Count)
+	const int32 NetworkServiceCount = TerrainNetworkComponents.Num() + (OverlayReplica ? 1 : 0);
+	for (int32 Count = 0; Count < NetworkServiceCount && FPlatformTime::Seconds() < NetworkDeadline; ++Count)
 	{
-		TerrainNetworkCursor %= TerrainNetworkComponents.Num();
-		if (auto* Network = TerrainNetworkComponents[TerrainNetworkCursor++].Get()) Network->AdvanceTerrainNetwork(TerrainFrameContext);
-	}
-	if (OverlayReplica)
-	{
-		FString OverlayError;
-		if (FPlatformTime::Seconds() < NetworkDeadline) OverlayReplica->Advance(1, OverlayError);
+		TerrainNetworkCursor %= NetworkServiceCount;
+		const int32 Service = TerrainNetworkCursor++;
+		if (Service < TerrainNetworkComponents.Num())
+		{
+			if (auto* Network = TerrainNetworkComponents[Service].Get()) Network->AdvanceTerrainNetwork(TerrainFrameContext);
+		}
+		else
+		{
+			FString OverlayError;
+			OverlayReplica->Advance(1, OverlayError);
+		}
 	}
 	const double OverlayDeadline = TerrainFrameContext.Deadline(0.05);
 	for (int32 Count = 0; Count < 16 && FPlatformTime::Seconds() < OverlayDeadline; ++Count)
@@ -692,6 +707,18 @@ void UVoxelModule::OnRefresh(
 	}
 }
 
+void UVoxelModule::OnPause()
+{
+	Super::OnPause();
+	if (Scheduler) Scheduler->SetPaused(true);
+}
+
+void UVoxelModule::OnUnPause()
+{
+	Super::OnUnPause();
+	if (Scheduler) Scheduler->SetPaused(false);
+}
+
 void UVoxelModule::OnTermination(const EPhase InPhase)
 {
 	FString Error;
@@ -778,6 +805,7 @@ bool UVoxelModule::CreateWorld(
 		return false;
 	}
 
+	WorldData = NewWorldData();
 	RegionStore.Reset();
 
 	return StartWorld(
@@ -967,6 +995,7 @@ bool UVoxelModule::StartWorld(
 		return false;
 	}
 	Scheduler->SetBudget(TaskBudget);
+	Scheduler->SetPaused(GetModuleState() == EModuleState::Paused || GetModuleState() == EModuleState::UnRunning);
 	if (!Scheduler->InitializeStatistics(NewWorldEpoch))
 	{
 		OutError = TEXT("地形统计固定窗口容量无法预授予");
@@ -1157,7 +1186,7 @@ bool UVoxelModule::StartWorld(
 	ReadyStage = EVoxelWorldReadyStage::AssetsValidated;
 	ReadinessSnapshot = {};
 	bWorldLoadRejected = false;
-	WorldState = EVoxelWorldState::Running;
+	WorldState = IsAuthority() && !RegionStore.IsDirectoryReady() ? EVoxelWorldState::Initializing : EVoxelWorldState::Running;
 	if (!WorldData)
 	{
 		WorldData = NewWorldData();
@@ -1169,7 +1198,7 @@ bool UVoxelModule::StartWorld(
 	FVoxelManifestCodec::Encode(Manifest, WorldData->ManifestBytes);
 	// 远端客户端没有 GameMode 的模块启动阶段；握手建立运行时后启用自身刷新。
 	if (bInRemote && GetModuleState() == EModuleState::None && IsModuleAutoRun()) Run();
-	OnWorldInitialized.Broadcast();
+	if (WorldState == EVoxelWorldState::Running) OnWorldInitialized.Broadcast();
 	OutError.Reset();
 	return true;
 }

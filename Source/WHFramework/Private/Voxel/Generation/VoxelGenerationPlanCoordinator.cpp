@@ -931,6 +931,13 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 		if (!InOutState.bAttemptPendingAdmission)
 		{
 			checkf(NextAttemptId != MAX_uint64, TEXT("Generation attempt serial exhausted"));
+			if (InOutState.AttemptId && (NextAttemptId + 1) % 1024 == 0)
+			{
+				UE_LOG(LogTemp, Display, TEXT("Voxel fact new attempt: kind=%d key=%s previous=%llu next=%llu state=%d inFlight=%d cached=%d prerequisites=%d subscriptions=%d parents=%d"),
+					int32(InDependency.Kind), *InDependency.Coordinate().ToString(), InOutState.AttemptId, NextAttemptId + 1,
+					int32(InOutState.State), InOutState.bInFlight, IsCached(InDependency), InOutState.Prerequisites.Num(),
+					InOutState.Donations.Num(), PriorityGraph.HasConsumers(InOutState.PriorityNode));
+			}
 			InOutState.AttemptId = ++NextAttemptId;
 			InOutState.bAttemptPendingAdmission = true;
 		}
@@ -1209,9 +1216,10 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 					const uint64 Count = ++Storage->CanceledResults;
 					if (Count <= 8 || Count % 1024 == 0)
 					{
-						UE_LOG(LogTemp, Display, TEXT("Voxel plan canceled result: count=%llu kind=%d key=%s attempt=%llu cached=%d executeMs=%.3f subscriptions=%d parents=%d"),
+						UE_LOG(LogTemp, Display, TEXT("Voxel plan canceled result: count=%llu kind=%d key=%s attempt=%llu cached=%d executeMs=%.3f subscriptions=%d parents=%d displaced=%d pendingAdmission=%d"),
 							Count, int32(Dependency.Kind), *Dependency.Coordinate().ToString(), Result.Stamp.Token,
-							IsCached(Dependency), Result.ExecuteMilliseconds, State->Donations.Num(), PriorityGraph.HasConsumers(State->PriorityNode));
+							IsCached(Dependency), Result.ExecuteMilliseconds, State->Donations.Num(), PriorityGraph.HasConsumers(State->PriorityNode),
+							Result.bAdmissionDisplaced, State->bAttemptPendingAdmission);
 					}
 				}
 
@@ -1292,6 +1300,8 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 				if (Result.bCanceled || Result.Error.StartsWith(TEXT("DependencyNotReady")) ||
 					Result.Error.StartsWith(TEXT("CapacityBlocked")))
 				{
+					// 容量置换继续同一逻辑请求，不能遗留旧准入记录或重置首次请求时间。
+					State->bAttemptPendingAdmission = Result.bAdmissionDisplaced;
 					State->State = EVoxelPlanDependencyState::Missing;
 					return;
 				}
@@ -2070,6 +2080,19 @@ bool FVoxelGenerationPlanCoordinator::RegisterClosure(const FVoxelGenerationPlan
 	State.PrerequisitesCapacity = Count;
 	Storage->PriorityFacts.Add(Node, InDependency);
 	InRegistration.Add(State);
+	if (!State.Prerequisites.IsEmpty())
+	{
+		const int64 Side = InDependency.Kind == EVoxelGenerationPlanKind::Ecology ?
+			FVoxelGenerationQuery::EcologyTileSide : FVoxelGenerationQuery::GenerationPlanTileSide;
+		const auto Coordinate = InDependency.Coordinate();
+		const FIntPoint Center(int32(FMath::Clamp<int64>(int64(Coordinate.X) * Side, MIN_int32, MAX_int32)),
+			int32(FMath::Clamp<int64>(int64(Coordinate.Y) * Side, MIN_int32, MAX_int32)));
+		// 已知闭包从登记到消费者释放都归事实槽持有，不能等待全部就绪才保护先完成的部分。
+		if (!RetainDependencies(State.Prerequisites, Center, ControlConsumer, State.PrerequisiteRetention, OutError))
+		{
+			return false;
+		}
+	}
 	return SetFactDependencies(InDependency, OutError);
 }
 

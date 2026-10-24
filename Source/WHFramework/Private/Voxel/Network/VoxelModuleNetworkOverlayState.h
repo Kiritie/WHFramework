@@ -225,6 +225,7 @@ struct FVoxelOverlayControlAdmission
 
 struct FVoxelOverlayNetworkState
 {
+	int32 AdvancePhase = 0;
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	FVoxelOverlayAuthorityIdentity Identity;
