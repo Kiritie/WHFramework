@@ -24,6 +24,12 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "0"))
 	float TitleSpacing = 16.f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	FSlateBrush TitleSeparator;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "0"))
+	float TitleSeparatorHeight = 0.f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "0"))
 	float TitleBarHeight = 0.f;
 

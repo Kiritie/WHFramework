@@ -79,12 +79,17 @@ public:
     void SetTransferInventoryId(FGuid InInventoryId);
     void SyncSelection(FGuid InInventoryId, FInventorySlotKey InSlot);
     bool SubmitRequest(FInventoryClientRequest InRequest);
-    void SetResultText(const FText& InText);
+    virtual void SetResultText(const FText& InText);
     void SetGroupSlotHosts(FGameplayTag InGroup, const TMap<int32, UPanelWidget*>& InHosts);
 
 protected:
     virtual TSharedRef<SWidget> RebuildWidget() override;
     virtual void NativeConstruct() override;
+    void UpdateResultFade();
+    void ResumeResultFade();
+    FTimerHandle ResultFadeTimer;
+    double ResultFadeAt = 0.0;
+
     virtual void RebuildViews();
     virtual void ConfigureSlot(UWidgetAbilityInventorySlotBase* InWidget, const FInventorySlotKey& InSlot) const;
     virtual int32 GetInventoryColumns(const FGuid& InInventoryId, const FGameplayTag& InGroup) const;
@@ -95,6 +100,12 @@ protected:
 	virtual void CloseSplitQuantity();
 	void ConfirmSplitQuantity(int32 InQuantity);
 	void CancelSplit();
+
+    UPROPERTY(EditDefaultsOnly, meta = (ClampMin = "0"))
+    float ResultDisplayTime = 0.f;
+
+    UPROPERTY(EditDefaultsOnly, meta = (ClampMin = "0.01"))
+    float ResultFadeTime = .5f;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     bool bStackInventoriesVertically = false;

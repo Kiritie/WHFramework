@@ -217,6 +217,28 @@ bool UWidgetEditorToolset::RetargetWidgetEvent(UBlueprint* Blueprint, FName Comp
 	return bSuccess;
 }
 
+bool UWidgetEditorToolset::ShareWidgetAnimationBinding(UBlueprint* Blueprint, FName AnimationName, FName SourceWidget, FName TargetWidget)
+{
+	FString Error;
+	const bool bSuccess = UWidgetBlueprintEditorLibrary::ShareWidgetAnimationBinding(Blueprint, AnimationName, SourceWidget, TargetWidget, Error);
+	if (!bSuccess)
+	{
+		UKismetSystemLibrary::RaiseScriptError(Error);
+	}
+	return bSuccess;
+}
+
+bool UWidgetEditorToolset::RemoveWidgetAnimationBinding(UBlueprint* Blueprint, FName AnimationName, FName WidgetName)
+{
+	FString Error;
+	const bool bSuccess = UWidgetBlueprintEditorLibrary::RemoveWidgetAnimationBinding(Blueprint, AnimationName, WidgetName, Error);
+	if (!bSuccess)
+	{
+		UKismetSystemLibrary::RaiseScriptError(Error);
+	}
+	return bSuccess;
+}
+
 bool UWidgetEditorToolset::CompileWidgetBlueprint(UBlueprint* Blueprint)
 {
 	FString Error;

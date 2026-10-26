@@ -92,6 +92,7 @@ public:
 	FGameplayAbilitySpecHandle GetPendingActionHandle(const FGuid& ActivationId) const;
 	bool IsActionActive(const FGuid& ActivationId) const;
 	FOnAbilityActionFinished OnActionFinished;
+	FSimpleMulticastDelegate OnGrantSourcesChanged;
 	bool ValidateGrantedRequest(const FAbilityActionRequest& Request, FGameplayTag& OutReason, bool bRequireReplicatedEntry = true) const;
 	void PublishActionResult(const FAbilityActionResult& Result);
 	bool BindOwnerAvatar(AActor* OwnerActor, AActor* AvatarActor);
@@ -113,6 +114,7 @@ public:
 	bool ReplaceGrantSourceSet(const TSet<FGuid>& OwnedSources, const TArray<FAbilityGrantSourceDefinition>& DesiredSources);
 	bool FindGrantedAbility(FPrimaryAssetId DefinitionId, FGameplayTag ActionTag, FGameplayAbilitySpecHandle& OutHandle) const;
 	const TArray<FAbilityGrantedEntry>& GetGrantedEntries() const;
+	bool IsGrantedAbilityEnabled(FGameplayAbilitySpecHandle InHandle) const;
 	bool CapturePersistentEffects(TArray<FAbilityEffectSaveData>& OutEffects) const;
 	bool ValidatePersistentEffects(const TArray<FAbilityEffectSaveData>& Effects) const;
 	bool RestorePersistentEffects(const TArray<FAbilityEffectSaveData>& Effects);
@@ -122,6 +124,7 @@ public:
 	void ClearIndependentEffects();
 
 protected:
+	virtual void OnRep_ActivateAbilities() override;
 	virtual void InternalServerTryActivateAbility(FGameplayAbilitySpecHandle AbilityToActivate, bool InputPressed, const FPredictionKey& PredictionKey, const FGameplayEventData* TriggerEventData) override;
 
 private:
@@ -142,7 +145,13 @@ private:
 	UFUNCTION(Client, Reliable)
 	void ClientReceiveActionResult(const FAbilityActionResult& Result);
 
-	UPROPERTY(Replicated)
+	UFUNCTION()
+	void OnRep_GrantedEntries();
+	void NotifyGrantSourcesChanged();
+	FTimerHandle GrantSourcesChangedTimer;
+	bool bGrantSourcesNotificationPending = false;
+
+	UPROPERTY(ReplicatedUsing = OnRep_GrantedEntries)
 	TArray<FAbilityGrantedEntry> GrantedEntries;
 
 	UPROPERTY(Transient)

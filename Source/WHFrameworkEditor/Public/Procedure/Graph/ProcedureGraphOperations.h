@@ -12,6 +12,7 @@ public:
     static bool CanEdit(const UProcedureAsset* Asset);
     static void Record(UProcedureAssetGraph* Graph);
     static void Changed(UProcedureAssetGraph* Graph);
+    static bool InitializeStart(UProcedureAssetGraph* Graph);
     static bool CanConnect(const UProcedureAsset* Asset, FGuid From, FName Output, FGuid To);
     static bool Connect(UProcedureAssetGraph* Graph, FGuid From, FName Output, FGuid To);
     static bool Disconnect(UProcedureAssetGraph* Graph, FGuid NodeId, FName PinName = NAME_None, bool bInput = false, FGuid OtherId = FGuid());

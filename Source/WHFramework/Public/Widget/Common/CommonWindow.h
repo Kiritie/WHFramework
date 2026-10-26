@@ -67,6 +67,12 @@ protected:
 	TObjectPtr<USizeBox> TitleBarSize;
 
 	UPROPERTY(Transient)
+	TObjectPtr<USizeBox> TitleSeparatorSize;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBorder> TitleSeparator;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UCommonButton> Btn_Close;
 
 	UPROPERTY(Transient)

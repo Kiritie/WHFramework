@@ -5,6 +5,7 @@
 #include "Ability/Inventory/Widget/WidgetAbilityInventorySlotBase.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Blueprint/WidgetTree.h"
+#include "TimerManager.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/HorizontalBox.h"
@@ -116,6 +117,7 @@ void UWidgetAbilityInventoryBase::OnReset(bool bForce)
 
 void UWidgetAbilityInventoryBase::NativeDestruct()
 {
+    if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ResultFadeTimer);
     CancelSplit();
     UnbindControls();
 
@@ -133,6 +135,7 @@ void UWidgetAbilityInventoryBase::NativeConstruct()
 {
     Super::NativeConstruct();
     BindControls();
+    ResumeResultFade();
 }
 
 void UWidgetAbilityInventoryBase::BindControls()
@@ -1061,6 +1064,37 @@ void UWidgetAbilityInventoryBase::SetResultText(const FText& InText)
     if (ResultText)
     {
         ResultText->SetText(InText);
+        ResultText->SetRenderOpacity(1.f);
         ResultText->SetVisibility(InText.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+        ResultFadeAt = !InText.IsEmpty() && ResultDisplayTime > 0.f ? FPlatformTime::Seconds() + ResultDisplayTime : 0.0;
+        ResumeResultFade();
+    }
+}
+
+void UWidgetAbilityInventoryBase::ResumeResultFade()
+{
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(ResultFadeTimer);
+        if (ResultFadeAt > 0.0)
+        {
+            UpdateResultFade();
+            if (ResultFadeAt > 0.0)
+            {
+                World->GetTimerManager().SetTimer(ResultFadeTimer, this, &ThisClass::UpdateResultFade, .05f, true);
+            }
+        }
+    }
+}
+
+void UWidgetAbilityInventoryBase::UpdateResultFade()
+{
+    const float Opacity = FMath::Clamp(static_cast<float>((ResultFadeAt + FMath::Max(.01f, ResultFadeTime) - FPlatformTime::Seconds()) / FMath::Max(.01f, ResultFadeTime)), 0.f, 1.f);
+    ResultText->SetRenderOpacity(Opacity);
+    if (Opacity <= 0.f)
+    {
+        ResultText->SetVisibility(ESlateVisibility::Collapsed);
+        ResultFadeAt = 0.0;
+        if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ResultFadeTimer);
     }
 }

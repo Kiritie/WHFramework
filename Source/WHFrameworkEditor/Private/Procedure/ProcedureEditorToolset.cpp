@@ -94,6 +94,17 @@ bool UProcedureEditorToolset::ConnectNodes(UProcedureAsset* Asset, FGuid From, F
 	return bSuccess;
 }
 
+bool UProcedureEditorToolset::InitializeStart(UProcedureAsset* Asset)
+{
+	const TStrongObjectPtr<UProcedureAssetGraph> Graph = GetEditableGraph(Asset);
+	const bool bSuccess = Graph && FProcedureGraphOperations::InitializeStart(Graph.Get());
+	if (!bSuccess)
+	{
+		UKismetSystemLibrary::RaiseScriptError(TEXT("只有起点身份缺失且没有连线的源流程图可以初始化起点。"));
+	}
+	return bSuccess;
+}
+
 bool UProcedureEditorToolset::DisconnectNodes(UProcedureAsset* Asset, FGuid NodeId, FName PinName, bool bInput, FGuid OtherId)
 {
 	const TStrongObjectPtr<UProcedureAssetGraph> Graph = GetEditableGraph(Asset);

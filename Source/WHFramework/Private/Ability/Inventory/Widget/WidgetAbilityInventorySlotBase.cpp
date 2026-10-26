@@ -78,8 +78,7 @@ TSharedRef<SWidget> UWidgetAbilityInventorySlotBase::RebuildWidget()
     }
     TSharedRef<SWidget> Result = Super::RebuildWidget();
     check(Frame && Icon && IconSize && Count && Status && Cooldown && SelectionMarker && PendingMarker);
-    IconSize->SetWidthOverride(IconExtent.X);
-    IconSize->SetHeightOverride(IconExtent.Y);
+    RefreshIconSize();
     Icon->SetStyleTag(FGameplayTag());
     if (!bHasDisplay)
     {
@@ -106,12 +105,25 @@ void UWidgetAbilityInventorySlotBase::SetPresentation(FGameplayTag InFrameStyle,
     FrameStyleTag = InFrameStyle;
     LockedStyleTag = InLockedStyle;
     IconExtent = InIconExtent;
+    RefreshIconSize();
+    RefreshFrame();
+}
+
+void UWidgetAbilityInventorySlotBase::RefreshIconSize()
+{
     if (IconSize)
     {
-        IconSize->SetWidthOverride(IconExtent.X);
-        IconSize->SetHeightOverride(IconExtent.Y);
+        if (bFillIcon)
+        {
+            IconSize->ClearWidthOverride();
+            IconSize->ClearHeightOverride();
+        }
+        else
+        {
+            IconSize->SetWidthOverride(IconExtent.X);
+            IconSize->SetHeightOverride(IconExtent.Y);
+        }
     }
-    RefreshFrame();
 }
 
 void UWidgetAbilityInventorySlotBase::RefreshSlot(const FInventorySlotState& InState, const FText& InName, UObject* InIcon, const FText& InTooltip)

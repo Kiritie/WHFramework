@@ -448,6 +448,89 @@ bool UWidgetBlueprintEditorLibrary::RetargetWidgetEvent(UBlueprint* InBlueprint,
 	return true;
 }
 
+bool UWidgetBlueprintEditorLibrary::ShareWidgetAnimationBinding(UBlueprint* InBlueprint, FName InAnimationName, FName InSourceWidget, FName InTargetWidget, FString& OutError)
+{
+	OutError.Reset();
+	UWidgetBlueprint* Blueprint = Cast<UWidgetBlueprint>(InBlueprint);
+	if (!Blueprint || !Blueprint->WidgetTree || !Blueprint->WidgetTree->FindWidget(InTargetWidget) || (GEditor && GEditor->PlayWorld))
+	{
+		OutError = TEXT("An editable widget blueprint and existing target widget are required outside PIE.");
+		return false;
+	}
+	UWidgetAnimation* Animation = nullptr;
+	for (UWidgetAnimation* Candidate : Blueprint->Animations)
+	{
+		if (Candidate && Candidate->GetFName() == InAnimationName) Animation = Candidate;
+	}
+	const FWidgetAnimationBinding* Source = Animation ? Animation->GetBindings().FindByPredicate([InSourceWidget](const FWidgetAnimationBinding& Binding)
+	{
+		return Binding.WidgetName == InSourceWidget && !Binding.bIsRootWidget && Binding.SlotWidgetName.IsNone();
+	}) : nullptr;
+	if (!Source)
+	{
+		OutError = TEXT("The source widget must have a direct binding in the named animation.");
+		return false;
+	}
+	for (const FWidgetAnimationBinding& Binding : Animation->GetBindings())
+	{
+		if (Binding.WidgetName == InTargetWidget)
+		{
+			if (Binding.AnimationGuid == Source->AnimationGuid) return true;
+			OutError = TEXT("The target widget already has a different animation binding.");
+			return false;
+		}
+	}
+	FWidgetAnimationBinding Shared = *Source;
+	Shared.WidgetName = InTargetWidget;
+	FScopedTransaction Transaction(NSLOCTEXT("WidgetBlueprint", "ShareAnimationBinding", "共享控件动画曲线"));
+	Blueprint->Modify();
+	Animation->Modify();
+	Animation->AnimationBindings.Add(Shared);
+	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+	return true;
+}
+
+bool UWidgetBlueprintEditorLibrary::RemoveWidgetAnimationBinding(UBlueprint* InBlueprint, FName InAnimationName, FName InWidgetName, FString& OutError)
+{
+	OutError.Reset();
+	UWidgetBlueprint* Blueprint = Cast<UWidgetBlueprint>(InBlueprint);
+	if (!Blueprint || (GEditor && GEditor->PlayWorld))
+	{
+		OutError = TEXT("An editable widget blueprint is required outside PIE.");
+		return false;
+	}
+	UWidgetAnimation* Animation = nullptr;
+	for (UWidgetAnimation* Candidate : Blueprint->Animations)
+	{
+		if (Candidate && Candidate->GetFName() == InAnimationName)
+		{
+			Animation = Candidate;
+			break;
+		}
+	}
+	if (!Animation)
+	{
+		OutError = TEXT("The named widget animation does not exist.");
+		return false;
+	}
+	if (!Animation->GetBindings().ContainsByPredicate([InWidgetName](const FWidgetAnimationBinding& Binding)
+	{
+		return Binding.WidgetName == InWidgetName;
+	}))
+	{
+		return true;
+	}
+	FScopedTransaction Transaction(NSLOCTEXT("WidgetBlueprint", "RemoveAnimationBinding", "解除控件动画绑定"));
+	Blueprint->Modify();
+	Animation->Modify();
+	Animation->AnimationBindings.RemoveAll([InWidgetName](const FWidgetAnimationBinding& Binding)
+	{
+		return Binding.WidgetName == InWidgetName;
+	});
+	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+	return true;
+}
+
 bool UWidgetBlueprintEditorLibrary::ValidateWidgetIdentifiers(UBlueprint* InBlueprint, FString& OutError)
 {
 	OutError.Reset();

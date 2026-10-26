@@ -1448,6 +1448,37 @@ void UAbilitySystemComponentBase::EndPlay(const EEndPlayReason::Type EndPlayReas
 		GetWorld()->GetTimerManager().ClearTimer(GrantReleaseTimer);
 	}
 	OnActionFinished.Clear();
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(GrantSourcesChangedTimer);
+	}
+	bGrantSourcesNotificationPending = false;
+	OnGrantSourcesChanged.Clear();
+}
+
+void UAbilitySystemComponentBase::OnRep_ActivateAbilities()
+{
+	Super::OnRep_ActivateAbilities();
+	NotifyGrantSourcesChanged();
+}
+
+void UAbilitySystemComponentBase::OnRep_GrantedEntries()
+{
+	NotifyGrantSourcesChanged();
+}
+
+void UAbilitySystemComponentBase::NotifyGrantSourcesChanged()
+{
+	if (bGrantSourcesNotificationPending || !GetWorld())
+	{
+		return;
+	}
+	bGrantSourcesNotificationPending = true;
+	GrantSourcesChangedTimer = GetWorld()->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		bGrantSourcesNotificationPending = false;
+		OnGrantSourcesChanged.Broadcast();
+	}));
 }
 
 void UAbilitySystemComponentBase::SetAbilityEntityId(FGuid InEntityId)
@@ -1630,6 +1661,7 @@ bool UAbilitySystemComponentBase::SetGrantSource(FGuid SourceId, const TArray<FA
 		GetOwner()->ForceNetUpdate();
 	}
 	GrantedHandles = Stored.AbilityHandles;
+	NotifyGrantSourcesChanged();
 	}
 	for (int32 Index = 0; Index < Abilities.Num(); ++Index)
 	{
@@ -1659,6 +1691,7 @@ void UAbilitySystemComponentBase::RemoveGrantSourceInternal(FGuid SourceId)
 	{
 		return Entry.SourceId == SourceId;
 	});
+	NotifyGrantSourcesChanged();
 	for (FGameplayAbilitySpecHandle Handle : Removed.AbilityHandles)
 	{
 		if (FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(Handle))
@@ -1725,6 +1758,16 @@ bool UAbilitySystemComponentBase::FindGrantedAbility(FPrimaryAssetId DefinitionI
 const TArray<FAbilityGrantedEntry>& UAbilitySystemComponentBase::GetGrantedEntries() const
 {
 	return GrantedEntries;
+}
+
+bool UAbilitySystemComponentBase::IsGrantedAbilityEnabled(FGameplayAbilitySpecHandle InHandle) const
+{
+	const FAbilityGrantedEntry* Entry = GrantedEntries.FindByPredicate([InHandle](const FAbilityGrantedEntry& Candidate)
+	{
+		return Candidate.AbilityHandle == InHandle;
+	});
+	const FGameplayAbilitySpec* Spec = const_cast<UAbilitySystemComponentBase*>(this)->FindAbilitySpecFromHandle(InHandle);
+	return Entry && Entry->bActionEnabled && !SuspendedGrantSources.Contains(Entry->SourceId) && Spec && Spec->Ability && !Spec->PendingRemove;
 }
 
 bool UAbilitySystemComponentBase::IsGrantEffect(FActiveGameplayEffectHandle Handle) const
@@ -1991,6 +2034,7 @@ bool UAbilitySystemComponentBase::ReplaceGrantSourceSet(const TSet<FGuid>& Owned
 			GrantedEntries.Add(Entry);
 		}
 	}
+	NotifyGrantSourcesChanged();
 	if (GetOwner())
 	{
 		GetOwner()->ForceNetUpdate();
@@ -2296,13 +2340,29 @@ void UAbilitySystemComponentBase::SetGrantSourceSuspended(FGuid SourceId, bool b
 	if (!IsOwnerActorAuthoritative() || !SourceId.IsValid()) return;
 	if (bSuspended) SuspendedGrantSources.Add(SourceId);
 	else if (!RevokedGrantSources.Contains(SourceId)) SuspendedGrantSources.Remove(SourceId);
+	const FAbilityGrantSourceState* Source = GrantSources.Find(SourceId);
+	for (FAbilityGrantedEntry& Entry : GrantedEntries)
+	{
+		if (Entry.SourceId != SourceId)
+		{
+			continue;
+		}
+		const int32 Index = Source ? Source->AbilityHandles.IndexOfByKey(Entry.AbilityHandle) : INDEX_NONE;
+		Entry.bActionEnabled = !SuspendedGrantSources.Contains(SourceId) && Source && Source->Abilities.IsValidIndex(Index) && Source->Abilities[Index].bActionEnabled;
+	}
+	if (GetOwner())
+	{
+		GetOwner()->ForceNetUpdate();
+	}
+	NotifyGrantSourcesChanged();
 }
 
 void UAbilitySystemComponentBase::RevokeGrantSource(FGuid SourceId)
 {
 	if (!IsOwnerActorAuthoritative() || !SourceId.IsValid()) return;
-	SuspendedGrantSources.Add(SourceId);
+	SetGrantSourceSuspended(SourceId, true);
 	RevokedGrantSources.Add(SourceId);
+	NotifyGrantSourcesChanged();
 	TryReleaseRevokedGrantSources();
 }
 

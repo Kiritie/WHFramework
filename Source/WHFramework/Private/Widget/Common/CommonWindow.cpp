@@ -54,6 +54,12 @@ void UCommonWindow::BuildNativeLayout()
 	TitleSlot->SetVerticalAlignment(VAlign_Center);
 	Btn_Close = WidgetTree->ConstructWidget<UCommonButton>(UCommonButton::StaticClass(), TEXT("Btn_Close"));
 	TitleBar->AddChildToHorizontalBox(Btn_Close)->SetVerticalAlignment(VAlign_Top);
+	TitleSeparatorSize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("TitleSeparatorSize"));
+	Column->AddChildToVerticalBox(TitleSeparatorSize);
+	TitleSeparator = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("TitleSeparator"));
+	TitleSeparator->SetPadding(FMargin(0.f));
+	TitleSeparator->SetVisibility(ESlateVisibility::HitTestInvisible);
+	TitleSeparatorSize->SetContent(TitleSeparator);
 	Content = WidgetTree->ConstructWidget<UNamedSlot>(UNamedSlot::StaticClass(), TEXT("Content"));
 	Column->AddChildToVerticalBox(Content)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 	SetTitle(Title);
@@ -117,6 +123,7 @@ void UCommonWindow::SetTitle(const FText& InTitle)
 	}
 	if (Btn_Close) Btn_Close->SetVisibility(bShowCloseButton ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	if (TitleBar) TitleBar->SetVisibility(Title.IsEmpty() && !bShowCloseButton ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
+	if (TitleSeparatorSize) TitleSeparatorSize->SetVisibility(Title.IsEmpty() && !bShowCloseButton ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
 	if (TitleBarSize) TitleBarSize->SetVisibility(Title.IsEmpty() && !bShowCloseButton ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 }
 
@@ -153,7 +160,10 @@ void UCommonWindow::ApplyResolvedStyle(const UObject* InStyle)
 	Txt_Title->SetWrapTextAt(Style->TextWidth);
 	if (Style->TitleBarHeight > 0.f) TitleBarSize->SetHeightOverride(Style->TitleBarHeight);
 	else TitleBarSize->ClearHeightOverride();
-	CastChecked<UVerticalBoxSlot>(TitleBarSize->Slot)->SetPadding(FMargin(0.f, 0.f, 0.f, Style->TitleSpacing));
+	CastChecked<UVerticalBoxSlot>(TitleBarSize->Slot)->SetPadding(FMargin(0.f));
+	TitleSeparator->SetBrush(Style->TitleSeparator);
+	TitleSeparatorSize->SetHeightOverride(Style->TitleSeparatorHeight);
+	CastChecked<UVerticalBoxSlot>(TitleSeparatorSize->Slot)->SetPadding(FMargin(0.f, 0.f, 0.f, Style->TitleSpacing));
 	Btn_Close->SetStyleTag(CloseButtonStyleTag.IsValid() ? CloseButtonStyleTag : Style->CloseButtonStyleTag);
 	Btn_Close->SetTitle(Style->CloseButtonText);
 	Btn_Close->SetContentMinSize(Style->CloseButtonSize);

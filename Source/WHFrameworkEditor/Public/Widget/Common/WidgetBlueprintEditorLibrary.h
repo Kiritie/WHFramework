@@ -56,6 +56,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "WidgetModule")
 	static bool RetargetWidgetEvent(UBlueprint* InBlueprint, FName InComponentName, UClass* InDelegateOwnerClass, FName InDelegateName, FString& OutError);
 
+	UFUNCTION(BlueprintCallable, Category = "WidgetModule")
+	static bool ShareWidgetAnimationBinding(UBlueprint* InBlueprint, FName InAnimationName, FName InSourceWidget, FName InTargetWidget, FString& OutError);
+
+	UFUNCTION(BlueprintCallable, Category = "WidgetModule")
+	static bool RemoveWidgetAnimationBinding(UBlueprint* InBlueprint, FName InAnimationName, FName InWidgetName, FString& OutError);
+
 	UFUNCTION(BlueprintPure, Category = "WidgetModule")
 	static bool ValidateWidgetIdentifiers(UBlueprint* InBlueprint, FString& OutError);
 

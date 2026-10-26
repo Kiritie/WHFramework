@@ -3,6 +3,7 @@
 #include "Procedure/Base/ProcedureAsset.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/Graph/ProcedureAssetGraph.h"
+#include "Procedure/Graph/ProcedureAssetGraphNode.h"
 #include "Procedure/Graph/ProcedureAssetGraphSchema.h"
 #include "Procedure/Graph/ProcedureGraphOperations.h"
 #include "Misc/AutomationTest.h"
@@ -225,6 +226,40 @@ bool FProcedureEditorTransactionTest::RunTest(const FString& Parameters)
     GEditor->UndoTransaction();
     Fixture.Graph->Rebuild();
     TestEqual(TEXT("Undo paste removes cloned author definitions"), Fixture.Asset->Nodes.Num(), CountBefore);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProcedureStartInitializationTest, "WHFramework.Procedure.Graph.StartInitializationAndVisibleLinks",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FProcedureStartInitializationTest::RunTest(const FString& Parameters)
+{
+    if (!GEditor || GEditor->PlayWorld) return false;
+    ProcedureGraphTests::FFixture Fixture;
+    Fixture.Asset->Links.Reset();
+    Fixture.Asset->StartId.Invalidate();
+    TestFalse(TEXT("缺少起点身份不能编译"), Fixture.Asset->Recompile());
+    TestTrue(TEXT("通过事务显式初始化空连线图起点"), FProcedureGraphOperations::InitializeStart(Fixture.Graph.Get()));
+    const FGuid Start = Fixture.Asset->StartId;
+    TestTrue(TEXT("起点身份有效"), Start.IsValid());
+    TestFalse(TEXT("有效起点不能重复初始化"), FProcedureGraphOperations::InitializeStart(Fixture.Graph.Get()));
+    TestTrue(TEXT("起点到业务节点建立真实连线"), FProcedureGraphOperations::Connect(Fixture.Graph.Get(), Start, TEXT("Out"), Fixture.Ids[0]));
+    Fixture.Graph->Rebuild();
+    UEdGraphNode* StartNode = Fixture.Graph->FindNode(Start);
+    UEdGraphNode* BusinessNode = Fixture.Graph->FindNode(Fixture.Ids[0]);
+    UEdGraphPin* Output = StartNode ? StartNode->FindPin(TEXT("Out"), EGPD_Output) : nullptr;
+    UEdGraphPin* Input = BusinessNode ? BusinessNode->FindPin(TEXT("In"), EGPD_Input) : nullptr;
+    TestTrue(TEXT("图重建后两端Pin保留可绘制连接"), Output && Input && Output->LinkedTo.Contains(Input));
+    TestFalse(TEXT("已有连接不能再次提示可连接"), FProcedureGraphOperations::CanConnect(Fixture.Asset.Get(), Start, TEXT("Out"), Fixture.Ids[0]));
+    TestEqual(TEXT("编译入口来自真实Start连线"), Fixture.Asset->EntryNodeId, Fixture.Ids[0]);
+    GEditor->UndoTransaction();
+    Fixture.Graph->Rebuild();
+    TestTrue(TEXT("撤销连线恢复空程序"), Fixture.Asset->CompiledNodes.IsEmpty());
+    GEditor->UndoTransaction();
+    Fixture.Graph->Rebuild();
+    TestFalse(TEXT("撤销初始化恢复缺失身份"), Fixture.Asset->StartId.IsValid());
+    GEditor->RedoTransaction();
+    Fixture.Graph->Rebuild();
+    TestEqual(TEXT("重做恢复同一起点身份"), Fixture.Asset->StartId, Start);
     return true;
 }
 #endif

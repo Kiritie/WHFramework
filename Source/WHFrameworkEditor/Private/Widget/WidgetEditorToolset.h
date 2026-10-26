@@ -41,6 +41,12 @@ public:
 	static bool RetargetWidgetEvent(UBlueprint* Blueprint, FName ComponentName, UClass* DelegateOwnerClass, FName DelegateName);
 
 	UFUNCTION(meta = (AICallable))
+	static bool ShareWidgetAnimationBinding(UBlueprint* Blueprint, FName AnimationName, FName SourceWidget, FName TargetWidget);
+
+	UFUNCTION(meta = (AICallable))
+	static bool RemoveWidgetAnimationBinding(UBlueprint* Blueprint, FName AnimationName, FName WidgetName);
+
+	UFUNCTION(meta = (AICallable))
 	static bool CompileWidgetBlueprint(UBlueprint* Blueprint);
 
 	UFUNCTION(meta = (AICallable))

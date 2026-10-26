@@ -64,6 +64,11 @@ bool FProcedureGraphOperations::CanConnect(const UProcedureAsset* Asset, FGuid F
         return false;
     }
     if (Asset->Links.ContainsByPredicate([&](const FProcedureLink& Link)
+        { return Link.From == From && Link.Output == Output && Link.To == To; }))
+    {
+        return false;
+    }
+    if (Asset->Links.ContainsByPredicate([&](const FProcedureLink& Link)
         { return (Link.From == From && Link.To != To) || (Link.To == To && Link.From != From); }))
     {
         return false;
@@ -83,14 +88,23 @@ bool FProcedureGraphOperations::CanConnect(const UProcedureAsset* Asset, FGuid F
     return true;
 }
 
-bool FProcedureGraphOperations::Connect(UProcedureAssetGraph* Graph, FGuid From, FName Output, FGuid To)
+bool FProcedureGraphOperations::InitializeStart(UProcedureAssetGraph* Graph)
 {
-    if (!Graph || !CanEdit(Graph->Asset) || !CanConnect(Graph->Asset, From, Output, To))
+    if (!Graph || !CanEdit(Graph->Asset) || Graph->Asset->StartId.IsValid() || !Graph->Asset->Links.IsEmpty())
     {
         return false;
     }
-    if (Graph->Asset->Links.ContainsByPredicate([&](const FProcedureLink& Link)
-        { return Link.From == From && Link.Output == Output && Link.To == To; }))
+    const FScopedTransaction Transaction(NSLOCTEXT("ProcedureGraph", "InitializeStart", "初始化流程起点"));
+    Record(Graph);
+    Graph->Asset->StartId = FGuid::NewGuid();
+    Graph->Asset->StartPosition = FVector2D::ZeroVector;
+    Changed(Graph);
+    return true;
+}
+
+bool FProcedureGraphOperations::Connect(UProcedureAssetGraph* Graph, FGuid From, FName Output, FGuid To)
+{
+    if (!Graph || !CanEdit(Graph->Asset) || !CanConnect(Graph->Asset, From, Output, To))
     {
         return false;
     }

@@ -19,6 +19,9 @@ public:
 	static FString GetGraphData(UProcedureAsset* Asset);
 
 	UFUNCTION(meta = (AICallable))
+	static bool InitializeStart(UProcedureAsset* Asset);
+
+	UFUNCTION(meta = (AICallable))
 	static bool ConnectNodes(UProcedureAsset* Asset, FGuid From, FName Output, FGuid To);
 
 	UFUNCTION(meta = (AICallable))
