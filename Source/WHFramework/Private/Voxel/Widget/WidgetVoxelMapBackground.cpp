@@ -10,6 +10,18 @@ int32 UWidgetVoxelMapBackground::GetLODStride(const float InCellPixelSize)
 	return FVoxelMapTileCache::SelectStep(InCellPixelSize);
 }
 
+void UWidgetVoxelMapBackground::NativeDestruct()
+{
+	if (UVoxelModule* Module = UVoxelModule::GetPtr(GetWorld()))
+	{
+		if (FVoxelMapTileCache* Cache = Module->GetMapTileCache())
+		{
+			Cache->ReleaseRequest(RequestSource);
+		}
+	}
+	Super::NativeDestruct();
+}
+
 void UWidgetVoxelMapBackground::NativeTick(
 	const FGeometry& MyGeometry,
 	const float InDeltaTime)
@@ -28,7 +40,7 @@ void UWidgetVoxelMapBackground::NativeTick(
 	TArray<FVoxelMapTileKey> Visible;
 	FVoxelMapTileCache::VisibleTiles(
 		MapView, MyGeometry.GetLocalSize(), Module->BlockSize(), Visible);
-	Cache->Request(Visible, MapView);
+	Cache->Request(RequestSource, Visible, MapView);
 	if (LastTileRevision != Cache->GetRevision())
 	{
 		LastTileRevision = Cache->GetRevision();

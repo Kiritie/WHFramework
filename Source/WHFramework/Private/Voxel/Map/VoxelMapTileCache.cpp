@@ -230,39 +230,60 @@ void FVoxelMapTileCache::VisibleTiles(
 	}
 }
 
-void FVoxelMapTileCache::Request(const TArray<FVoxelMapTileKey>& InKeys, const FSceneMapView& InView)
+void FVoxelMapTileCache::Request(const FGuid& InSource, const TArray<FVoxelMapTileKey>& InKeys, const FSceneMapView& InView)
 {
 	check(IsInGameThread());
-	if (bResetting || !ColorResolver)
+	if (bResetting || !ColorResolver || !InSource.IsValid())
 	{
 		return;
 	}
+	FViewRequest& View = Views.FindOrAdd(InSource);
+	View.Keys = InKeys;
+	View.View = InView;
+	View.LastRequestFrame = GFrameCounter;
+	RefreshRequests();
+}
+
+void FVoxelMapTileCache::ReleaseRequest(const FGuid& InSource)
+{
+	check(IsInGameThread());
+	if (Views.Remove(InSource) && !bResetting)
+	{
+		RefreshRequests();
+	}
+}
+
+void FVoxelMapTileCache::RefreshRequests()
+{
 	TSet<FVoxelMapTileKey> Targets;
 	TSet<FVoxelMapTileKey> Desired;
 	TArray<FVoxelMapTileKey> Requests;
-	for (const FVoxelMapTileKey& Key : InKeys)
+	for (const auto& View : Views)
 	{
-		if (Key.Step <= 0 || Key.Step > MAX_int32 / (TileSide - 1))
+		for (const FVoxelMapTileKey& Key : View.Value.Keys)
 		{
-			continue;
-		}
-		Targets.Add(Key);
-		if (!Desired.Contains(Key))
-		{
-			Desired.Add(Key);
-			Requests.Add(Key);
-		}
-		if (FTile* Tile = Tiles.Find(Key))
-		{
-			Tile->LastUse = ++Sequence;
-		}
-		if (Key.Step < 512)
-		{
-			const FVoxelMapTileKey Parent = ParentKey(Key, 512);
-			if (!Desired.Contains(Parent))
+			if (Key.Step <= 0 || Key.Step > MAX_int32 / (TileSide - 1))
 			{
-				Desired.Add(Parent);
-				Requests.Add(Parent);
+				continue;
+			}
+			Targets.Add(Key);
+			if (!Desired.Contains(Key))
+			{
+				Desired.Add(Key);
+				Requests.Add(Key);
+			}
+			if (FTile* Tile = Tiles.Find(Key))
+			{
+				Tile->LastUse = ++Sequence;
+			}
+			if (Key.Step < 512)
+			{
+				const FVoxelMapTileKey Parent = ParentKey(Key, 512);
+				if (!Desired.Contains(Parent))
+				{
+					Desired.Add(Parent);
+					Requests.Add(Parent);
+				}
 			}
 		}
 	}
@@ -278,10 +299,15 @@ void FVoxelMapTileCache::Request(const TArray<FVoxelMapTileKey>& InKeys, const F
 	{
 		CancelRequest(Key);
 	}
-	const FVector2D Center = InView.Center / BlockSize;
-	const auto DistanceSquared = [Center](const FVoxelMapTileKey& InKey)
+	const auto DistanceSquared = [this](const FVoxelMapTileKey& InKey)
 	{
-		return FVector2D::DistSquared((FVector2D(InKey.Coordinate) + FVector2D(0.5)) * TileSide * InKey.Step, Center);
+		const FVector2D Center = (FVector2D(InKey.Coordinate) + FVector2D(0.5)) * TileSide * InKey.Step;
+		double Distance = MAX_dbl;
+		for (const auto& View : Views)
+		{
+			Distance = FMath::Min(Distance, FVector2D::DistSquared(Center, View.Value.View.Center / BlockSize));
+		}
+		return Distance;
 	};
 	Requests.Sort([&Targets, &DistanceSquared](const FVoxelMapTileKey& Left, const FVoxelMapTileKey& Right)
 	{
@@ -366,6 +392,16 @@ void FVoxelMapTileCache::Tick(const double InDeadline)
 	check(IsInGameThread());
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_MapTileAdmissions);
 	if (bResetting) return;
+	bool bViewsExpired = false;
+	for (auto View = Views.CreateIterator(); View; ++View)
+	{
+		if (GFrameCounter >= View.Value().LastRequestFrame && GFrameCounter - View.Value().LastRequestFrame > 2)
+		{
+			View.RemoveCurrent();
+			bViewsExpired = true;
+		}
+	}
+	if (bViewsExpired) RefreshRequests();
 	TArray<FVoxelMapTileKey, TInlineAllocator<8>> Candidates;
 	for (const auto& Pair : Pending)
 	{

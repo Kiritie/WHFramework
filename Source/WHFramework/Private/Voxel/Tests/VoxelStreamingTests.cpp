@@ -2012,7 +2012,7 @@ bool FVoxelMapTileBuildTest::RunTest(const FString& InParameters)
 	Requested.Add(WorldKey);
 	FSceneMapView View;
 	const double StartSeconds = FPlatformTime::Seconds();
-	Cache.Request(Requested, View);
+	Cache.Request(FGuid(1, 0, 0, 0), Requested, View);
 	const double Deadline = FPlatformTime::Seconds() + 90.0;
 	while ((!Cache.FindBrush(Key) || !Cache.FindBrush(WorldKey)) &&
 		FPlatformTime::Seconds() < Deadline)

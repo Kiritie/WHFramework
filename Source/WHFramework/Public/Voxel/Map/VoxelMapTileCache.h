@@ -56,7 +56,8 @@ public:
 		double InBlockSize,
 		TArray<FVoxelMapTileKey>& OutKeys);
 
-	void Request(const TArray<FVoxelMapTileKey>& InKeys, const FSceneMapView& InView);
+	void Request(const FGuid& InSource, const TArray<FVoxelMapTileKey>& InKeys, const FSceneMapView& InView);
+	void ReleaseRequest(const FGuid& InSource);
 	void Tick(double InDeadline);
 	void OnGenerationDependencyReady(const FVoxelGenerationConsumerKey& InConsumer);
 	void SetColorResolver(FVoxelMapColorResolver InResolver, uint32 InStyleRevision);
@@ -65,6 +66,10 @@ public:
 	bool FindDrawBrush(const FVoxelMapTileKey& InKey, FSlateBrush& OutBrush) const;
 	const FSlateBrush* FindBrush(const FVoxelMapTileKey& InKey) const;
 	uint64 GetRevision() const { return Revision; }
+	int32 GetReadyTileCount() const { return Tiles.Num(); }
+	int32 GetPendingTileCount() const { return Pending.Num(); }
+	bool HasColorResolver() const { return bool(ColorResolver); }
+	int32 GetViewCount() const { return Views.Num(); }
 
 private:
 #if WITH_DEV_AUTOMATION_TESTS
@@ -72,6 +77,12 @@ private:
 	friend class FVoxelMapCacheLifetimeTest;
 #endif
 	struct FBuildWork;
+	struct FViewRequest
+	{
+		TArray<FVoxelMapTileKey> Keys;
+		FSceneMapView View;
+		uint64 LastRequestFrame = 0;
+	};
 	struct FPendingTile
 	{
 		FVoxelGenerationConsumerKey Consumer;
@@ -97,6 +108,7 @@ private:
 	};
 
 	void ApplyTile(const FVoxelMapTileKey& InKey, FVoxelTaskResult&& InResult);
+	void RefreshRequests();
 	bool AdvanceRequest(const FVoxelMapTileKey& InKey, double InDistanceScore);
 	bool DeferRequest(const FVoxelMapTileKey& InKey, const FVoxelGenerationConsumerKey& InConsumer,
 		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources, uint64 InBeforeAdmission,
@@ -124,4 +136,5 @@ private:
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PendingStorageLease;
 	int32 PendingCapacity = 0;
 	TMap<FVoxelMapTileKey, FPendingTile> Pending;
+	TMap<FGuid, FViewRequest> Views;
 };

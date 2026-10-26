@@ -164,12 +164,12 @@ bool FVoxelMapStyleEpochTest::RunTest(const FString& InParameters)
 	const TArray<FVoxelMapTileKey> Requested{Parent};
 	FSceneMapView View;
 	Cache.SetColorResolver([](const FVoxelColumnSample&, const FVoxelGenerationRuntimeConfig&) { return FColor::Red; }, 1);
-	Cache.Request(Requested, View);
+	Cache.Request(FGuid(1, 0, 0, 0), Requested, View);
 	if (!TestTrue(TEXT("地图只建立一个原始请求"), Cache.Pending.Contains(Parent))) return false;
 	const auto OriginalConsumer = Cache.Pending.FindChecked(Parent).Consumer;
 	for (int32 Index = 0; Index < 32; ++Index)
 	{
-		Cache.Request(Requested, View);
+		Cache.Request(FGuid(1, 0, 0, 0), Requested, View);
 		Cache.Tick(FPlatformTime::Seconds() + 0.008);
 	}
 	TestTrue(TEXT("真实计划结果尚未应用时重复请求不更换Consumer"),
@@ -191,7 +191,7 @@ bool FVoxelMapStyleEpochTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("旧样式任务取消并完成回收"), Drain());
 	TestNull(TEXT("旧样式不能发布到新缓存"), Cache.FindBrush(Parent));
 	TestEqual(TEXT("丢弃结果不增长发布Revision"), Cache.GetRevision(), NewStyleRevision);
-	Cache.Request(Requested, View);
+	Cache.Request(FGuid(1, 0, 0, 0), Requested, View);
 	TestTrue(TEXT("停止重复UI Request后已接纳瓦片仍由真实Emerge和Map Tick完成"), Drain());
 	TestTrue(TEXT("瓦片完成后归还Map请求目录租约"), !Cache.PendingStorageLease && Cache.PendingCapacity == 0);
 	TestTrue(TEXT("稀疏跨行实际经历前批保留释放"), bObservedRowRelease);
@@ -232,10 +232,10 @@ bool FVoxelMapStyleEpochTest::RunTest(const FString& InParameters)
 		}
 	}
 	const FVoxelMapTileKey CanceledKey{FIntPoint(2, 2), 512};
-	Cache.Request({CanceledKey}, View);
+	Cache.Request(FGuid(1, 0, 0, 0), {CanceledKey}, View);
 	Cache.Tick(FPlatformTime::Seconds() + 0.008);
 	TestTrue(TEXT("可注销的冷请求已登记"), Cache.Pending.Contains(CanceledKey));
-	Cache.Request({}, View);
+	Cache.Request(FGuid(1, 0, 0, 0), {}, View);
 	TestTrue(TEXT("视图移出后原请求被移除"), Cache.Pending.IsEmpty());
 	TestTrue(TEXT("注销后真实计划任务最终退出"), Drain());
 	TestNull(TEXT("注销后的瓦片结果不能发布"), Cache.FindBrush(CanceledKey));
@@ -354,7 +354,7 @@ bool FVoxelMapCacheLifetimeTest::RunTest(const FString& InParameters)
 	});
 	Cache->SetColorResolver([](const FVoxelColumnSample&, const FVoxelGenerationRuntimeConfig&) { return FColor::Blue; }, 1);
 	const FVoxelMapTileKey Key{FIntPoint(-1, -1), 512};
-	Cache->Request({Key}, FSceneMapView{});
+	Cache->Request(FGuid(1, 0, 0, 0), {Key}, FSceneMapView{});
 	const FVoxelInterestSet EmptyInterest;
 	TWeakPtr<FVoxelMapTileCache::FBuildWork, ESPMode::ThreadSafe> RetiredWork;
 	bool bRasterAdmitted = false;

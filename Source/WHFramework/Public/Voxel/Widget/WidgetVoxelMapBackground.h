@@ -12,6 +12,8 @@ public:
 	static int32 GetLODStride(float InCellPixelSize);
 
 protected:
+	virtual void NativeDestruct() override;
+
 	virtual void NativeTick(
 		const FGeometry& MyGeometry,
 		float InDeltaTime) override;
@@ -31,5 +33,7 @@ protected:
 	                          bool bParentEnabled) const override;
 
 private:
+	FGuid RequestSource = FGuid::NewGuid();
+
 	uint64 LastTileRevision = 0;
 };

@@ -44,6 +44,7 @@ void UCommonOptionSelector::BuildNativeLayout()
 	Btn_Last->SetTitle(FText::FromString(TEXT("‹")));
 	Controls->AddChildToHorizontalBox(Btn_Last);
 	TxtBox_Value = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass(), TEXT("TxtBox_Value"));
+	TxtBox_Value->SetJustification(ETextJustify::Center);
 	Controls->AddChildToHorizontalBox(TxtBox_Value)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 	Combo_Value = WidgetTree->ConstructWidget<UNativeWidgetHost>(UNativeWidgetHost::StaticClass(), TEXT("Combo_Value"));
 	Controls->AddChildToHorizontalBox(Combo_Value)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));

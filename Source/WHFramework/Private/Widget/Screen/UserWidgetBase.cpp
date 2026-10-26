@@ -362,7 +362,7 @@ UWidgetMountSlot* UUserWidgetBase::GetWidgetMountSlot(const FGameplayTag& InSlot
 
 bool UUserWidgetBase::IsWidgetActiveInHierarchy() const
 {
-	if(!IsActivated()
+	if((bWidgetActivatable && !IsActivated())
 		|| (WidgetState != EScreenWidgetState::Opening && WidgetState != EScreenWidgetState::Opened)
 		|| GetVisibility() == ESlateVisibility::Collapsed
 		|| GetVisibility() == ESlateVisibility::Hidden)
