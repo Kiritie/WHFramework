@@ -223,7 +223,8 @@ void UCommonButton::SetTitle(const FText InTitle)
 		const UCommonButtonStyleN* ButtonStyle = Cast<UCommonButtonStyleN>(GetStyle());
 		const bool bIconOnly = ButtonStyle && ButtonStyle->bIconOnly;
 		const UCommonTextBlockN* TitleDefaults = CastChecked<UCommonTextBlockN>(Txt_Title->GetArchetype());
-		Txt_Title->SetMinDesiredWidth(bIconOnly ? 0.f : FMath::Max(TitleMinWidth, TitleDefaults->GetMinDesiredWidth()));
+		const float WrapWidth = ButtonStyle ? ButtonStyle->TitleWrapWidth : 0.f;
+		Txt_Title->SetMinDesiredWidth(bIconOnly ? 0.f : FMath::Max3(TitleMinWidth, TitleDefaults->GetMinDesiredWidth(), WrapWidth));
 		Txt_Title->SetText(bIconOnly ? FText::GetEmpty() : Title);
 		Txt_Title->SetVisibility(Title.IsEmpty() || bIconOnly ? ESlateVisibility::Collapsed : ESlateVisibility::SelfHitTestInvisible);
 	}
@@ -457,10 +458,11 @@ void UCommonButton::ApplyTitleStyle()
 	if (Txt_Title)
 	{
 		Txt_Title->SetStyleTag(FGameplayTag());
+		const UCommonButtonStyleN* ButtonStyle = Cast<UCommonButtonStyleN>(GetStyle());
 		FGameplayTag TitleTag = TitleTextStyleTag;
 		if (!TitleTag.IsValid())
 		{
-			if (const UCommonButtonStyleN* ButtonStyle = Cast<UCommonButtonStyleN>(GetStyle()))
+			if (ButtonStyle)
 			{
 				TitleTag = !GetIsEnabled() ? ButtonStyle->DisabledTextStyleTag
 					: GetSelected() ? (IsHovered() ? ButtonStyle->SelectedHoveredTextStyleTag : ButtonStyle->SelectedTextStyleTag)
@@ -474,6 +476,13 @@ void UCommonButton::ApplyTitleStyle()
 		Txt_Title->SetStyle(TitleTag.IsValid()
 			? FWidgetThemeResolver::ResolveClass(this, TitleTag, EWidgetStyleKind::Text)
 			: GetCurrentTextStyleClass().Get());
+		const UCommonTextBlockN* TitleDefaults = CastChecked<UCommonTextBlockN>(Txt_Title->GetArchetype());
+		const bool bWrapTitle = ButtonStyle && ButtonStyle->TitleWrapWidth > 0.f;
+		const ETextJustify::Type DefaultJustification = NativeContent ? ETextJustify::Center : TitleDefaults->GetTextJustification();
+		Txt_Title->SetAutoWrapText(bWrapTitle || TitleDefaults->GetAutoWrapText());
+		Txt_Title->SetWrapTextAt(bWrapTitle ? ButtonStyle->TitleWrapWidth : TitleDefaults->GetWrapTextAt());
+		Txt_Title->SetWrappingPolicy(bWrapTitle ? ETextWrappingPolicy::AllowPerCharacterWrapping : TitleDefaults->GetTextWrappingPolicy());
+		Txt_Title->SetJustification(bWrapTitle ? ButtonStyle->TitleJustification.GetValue() : DefaultJustification);
 	}
 }
 

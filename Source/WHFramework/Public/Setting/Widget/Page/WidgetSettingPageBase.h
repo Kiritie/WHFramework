@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Widget/Sub/SubActivatableWidgetBase.h"
+#include "Widget/Style/CommonStyleTypes.h"
 
 #include "WidgetSettingPageBase.generated.h"
 
@@ -80,6 +81,15 @@ private:
 	TWeakObjectPtr<UObject> PendingFocusItem;
 	FName PendingFocusWidgetName;
 	FDelegateHandle ThemeChangedHandle;
+
+	UPROPERTY(Transient)
+	FGameplayTag PageLabelTextStyleTag;
+
+	UPROPERTY(Transient)
+	TMap<FName, FGameplayTag> PageRendererLabelTextStyleTags;
+
+	UPROPERTY(Transient)
+	FCommonControlStyleTags PageControlStyles;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (BindWidget), Category = "Components")

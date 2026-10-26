@@ -16,6 +16,7 @@ UWidgetSettingEntryBase::UWidgetSettingEntryBase(const FObjectInitializer& Objec
 
 void UWidgetSettingEntryBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
+	SetPageStyleContext(FGameplayTag(), FCommonControlStyleTags());
 	SetSettingEntry(nullptr);
 
 	Super::OnDespawn_Implementation(InMode);
@@ -36,6 +37,7 @@ void UWidgetSettingEntryBase::NativeDestruct()
 
 void UWidgetSettingEntryBase::NativeOnEntryReleased()
 {
+	SetPageStyleContext(FGameplayTag(), FCommonControlStyleTags());
 	SetSettingEntry(nullptr);
 	IUserListEntry::NativeOnEntryReleased();
 }
@@ -120,6 +122,14 @@ bool UWidgetSettingEntryBase::CommitUserValue(const FParameter& InValue)
 	return bResult;
 }
 
+void UWidgetSettingEntryBase::SetPageStyleContext(FGameplayTag InLabelTextStyleTag, const FCommonControlStyleTags& InControlStyles)
+{
+	PageControlStyles = InControlStyles;
+	const ThisClass* Defaults = GetClass()->GetDefaultObject<ThisClass>();
+	SetTitleTextStyleTag(InLabelTextStyleTag.IsValid() ? InLabelTextStyleTag : Defaults->TitleTextStyleTag);
+	OnResolvedStyleChanged(Cast<UCommonButtonStyleN>(GetStyle()));
+}
+
 void UWidgetSettingEntryBase::OnResolvedStyleChanged(const UCommonButtonStyleN* InStyle)
 {
 	Super::OnResolvedStyleChanged(InStyle);
@@ -128,7 +138,13 @@ void UWidgetSettingEntryBase::OnResolvedStyleChanged(const UCommonButtonStyleN* 
 		return;
 	}
 	UWidget* Control = GetValueControl();
-	const FCommonControlStyleTags& Styles = InStyle->ControlStyles;
+	FCommonControlStyleTags Styles = InStyle->ControlStyles;
+	if (PageControlStyles.ValueInputStyleTag.IsValid()) Styles.ValueInputStyleTag = PageControlStyles.ValueInputStyleTag;
+	if (PageControlStyles.ValueToggleStyleTag.IsValid()) Styles.ValueToggleStyleTag = PageControlStyles.ValueToggleStyleTag;
+	if (PageControlStyles.ValueRangeStyleTag.IsValid()) Styles.ValueRangeStyleTag = PageControlStyles.ValueRangeStyleTag;
+	if (PageControlStyles.ValueOptionStyleTag.IsValid()) Styles.ValueOptionStyleTag = PageControlStyles.ValueOptionStyleTag;
+	if (PageControlStyles.ValueButtonStyleTag.IsValid()) Styles.ValueButtonStyleTag = PageControlStyles.ValueButtonStyleTag;
+	if (PageControlStyles.ReasonTextStyleTag.IsValid()) Styles.ReasonTextStyleTag = PageControlStyles.ReasonTextStyleTag;
 	if (UCommonOptionSelector* Option = Cast<UCommonOptionSelector>(Control))
 	{
 		Option->SetInheritedStyleTag(Styles.ValueOptionStyleTag);

@@ -21,12 +21,24 @@ namespace
 				return FString::Printf(TEXT("Slot%d"), static_cast<int32>(InSlot));
 		}
 	}
+
+	EPlayerMappableKeySlot GetDefinitionSlot(const FSettingDefinition& InDefinition)
+	{
+		const FString Id = InDefinition.SettingId.Name.ToString();
+		for (int32 Index = static_cast<int32>(EPlayerMappableKeySlot::First); Index <= static_cast<int32>(EPlayerMappableKeySlot::Seventh); ++Index)
+		{
+			const EPlayerMappableKeySlot Slot = static_cast<EPlayerMappableKeySlot>(Index);
+			if (Id.EndsWith(TEXT(".") + GetSlotName(Slot))) return Slot;
+		}
+		return EPlayerMappableKeySlot::Unspecified;
+	}
 }
 
 void UInputSettingProvider::CollectDefinitions(TArray<FSettingDefinition>& OutDefinitions) const
 {
 	const UInputModule* Input = UInputModule::GetPtr(GetWorld());
 	if (!Input) return;
+	int32 DisplayOrder = 0;
 	for(const FInputMappableEntry& Entry : Input->GetAllMappableEntries())
 	{
 		const FSettingId SettingId{FName(*FString::Printf(TEXT("Input.%s.%s"), *Entry.MappingName.ToString(), *GetSlotName(Entry.Slot)))};
@@ -46,8 +58,9 @@ void UInputSettingProvider::CollectDefinitions(TArray<FSettingDefinition>& OutDe
 		const FString SourceCategory = Entry.DisplayCategory.ToString();
 		const bool bSystemOperation = SourceCategory.Contains(TEXT("System")) || SourceCategory.Contains(TEXT("系统"));
 		Definition->Category = bSystemOperation ? FName(TEXT("System Operation")) : FName(TEXT("Character Control"));
+		Definition->CategoryDisplayName = bSystemOperation ? NSLOCTEXT("WH.Setting", "SystemInput", "系统操作") : NSLOCTEXT("WH.Setting", "CharacterInput", "角色控制");
 		Definition->CategoryOrder = bSystemOperation ? 10 : 0;
-		Definition->Order = static_cast<int32>(Entry.Slot);
+		Definition->Order = DisplayOrder++;
 		Definition->DisplayName = Entry.DisplayName.IsEmpty() ? FText::FromName(Entry.MappingName) : Entry.DisplayName;
 		Definition->Renderer = ESettingRendererType::Key;
 		Definition->ApplyPolicy = ESettingApplyPolicy::Deferred;
@@ -169,7 +182,7 @@ bool UInputSettingProvider::Apply(const FSettingDefinition& InDefinition, const 
 	return Input->MapPlayerKeyByMappingName(
 		FName(*InDefinition.SourcePath),
 		*Key,
-		static_cast<EPlayerMappableKeySlot>(InDefinition.Order),
+		GetDefinitionSlot(InDefinition),
 		0,
 		&FailureReasons);
 }
@@ -199,7 +212,7 @@ FKey UInputSettingProvider::FindCurrentKey(const FSettingDefinition& InDefinitio
 {
 	const UInputModule* Input = UInputModule::GetPtr(GetWorld());
 	if (!Input) return FKey();
-	const EPlayerMappableKeySlot Slot = static_cast<EPlayerMappableKeySlot>(InDefinition.Order);
+	const EPlayerMappableKeySlot Slot = GetDefinitionSlot(InDefinition);
 	const TArray<FPlayerKeyMapping> Mappings = Input->GetPlayerKeyMappingsByMappingName(FName(*InDefinition.SourcePath));
 	if(const FPlayerKeyMapping* Mapping = Mappings.FindByPredicate([Slot](const FPlayerKeyMapping& Item)
 	{
@@ -216,7 +229,7 @@ FKey UInputSettingProvider::FindDefaultKey(const FSettingDefinition& InDefinitio
 	const UInputModule* Input = UInputModule::GetPtr(GetWorld());
 	if (!Input) return FKey();
 	const FName MappingName(*InDefinition.SourcePath);
-	const EPlayerMappableKeySlot Slot = static_cast<EPlayerMappableKeySlot>(InDefinition.Order);
+	const EPlayerMappableKeySlot Slot = GetDefinitionSlot(InDefinition);
 	const TArray<FInputMappableEntry> Entries = Input->GetAllMappableEntries();
 	if(const FInputMappableEntry* Entry = Entries.FindByPredicate([MappingName, Slot](const FInputMappableEntry& Item)
 	{

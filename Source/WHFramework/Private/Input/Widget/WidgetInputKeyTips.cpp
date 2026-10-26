@@ -15,6 +15,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "Engine/LocalPlayer.h"
 #include "Input/InputModule.h"
+#include "InputCoreTypes.h"
 #include "Widget/Common/CommonTextBlockN.h"
 #include "Widget/Theme/WidgetStyleTags.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
@@ -285,6 +286,7 @@ void UWidgetInputKeyTips::RefreshData()
 	{
 		InputModule = UInputModule::GetPtr(GetWorld());
 	}
+	TArray<FKey> DisplayKeys;
 	for(const FGameplayTag& ActionTag : ActionTags)
 	{
 		if(!InputModule || !ActionTag.IsValid())
@@ -292,45 +294,80 @@ void UWidgetInputKeyTips::RefreshData()
 			continue;
 		}
 
-		for(const FKey& Key : InputModule->GetKeysByActionTag(ActionTag))
+		TArray<FKey> Keys;
+		// Slate 的固定指针手势不属于可重绑的 Enhanced Input 映射。
+		const FName TagName = ActionTag.GetTagName();
+		if (TagName == TEXT("Input.UI.Pointer.Primary")) Keys.Add(EKeys::LeftMouseButton);
+		else if (TagName == TEXT("Input.UI.Pointer.Secondary")) Keys.Add(EKeys::RightMouseButton);
+		else if (TagName == TEXT("Input.UI.Pointer.Wheel")) Keys.Add(EKeys::MouseWheelAxis);
+		else Keys = InputModule->GetKeysByActionTag(ActionTag);
+		if (!KeyMappingNames.IsEmpty())
 		{
+			Keys.Reset();
+			const TArray<FPlayerKeyMapping> Mappings = InputModule->GetPlayerKeyMappingsByTag(ActionTag);
+			for (const FPlayerKeyMapping& Mapping : Mappings)
+			{
+				if (KeyMappingNames.Contains(Mapping.GetMappingName())) Keys.AddUnique(Mapping.GetCurrentKey());
+			}
+			if (Mappings.IsEmpty())
+			{
+				for (const FInputMappableEntry& Entry : InputModule->GetMappableEntriesByActionTag(ActionTag))
+				{
+					if (KeyMappingNames.Contains(Entry.MappingName)) Keys.AddUnique(Entry.DefaultKey);
+				}
+			}
+		}
+		for(const FKey& Key : Keys)
+		{
+			if (!Key.IsValid()) continue;
 			if ((InputType == ECommonInputType::MouseAndKeyboard && Key.IsGamepadKey()) ||
 				(InputType == ECommonInputType::Gamepad && !Key.IsGamepadKey()))
 			{
 				continue;
 			}
-			FSlateBrush ImageBrush;
-			if(Settings->TryGetInputBrush(
-				ImageBrush,
-				Key,
-				InputType,
-				GamepadName)
-				&& ImageBrush.GetResourceObject())
+			DisplayKeys.AddUnique(Key);
+		}
+	}
+	for (const FKey& Key : FixedKeys)
+	{
+		if (Key.IsValid()) DisplayKeys.AddUnique(Key);
+	}
+	for (const FKey& Key : DisplayKeys)
+	{
+		const ECommonInputType KeyInputType = FixedKeys.Contains(Key)
+			? (Key.IsGamepadKey() ? ECommonInputType::Gamepad : ECommonInputType::MouseAndKeyboard)
+			: InputType;
+		FSlateBrush ImageBrush;
+		if(Settings->TryGetInputBrush(
+			ImageBrush,
+			Key,
+			KeyInputType,
+			GamepadName)
+			&& ImageBrush.GetResourceObject())
+		{
+			const FVector2D IconSize = ImageBrush.ImageSize;
+			const FVector2D MaxSize = KeyIconMaxSize;
+			if (IconSize.X > 0.f && IconSize.Y > 0.f)
 			{
-				const FVector2D IconSize = ImageBrush.ImageSize;
-				const FVector2D MaxSize = KeyIconMaxSize;
-				if (IconSize.X > 0.f && IconSize.Y > 0.f)
-				{
-					ImageBrush.ImageSize = IconSize * FMath::Min(MaxSize.X / IconSize.X, MaxSize.Y / IconSize.Y);
-				}
-				UImage* Image = NewObject<UImage>(this);
-				Image->SetBrush(ImageBrush);
-				if(UHorizontalBoxSlot* ImageSlot = Box_KeyIcon->AddChildToHorizontalBox(Image))
-				{
-					Image->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-					ImageSlot->SetPadding(FMargin(0.f, 0.f, KeySpacing, 0.f));
-					ImageSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
-					ImageSlot->SetVerticalAlignment(VAlign_Center);
-				}
+				ImageBrush.ImageSize = IconSize * FMath::Min(MaxSize.X / IconSize.X, MaxSize.Y / IconSize.Y);
 			}
-			else
+			UImage* Image = NewObject<UImage>(this);
+			Image->SetBrush(ImageBrush);
+			if(UHorizontalBoxSlot* ImageSlot = Box_KeyIcon->AddChildToHorizontalBox(Image))
 			{
-				if(!KeyCode.IsEmpty())
-				{
-					KeyCode += TEXT("/");
-				}
-				KeyCode += Key.GetDisplayName(false).ToString();
+				Image->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+				ImageSlot->SetPadding(FMargin(0.f, 0.f, KeySpacing, 0.f));
+				ImageSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
+				ImageSlot->SetVerticalAlignment(VAlign_Center);
 			}
+		}
+		else
+		{
+			if(!KeyCode.IsEmpty())
+			{
+				KeyCode += TEXT("/");
+			}
+			KeyCode += Key.GetDisplayName(false).ToString();
 		}
 	}
 
@@ -397,5 +434,17 @@ void UWidgetInputKeyTips::SetKeyDisplayName(const FText InKeyDisplayName)
 void UWidgetInputKeyTips::SetActionTags(const TArray<FGameplayTag>& InActionTags)
 {
 	ActionTags = InActionTags;
+	RefreshData();
+}
+
+void UWidgetInputKeyTips::SetKeyMappingNames(const TArray<FName>& InMappingNames)
+{
+	KeyMappingNames = InMappingNames;
+	RefreshData();
+}
+
+void UWidgetInputKeyTips::SetFixedKeys(const TArray<FKey>& InKeys)
+{
+	FixedKeys = InKeys;
 	RefreshData();
 }

@@ -68,6 +68,9 @@ protected:
 	PROPERTY_BINDING_IMPLEMENTATION(FSlateColor, HighlightColor);
 
 public:
+	ETextWrappingPolicy GetTextWrappingPolicy() const { return WrappingPolicy; }
+	ETextJustify::Type GetTextJustification() const { return Justification; }
+
 	UFUNCTION(BlueprintPure, Category = "Widget")
 	virtual FText GetHighlightText() const;
 

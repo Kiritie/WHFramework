@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "CommonButtonBase.h"
+#include "Framework/Text/TextLayout.h"
 #include "Widget/Style/CommonStyleTypes.h"
 #include "CommonButtonStyleN.generated.h"
 
@@ -30,6 +31,12 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FCommonControlStyleTags ControlStyles;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "0"))
+	float TitleWrapWidth = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TEnumAsByte<ETextJustify::Type> TitleJustification = ETextJustify::Center;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (Categories = "UI.Style.Text"))
 	FGameplayTag NormalTextStyleTag;

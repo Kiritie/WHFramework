@@ -67,6 +67,12 @@ public:
 	UFUNCTION(BlueprintCallable)
 	bool PlaceSelected();
 
+	bool CanRotateSelected() const;
+	bool RotateSelected(int32 InQuarterTurns);
+	void ResetPlacementRotation();
+	uint8 GetPlacementQuarterTurns() const { return PlacementQuarterTurns; }
+	FSimpleMulticastDelegate OnPlacementChanged;
+
 	UFUNCTION(BlueprintCallable)
 	bool PlaceItem(
 		const FVoxelItem& InItem);
@@ -178,6 +184,7 @@ private:
 
 	bool bHeld = false;
 	bool bBreakActive = false;
+	uint8 PlacementQuarterTurns = 0;
 
 	uint64 ObservedWorldEpoch = 0;
 

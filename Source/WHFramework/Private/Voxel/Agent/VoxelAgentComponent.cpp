@@ -4,6 +4,7 @@
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Ability/Inventory/InventoryNetworkComponent.h"
 #include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryItemRegistry.h"
 
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
@@ -250,6 +251,7 @@ bool UVoxelAgentComponent::MakeIntent(
 
 	OutIntent.Action =
 		InAction;
+	OutIntent.PlacementQuarterTurns = InAction == EVoxelEditAction::Place ? PlacementQuarterTurns : 0;
 
 	OutIntent.ExpectedTarget =
 		Hit.Index;
@@ -432,6 +434,62 @@ bool UVoxelAgentComponent::PlaceSelected()
 			Intent) &&
 		Send(
 			Intent);
+}
+
+bool UVoxelAgentComponent::CanRotateSelected() const
+{
+	const IAbilityInventoryAgentInterface* InventoryAgent = Cast<IAbilityInventoryAgentInterface>(GetOwner());
+	const UVoxelModule* VoxelModule = Module.Get();
+	if (!InventoryAgent || !VoxelModule || !VoxelModule->IsReady())
+	{
+		return false;
+	}
+	FInventorySnapshot Snapshot;
+	if (GetOwner()->HasAuthority())
+	{
+		const UAbilityInventoryBase* Inventory = InventoryAgent->GetInventory();
+		if (!Inventory)
+		{
+			return false;
+		}
+		Snapshot = Inventory->MakeSnapshot();
+	}
+	else
+	{
+		const UInventoryNetworkComponent* InventoryNetwork = BoundController.IsValid() ? BoundController->FindComponentByClass<UInventoryNetworkComponent>() : nullptr;
+		const FInventorySnapshot* View = InventoryNetwork ? InventoryNetwork->FindView(InventoryNetwork->GetOwnerInventoryId()) : nullptr;
+		if (!View)
+		{
+			return false;
+		}
+		Snapshot = *View;
+	}
+	const FInventorySlotState* Slot = Snapshot.FindSlot(InventoryAgent->GetSelectedInventorySlot());
+	const UInventoryWorldSubsystem* System = GetWorld()->GetSubsystem<UInventoryWorldSubsystem>();
+	const FInventoryItemDefinition* Item = Slot && !Slot->bLocked && !Slot->Item.IsEmpty() && System ? System->GetRegistry().Find(Slot->Item.ItemId) : nullptr;
+	const FVoxelRuntimeDefinition* Definition = Item && VoxelModule->GetRegistry() ? VoxelModule->GetRegistry()->Find(Item->PlaceableVoxelId) : nullptr;
+	return Definition && (Definition->Shape == EVoxelShapeKind::FullCube || Definition->Shape == EVoxelShapeKind::Stair ||
+		Definition->Shape == EVoxelShapeKind::Door || Definition->Shape == EVoxelShapeKind::Trapdoor);
+}
+
+bool UVoxelAgentComponent::RotateSelected(int32 InQuarterTurns)
+{
+	if (!CanRotateSelected() || InQuarterTurns == 0)
+	{
+		return false;
+	}
+	PlacementQuarterTurns = uint8((int32(PlacementQuarterTurns) + (InQuarterTurns > 0 ? 1 : 3)) & 3);
+	OnPlacementChanged.Broadcast();
+	return true;
+}
+
+void UVoxelAgentComponent::ResetPlacementRotation()
+{
+	if (PlacementQuarterTurns != 0)
+	{
+		PlacementQuarterTurns = 0;
+		OnPlacementChanged.Broadcast();
+	}
 }
 
 bool UVoxelAgentComponent::PlaceItem(

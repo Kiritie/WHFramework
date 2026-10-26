@@ -3304,7 +3304,14 @@ FVoxelEditReply UVoxelModule::ExecuteIntent(
         PlaceType = Definition->TypeId;
     }
     FVoxelInteractionPlan Plan;
-    if(!BuildInteractionPlan(Hit, InIntent.Action, PlaceType, InIntent.Direction, InSource, Plan, Reply.Reason) ||
+	if (InIntent.PlacementQuarterTurns > 3)
+	{
+		Reply.Reason = TEXT("Voxel.InvalidPlacementRotation");
+		return Reply;
+	}
+	const FVector PlacementDirection = InIntent.Action == EVoxelEditAction::Place ?
+		InIntent.Direction.RotateAngleAxis(InIntent.PlacementQuarterTurns * 90.0, FVector::UpVector) : InIntent.Direction;
+    if(!BuildInteractionPlan(Hit, InIntent.Action, PlaceType, PlacementDirection, InSource, Plan, Reply.Reason) ||
         !ValidateInteractionPlan(Plan, Reply.Reason))
     {
         return Reply;

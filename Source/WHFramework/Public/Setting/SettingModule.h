@@ -219,7 +219,7 @@ public:
 	TArray<USettingEntry*> GetSettingEntriesByPage(FName InPage) const;
 
 	UFUNCTION(BlueprintPure)
-	TArray<FSettingPageDefinition> GetSettingPages() const;
+	virtual TArray<FSettingPageDefinition> GetSettingPages() const;
 
 	UFUNCTION(BlueprintPure)
 	float GetConfirmationTimeout() const { return ConfirmationTimeout; }

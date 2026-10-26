@@ -2,6 +2,7 @@
 
 #include "Blueprint/IUserObjectListEntry.h"
 #include "Widget/Common/CommonButton.h"
+#include "Widget/Style/CommonStyleTypes.h"
 
 #include "WidgetSettingEntryBase.generated.h"
 
@@ -28,7 +29,6 @@ protected:
 	virtual void NativeOnEntryReleased() override;
 	virtual void OnResolvedStyleChanged(const UCommonButtonStyleN* InStyle) override;
 	virtual UWidget* GetValueControl() const;
-	virtual FName GetRendererName() const;
 	virtual void BindValueControl();
 	virtual void UnbindValueControl();
 	virtual void ConfigureValueControl();
@@ -41,6 +41,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual void RefreshFromModel();
 	void RefreshModelState();
+	virtual FName GetRendererName() const;
+	void SetPageStyleContext(FGameplayTag InLabelTextStyleTag, const FCommonControlStyleTags& InControlStyles);
 
 protected:
 	UFUNCTION(BlueprintNativeEvent)
@@ -52,6 +54,9 @@ protected:
 	TObjectPtr<USettingEntry> SettingEntry;
 
 	bool bRefreshingFromModel = false;
+
+	UPROPERTY(Transient)
+	FCommonControlStyleTags PageControlStyles;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UCommonTextBlockN> Txt_Reason;

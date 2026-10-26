@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
+#include "InputCoreTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Widget/Pool/PoolWidgetBase.h"
 #if WITH_EDITOR
@@ -119,6 +120,13 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (Categories = "Input"))
 	TArray<FGameplayTag> ActionTags;
 
+	/** 可选的语义映射行过滤，例如同一轴动作中的上升与下潜。 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+	TArray<FName> KeyMappingNames;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+	TArray<FKey> FixedKeys;
+
 public:
 	UFUNCTION(BlueprintPure)
 	FText GetKeyDisplayName() const;
@@ -131,6 +139,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void SetActionTags(const TArray<FGameplayTag>& InActionTags);
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void SetKeyMappingNames(const TArray<FName>& InMappingNames);
+
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void SetFixedKeys(const TArray<FKey>& InKeys);
 
 private:
 	void BuildNativeLayout();

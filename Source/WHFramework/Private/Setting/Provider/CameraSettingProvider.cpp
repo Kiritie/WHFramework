@@ -51,6 +51,8 @@ void UCameraSettingProvider::CollectDefinitions(TArray<FSettingDefinition>& OutD
 		Definition.Provider = FName(TEXT("Camera"));
 		Definition.Page = FName(TEXT("Camera"));
 		Definition.Category = Category;
+		Definition.CategoryDisplayName = Category == FName(TEXT("Camera Move")) ? NSLOCTEXT("WH.CameraSetting", "MoveCategory", "相机移动") :
+			Category == FName(TEXT("Camera Rotate")) ? NSLOCTEXT("WH.CameraSetting", "RotateCategory", "相机旋转") : NSLOCTEXT("WH.CameraSetting", "ZoomCategory", "相机缩放");
 		Definition.CategoryOrder = Category == FName(TEXT("Camera Move")) ? 0 : Category == FName(TEXT("Camera Rotate")) ? 10 : 20;
 		Definition.Order = Order;
 		Definition.DisplayName = Name;

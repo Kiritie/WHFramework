@@ -78,51 +78,51 @@ public:
 	}
 
 public:
-	UPROPERTY(meta = (SettingCategory = "Display", SettingOrder = "0", SettingRequiresConfirmation))
+	UPROPERTY(meta = (DisplayName = "窗口模式", SettingCategoryDisplayName = "显示", SettingCategory = "Display", SettingOrder = "0", SettingRequiresConfirmation))
 	EWindowModeN WindowMode;
 
-	UPROPERTY(meta = (SettingLeaf, SettingRenderer = "Option", SettingApply = "Deferred", SettingCategory = "Display", SettingOrder = "10", SettingRequiresConfirmation))
+	UPROPERTY(meta = (DisplayName = "分辨率", SettingCategoryDisplayName = "显示", SettingLeaf, SettingRenderer = "Option", SettingApply = "Deferred", SettingCategory = "Display", SettingOrder = "10", SettingRequiresConfirmation))
 	FIntPoint WindowResolution;
 
-	UPROPERTY(meta = (SettingCategory = "Display", SettingOrder = "20"))
+	UPROPERTY(meta = (DisplayName = "垂直同步", SettingCategoryDisplayName = "显示", SettingCategory = "Display", SettingOrder = "20"))
 	bool bEnableVSync;
 
-	UPROPERTY(meta = (SettingCategory = "Display", SettingOrder = "30"))
+	UPROPERTY(meta = (DisplayName = "动态分辨率", SettingCategoryDisplayName = "显示", SettingCategory = "Display", SettingOrder = "30"))
 	bool bEnableDynamicResolution;
 
-	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "40"))
+	UPROPERTY(meta = (DisplayName = "整体画质", SettingCategoryDisplayName = "画质", SettingCategory = "Quality", SettingOrder = "40"))
 	EVideoQuality GlobalVideoQuality;
 
-	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "50"))
+	UPROPERTY(meta = (DisplayName = "视距", SettingCategoryDisplayName = "画质", SettingCategory = "Quality", SettingOrder = "50"))
 	EVideoQuality ViewDistanceQuality;
 
-	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "60"))
+	UPROPERTY(meta = (DisplayName = "阴影", SettingCategoryDisplayName = "画质", SettingCategory = "Quality", SettingOrder = "60"))
 	EVideoQuality ShadowQuality;
 
-	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "70"))
+	UPROPERTY(meta = (DisplayName = "全局光照", SettingCategoryDisplayName = "画质", SettingCategory = "Quality", SettingOrder = "70"))
 	EVideoQuality GlobalIlluminationQuality;
 
-	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "80"))
+	UPROPERTY(meta = (DisplayName = "反射", SettingCategoryDisplayName = "画质", SettingCategory = "Quality", SettingOrder = "80"))
 	EVideoQuality ReflectionQuality;
 
-	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "90"))
+	UPROPERTY(meta = (DisplayName = "抗锯齿", SettingCategoryDisplayName = "画质", SettingCategory = "Quality", SettingOrder = "90"))
 	EVideoQuality AntiAliasingQuality;
 
-	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "100"))
+	UPROPERTY(meta = (DisplayName = "纹理", SettingCategoryDisplayName = "画质", SettingCategory = "Quality", SettingOrder = "100"))
 	EVideoQuality TextureQuality;
 
-	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "110"))
+	UPROPERTY(meta = (DisplayName = "特效", SettingCategoryDisplayName = "画质", SettingCategory = "Quality", SettingOrder = "110"))
 	EVideoQuality VisualEffectQuality;
 
-	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "120"))
+	UPROPERTY(meta = (DisplayName = "后期处理", SettingCategoryDisplayName = "画质", SettingCategory = "Quality", SettingOrder = "120"))
 	EVideoQuality PostProcessingQuality;
 
-	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "130"))
+	UPROPERTY(meta = (DisplayName = "植被", SettingCategoryDisplayName = "画质", SettingCategory = "Quality", SettingOrder = "130"))
 	EVideoQuality FoliageQuality;
 
-	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "140"))
+	UPROPERTY(meta = (DisplayName = "着色", SettingCategoryDisplayName = "画质", SettingCategory = "Quality", SettingOrder = "140"))
 	EVideoQuality ShadingQuality;
 
-	UPROPERTY(meta = (SettingCategory = "Quality", SettingOrder = "150", DisplayName = "环境光遮蔽（SSAO）"))
+	UPROPERTY(meta = (SettingCategoryDisplayName = "画质", SettingCategory = "Quality", SettingOrder = "150", DisplayName = "环境光遮蔽（SSAO）"))
 	EVideoQuality AmbientOcclusionQuality;
 };

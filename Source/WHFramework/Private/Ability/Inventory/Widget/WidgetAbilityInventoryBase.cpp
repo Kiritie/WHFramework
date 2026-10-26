@@ -9,6 +9,7 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
+#include "Components/OverlaySlot.h"
 #include "Components/PanelWidget.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Widget/Common/CommonButton.h"
@@ -412,7 +413,11 @@ void UWidgetAbilityInventoryBase::RebuildViews()
             Slots.Add(SlotId(InventoryId, SlotState.Key), Widget);
             if (FixedHost)
             {
-                FixedHost->AddChild(Widget);
+                if (UOverlaySlot* HostSlot = Cast<UOverlaySlot>(FixedHost->AddChild(Widget)))
+                {
+                    HostSlot->SetHorizontalAlignment(HAlign_Fill);
+                    HostSlot->SetVerticalAlignment(VAlign_Fill);
+                }
             }
             else
             {

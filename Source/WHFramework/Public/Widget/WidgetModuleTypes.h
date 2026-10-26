@@ -328,9 +328,9 @@ public:
 	}
 
 public:
-	UPROPERTY(meta = (SettingRenderer = "Option", SettingApply = "Immediate", SettingCategory = "Global", SettingOrder = "0"))
+	UPROPERTY(meta = (DisplayName = "语言", SettingCategoryDisplayName = "全局", SettingRenderer = "Option", SettingApply = "Immediate", SettingCategory = "Global", SettingOrder = "0"))
 	int32 LanguageType;
 
-	UPROPERTY(meta = (ClampMin = "0.5", ClampMax = "2.0", SettingApply = "Preview", SettingCategory = "Global", SettingOrder = "10"))
+	UPROPERTY(meta = (DisplayName = "界面缩放", SettingCategoryDisplayName = "全局", ClampMin = "0.5", ClampMax = "2.0", SettingApply = "Preview", SettingCategory = "Global", SettingOrder = "10"))
 	float GlobalScale;
 };

@@ -42,6 +42,7 @@ struct WHFRAMEWORK_API FVoxelEditIntent
     uint64 ExpectedInventoryRevision = 0;
     uint32 ExpectedInventoryGeneration = 1;
     uint64 ExpectedRevision = 0;
+	uint8 PlacementQuarterTurns = 0;
 };
 
 struct WHFRAMEWORK_API FVoxelEditReply

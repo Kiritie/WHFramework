@@ -711,6 +711,7 @@ bool FVoxelNetworkCodec::EncodeIntent(
 	TArray<uint8>& OutBytes)
 {
 	if (InIntent.RequestId == 0 || !InIntent.InventoryStoreId.IsValid() ||
+		InIntent.PlacementQuarterTurns > 3 ||
 		static_cast<uint8>(InIntent.Action) > static_cast<uint8>(EVoxelEditAction::Use) ||
 		InIntent.Origin.ContainsNaN() ||
 		InIntent.Direction.ContainsNaN())
@@ -746,6 +747,7 @@ bool FVoxelNetworkCodec::EncodeIntent(
 	Writer.U64(InIntent.ExpectedInventoryRevision);
 	Writer.U32(InIntent.ExpectedInventoryGeneration);
 	Writer.U64(InIntent.ExpectedRevision);
+	Writer.U8(InIntent.PlacementQuarterTurns);
 	return Writer.Finish(OutBytes);
 }
 
@@ -785,8 +787,10 @@ bool FVoxelNetworkCodec::DecodeIntent(
 	Value.ExpectedInventoryRevision = Reader.U64();
 	Value.ExpectedInventoryGeneration = Reader.U32();
 	Value.ExpectedRevision = Reader.U64();
+	Value.PlacementQuarterTurns = Reader.U8();
 	const double DirectionLength = Value.Direction.SizeSquared();
 	if (!Reader.End() ||
+		Value.PlacementQuarterTurns > 3 ||
 		DirectionLength < 0.99 ||
 		DirectionLength > 1.01 ||
 		(!ItemId.IsEmpty() && !Value.ExpectedItemID.IsValid()) ||

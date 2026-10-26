@@ -18,6 +18,7 @@ namespace
 		Definition.Provider = AudioProviderName;
 		Definition.Page = AudioProviderName;
 		Definition.Category = FName(TEXT("Volume"));
+		Definition.CategoryDisplayName = NSLOCTEXT("WH.Setting", "VolumeCategory", "音量");
 		Definition.Order = InOrder;
 		Definition.DisplayName = InDisplayName;
 		Definition.Renderer = ESettingRendererType::Number;
@@ -37,10 +38,10 @@ namespace
 void UAudioSettingProvider::CollectDefinitions(TArray<FSettingDefinition>& OutDefinitions) const
 {
 	if (!UAudioModule::GetPtr(GetWorld())) return;
-	OutDefinitions.Add(MakeAudioVolumeDefinition(MasterVolumeId, NSLOCTEXT("WH.Setting", "MasterVolume", "Master Volume"), 0));
-	OutDefinitions.Add(MakeAudioVolumeDefinition(BackgroundVolumeId, NSLOCTEXT("WH.Setting", "BackgroundVolume", "Background Volume"), 1));
-	OutDefinitions.Add(MakeAudioVolumeDefinition(EnvironmentVolumeId, NSLOCTEXT("WH.Setting", "EnvironmentVolume", "Environment Volume"), 2));
-	OutDefinitions.Add(MakeAudioVolumeDefinition(EffectVolumeId, NSLOCTEXT("WH.Setting", "EffectVolume", "Effects Volume"), 3));
+	OutDefinitions.Add(MakeAudioVolumeDefinition(MasterVolumeId, NSLOCTEXT("WH.Setting", "MasterVolume", "全局音量"), 0));
+	OutDefinitions.Add(MakeAudioVolumeDefinition(BackgroundVolumeId, NSLOCTEXT("WH.Setting", "BackgroundVolume", "背景音量"), 1));
+	OutDefinitions.Add(MakeAudioVolumeDefinition(EnvironmentVolumeId, NSLOCTEXT("WH.Setting", "EnvironmentVolume", "环境音量"), 2));
+	OutDefinitions.Add(MakeAudioVolumeDefinition(EffectVolumeId, NSLOCTEXT("WH.Setting", "EffectVolume", "音效音量"), 3));
 }
 
 bool UAudioSettingProvider::CanHandle(const FSettingDefinition& InDefinition) const

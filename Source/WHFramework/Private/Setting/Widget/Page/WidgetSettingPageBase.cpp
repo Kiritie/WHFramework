@@ -177,6 +177,11 @@ void UWidgetSettingPageBase::HandleThemeChanged()
 
 void UWidgetSettingPageBase::HandleEntryWidgetGenerated(UUserWidget& InEntryWidget)
 {
+	if (UWidgetSettingEntryBase* Entry = Cast<UWidgetSettingEntryBase>(&InEntryWidget))
+	{
+		const FGameplayTag* RendererLabel = PageRendererLabelTextStyleTags.Find(Entry->GetRendererName());
+		Entry->SetPageStyleContext(RendererLabel ? *RendererLabel : PageLabelTextStyleTag, PageControlStyles);
+	}
 	if (!PendingFocusItem.IsValid() || SettingList->GetListObjectFromEntry(InEntryWidget) != PendingFocusItem.Get())
 	{
 		return;
@@ -232,12 +237,18 @@ void UWidgetSettingPageBase::Apply()
 void UWidgetSettingPageBase::SetPage(FName InPage)
 {
 	PageName = InPage;
+	PageLabelTextStyleTag = FGameplayTag();
+	PageRendererLabelTextStyleTags.Reset();
+	PageControlStyles = FCommonControlStyleTags();
 	RefreshEntries();
 }
 
 void UWidgetSettingPageBase::SetPageDefinition(const FSettingPageDefinition& InDefinition)
 {
 	PageName = InDefinition.Page;
+	PageLabelTextStyleTag = InDefinition.LabelTextStyleTag;
+	PageRendererLabelTextStyleTags = InDefinition.RendererLabelTextStyleTags;
+	PageControlStyles = InDefinition.ControlStyles;
 	Title = InDefinition.DisplayName.IsEmpty() ? FText::FromName(InDefinition.Page) : InDefinition.DisplayName;
 	RefreshEntries();
 }
@@ -285,7 +296,7 @@ void UWidgetSettingPageBase::RefreshEntries()
 			if(!LastCategory.IsNone())
 			{
 				USettingCategoryEntry* CategoryEntry = NewObject<USettingCategoryEntry>(this);
-				CategoryEntry->Initialize(LastCategory, FText::FromName(LastCategory), Definition.CategoryOrder);
+				CategoryEntry->Initialize(LastCategory, Definition.CategoryDisplayName.IsEmpty() ? FText::FromName(LastCategory) : Definition.CategoryDisplayName, Definition.CategoryOrder);
 				CategoryEntries.Add(CategoryEntry);
 				ListItems.Add(CategoryEntry);
 			}

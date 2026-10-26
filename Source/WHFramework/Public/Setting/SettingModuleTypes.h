@@ -8,6 +8,7 @@
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Video/VideoModuleTypes.h"
 #include "Widget/WidgetModuleTypes.h"
+#include "Widget/Style/CommonStyleTypes.h"
 
 #include "SettingModuleTypes.generated.h"
 
@@ -207,6 +208,9 @@ public:
 	FName Category;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FText CategoryDisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 CategoryOrder = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -369,6 +373,15 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Order = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Categories = "UI.Style.Text"))
+	FGameplayTag LabelTextStyleTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ToolTip = "Optional text overrides keyed by the entry renderer name, such as Bool, Enum, Option or Key."))
+	TMap<FName, FGameplayTag> RendererLabelTextStyleTags;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FCommonControlStyleTags ControlStyles;
 };
 
 USTRUCT(BlueprintType)

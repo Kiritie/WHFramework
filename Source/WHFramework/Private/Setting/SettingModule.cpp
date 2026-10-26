@@ -291,6 +291,10 @@ void USettingModule::CollectPropertyDefinitions(const UStruct* InStruct, const F
 		Definition.Order = HasMetadata(*Property, TEXT("SettingOrder"))
 		                       ? FCString::Atoi(*GetMetadata(*Property, TEXT("SettingOrder")))
 		                       : OutDefinitions.Num() - 1;
+		if (HasMetadata(*Property, TEXT("SettingCategoryDisplayName")))
+		{
+			Definition.CategoryDisplayName = FText::FromString(GetMetadata(*Property, TEXT("SettingCategoryDisplayName")));
+		}
 		Definition.CategoryOrder = HasMetadata(*Property, TEXT("SettingCategoryOrder"))
 		                               ? FCString::Atoi(*GetMetadata(*Property, TEXT("SettingCategoryOrder")))
 		                               : 0;

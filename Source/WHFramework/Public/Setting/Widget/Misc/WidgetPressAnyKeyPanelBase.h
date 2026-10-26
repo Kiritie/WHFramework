@@ -6,6 +6,8 @@
 
 #include "WidgetPressAnyKeyPanelBase.generated.h"
 
+class UWidgetInputKeyTips;
+
 /**
  * 
  */
@@ -25,6 +27,9 @@ public:
 	virtual void OnClose(bool bInstant) override;
 
 protected:
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UWidgetInputKeyTips> CancelKeyTips;
+
 	void HandleKeySelected(FKey InKey);
 	
 	void HandleKeySelectionCanceled();

@@ -4,6 +4,7 @@
 
 #include "Framework/Application/IInputProcessor.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Input/Widget/WidgetInputKeyTips.h"
 
 class ICursor;
 
@@ -89,6 +90,8 @@ UWidgetPressAnyKeyPanelBase::UWidgetPressAnyKeyPanelBase(const FObjectInitialize
 void UWidgetPressAnyKeyPanelBase::OnInitialize(const FParameter& InParams)
 {
 	Super::OnInitialize(InParams);
+	CancelKeyTips->SetFixedKeys({EKeys::Escape});
+	CancelKeyTips->SetKeyDisplayName(NSLOCTEXT("PressAnyKey", "CancelKeyHint", "取消"));
 }
 
 void UWidgetPressAnyKeyPanelBase::OnOpen(const FParameter& InParams, bool bInstant)
