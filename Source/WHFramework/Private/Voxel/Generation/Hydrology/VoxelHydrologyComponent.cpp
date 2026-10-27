@@ -171,14 +171,32 @@ bool FVoxelHydrologyComponentBuild::ReadExteriorNode(const FIntPoint& InCell, FT
     if (FVoxelHydrologyMacroInput::Read(Recipe->Settings, InCell, InLookup, InRequestTile, Sample, World, OutError) != EVoxelHydrologyClosureRead::Ready) return false;
     const int32 Side = Recipe->Settings.HydrologyRegionSide;
     const FVoxelHydrologyRegionKey Key{FIntPoint(VoxelGeneration::FloorDivide(InCell.X, Side), VoxelGeneration::FloorDivide(InCell.Y, Side))};
-    TSharedPtr<const FVoxelHydrologyNetworkRunoff, ESPMode::ThreadSafe> Outside;
-    if (!Cache.AdvanceHydrologyRunoff(Key, Config, InLookup, InRequestTile, Outside, OutError, InCancel)) return false;
-    const auto* Control = Outside->Find(InCell);
-    if (!Control)
+    if (ExteriorRunoff.IsSet() && ExteriorRunoff->Cell != InCell)
     {
-        OutError = TEXT("HydrologyComponentConflict: regional exit has no actual neighboring control");
+        OutError = TEXT("HydrologyComponentConflict: exterior runoff cursor changed before commit");
         return false;
     }
+    TSharedPtr<const FVoxelHydrologyNetworkRunoff, ESPMode::ThreadSafe> Outside;
+    if (!ExteriorRunoff.IsSet())
+    {
+        if (!Cache.AdvanceHydrologyRunoff(Key, Config, InLookup, InRequestTile, Outside, OutError, InCancel)) return false;
+        const auto* Control = Outside->Find(InCell);
+        if (!Control || Outside->Coordinate != Key.Coordinate || Outside->Generation != Generation || !Outside->Fingerprint)
+        {
+            OutError = TEXT("HydrologyComponentConflict: regional exit has no matching neighboring control");
+            return false;
+        }
+        ExteriorRunoff.Emplace(FExteriorRunoffSnapshot{InCell, Outside->Coordinate, Outside->Generation, Outside->Fingerprint, *Control});
+    }
+    const auto& Control = ExteriorRunoff->Control;
+#if WITH_DEV_AUTOMATION_TESTS
+    if (bTestPauseAfterExteriorSnapshot)
+    {
+        bTestPauseAfterExteriorSnapshot = false;
+        OutError = TEXT("Yielded: test exterior runoff snapshot");
+        return false;
+    }
+#endif
     FVoxelHydrologyComponentNode Node;
     Node.Cell = World;
     Node.RoutePoint.Position = World;
@@ -188,6 +206,12 @@ bool FVoxelHydrologyComponentBuild::ReadExteriorNode(const FIntPoint& InCell, FT
     Node.ReceiverId = Sample.WaterId;
     TSharedPtr<const FVoxelHydrologyChannelPlan, ESPMode::ThreadSafe> OutsideChannels;
     if (!Cache.AdvanceHydrologyChannels(Key, Config, InLookup, InRequestTile, OutsideChannels, OutError, InCancel)) return false;
+    if (OutsideChannels->Coordinate != ExteriorRunoff->Coordinate || OutsideChannels->Generation != ExteriorRunoff->Generation ||
+        OutsideChannels->RunoffFingerprint != ExteriorRunoff->Fingerprint)
+    {
+        OutError = TEXT("HydrologyComponentConflict: exterior channel and runoff identities differ");
+        return false;
+    }
     const auto* Channel = OutsideChannels->Find(InCell);
     if (!Channel || !Channel->bActive || Channel->WaterZ == MAX_int32)
     {
@@ -195,14 +219,14 @@ bool FVoxelHydrologyComponentBuild::ReadExteriorNode(const FIntPoint& InCell, FT
         return false;
     }
     Node.RoutePoint.WaterZ = Channel->WaterZ;
-    Node.RoutePoint.Accumulation = Control->Accumulation;
-    Node.bHasParent = Control->Control.bHasParent;
+    Node.RoutePoint.Accumulation = Control.Accumulation;
+    Node.bHasParent = Control.Control.bHasParent;
     if (Node.bHasParent)
     {
         const int64 CellSize = Recipe->Settings.HydrologyCellSize;
         Node.ParentCell = FIntPoint(
-            int32(FMath::Max(VoxelGeneration::WorldCellMin, int64(Control->Control.ParentCell.X) * CellSize)),
-            int32(FMath::Max(VoxelGeneration::WorldCellMin, int64(Control->Control.ParentCell.Y) * CellSize)));
+            int32(FMath::Max(VoxelGeneration::WorldCellMin, int64(Control.Control.ParentCell.X) * CellSize)),
+            int32(FMath::Max(VoxelGeneration::WorldCellMin, int64(Control.Control.ParentCell.Y) * CellSize)));
     }
     Node.bGhost = true;
     SetShape(Node);
@@ -390,6 +414,7 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVox
                     if (!VoxelGenerationAllocation::RetainMap(ExteriorNodes, ExteriorNodes.Num() + 1, OutError)) return false;
                     const int32 ExteriorIndex = PrepareSelected.Add(Exterior);
                     Existing = &ExteriorNodes.Add(ParentCell, ExteriorIndex);
+                    ExteriorRunoff.Reset();
                 }
                 Node.Parent = *Existing;
             }

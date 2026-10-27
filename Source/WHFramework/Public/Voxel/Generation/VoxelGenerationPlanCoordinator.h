@@ -159,10 +159,17 @@ private:
 		uint64 AttemptId = 0;
 		uint64 CapacityVersion = 0;
 		uint64 TaskCapacityVersion = 0;
+		uint64 TaskQueueVersion = 0;
+		uint64 TaskQueueResourceVersion = 0;
+		uint64 TaskQueueInputBytes = 0;
+		double TaskQueueRetryAt = 0.0;
+		FVoxelTerrainServicePriority TaskQueuePriority;
+		EVoxelWorkClass TaskQueueWorkClass = EVoxelWorkClass::None;
 		bool bAttemptPendingAdmission = false;
 		bool bPrerequisiteRetentionPending = false;
 		bool bWaitingCapacity = false;
 		bool bWaitingTaskCapacity = false;
+		bool bWaitingTaskQueueCapacity = false;
 		bool bAdmissionLinked = false;
 		bool bInFlight = false;
 		bool bRegistering = false;

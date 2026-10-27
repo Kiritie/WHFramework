@@ -817,6 +817,18 @@ bool FVoxelTaskScheduler::IsTerminal(const FVoxelTaskKey& InKey) const
 		Attempt->Blocked == EVoxelTaskBlockReason::TerminalFailure);
 }
 
+uint64 FVoxelTaskScheduler::GetQueueAdmissionVersion() const
+{
+	check(IsInGameThread());
+	return QueueAdmissionVersion;
+}
+
+void FVoxelTaskScheduler::ChangedQueueAdmission()
+{
+	checkf(QueueAdmissionVersion != MAX_uint64, TEXT("Voxel task queue admission version exhausted"));
+	++QueueAdmissionVersion;
+}
+
 bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 {
 	check(IsInGameThread());
@@ -1014,6 +1026,7 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 			}
 		}
 		Pending.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+		ChangedQueueAdmission();
 		QueuedInputBytes -= Displaced.InputBytes;
 		const FVoxelTaskKey DisplacedKey{Displaced.Kind, Displaced.Stamp};
 		RemoveActive(Displaced.Stamp, Displaced.Kind, Displaced.WorkClass, false);
@@ -1033,6 +1046,7 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 	check(Pending.Num() < Pending.Max());
 	Pending.Add(
 		MoveTemp(InRequest));
+	ChangedQueueAdmission();
 
 	Pump();
 	FlushSectionIdleNotifications();
@@ -1101,6 +1115,10 @@ void FVoxelTaskScheduler::VisitPriorityStates(TFunctionRef<void(FVoxelTaskReques
 		const auto Restore = [this, &Identity, Next](auto& Request)
 		{
 			if (Request.Sequence != Next || Request.Kind != Identity.Kind || !(Request.Stamp == Identity.Stamp)) return false;
+			if (Request.WorkClass != Identity.WorkClass || Request.SourcePriority != Identity.SourcePriority ||
+				Request.DistanceScore != Identity.DistanceScore || Request.ForwardScore != Identity.ForwardScore ||
+				Request.SourceStableKey != Identity.SourceStableKey || Request.ServiceBand != Identity.ServiceBand ||
+				Request.TerrainStage != Identity.TerrainStage) ChangedQueueAdmission();
 			CriticalTaskCount += int32(Identity.WorkClass == EVoxelWorkClass::Critical) - int32(Request.WorkClass == EVoxelWorkClass::Critical);
 			Request.WorkClass = Identity.WorkClass;
 			Request.SourcePriority = Identity.SourcePriority;
@@ -1173,6 +1191,7 @@ void FVoxelTaskScheduler::UpdateTerrainStages(TFunctionRef<void(EVoxelTaskKind, 
 void FVoxelTaskScheduler::SetPaused(bool bInPaused)
 {
 	check(IsInGameThread());
+	if (bPaused != bInPaused) ChangedQueueAdmission();
 	bPaused = bInPaused;
 }
 
@@ -1299,7 +1318,11 @@ void FVoxelTaskScheduler::Tick(
 				Completed.ReservedBytes;
 
 			FVoxelTaskRequest& OriginalRequest = Completed.Slot->Request;
-			if (OriginalRequest.bResumable) RunningContinuationInputBytes -= OriginalRequest.InputBytes;
+			if (OriginalRequest.bResumable)
+			{
+				RunningContinuationInputBytes -= OriginalRequest.InputBytes;
+				ChangedQueueAdmission();
+			}
 			// 最后一次原生执行实际退休后才结算；续跑保留同一完整授额。
 			if (Completed.NativeLease)
 			{
@@ -1585,6 +1608,7 @@ void FVoxelTaskScheduler::CancelSection(
 			MoveTemp(Pending[Index]);
 
 		Pending.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+		ChangedQueueAdmission();
 
 		RemoveActive(
 			Request.Stamp,
@@ -1622,6 +1646,7 @@ void FVoxelTaskScheduler::CancelAttempt(const FVoxelTaskKey& InKey, const uint64
 	{
 		FVoxelTaskRequest Request = MoveTemp(Pending[PendingIndex]);
 		Pending.RemoveAtSwap(PendingIndex, 1, EAllowShrinking::No);
+		ChangedQueueAdmission();
 		QueuedInputBytes -= Request.InputBytes;
 		RemoveActive(Request.Stamp, Request.Kind, Request.WorkClass);
 		QueueCanceled(MoveTemp(Request));
@@ -1683,6 +1708,7 @@ void FVoxelTaskScheduler::StopAndJoin()
 	}
 
 	bStopped = true;
+	ChangedQueueAdmission();
 
 	for (auto* Queue : {&Running, &AwaitingApply})
 	{
@@ -1800,6 +1826,9 @@ void FVoxelTaskScheduler::SetBudget(
 	const FVoxelTaskBudget& InBudget)
 {
 	check(IsInGameThread());
+	const int32 PreviousPending = Budget.MaxPendingTasks;
+	const int32 PreviousCoarse = Budget.MaxPendingCoarseTerrainTasks;
+	const uint64 PreviousInput = Budget.MaxInputBytes;
 
 	Budget.MaxConcurrentTasks =
 		FMath::Max(
@@ -1875,6 +1904,8 @@ void FVoxelTaskScheduler::SetBudget(
 			Budget.MaxPendingTasks);
 	Budget.MaxWaitingDependencyTasks = FMath::Max(0, InBudget.MaxWaitingDependencyTasks);
 	Budget.bBorrowIdleKindSlots = InBudget.bBorrowIdleKindSlots;
+	if (PreviousPending != Budget.MaxPendingTasks || PreviousCoarse != Budget.MaxPendingCoarseTerrainTasks ||
+		PreviousInput != Budget.MaxInputBytes) ChangedQueueAdmission();
 }
 
 void FVoxelTaskScheduler::SetObservedTerrainStage(const int32 InStage)
@@ -2168,6 +2199,7 @@ void FVoxelTaskScheduler::RetireCompletedTasks()
 			Continuation.ExecutionReservation = MoveTemp(Completed.ExecutionReservation);
 			check(Pending.Num() < Pending.Max());
 			Pending.Add(MoveTemp(Continuation));
+			ChangedQueueAdmission();
 			++Diagnostics.ContinuationSlicesRetired;
 			continue;
 		}
@@ -2328,6 +2360,7 @@ void FVoxelTaskScheduler::Pump()
 				{
 					FVoxelTaskRequest Rejected = MoveTemp(Pending[BestIndex]);
 					Pending.RemoveAtSwap(BestIndex, 1, EAllowShrinking::No);
+					ChangedQueueAdmission();
 					QueuedInputBytes -= Rejected.InputBytes;
 					RemoveActive(Rejected.Stamp, Rejected.Kind, Rejected.WorkClass, false);
 					AdmissionAttempts.FindChecked({Rejected.Kind, Rejected.Stamp}).Blocked = Rejected.Blocked;
@@ -2368,6 +2401,7 @@ void FVoxelTaskScheduler::Pump()
 		}
 		FVoxelTaskRequest Request = MoveTemp(Pending[BestIndex]);
 		Pending.RemoveAtSwap(BestIndex, 1, EAllowShrinking::No);
+		ChangedQueueAdmission();
 		QueuedInputBytes -= Request.InputBytes;
 		ReservedBytes += Request.ReservedBytes;
 		FRunning RunningTask;

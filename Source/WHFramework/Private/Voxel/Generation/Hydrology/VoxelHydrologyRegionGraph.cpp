@@ -338,15 +338,17 @@ bool FVoxelHydrologyRegionGraphBuild::Initialize(const FIntPoint& InMinimum, con
 	return true;
 }
 
-bool FVoxelHydrologyRegionGraphBuild::Allocate(FString& OutError)
+bool FVoxelHydrologyRegionGraphBuild::AllocateReadCapacity(const int32 InCapacity, FString& OutError)
 {
-	if (!VoxelGenerationAllocation::RetainArray(Cells, CellCount, OutError) ||
-		!VoxelGenerationAllocation::RetainArray(Candidates, CellCount * 2, OutError) ||
-		!VoxelGenerationAllocation::RetainArray(Result.ForestNeighbors, CellCount, OutError) ||
-		!VoxelGenerationAllocation::RetainArray(Result.CellLocations, CellCount, OutError))
+	check(InCapacity > ReadCapacity && InCapacity <= CellCount);
+	if (!VoxelGenerationAllocation::RetainArray(Cells, InCapacity, OutError) ||
+		!VoxelGenerationAllocation::RetainArray(Candidates, InCapacity * 2, OutError) ||
+		!VoxelGenerationAllocation::RetainArray(Result.ForestNeighbors, InCapacity, OutError) ||
+		!VoxelGenerationAllocation::RetainArray(Result.CellLocations, InCapacity, OutError))
 	{
 		return false;
 	}
+	ReadCapacity = InCapacity;
 	return true;
 }
 
@@ -504,7 +506,11 @@ EVoxelHydrologyRegionStep FVoxelHydrologyRegionGraphBuild::Advance(const uint64 
 				OutError = TEXT("Invalid hydrology region ground, rainfall or positive identified receiver");
 				return Failure(OutError);
 			}
-			if (Cursor == 0 && !Allocate(OutError)) return Failure(OutError);
+			if (Cursor == ReadCapacity)
+			{
+				const int32 NextCapacity = int32(FMath::Min<int64>(CellCount, FMath::Max<int64>(256, int64(ReadCapacity) * 2)));
+				if (!AllocateReadCapacity(NextCapacity, OutError)) return Failure(OutError);
+			}
 			FCell& Cell = Cells.AddDefaulted_GetRef();
 			Cell.Sample = Sample;
 			Cell.Parent = Cursor;

@@ -57,6 +57,154 @@ bool FVoxelCoverageRegionHaloTest::RunTest(const FString& InParameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelVolumeRegionFaceFilterTest,
+	"WHFramework.Voxel.Rendering.VolumeRegionFaceFilter",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelVolumeRegionFaceFilterTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	// The old production path built every face, sorted it, and only then removed
+	// owners outside the region. Compare the full ordered payload, not a hash.
+	const auto CompareToPrevious = [this](const FString& Case, const TSet<FVoxelViewKey>& Nodes,
+		const uint8 MaximumLevel, const TMap<FVoxelViewKey, int32>* Steps, const FVoxelViewKey* Region)
+	{
+		TArray<FVoxelVolumeTransitionFace> Expected;
+		TArray<FVoxelVolumeTransitionFace> Actual;
+		FVoxelVolumeTransitionPlanner::Build(Nodes, MaximumLevel, Expected, Steps, nullptr);
+		if (Region)
+		{
+			Expected.RemoveAll([Region](const FVoxelVolumeTransitionFace& Face)
+			{
+				FVoxelViewKey Owner = Face.Owner;
+				while (Owner.Level < Region->Level) Owner = Owner.GetParent();
+				return !(Owner == *Region);
+			});
+		}
+		FVoxelVolumeTransitionPlanner::Build(Nodes, MaximumLevel, Actual, Steps, Region);
+		TestEqual(Case + TEXT(" ordered face count"), Actual.Num(), Expected.Num());
+		for (int32 Index = 0; Index < FMath::Min(Actual.Num(), Expected.Num()); ++Index)
+		{
+			const auto& A = Actual[Index];
+			const auto& E = Expected[Index];
+			TestTrue(FString::Printf(TEXT("%s ordered face %d retains every field"), *Case, Index),
+				A.Owner == E.Owner && A.Neighbor == E.Neighbor && A.Direction == E.Direction &&
+				A.Min == E.Min && A.Max == E.Max && A.Ratio == E.Ratio);
+		}
+		return Actual;
+	};
+	const auto HasFace = [](const TArray<FVoxelVolumeTransitionFace>& Faces,
+		const FVoxelViewKey& Owner, const FVoxelViewKey& Neighbor)
+	{
+		return Faces.ContainsByPredicate([&](const FVoxelVolumeTransitionFace& Face)
+		{
+			return Face.Owner == Owner && Face.Neighbor == Neighbor;
+		});
+	};
+
+	for (int32 Axis = 0; Axis < 3; ++Axis)
+	{
+		const FVoxelViewKey Owner{FIntVector(-1, -1, -1), 1};
+		FIntVector NeighborCoordinate(-1, -1, -1);
+		NeighborCoordinate[Axis] = 0;
+		const FVoxelViewKey Neighbor{NeighborCoordinate, 1};
+		const FVoxelViewKey OwnerRegion{FIntVector(-1, -1, -1), 2};
+		FIntVector OtherRegionCoordinate(-1, -1, -1);
+		OtherRegionCoordinate[Axis] = 0;
+		const FVoxelViewKey OtherRegion{OtherRegionCoordinate, 2};
+		const TSet<FVoxelViewKey> Nodes{Owner, Neighbor};
+		const TMap<FVoxelViewKey, int32> Steps{{Owner, 4}, {Neighbor, 2}};
+		const FString Case = FString::Printf(TEXT("negative coordinate axis %d"), Axis);
+		const auto Faces = CompareToPrevious(Case, Nodes, 2, &Steps, &OwnerRegion);
+		if (TestEqual(Case + TEXT(" produces an actual same-level face"), Faces.Num(), 1))
+		{
+			const FVoxelGenerationBounds Bounds = Neighbor.GetBounds();
+			TestTrue(Case + TEXT(" has the expected owner, neighbor, direction, bounds and ratio"),
+				Faces[0].Owner == Owner && Faces[0].Neighbor == Neighbor &&
+				static_cast<uint8>(Faces[0].Direction) == uint8(Axis * 2) &&
+				Faces[0].Min == Bounds.Min && Faces[0].Max == Bounds.Max && Faces[0].Ratio == 1);
+		}
+		TestTrue(Case + TEXT(" excludes the other owner region"),
+			CompareToPrevious(Case + TEXT(" outside"), Nodes, 2, &Steps, &OtherRegion).IsEmpty());
+		const TMap<FVoxelViewKey, int32> EqualSteps{{Owner, 2}, {Neighbor, 2}};
+		TestTrue(Case + TEXT(" equal steps do not produce a transition"),
+			CompareToPrevious(Case + TEXT(" equal steps"), Nodes, 2, &EqualSteps, &OwnerRegion).IsEmpty());
+		const TMap<FVoxelViewKey, int32> MissingStep{{Owner, 4}};
+		TestTrue(Case + TEXT(" missing neighbor step does not produce a transition"),
+			CompareToPrevious(Case + TEXT(" missing step"), Nodes, 2, &MissingStep, &OwnerRegion).IsEmpty());
+	}
+
+	const FVoxelViewKey Fine{FIntVector(-1, 0, 0), 0};
+	const FVoxelViewKey FirstCoarse{FIntVector::ZeroValue, 1};
+	const FVoxelViewKey LaterCoarse{FIntVector::ZeroValue, 2};
+	const FVoxelViewKey CoarseRegion{FIntVector::ZeroValue, 2};
+	const FVoxelViewKey OutsideRegion{FIntVector(-1, 0, 0), 2};
+	TSet<FVoxelViewKey> Mixed{Fine, FirstCoarse, LaterCoarse};
+	const auto MixedFaces = CompareToPrevious(TEXT("first cross-LOD neighbor"), Mixed, 2, nullptr, &CoarseRegion);
+	TestTrue(TEXT("The first cross-LOD owner produces a real transition"), HasFace(MixedFaces, FirstCoarse, Fine));
+	TestFalse(TEXT("A later overlapping coarse candidate does not replace the first"), HasFace(MixedFaces, LaterCoarse, Fine));
+	const auto FilteredMixed = CompareToPrevious(TEXT("first cross-LOD owner filtered"), Mixed, 2, nullptr, &OutsideRegion);
+	TestFalse(TEXT("A first owner outside the region contributes no fine transition"),
+		HasFace(FilteredMixed, FirstCoarse, Fine) || HasFace(FilteredMixed, LaterCoarse, Fine));
+	TestTrue(TEXT("An owner coarser than the requested region is not included"),
+		CompareToPrevious(TEXT("owner above region level"), Mixed, 2, nullptr, &Fine).IsEmpty());
+	Mixed.Add({FIntVector::ZeroValue, 0});
+	const auto SameLevelFirst = CompareToPrevious(TEXT("same-level neighbor precedes coarse search"), Mixed, 2, nullptr, &CoarseRegion);
+	TestFalse(TEXT("A same-level neighbor suppresses the coarse candidates for that fine node"),
+		HasFace(SameLevelFirst, FirstCoarse, Fine) || HasFace(SameLevelFirst, LaterCoarse, Fine));
+
+	TSet<FVoxelViewKey> Neighborhood;
+	TMap<FVoxelViewKey, int32> NeighborhoodSteps;
+	const FVoxelViewKey Center{FIntVector::ZeroValue, 6};
+	for (int32 Z = -1; Z <= 1; ++Z)
+		for (int32 Y = -1; Y <= 1; ++Y)
+			for (int32 X = -1; X <= 1; ++X)
+			{
+				const FVoxelViewKey Key{FIntVector(X, Y, Z), 6};
+				Neighborhood.Add(Key);
+				NeighborhoodSteps.Add(Key, Key == Center ? 4 : 2);
+			}
+	TMap<FVoxelViewKey, TSet<FVoxelViewKey>> Regions;
+	FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Neighborhood, Regions);
+	const TSet<FVoxelViewKey>* CenterLocal = Regions.Find(Center);
+	if (TestNotNull(TEXT("The central region exists"), CenterLocal))
+	{
+		TestEqual(TEXT("The central region retains all 26 touching neighbors"), CenterLocal->Num(), 27);
+		const auto CenterFaces = CompareToPrevious(TEXT("26 neighboring regions"), *CenterLocal, 6, &NeighborhoodSteps, &Center);
+		TestEqual(TEXT("Six face neighbors yield six central owner transitions"), CenterFaces.Num(), 6);
+		for (const auto& Face : CenterFaces)
+		{
+			const FIntVector Delta = Face.Neighbor.Coordinate - Center.Coordinate;
+			TestTrue(TEXT("Each central transition reaches one face neighbor"), Face.Owner == Center &&
+				FMath::Abs(Delta.X) + FMath::Abs(Delta.Y) + FMath::Abs(Delta.Z) == 1 && Face.Ratio == 1);
+		}
+	}
+	for (const auto& Pair : Regions)
+	{
+		CompareToPrevious(TEXT("each neighboring owner region"), Pair.Value, 6, &NeighborhoodSteps, &Pair.Key);
+	}
+	const auto AllFaces = CompareToPrevious(TEXT("no owner filter"), Neighborhood, 6, &NeighborhoodSteps, nullptr);
+	TestEqual(TEXT("Unfiltered neighborhood retains all six observable faces"), AllFaces.Num(), 6);
+	TArray<FVoxelVolumeTransitionFace> DefaultFaces;
+	FVoxelVolumeTransitionPlanner::Build(Neighborhood, 6, DefaultFaces, &NeighborhoodSteps);
+	TestEqual(TEXT("Omitting the region parameter preserves the default result count"), DefaultFaces.Num(), AllFaces.Num());
+	for (int32 Index = 0; Index < FMath::Min(DefaultFaces.Num(), AllFaces.Num()); ++Index)
+	{
+		const auto& A = DefaultFaces[Index];
+		const auto& E = AllFaces[Index];
+		TestTrue(TEXT("Default region preserves the ordered face payload"),
+			A.Owner == E.Owner && A.Neighbor == E.Neighbor && A.Direction == E.Direction &&
+			A.Min == E.Min && A.Max == E.Max && A.Ratio == E.Ratio);
+	}
+	const TSet<FVoxelViewKey> EmptyNodes;
+	TArray<FVoxelVolumeTransitionFace> ResetFaces = AllFaces;
+	FVoxelVolumeTransitionPlanner::Build(EmptyNodes, 6, ResetFaces, nullptr, &Center);
+	TestTrue(TEXT("Empty input clears previously produced output"), ResetFaces.IsEmpty());
+	TestTrue(TEXT("Empty input matches the previous region filter"),
+		CompareToPrevious(TEXT("empty input"), EmptyNodes, 6, nullptr, &Center).IsEmpty());
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelManagerLocalCoverageTest,
 	"WHFramework.Voxel.Rendering.ManagerLocalCoverage",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -287,6 +435,92 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	Manager.Reset();
 	TestTrue(TEXT("Reset releases both committed nodes and their owner index"),
 		Manager.VisibleTerrainNodes.IsEmpty() && Manager.VisibleTerrainNodesByGroup.IsEmpty());
+	const auto SameRect = [](const FVoxelCoverageRect& Left, const FVoxelCoverageRect& Right)
+	{
+		return Left.Min == Right.Min && Left.Max == Right.Max;
+	};
+	const FVoxelCoverageRect First{{0, 0}, {10, 10}};
+	const FVoxelCoverageRect Second{{100, 0}, {110, 10}};
+	const FVoxelCoverageRect Third{{200, 0}, {210, 10}};
+	TArray<FVoxelCoverageRect> Pending{First, Second, Third};
+	for (int32 Update = 0; Update < 8; ++Update)
+	{
+		FVoxelViewManager::MergeCoverageRect(Pending, First);
+	}
+	TestTrue(TEXT("Repeated updates retain the oldest overlapping scope before independent scopes"),
+		Pending.Num() == 3 && SameRect(Pending[0], {{-1, -1}, {11, 11}}) &&
+		SameRect(Pending[1], Second) && SameRect(Pending[2], Third));
+	const FVoxelCoverageRect Fourth{{300, 0}, {310, 10}};
+	FVoxelViewManager::MergeCoverageRect(Pending, Fourth);
+	TestTrue(TEXT("A new independent scope is appended without reordering existing scopes"),
+		Pending.Num() == 4 && SameRect(Pending[1], Second) && SameRect(Pending[2], Third) &&
+		SameRect(Pending[3], {{299, -1}, {311, 11}}));
+	TArray<FVoxelCoverageRect> Bridged{
+		{{0, 0}, {10, 10}}, {{100, 100}, {110, 110}}, {{8, 12}, {18, 22}}, {{200, 200}, {210, 210}}};
+	FVoxelViewManager::MergeCoverageRect(Bridged, {{16, 0}, {20, 14}});
+	TestTrue(TEXT("A later intersection expands backwards to the earliest merged scope"),
+		Bridged.Num() == 3 && SameRect(Bridged[0], {{0, -1}, {21, 22}}) &&
+		SameRect(Bridged[1], {{100, 100}, {110, 110}}) && SameRect(Bridged[2], {{200, 200}, {210, 210}}));
+	TArray<FVoxelCoverageRect> Empty;
+	FVoxelViewManager::MergeCoverageRect(Empty, {{-64, -64}, {-48, -48}});
+	TestTrue(TEXT("An empty queue keeps the original one-cell halo, including negative coordinates"),
+		Empty.Num() == 1 && SameRect(Empty[0], {{-65, -65}, {-47, -47}}));
+	TArray<FVoxelCoverageRect> Touching{{{0, 0}, {10, 10}}};
+	FVoxelViewManager::MergeCoverageRect(Touching, {{11, 0}, {20, 10}});
+	TestEqual(TEXT("Half-open scopes that only touch after the halo stay distinct"), Touching.Num(), 2);
+	FVoxelViewManager::MergeCoverageRect(Touching, {{10, 0}, {11, 10}});
+	TestTrue(TEXT("A halo intersection merges both adjacent scopes"), Touching.Num() == 1 &&
+		SameRect(Touching[0], {{0, -1}, {21, 11}}));
+	const auto RectLess = [](const FVoxelCoverageRect& Left, const FVoxelCoverageRect& Right)
+	{
+		if (Left.Min.X != Right.Min.X) return Left.Min.X < Right.Min.X;
+		if (Left.Min.Y != Right.Min.Y) return Left.Min.Y < Right.Min.Y;
+		if (Left.Max.X != Right.Max.X) return Left.Max.X < Right.Max.X;
+		return Left.Max.Y < Right.Max.Y;
+	};
+	FRandomStream Random(1975);
+	for (int32 Trial = 0; Trial < 128; ++Trial)
+	{
+		TArray<FVoxelCoverageRect> Actual;
+		for (int32 Index = 0; Index < 16; ++Index)
+		{
+			const FIntPoint Min(Random.RandRange(-64, 64), Random.RandRange(-64, 64));
+			Actual.Add({Min, Min + FIntPoint(Random.RandRange(1, 24), Random.RandRange(1, 24))});
+		}
+		TArray<FVoxelCoverageRect> Reference = Actual;
+		const FIntPoint Min(Random.RandRange(-64, 64), Random.RandRange(-64, 64));
+		const FVoxelCoverageRect Added{Min, Min + FIntPoint(Random.RandRange(1, 24), Random.RandRange(1, 24))};
+		FVoxelCoverageRect OldMerged{Added.Min - FIntPoint(1, 1), Added.Max + FIntPoint(1, 1)};
+		for (int32 Index = 0; Index < Reference.Num();)
+		{
+			const FVoxelCoverageRect& Existing = Reference[Index];
+			if (!OldMerged.Intersects(Existing)) { ++Index; continue; }
+			OldMerged.Min.X = FMath::Min(OldMerged.Min.X, Existing.Min.X);
+			OldMerged.Min.Y = FMath::Min(OldMerged.Min.Y, Existing.Min.Y);
+			OldMerged.Max.X = FMath::Max(OldMerged.Max.X, Existing.Max.X);
+			OldMerged.Max.Y = FMath::Max(OldMerged.Max.Y, Existing.Max.Y);
+			Reference.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+			Index = 0;
+		}
+		Reference.Add(OldMerged);
+		FVoxelViewManager::MergeCoverageRect(Actual, Added);
+		Reference.Sort(RectLess);
+		Actual.Sort(RectLess);
+		if (!TestEqual(TEXT("Stable merge preserves the previous coverage rectangle count"), Actual.Num(), Reference.Num())) return false;
+		for (int32 Index = 0; Index < Actual.Num(); ++Index)
+		{
+			if (!TestTrue(TEXT("Stable merge preserves every previous coverage rectangle"), SameRect(Actual[Index], Reference[Index]))) return false;
+		}
+	}
+	Manager.bCoverageDirty = false;
+	Manager.bCoverageDirtyFull = false;
+	Manager.DirtyCoverageRects = {First};
+	Manager.ActiveDirtyCoverageRects = {Second};
+	Manager.MarkCoverageDirty({});
+	TestTrue(TEXT("Invalid dirty bounds retain the existing full-coverage fallback without altering the active scope"),
+		Manager.bCoverageDirty && Manager.bCoverageDirtyFull && Manager.DirtyCoverageRects.IsEmpty() &&
+		Manager.ActiveDirtyCoverageRects.Num() == 1 && SameRect(Manager.ActiveDirtyCoverageRects[0], Second));
+	Manager.ActiveDirtyCoverageRects.Reset();
 	Manager.bCoverageDirty = false;
 	Manager.bCoverageDirtyFull = false;
 	FVoxelInterestDelta DataOnly;

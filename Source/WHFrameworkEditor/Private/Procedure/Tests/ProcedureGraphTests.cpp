@@ -7,9 +7,16 @@
 #include "Procedure/Graph/ProcedureAssetGraphSchema.h"
 #include "Procedure/Graph/ProcedureGraphOperations.h"
 #include "Misc/AutomationTest.h"
+#include "Misc/PackageName.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
 #include "ScopedTransaction.h"
 #include "Editor.h"
 #include "JsonObjectConverter.h"
+#include "UObject/GarbageCollection.h"
+#include "UObject/Linker.h"
+#include "UObject/Package.h"
+#include "UObject/SavePackage.h"
 #include "UObject/StrongObjectPtr.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -49,6 +56,58 @@ struct FFixture
         }
         Asset->Recompile();
         Graph->Rebuild();
+    }
+};
+
+struct FPersistencePackage
+{
+    const FString Id = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    const FString Root = TEXT("/ProcedurePersistence_") + Id + TEXT("/");
+    const FString Directory = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation/ProcedurePersistence") / Id) + TEXT("/");
+    const FString PackageName = Root + TEXT("Procedure");
+    const FString Filename = Directory / TEXT("Procedure.uasset");
+    FAutomationTestBase& Test;
+    bool bMounted = false;
+
+    explicit FPersistencePackage(FAutomationTestBase& InTest)
+        : Test(InTest)
+    {
+    }
+
+    bool Create()
+    {
+        if (FindPackage(nullptr, *PackageName) || IFileManager::Get().DirectoryExists(*Directory) ||
+            !IFileManager::Get().MakeDirectory(*Directory, true))
+        {
+            Test.AddError(TEXT("无法创建独立流程保存测试目录。"));
+            return false;
+        }
+        FPackageName::RegisterMountPoint(Root, Directory);
+        bMounted = true;
+        return true;
+    }
+
+    void Release(UPackage* InPackage) const
+    {
+        if (!InPackage) return;
+        if (UProcedureAsset* Asset = FindObject<UProcedureAsset>(InPackage, TEXT("Procedure")))
+        {
+            Asset->ClearFlags(RF_Standalone);
+        }
+        InPackage->ClearFlags(RF_Standalone);
+        InPackage->SetDirtyFlag(false);
+        ResetLoaders(InPackage);
+        CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+    }
+
+    ~FPersistencePackage()
+    {
+        if (!bMounted) return;
+        Release(FindPackage(nullptr, *PackageName));
+        FPackageName::UnRegisterMountPoint(Root, Directory);
+        const bool bDeleted = !IFileManager::Get().FileExists(*Filename) || IFileManager::Get().Delete(*Filename, false, true);
+        Test.TestTrue(TEXT("删除本测试创建的包文件"), bDeleted);
+        Test.TestTrue(TEXT("只删除本测试的空目录"), IFileManager::Get().DeleteDirectory(*Directory, false, false));
     }
 };
 }
@@ -260,6 +319,96 @@ bool FProcedureStartInitializationTest::RunTest(const FString& Parameters)
     GEditor->RedoTransaction();
     Fixture.Graph->Rebuild();
     TestEqual(TEXT("重做恢复同一起点身份"), Fixture.Asset->StartId, Start);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FProcedureCollectableTextPersistenceTest, "WHFramework.Procedure.Graph.CollectableTextSaveAndReload",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FProcedureCollectableTextPersistenceTest::RunTest(const FString& Parameters)
+{
+    (void)Parameters;
+    if (!GEditor || GEditor->PlayWorld)
+    {
+        AddError(TEXT("流程包保存测试需要在非 PIE 编辑器中执行。"));
+        return false;
+    }
+
+    ProcedureGraphTests::FPersistencePackage Temporary(*this);
+    if (!Temporary.Create()) return false;
+    UPackage* Package = CreatePackage(*Temporary.PackageName);
+    UProcedureAsset* Asset = NewObject<UProcedureAsset>(Package, TEXT("Procedure"), RF_Public | RF_Standalone);
+    Asset->StartId = FGuid::NewGuid();
+    const FGuid StartId = Asset->StartId;
+    UProcedureBase* First = NewObject<UProcedureBase>(Asset, TEXT("First"));
+    UProcedureBase* Second = NewObject<UProcedureBase>(Asset, TEXT("Second"));
+    First->NodeId = FGuid::NewGuid();
+    Second->NodeId = FGuid::NewGuid();
+    const FGuid FirstId = First->NodeId;
+    const FGuid SecondId = Second->NodeId;
+    First->ProcedureDisplayName = NSLOCTEXT("ProcedurePersistenceTest", "FirstTitle", "流程保存测试节点");
+    First->ProcedureDescription = NSLOCTEXT("ProcedurePersistenceTest", "FirstDescription", "可收集的流程说明文本。");
+    Second->ProcedureDisplayName = NSLOCTEXT("ProcedurePersistenceTest", "SecondTitle", "后续流程节点");
+    First->GraphPosition = FVector2D(125.0, -64.0);
+    Second->GraphPosition = FVector2D(430.0, 75.0);
+    Asset->Nodes = {First, Second};
+    FProcedureLink Entry;
+    Entry.From = StartId;
+    Entry.To = FirstId;
+    FProcedureLink Next;
+    Next.From = FirstId;
+    Next.To = SecondId;
+    Asset->Links = {Entry, Next};
+    if (!TestTrue(TEXT("节点文字参与本地化收集"), First->ProcedureDisplayName.ShouldGatherForLocalization() &&
+        First->ProcedureDescription.ShouldGatherForLocalization()) ||
+        !TestTrue(TEXT("保存前真实流程连接可编译"), Asset->Recompile())) return false;
+
+    FSavePackageArgs SaveArgs;
+    SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+    if (!TestTrue(TEXT("含可收集文字的流程包实际写入磁盘"), UPackage::SavePackage(Package, Asset, *Temporary.Filename, SaveArgs))) return false;
+    if (!TestTrue(TEXT("流程包文件存在且非空"), IFileManager::Get().FileSize(*Temporary.Filename) > 0)) return false;
+    const TWeakObjectPtr<UPackage> OriginalPackage(Package);
+    Temporary.Release(Package);
+    Package = nullptr;
+    Asset = nullptr;
+    First = nullptr;
+    Second = nullptr;
+    if (!TestFalse(TEXT("重载前原流程包已被回收"), OriginalPackage.IsValid()) ||
+        !TestNull(TEXT("重载不能复用旧内存包"), FindPackage(nullptr, *Temporary.PackageName))) return false;
+
+    UPackage* ReloadedPackage = LoadPackage(nullptr, *Temporary.PackageName, LOAD_None);
+    UProcedureAsset* Reloaded = ReloadedPackage ? FindObject<UProcedureAsset>(ReloadedPackage, TEXT("Procedure")) : nullptr;
+    if (!TestNotNull(TEXT("从磁盘重新加载流程资产"), Reloaded)) return false;
+    TestEqual(TEXT("起点身份保存"), Reloaded->StartId, StartId);
+    if (!TestEqual(TEXT("两个作者节点保留"), Reloaded->Nodes.Num(), 2) ||
+        !TestEqual(TEXT("两个作者连接保留"), Reloaded->Links.Num(), 2)) return false;
+    UProcedureBase* ReloadedFirst = Reloaded->FindNode(FirstId);
+    UProcedureBase* ReloadedSecond = Reloaded->FindNode(SecondId);
+    if (!TestNotNull(TEXT("第一个节点按身份恢复"), ReloadedFirst) ||
+        !TestNotNull(TEXT("第二个节点按身份恢复"), ReloadedSecond)) return false;
+    TestTrue(TEXT("加载后文字仍可收集"), ReloadedFirst->ProcedureDisplayName.ShouldGatherForLocalization() &&
+        ReloadedFirst->ProcedureDescription.ShouldGatherForLocalization());
+    const FString* TitleSource = FTextInspector::GetSourceString(ReloadedFirst->ProcedureDisplayName);
+    const FString* DescriptionSource = FTextInspector::GetSourceString(ReloadedFirst->ProcedureDescription);
+    TestTrue(TEXT("标题源文本保留"), TitleSource && *TitleSource == TEXT("流程保存测试节点"));
+    TestTrue(TEXT("说明源文本保留"), DescriptionSource && *DescriptionSource == TEXT("可收集的流程说明文本。"));
+    TestEqual(TEXT("节点位置保留"), ReloadedFirst->GraphPosition, FVector2D(125.0, -64.0));
+    TestTrue(TEXT("原始两条连接保留"), Reloaded->Links[0].From == StartId && Reloaded->Links[0].To == FirstId &&
+        Reloaded->Links[0].Output == TEXT("Out") && Reloaded->Links[1].From == FirstId && Reloaded->Links[1].To == SecondId &&
+        Reloaded->Links[1].Output == TEXT("Out"));
+    FString Error;
+    TestTrue(TEXT("保存后的运行流程有效"), Reloaded->ValidateCompiled(Error));
+    TestTrue(TEXT("运行流程按连接顺序保留"), Reloaded->EntryNodeId == FirstId && Reloaded->CompiledNodes.Num() == 2 &&
+        Reloaded->CompiledNodes[0] == ReloadedFirst && Reloaded->CompiledNodes[1] == ReloadedSecond);
+    TStrongObjectPtr<UProcedureAssetGraph> Graph(NewObject<UProcedureAssetGraph>(GetTransientPackage()));
+    Graph->Asset = Reloaded;
+    Graph->Schema = UProcedureAssetGraphSchema::StaticClass();
+    Graph->Rebuild();
+    UEdGraphNode* FirstVisual = Graph->FindNode(FirstId);
+    UEdGraphNode* SecondVisual = Graph->FindNode(SecondId);
+    UEdGraphPin* Output = FirstVisual ? FirstVisual->FindPin(TEXT("Out"), EGPD_Output) : nullptr;
+    UEdGraphPin* Input = SecondVisual ? SecondVisual->FindPin(TEXT("In"), EGPD_Input) : nullptr;
+    TestTrue(TEXT("重建的图形端口连接保留"), Output && Input && Output->LinkedTo.Contains(Input));
     return true;
 }
 #endif

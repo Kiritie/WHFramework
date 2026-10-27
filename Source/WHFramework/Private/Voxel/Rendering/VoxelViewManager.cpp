@@ -2247,22 +2247,48 @@ void FVoxelViewManager::MergeCoverageRect(TArray<FVoxelCoverageRect>& InOutRects
 {
 	FVoxelCoverageRect Merged{InBounds.Min - FIntPoint(1, 1),
 		InBounds.Max + FIntPoint(1, 1)};
-	for (int32 Index = 0; Index < InOutRects.Num();)
+	for (const FVoxelCoverageRect& Existing : InOutRects)
 	{
-		const FVoxelCoverageRect& Existing = InOutRects[Index];
-		if (!Merged.Intersects(Existing))
-		{
-			++Index;
-			continue;
-		}
-		Merged.Min.X = FMath::Min(Merged.Min.X, Existing.Min.X);
-		Merged.Min.Y = FMath::Min(Merged.Min.Y, Existing.Min.Y);
-		Merged.Max.X = FMath::Max(Merged.Max.X, Existing.Max.X);
-		Merged.Max.Y = FMath::Max(Merged.Max.Y, Existing.Max.Y);
-		InOutRects.RemoveAtSwap(Index, 1, EAllowShrinking::No);
-		Index = 0;
+		check(Existing.IsValid());
 	}
-	InOutRects.Add(Merged);
+	int32 FirstMerged = INDEX_NONE;
+	bool bMergedAny;
+	do
+	{
+		bMergedAny = false;
+		for (int32 Index = 0; Index < InOutRects.Num(); ++Index)
+		{
+			FVoxelCoverageRect& Existing = InOutRects[Index];
+			if (!Existing.IsValid() || !Merged.Intersects(Existing))
+			{
+				continue;
+			}
+			Merged.Min.X = FMath::Min(Merged.Min.X, Existing.Min.X);
+			Merged.Min.Y = FMath::Min(Merged.Min.Y, Existing.Min.Y);
+			Merged.Max.X = FMath::Max(Merged.Max.X, Existing.Max.X);
+			Merged.Max.Y = FMath::Max(Merged.Max.Y, Existing.Max.Y);
+			FirstMerged = FirstMerged == INDEX_NONE ? Index : FMath::Min(FirstMerged, Index);
+			Existing = {};
+			bMergedAny = true;
+		}
+	}
+	while (bMergedAny);
+	if (FirstMerged == INDEX_NONE)
+	{
+		InOutRects.Add(Merged);
+		return;
+	}
+	int32 Write = FirstMerged;
+	InOutRects[Write++] = Merged;
+	for (int32 Read = FirstMerged + 1; Read < InOutRects.Num(); ++Read)
+	{
+		if (InOutRects[Read].IsValid())
+		{
+			if (Write != Read) InOutRects[Write] = InOutRects[Read];
+			++Write;
+		}
+	}
+	InOutRects.SetNum(Write, EAllowShrinking::No);
 }
 
 void FVoxelViewManager::InvalidateCoverageCommitGate()
@@ -3692,6 +3718,187 @@ FVoxelTerrainReadinessSnapshot FVoxelViewManager::CaptureTerrainReadiness() cons
 			Target.bVisible = Target.bMeshReady && SourceId && !Publisher->IsHidden(SourceId) && Publisher->IsPresented(SourceId);
 	}
 	return Snapshot;
+}
+
+FVoxelProxyPublicationState FVoxelViewManager::CaptureProxyPublicationState(const FVoxelViewKey& InKey, const uint64 InExpectedEpoch) const
+{
+	FVoxelProxyPublicationState State;
+	if (!IsInGameThread())
+	{
+		State.Error = TEXT("Proxy probe must be queried on the game thread");
+		return State;
+	}
+	State.WorldEpoch = WorldEpoch;
+	if (!InExpectedEpoch || InExpectedEpoch != WorldEpoch || Module.GetWorldEpoch() != WorldEpoch)
+	{
+		State.Error = TEXT("Proxy probe requires the current world epoch");
+		return State;
+	}
+	if (InKey.Level == 0 || InKey.Level > VoxelStreamingGeometry::MaximumSpatialLevel)
+	{
+		State.Error = TEXT("Invalid proxy level");
+		return State;
+	}
+	if (!Module.GetRuntime() || !Publisher || !Module.GetCurrentInterestSnapshot())
+	{
+		State.Error = TEXT("Proxy runtime, publisher or current interest is unavailable");
+		return State;
+	}
+	const auto& Settings = Module.GetManifest().Settings;
+	const FVoxelTerrainSpatialKey Spatial{EVoxelTerrainRepresentation::VoxelProxy, InKey.Coordinate, InKey.Level};
+	if (!Spatial.TryBounds(Settings.MinZ, Settings.MaxZ, State.Bounds.Min, State.Bounds.Max) ||
+		!VoxelGeneration::IsWorldCell(State.Bounds.Min.X) || !VoxelGeneration::IsWorldCell(int64(State.Bounds.Max.X) - 1) ||
+		!VoxelGeneration::IsWorldCell(State.Bounds.Min.Y) || !VoxelGeneration::IsWorldCell(int64(State.Bounds.Max.Y) - 1) ||
+		!VoxelGeneration::IsWorldCell(State.Bounds.Min.Z) || !VoxelGeneration::IsWorldCell(int64(State.Bounds.Max.Z) - 1) ||
+		State.Bounds.Min.Z >= Settings.MaxZ || State.Bounds.Max.Z <= Settings.MinZ)
+	{
+		State.Error = TEXT("Invalid proxy bounds for the current world");
+		return State;
+	}
+	State.bAvailable = true;
+	State.Frame = Module.GetTerrainFrameContext().GetFrameCounter();
+	State.GenerationIdentity = Module.GetManifest().BaseSampleHash;
+	const auto Desired = Module.GetDesiredInterestSnapshot();
+	State.bDesiredSnapshot = Desired.IsValid();
+	State.bAppliedSnapshot = AppliedInterestSnapshot.IsValid() && AppliedInputRoot.IsValid();
+	State.bCoverageSnapshot = CoverageInterestSnapshot.IsValid() && CoverageInputRoot.IsValid();
+	if (Desired)
+	{
+		State.DesiredRevision = Desired->PublicationRevision;
+		State.bDesiredWanted = Desired->VoxelProxy.Contains(InKey);
+	}
+	if (AppliedInterestSnapshot)
+	{
+		State.AppliedRevision = AppliedInterestSnapshot->PublicationRevision;
+		if (const auto* Geometry = AppliedInterestSnapshot->Geometry.Find(Spatial))
+		{
+			State.bGeometryFound = true;
+			State.Geometry = *Geometry;
+		}
+	}
+	if (AppliedInputRoot) State.bAppliedWanted = AppliedInputRoot->ProxyWanted.Contains(InKey);
+	if (CoverageInterestSnapshot) State.CoverageRevision = CoverageInterestSnapshot->PublicationRevision;
+	if (CoverageInputRoot) State.bCoverageWanted = CoverageInputRoot->ProxyWanted.Contains(InKey);
+	State.bInterestInputActive = bConsumingPublicationInputs;
+	State.bCoverageActive = CoverageContinuation.IsValid();
+	State.bCoverageFull = bActiveCoverageFull;
+	State.bCoverageDirty = bCoverageDirty;
+	State.bDirtyFull = bCoverageDirtyFull;
+	State.bCoverageRetry = bCoverageRetryRequested;
+	State.bCoverageDrain = bCoverageDrainPending;
+	if (State.bCoverageActive) State.CoverageAgeSeconds = FMath::Max(0.0, FPlatformTime::Seconds() - CoverageStartedSeconds);
+	FVoxelViewAdmission Admission;
+	Admission.Kind = EVoxelViewAdmissionKind::VoxelProxy;
+	Admission.ProxyKey = InKey;
+	State.bMeshReady = IsAdmissionMeshReady(Admission);
+	State.bDataReady = IsAdmissionDataReady(Admission);
+	State.bAdmissionPresented = IsAdmissionPresented(Admission);
+	State.bTerminalFailure = IsAdmissionTerminalFailure(Admission);
+	if (const auto* Attempt = RepresentationAttempts.Find(Spatial)) State.DataAdmissionGate = Attempt->DataAdmissionGate;
+	if (const auto* Metrics = GeometryMetrics.Find(Spatial))
+	{
+		State.bKnownEmptyAvailable = State.bMeshReady && State.bGeometryFound && Metrics->Geometry == State.Geometry && Metrics->bGenerated;
+		State.bKnownEmpty = State.bKnownEmptyAvailable && Metrics->Triangles == 0;
+	}
+	if (const auto Record = CoverageIndex.Find(Spatial))
+	{
+		State.bIndexed = true;
+		State.bIndexWanted = Record->bWanted;
+		State.bIndexReady = Record->bReady;
+		State.bIndexCommitted = Record->bCommitted;
+	}
+	State.bOwned = VisibleTerrainNodes.Contains(InKey);
+	const FVoxelViewSourceId Source = VoxelProxySources.FindRef(InKey);
+	State.bSourceExists = Source.IsValid();
+	State.SourceId = Source.Value;
+	if (State.bSourceExists && Publisher)
+	{
+		State.bHidden = Publisher->IsHidden(Source);
+		State.bHasPresentation = Publisher->HasPresentation(Source);
+		State.bPresented = Publisher->IsPresented(Source);
+		State.bCommitted = Publisher->IsCommitted(Source);
+	}
+	const FVoxelPublishGroupKey Group{1, InKey.Coordinate, InKey.Level};
+	State.bGroupOpen = OpenPublishGroups.Contains(Group);
+	State.bGroupActive = ActiveCoveragePublishGroups.Contains(Group);
+	State.bGroupBusy = Publisher && Publisher->IsGroupBusy(Group);
+	constexpr int32 MaximumScan = 1024;
+	State.PendingBoxes.Total = PendingVolumeHandoffBoxes.Num();
+	State.PendingBoxes.Scanned = FMath::Min(State.PendingBoxes.Total, MaximumScan);
+	for (int32 Index = 0; Index < State.PendingBoxes.Scanned; ++Index)
+	{
+		if (State.Bounds.Intersects(PendingVolumeHandoffBoxes[Index]))
+		{
+			if (State.PendingBoxes.FirstIndex == INDEX_NONE)
+			{
+				State.PendingBoxes.FirstIndex = Index;
+				State.FirstPendingBox = PendingVolumeHandoffBoxes[Index];
+			}
+			++State.PendingBoxes.Matches;
+		}
+	}
+	const FVoxelCoverageRect Rect = State.Bounds.ProjectXY();
+	const auto ScanRects = [&Rect, MaximumScan](const TArray<FVoxelCoverageRect>& InRects, FVoxelProxyProbeScan& OutScan)
+	{
+		OutScan.Total = InRects.Num();
+		OutScan.Scanned = FMath::Min(OutScan.Total, MaximumScan);
+		for (int32 Index = 0; Index < OutScan.Scanned; ++Index)
+		{
+			if (Rect.Intersects(InRects[Index]))
+			{
+				if (OutScan.FirstIndex == INDEX_NONE) OutScan.FirstIndex = Index;
+				++OutScan.Matches;
+			}
+		}
+	};
+	ScanRects(DirtyCoverageRects, State.DirtyRects);
+	ScanRects(ActiveDirtyCoverageRects, State.ActiveRects);
+	ScanRects(FailedPublishCoverageRects, State.FailedRects);
+	const auto CopySignature = [&InKey](const TMap<FVoxelViewKey, uint64>& InMap, FVoxelProxyProbeSignature& OutSignature)
+	{
+		if (const uint64* Value = InMap.Find(InKey))
+		{
+			OutSignature.bPresent = true;
+			OutSignature.Value = *Value;
+		}
+	};
+	CopySignature(DesiredVolumeSignatures, State.DesiredTransition);
+	CopySignature(PendingVolumeSignatures, State.PendingTransition);
+	CopySignature(PreparedVolumeSignatures, State.PreparedTransition);
+	CopySignature(VolumeTransitionSignatures, State.BuiltTransition);
+	State.Unsubmitted.Total = UnsubmittedVolumeOwners.Num();
+	State.Unsubmitted.Scanned = FMath::Min(State.Unsubmitted.Total, MaximumScan);
+	for (int32 Index = 0; Index < State.Unsubmitted.Scanned; ++Index)
+	{
+		if (UnsubmittedVolumeOwners[Index] == InKey)
+		{
+			if (State.Unsubmitted.FirstIndex == INDEX_NONE) State.Unsubmitted.FirstIndex = Index;
+			++State.Unsubmitted.Matches;
+		}
+	}
+	State.RegionTotal = VolumeCoveragePlans.Num();
+	for (const auto& Pair : VolumeCoveragePlans)
+	{
+		if (State.RegionScanned == MaximumScan) break;
+		++State.RegionScanned;
+		if (Pair.Key.Level < InKey.Level || Pair.Key.Level > VoxelStreamingGeometry::MaximumSpatialLevel) continue;
+		FVoxelViewKey Ancestor = InKey;
+		while (Ancestor.Level < Pair.Key.Level) Ancestor = Ancestor.GetParent();
+		if (!(Ancestor == Pair.Key)) continue;
+		++State.OwnerRegionMatches;
+		if (State.bOwnerRegionFound && State.OwnerRegion.Level <= Pair.Key.Level) continue;
+		State.bOwnerRegionFound = true;
+		State.OwnerRegion = Pair.Key;
+		State.OwnerDesiredSignature = Pair.Value.DesiredSignature;
+		State.OwnerPendingSignature = Pair.Value.PendingSignature;
+		State.bOwnerPlan = Pair.Value.Plan.IsValid();
+		if (Pair.Value.Plan)
+		{
+			State.OwnerPlanSignature = Pair.Value.Plan->Signature;
+			State.bOwnerPlanContainsKey = Pair.Value.Plan->Nodes.Contains(InKey);
+		}
+	}
+	return State;
 }
 
 FVoxelPrimaryFineReadiness FVoxelViewManager::GetPrimaryFineReadiness(const TMap<FIntVector, FVoxelExactDemand>& InExact) const
@@ -6005,6 +6212,27 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildHeightfieldTransitionStep
 
 FVoxelGameThreadContinuation FVoxelViewManager::RebuildVolumeTransitionSteps(const TSet<FVoxelViewKey>& InTargetNodes)
 {
+#if !UE_BUILD_SHIPPING
+	const bool bRecordGuardDiagnostics = CVarVoxelDebugRepresentation.GetValueOnGameThread() == 2;
+	const uint64 GuardDiagnosticEpoch = WorldEpoch;
+	uint64 GuardCaptures = 0;
+	uint64 GuardCountOnly = 0;
+	uint64 GuardGranted = 0;
+	uint64 GuardCapacityBlocked = 0;
+	uint64 GuardCapacityUnachievable = 0;
+	uint64 GuardInvalidRequest = 0;
+	uint64 GuardOther = 0;
+	bool bGuardPassComplete = false;
+	ON_SCOPE_EXIT
+	{
+		if (bRecordGuardDiagnostics)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Voxel volume guard capture: epoch=%llu complete=%d captures=%llu countOnly=%llu granted=%llu capacityBlocked=%llu capacityUnachievable=%llu invalidRequest=%llu other=%llu"),
+				GuardDiagnosticEpoch, int32(bGuardPassComplete), GuardCaptures, GuardCountOnly, GuardGranted,
+				GuardCapacityBlocked, GuardCapacityUnachievable, GuardInvalidRequest, GuardOther);
+		}
+	};
+#endif
 	// Fine 的局部面由 Native 同帧根事务接管。粗域拓扑规划只处理 Proxy，不能因 F0/F1 切换重建整份 Proxy body。
 	TSet<FVoxelViewKey> CoarseNodes;
 	for (const auto& Node : InTargetNodes)
@@ -6169,15 +6397,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildVolumeTransitionSteps(con
 			uint8 MaximumLevel = 0;
 			for (const FVoxelViewKey& Key : Nodes)
 				MaximumLevel = FMath::Max(MaximumLevel, Key.Level);
-			FVoxelVolumeTransitionPlanner::Build(Nodes, MaximumLevel, Payload->Faces, &SampleSteps);
-			Payload->Faces.RemoveAll(
-				[Region](const auto& Face)
-				{
-					FVoxelViewKey Owner = Face.Owner;
-					while (Owner.Level < Region.Level)
-						Owner = Owner.GetParent();
-					return !(Owner == Region);
-				});
+			FVoxelVolumeTransitionPlanner::Build(Nodes, MaximumLevel, Payload->Faces, &SampleSteps, &Region);
 			Result.CustomPayload = Payload;
 			Result.bSuccess = !Cancel.Load();
 			return Result;
@@ -6192,6 +6412,31 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildVolumeTransitionSteps(con
 		const auto Bounds = Region.GetBounds();
 		FVoxelCoverageLocalSnapshot Guard;
 		CoverageIndex.Capture(Bounds.Min - FIntVector(1), Bounds.Max + FIntVector(1), Guard, false);
+#if !UE_BUILD_SHIPPING
+		if (bRecordGuardDiagnostics)
+		{
+			++GuardCaptures;
+			GuardCountOnly += Guard.bCountOnly ? 1 : 0;
+			switch (Guard.ResourceAdmission)
+			{
+			case EVoxelTerrainResourceAdmission::Granted:
+				++GuardGranted;
+				break;
+			case EVoxelTerrainResourceAdmission::CapacityBlocked:
+				++GuardCapacityBlocked;
+				break;
+			case EVoxelTerrainResourceAdmission::CapacityUnachievable:
+				++GuardCapacityUnachievable;
+				break;
+			case EVoxelTerrainResourceAdmission::InvalidRequest:
+				++GuardInvalidRequest;
+				break;
+			default:
+				++GuardOther;
+				break;
+			}
+		}
+#endif
 		const uint64 Serial = VolumePlanSerial;
 		{
 			FString CallbackBindingError;
@@ -6204,7 +6449,36 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildVolumeTransitionSteps(con
 			if (!Current || Current->PendingSignature != Signature)
 				return;
 			Current->PendingSignature = 0;
-			if (!CoverageIndex.IsCurrent(Guard))
+			const bool bGuardCurrent = CoverageIndex.IsCurrent(Guard);
+#if !UE_BUILD_SHIPPING
+			if (CVarVoxelDebugRepresentation.GetValueOnGameThread() >= 3)
+			{
+				static uint64 ProcessApplyCount = 0;
+				static uint64 ProcessGuardCurrent = 0;
+				static uint64 ProcessGuardStale = 0;
+				static uint64 ProcessCountOnly = 0;
+				static uint64 ProcessSuccess = 0;
+				static uint64 ProcessCanceled = 0;
+				static uint64 ProcessDesiredChanged = 0;
+				++ProcessApplyCount;
+				ProcessGuardCurrent += bGuardCurrent ? 1 : 0;
+				ProcessGuardStale += bGuardCurrent ? 0 : 1;
+				ProcessCountOnly += Guard.bCountOnly ? 1 : 0;
+				ProcessSuccess += Result.bSuccess ? 1 : 0;
+				ProcessCanceled += Result.bCanceled ? 1 : 0;
+				ProcessDesiredChanged += Current->DesiredSignature != Signature ? 1 : 0;
+				if (ProcessApplyCount <= 4 || ProcessApplyCount % 64 == 0)
+				{
+					UE_LOG(LogTemp, Display, TEXT("Voxel volume guard apply: aggregate=process count=%llu currentTotal=%llu staleTotal=%llu countOnlyTotal=%llu successTotal=%llu canceledTotal=%llu desiredChangedTotal=%llu epoch=%llu serial=%llu owner=%s region=(%d,%d,%d,%d) current=%d countOnly=%d success=%d canceled=%d desiredChanged=%d"),
+						ProcessApplyCount, ProcessGuardCurrent, ProcessGuardStale, ProcessCountOnly, ProcessSuccess,
+						ProcessCanceled, ProcessDesiredChanged, Result.Stamp.WorldEpoch, Serial, *TaskOwnerId.ToString(),
+						Region.Coordinate.X, Region.Coordinate.Y, Region.Coordinate.Z, int32(Region.Level),
+						int32(bGuardCurrent), int32(Guard.bCountOnly), int32(Result.bSuccess), int32(Result.bCanceled),
+						int32(Current->DesiredSignature != Signature));
+				}
+			}
+#endif
+			if (!bGuardCurrent)
 			{
 				MarkCoverageDirty(VoxelProxyCoverageRect(Region));
 				return;
@@ -6527,6 +6801,9 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildVolumeTransitionSteps(con
 			const uint64* Desired = DesiredVolumeSignatures.Find(Stamp.ViewKey);
 			return !Desired || *Desired != Stamp.Token;
 		});
+#if !UE_BUILD_SHIPPING
+	bGuardPassComplete = true;
+#endif
 	co_return;
 }
 

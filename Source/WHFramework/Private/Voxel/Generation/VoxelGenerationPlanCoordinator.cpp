@@ -811,6 +811,7 @@ void FVoxelGenerationPlanCoordinator::ClearPendingRequest(FState& InState)
 	InState.PendingReadDependencies.Reset();
 	InState.bAttemptPendingAdmission = false;
 	InState.bWaitingTaskCapacity = false;
+	InState.bWaitingTaskQueueCapacity = false;
 	InState.bWaitingCapacity = false;
 }
 
@@ -835,6 +836,17 @@ void FVoxelGenerationPlanCoordinator::WaitForTaskAdmission(FState& InState, cons
 	InState.TaskCapacityVersion = InVersion;
 	LinkPendingAdmission(InState);
 	const auto& Request = InState.PendingRequest.GetValue();
+	InState.bWaitingTaskQueueCapacity = InReason == EVoxelTaskBlockReason::PendingCapacity;
+	if (InState.bWaitingTaskQueueCapacity)
+	{
+		InState.TaskQueueVersion = Scheduler.GetQueueAdmissionVersion();
+		InState.TaskQueueResourceVersion = Scheduler.GetTerrainResources()->Snapshot().Version;
+		InState.TaskQueueInputBytes = Request.InputBytes;
+		InState.TaskQueuePriority = FVoxelTaskScheduler::ResolveServicePriority(Request);
+		InState.TaskQueueWorkClass = Request.WorkClass;
+		const double AgeDeadline = Request.QueuedAt + 0.5;
+		InState.TaskQueueRetryAt = FPlatformTime::Seconds() < AgeDeadline ? AgeDeadline : MAX_dbl;
+	}
 	Scheduler.ObserveDemand(Request.Kind, Request.Stamp, InReason, Request.InputBytes, Request.ReservedBytes);
 }
 
@@ -958,12 +970,25 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	Request.SourceStableKey = InOutState.ServicePriority.SourceStableKey;
 	// 正文由原 Cache 租约承担，任务只返回已经授额的读取闭包。
 	const auto CaptureConsumer = Request.GenerationConsumer;
-	if (InOutState.bWaitingTaskCapacity && Scheduler.GetTerrainResources()->ReleaseVersionExcludingOwner(CaptureConsumer) <=
+	if (InOutState.bWaitingTaskCapacity && InOutState.bWaitingTaskQueueCapacity)
+	{
+		const bool bSameQueue = Scheduler.GetQueueAdmissionVersion() == InOutState.TaskQueueVersion;
+		const bool bSameResources = Scheduler.GetTerrainResources()->Snapshot().Version == InOutState.TaskQueueResourceVersion;
+		const bool bSameRequest = Request.InputBytes == InOutState.TaskQueueInputBytes &&
+			Request.WorkClass == InOutState.TaskQueueWorkClass &&
+			FVoxelTaskScheduler::ResolveServicePriority(Request) == InOutState.TaskQueuePriority;
+		if (bSameQueue && bSameResources && bSameRequest && FPlatformTime::Seconds() < InOutState.TaskQueueRetryAt)
+		{
+			return false;
+		}
+	}
+	else if (InOutState.bWaitingTaskCapacity && Scheduler.GetTerrainResources()->ReleaseVersionExcludingOwner(CaptureConsumer) <=
 		InOutState.TaskCapacityVersion)
 	{
 		return false;
 	}
 	InOutState.bWaitingTaskCapacity = false;
+	InOutState.bWaitingTaskQueueCapacity = false;
 	if (InOutState.bWaitingCapacity && Resources->ReleaseVersionExcludingOwner(CaptureConsumer) <= InOutState.CapacityVersion) return false;
 	InOutState.bWaitingCapacity = false;
 	const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(CaptureConsumer);
@@ -1333,6 +1358,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	InOutState.PendingReadDependencies.Reset();
 	InOutState.bAttemptPendingAdmission = false;
 	InOutState.bWaitingTaskCapacity = false;
+	InOutState.bWaitingTaskQueueCapacity = false;
 	InOutState.bWaitingCapacity = false;
 	InOutState.State = EVoxelPlanDependencyState::Queued;
 	InOutState.bInFlight = true;

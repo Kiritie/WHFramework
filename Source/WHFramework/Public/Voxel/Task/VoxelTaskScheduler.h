@@ -634,6 +634,7 @@ public:
 	FVoxelTaskScheduler& operator=(const FVoxelTaskScheduler&) = delete;
 
 	bool Enqueue(FVoxelTaskRequest&& InRequest);
+	uint64 GetQueueAdmissionVersion() const;
 	void SetPaused(bool bInPaused);
 	bool IsPaused() const { return bPaused; }
 	bool ObserveDemand(EVoxelTaskKind InKind, const FVoxelTaskStamp& InStamp,
@@ -826,6 +827,7 @@ private:
 	void RefreshBlockReasons();
 	void LogAdmissionStall(double InNow);
 	void VisitPriorityStates(TFunctionRef<void(FVoxelTaskRequest&)> InUpdate);
+	void ChangedQueueAdmission();
 	FVoxelGenerationConsumerKey ResolveNativeConsumer(const FVoxelTaskRequest& InRequest) const;
 	EVoxelTerrainResourceAdmission ReserveNativeExecution(FVoxelTaskRequest& InRequest,
 		EVoxelTaskBlockReason& OutBlocked);
@@ -912,6 +914,7 @@ private:
 	FVoxelTaskDiagnostics::TCounts<EVoxelTaskKind, double, FVoxelTaskDiagnostics::KindCapacity> ApplyCostEstimates;
 	uint64 NextSequence = 0;
 	uint64 BlockRefreshSequence = 0;
+	uint64 QueueAdmissionVersion = 1;
 
 	double LastBudgetWarning = -10.0;
 	double AdmissionStallStarted = -1.0;

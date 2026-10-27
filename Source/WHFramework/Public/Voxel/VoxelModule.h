@@ -157,6 +157,7 @@ public:
 	const FVoxelWorldReadinessSnapshot& GetReadiness() const;
 	FVoxelRepresentationReadiness GetRepresentationReadiness() const;
 	FVoxelTerrainReadinessSnapshot CaptureTerrainReadiness() const;
+	FVoxelProxyPublicationState CaptureProxyPublicationState(const FVoxelViewKey& InKey, uint64 InExpectedEpoch) const;
 	double BlockSize() const;
 	const FVoxelWorldManifest& GetManifest() const;
 	FGuid GetSessionId() const;

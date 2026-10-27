@@ -15,6 +15,11 @@ class WHFRAMEWORK_API UProcedureAsset : public UAssetBase
 public:
     UProcedureAsset(const FObjectInitializer& ObjectInitializer);
 
+#if WITH_EDITORONLY_DATA
+    virtual void Serialize(FStructuredArchiveRecord Record) override;
+    static void DeclareCustomVersions(FArchive& Ar, const UClass* SpecificSubclass);
+#endif
+
     virtual void Initialize() override;
 
     UPROPERTY(EditAnywhere)

@@ -88,6 +88,17 @@ public:
 
 private:
     friend class FVoxelGenerationPlanCache;
+#if WITH_DEV_AUTOMATION_TESTS
+    friend class FVoxelHydrologyExteriorTestAccess;
+#endif
+    struct FExteriorRunoffSnapshot
+    {
+        FIntPoint Cell = FIntPoint::ZeroValue;
+        FIntPoint Coordinate = FIntPoint::ZeroValue;
+        uint64 Generation = 0;
+        uint64 Fingerprint = 0;
+        FVoxelHydrologyNetworkRunoffCell Control;
+    };
     bool PrepareRiverNodes(FTileLookup InLookup, FVoxelHydrologyMacroInput::FRequestTile InRequestTile,
         FString& OutError, const TAtomic<bool>* InCancel);
     bool ReadExteriorNode(const FIntPoint& InCell, FTileLookup InLookup, FVoxelHydrologyMacroInput::FRequestTile InRequestTile,
@@ -128,6 +139,10 @@ private:
     TArray<uint8> PrepareActive;
     TArray<FVoxelHydrologyComponentNode> PrepareSelected;
     TMap<FIntPoint, int32> ExteriorNodes;
+    TOptional<FExteriorRunoffSnapshot> ExteriorRunoff;
+#if WITH_DEV_AUTOMATION_TESTS
+    bool bTestPauseAfterExteriorSnapshot = false;
+#endif
     int32 PrepareStage = 0;
     int32 PrepareCursor = 0;
     int32 PrepareSourceCursor = 0;

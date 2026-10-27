@@ -26,5 +26,6 @@ public:
 		const TSet<FVoxelViewKey>& InVisible,
 		uint8 InMaximumLevel,
 		TArray<FVoxelVolumeTransitionFace>& OutFaces,
-		const TMap<FVoxelViewKey, int32>* InSampleSteps = nullptr);
+		const TMap<FVoxelViewKey, int32>* InSampleSteps = nullptr,
+		const FVoxelViewKey* InOwnerRegion = nullptr);
 };

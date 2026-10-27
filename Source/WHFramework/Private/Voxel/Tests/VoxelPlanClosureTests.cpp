@@ -117,7 +117,7 @@ bool FVoxelLocalPlanClosureTest::RunTest(const FString& InParameters)
 		Hydro.Kind = EVoxelGenerationPlanKind::Hydrology;
 		const auto AdmissionConsumer = FVoxelGenerationConsumerKey::Section(19, FGuid::NewGuid(), 1, {}, 1);
 		const FVoxelGenerationPlanDependency Reads[] = {Hydro};
-		AdmissionCoordinator.Ensure(MakeArrayView(Reads), EVoxelWorkClass::Visible, 3, 1000., 0., AdmissionConsumer);
+		AdmissionCoordinator.Ensure(MakeArrayView(Reads), EVoxelWorkClass::Critical, 3, 1000., 0., AdmissionConsumer);
 		const uint64 OriginalAttempt = AdmissionCoordinator.Storage->States.FindChecked(Hydro).AttemptId;
 		FVoxelTaskRequest Urgent;
 		Urgent.Kind = EVoxelTaskKind::GenerateExactBase;
@@ -130,13 +130,127 @@ bool FVoxelLocalPlanClosureTest::RunTest(const FString& InParameters)
 		TestTrue(TEXT("紧急任务置换等待中的原生事实"), AdmissionScheduler.Enqueue(MoveTemp(Urgent)));
 		AdmissionScheduler.Tick([](FVoxelTaskResult&&) {});
 		TestTrue(TEXT("置换保留事实的原尝试身份"), AdmissionCoordinator.Storage->States.FindChecked(Hydro).bAttemptPendingAdmission);
+		AdmissionCoordinator.Ensure(MakeArrayView(Reads), EVoxelWorkClass::Critical, 3, 1000., 0., AdmissionConsumer);
+		{
+			auto& Waiting = AdmissionCoordinator.Storage->States.FindChecked(Hydro);
+			if (!TestTrue(TEXT("满队列拒绝后保留原请求及独立队列等待"), Waiting.PendingRequest.IsSet() &&
+				Waiting.bWaitingTaskCapacity && Waiting.bWaitingTaskQueueCapacity)) return false;
+			const uint64 InitialDeferrals = AdmissionScheduler.GetDiagnostics().CapacityDeferrals;
+			const uint64 QueueVersion = AdmissionScheduler.GetQueueAdmissionVersion();
+			const auto& Pending = Waiting.PendingRequest.GetValue();
+			TestTrue(TEXT("Ensure 的后续优先级规范化使原排队快照失效"), QueueVersion > Waiting.TaskQueueVersion);
+			TestEqual(TEXT("首次检查前账本版本与拒收快照一致"), AdmissionScheduler.GetTerrainResources()->Snapshot().Version,
+				Waiting.TaskQueueResourceVersion);
+			TestTrue(TEXT("首次检查前请求自身优先级与拒收快照一致"), Pending.WorkClass == Waiting.TaskQueueWorkClass &&
+				Pending.InputBytes == Waiting.TaskQueueInputBytes &&
+				FVoxelTaskScheduler::ResolveServicePriority(Pending) == Waiting.TaskQueuePriority);
+			TestTrue(TEXT("首次检查前聚合优先级与拒收快照一致"), Waiting.WorkClass == Waiting.TaskQueueWorkClass &&
+				Waiting.ServicePriority == Waiting.TaskQueuePriority && Waiting.SourcePriority == Waiting.TaskQueuePriority.SourcePriority &&
+				Waiting.DistanceScore == Waiting.TaskQueuePriority.DistanceCells && Waiting.ForwardScore == Waiting.TaskQueuePriority.ForwardScore);
+			TestTrue(TEXT("首次检查前年龄截止尚未到期"), FPlatformTime::Seconds() < Waiting.TaskQueueRetryAt);
+			TestFalse(TEXT("排队版本变化后执行一次实际准入检查"), AdmissionCoordinator.Queue(Hydro, Waiting));
+			TestEqual(TEXT("版本变化触发一次真实重试"), AdmissionScheduler.GetDiagnostics().CapacityDeferrals, InitialDeferrals + 1);
+			TestEqual(TEXT("重试后的排队快照已更新"), Waiting.TaskQueueVersion, AdmissionScheduler.GetQueueAdmissionVersion());
+			const uint64 Deferrals = AdmissionScheduler.GetDiagnostics().CapacityDeferrals;
+			for (int32 Retry = 0; Retry < 4; ++Retry)
+			{
+				TestFalse(TEXT("不变的队列与授额不重复接纳"), AdmissionCoordinator.Queue(Hydro, Waiting));
+			}
+			TestEqual(TEXT("不变快照不重新扫描满队列"), AdmissionScheduler.GetDiagnostics().CapacityDeferrals, Deferrals);
+			TestEqual(TEXT("只读重试不改变队列版本"), AdmissionScheduler.GetQueueAdmissionVersion(), QueueVersion);
+			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Pressure;
+			const auto PressureConsumer = FVoxelGenerationConsumerKey::Section(19, FGuid::NewGuid(), 1, {}, 99);
+			if (!TestTrue(TEXT("原账本资源变化可被观测"), AdmissionScheduler.GetTerrainResources()->Acquire(
+				PressureConsumer, EVoxelTerrainResourcePool::Input, 1, Pressure))) return false;
+			TestFalse(TEXT("授额变化后重新检查真实准入"), AdmissionCoordinator.Queue(Hydro, Waiting));
+			TestEqual(TEXT("授额变化不能隐藏排队检查"), AdmissionScheduler.GetDiagnostics().CapacityDeferrals, Deferrals + 1);
+			Pressure.Reset();
+			TestFalse(TEXT("授额释放后仍按原条件检查满队列"), AdmissionCoordinator.Queue(Hydro, Waiting));
+			TestEqual(TEXT("授额释放不被旧快照屏蔽"), AdmissionScheduler.GetDiagnostics().CapacityDeferrals, Deferrals + 2);
+			AdmissionScheduler.UpdatePriorities([UrgentStamp](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
+				EVoxelWorkClass&, int32&, double& Distance, double&)
+			{
+				if (Kind == EVoxelTaskKind::GenerateExactBase && Stamp == UrgentStamp) Distance += 1.0;
+			});
+			TestFalse(TEXT("已排队对手优先级变化后重新比较"), AdmissionCoordinator.Queue(Hydro, Waiting));
+			TestEqual(TEXT("队列优先级变化不被旧快照屏蔽"), AdmissionScheduler.GetDiagnostics().CapacityDeferrals, Deferrals + 3);
+			TestTrue(TEXT("年龄截止由原首次请求时间计算"), Waiting.TaskQueueRetryAt == MAX_dbl ||
+				Waiting.TaskQueueRetryAt == Waiting.PendingRequest.GetValue().QueuedAt + 0.5);
+			Waiting.TaskQueueRetryAt = FPlatformTime::Seconds() - 1.0;
+			TestFalse(TEXT("年龄截止到期会重试而不是永久阻塞"), AdmissionCoordinator.Queue(Hydro, Waiting));
+			TestEqual(TEXT("到期后实际重新执行原准入"), AdmissionScheduler.GetDiagnostics().CapacityDeferrals, Deferrals + 4);
+			Waiting.WorkClass = EVoxelWorkClass::Critical;
+			Waiting.SourcePriority = -1;
+			Waiting.DistanceScore = 0.0;
+			Waiting.ServicePriority.Band = EVoxelTerrainServiceBand::P0;
+			Waiting.ServicePriority.SourcePriority = -1;
+			Waiting.ServicePriority.DistanceCells = 0.0;
+			TestTrue(TEXT("优先级提升立即重试并可置换较低优先级"), AdmissionCoordinator.Queue(Hydro, Waiting));
+		}
+		TestFalse(TEXT("高优先级事实接纳后原满队列项被置换"), AdmissionScheduler.Has(UrgentStamp, EVoxelTaskKind::GenerateExactBase));
+		const uint64 BeforePriority = AdmissionScheduler.GetQueueAdmissionVersion();
+		AdmissionScheduler.UpdatePriorities([](EVoxelTaskKind Kind, const FVoxelTaskStamp&, EVoxelWorkClass&, int32&, double& Distance, double&)
+		{
+			if (Kind == EVoxelTaskKind::BuildGenerationPlan) Distance += 1.0;
+		});
+		TestTrue(TEXT("排队任务优先级实际变化使快照失效"), AdmissionScheduler.GetQueueAdmissionVersion() > BeforePriority);
+		const uint64 BeforeSameBudget = AdmissionScheduler.GetQueueAdmissionVersion();
+		AdmissionScheduler.SetBudget(Budget);
+		TestEqual(TEXT("重复相同预算不使快照失效"), AdmissionScheduler.GetQueueAdmissionVersion(), BeforeSameBudget);
+		Budget.MaxPendingTasks = 2;
+		AdmissionScheduler.SetBudget(Budget);
+		TestTrue(TEXT("排队预算实际变化使快照失效"), AdmissionScheduler.GetQueueAdmissionVersion() > BeforeSameBudget);
 		AdmissionScheduler.CancelTask(EVoxelTaskKind::GenerateExactBase, UrgentStamp);
 		AdmissionScheduler.Tick([](FVoxelTaskResult&&) {});
-		AdmissionCoordinator.Ensure(MakeArrayView(Reads), EVoxelWorkClass::Visible, 3, 1000., 0., AdmissionConsumer);
+		AdmissionCoordinator.Ensure(MakeArrayView(Reads), EVoxelWorkClass::Critical, 3, 1000., 0., AdmissionConsumer);
 		TestEqual(TEXT("置换重试不产生新token或遗留旧准入记录"), AdmissionCoordinator.Storage->States.FindChecked(Hydro).AttemptId, OriginalAttempt);
 		TestTrue(TEXT("原事实重新进入有界队列"), AdmissionCoordinator.Storage->States.FindChecked(Hydro).bInFlight);
+		const uint64 BeforeRelease = AdmissionScheduler.GetQueueAdmissionVersion();
 		AdmissionCoordinator.ReleaseConsumer(AdmissionConsumer);
+		TestTrue(TEXT("消费者释放取消排队事实并更新队列版本"), AdmissionScheduler.GetQueueAdmissionVersion() > BeforeRelease);
 		AdmissionScheduler.StopAndJoin();
+	}
+	{
+		FVoxelTaskScheduler QueueScheduler(true);
+		FVoxelTaskBudget Budget;
+		Budget.MaxConcurrentTasks = 1;
+		Budget.MaxPendingTasks = 1;
+		QueueScheduler.SetBudget(Budget);
+		auto MakeRequest = [](const uint64 Token, const EVoxelWorkClass WorkClass)
+		{
+			FVoxelTaskRequest Request;
+			Request.Kind = EVoxelTaskKind::GenerateExactBase;
+			Request.WorkClass = WorkClass;
+			Request.Stamp.WorldEpoch = 20;
+			Request.Stamp.Token = Token;
+			Request.ReservedBytes = 1024;
+			Request.Execute = [](const TAtomic<bool>& Cancel)
+			{
+				while (!Cancel.Load()) FPlatformProcess::Sleep(.001f);
+				return FVoxelTaskResult();
+			};
+			return Request;
+		};
+		TestTrue(TEXT("队列唤醒夹具占据执行槽"), QueueScheduler.Enqueue(MakeRequest(10, EVoxelWorkClass::Visible)));
+		auto Blocker = MakeRequest(11, EVoxelWorkClass::Critical);
+		const FVoxelTaskStamp BlockerStamp = Blocker.Stamp;
+		TestTrue(TEXT("队列唤醒夹具占满排队槽"), QueueScheduler.Enqueue(MoveTemp(Blocker)));
+		const auto QueueCache = MakeShared<FVoxelGenerationPlanCache, ESPMode::ThreadSafe>();
+		FVoxelGenerationPlanCoordinator QueueCoordinator(QueueScheduler, Config, QueueCache, 20);
+		FVoxelGenerationPlanDependency Hydro;
+		Hydro.Kind = EVoxelGenerationPlanKind::Hydrology;
+		const auto QueueConsumer = FVoxelGenerationConsumerKey::Section(20, FGuid::NewGuid(), 1, {}, 1);
+		QueueCoordinator.Ensure(MakeArrayView(&Hydro, 1), EVoxelWorkClass::Critical, 3, 1000., 0., QueueConsumer);
+		auto& Waiting = QueueCoordinator.Storage->States.FindChecked(Hydro);
+		if (!TestTrue(TEXT("事实确实因满队列等待"), Waiting.PendingRequest.IsSet() && Waiting.bWaitingTaskQueueCapacity)) return false;
+		const uint64 PreviousVersion = QueueScheduler.GetQueueAdmissionVersion();
+		const uint64 PreviousResources = QueueScheduler.GetTerrainResources()->Snapshot().Version;
+		QueueScheduler.CancelTask(EVoxelTaskKind::GenerateExactBase, BlockerStamp);
+		TestTrue(TEXT("取消排队任务改变准入版本"), QueueScheduler.GetQueueAdmissionVersion() > PreviousVersion);
+		TestEqual(TEXT("取消回执未处理时不依赖原账本版本变化"), QueueScheduler.GetTerrainResources()->Snapshot().Version, PreviousResources);
+		TestTrue(TEXT("队列槽释放后原事实立即重新接纳"), QueueCoordinator.Queue(Hydro, Waiting));
+		QueueCoordinator.ReleaseConsumer(QueueConsumer);
+		QueueScheduler.StopAndJoin();
 	}
 	return true;
 }

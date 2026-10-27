@@ -1,6 +1,7 @@
 #include "Procedure/Base/ProcedureAsset.h"
 
 #include "Procedure/Base/ProcedureBase.h"
+#include "UObject/FortniteMainBranchObjectVersion.h"
 #include "UObject/ObjectSaveContext.h"
 #include "UObject/UObjectHash.h"
 
@@ -9,6 +10,21 @@ UProcedureAsset::UProcedureAsset(const FObjectInitializer& ObjectInitializer)
 {
     NativeClass = GetClass();
 }
+
+#if WITH_EDITORONLY_DATA
+void UProcedureAsset::Serialize(FStructuredArchiveRecord Record)
+{
+    // 流程节点含可收集文本；保存包摘要前登记文本站点序列化所需版本。
+    Record.GetUnderlyingArchive().UsingCustomVersion(FFortniteMainBranchObjectVersion::GUID);
+    Super::Serialize(Record);
+}
+
+void UProcedureAsset::DeclareCustomVersions(FArchive& Ar, const UClass* SpecificSubclass)
+{
+    Super::DeclareCustomVersions(Ar, SpecificSubclass);
+    Ar.UsingCustomVersion(FFortniteMainBranchObjectVersion::GUID);
+}
+#endif
 
 void UProcedureAsset::Initialize()
 {

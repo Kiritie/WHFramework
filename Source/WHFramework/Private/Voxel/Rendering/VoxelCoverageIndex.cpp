@@ -6,6 +6,25 @@
 namespace
 {
 	TAtomic<uint64> NextVoxelCoverageVersion(0);
+	// 复制分支共享 StorageId；空根或 Reset 后的代数必须跨所有分支唯一。
+	TAtomic<uint64> NextVoxelCoverageStorageGeneration(1);
+
+	uint64 AllocateCoverageStorageGeneration()
+	{
+		uint64 Previous = NextVoxelCoverageStorageGeneration.Load();
+		for (;;)
+		{
+			if (Previous == MAX_uint64)
+			{
+				UE_LOG(LogTemp, Fatal, TEXT("Voxel coverage storage generation exhausted"));
+			}
+			const uint64 Next = Previous + 1;
+			if (NextVoxelCoverageStorageGeneration.CompareExchange(Previous, Next))
+			{
+				return Next;
+			}
+		}
+	}
 
 	bool SameCoverageRecord(const FVoxelCoverageRecord& InA, const FVoxelCoverageRecord& InB)
 	{
@@ -353,7 +372,12 @@ bool FVoxelCoverageIndex::RemoveUnique(const FVoxelTerrainSpatialKey& InKey)
 	for (const auto& Node : Mutable->Nodes)
 		if (Node) { Mutable->Records += Node->SubtreeRecords; Mutable->NodesCount += Node->SubtreeNodes; }
 	MembershipVersion = Serial;
-	if (!Mutable->Records) Root.Reset();
+	if (!Mutable->Records)
+	{
+		// 空根不再保存 slot/gap 版本；换代防止旧空守卫在插入、删除后复活。
+		StorageGeneration = AllocateCoverageStorageGeneration();
+		Root.Reset();
+	}
 	return true;
 }
 
@@ -708,10 +732,11 @@ void FVoxelCoverageIndex::PruneEmptyNodes(const int32 InOutstandingSnapshots)
 
 void FVoxelCoverageIndex::Reset()
 {
+	const uint64 NewStorageGeneration = AllocateCoverageStorageGeneration();
 	Root.Reset(); StorageLease.Reset(); ReservedRecordLimit = 0;
-	// Serial 不回退，世界换代由 StorageGeneration 明确隔离。
+	// Serial 不回退；独立重置的复制分支也不能共用相同的 StorageGeneration。
 	MembershipVersion = Serial;
-	check(StorageGeneration < MAX_uint64); ++StorageGeneration;
+	StorageGeneration = NewStorageGeneration;
 }
 
 FVoxelGameThreadContinuation FVoxelCoverageIndex::CaptureNodeSteps(FNodePtr InNode, const FVoxelCoverageIndexKey InKey,

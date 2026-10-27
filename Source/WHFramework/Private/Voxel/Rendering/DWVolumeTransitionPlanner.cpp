@@ -77,9 +77,16 @@ void FVoxelVolumeTransitionPlanner::GatherCoverageRegions(const TSet<FVoxelViewK
 void FVoxelVolumeTransitionPlanner::Build(
 	const TSet<FVoxelViewKey>& InVisible,
 	const uint8 InMaximumLevel,
-	TArray<FVoxelVolumeTransitionFace>& OutFaces, const TMap<FVoxelViewKey, int32>* InSampleSteps)
+	TArray<FVoxelVolumeTransitionFace>& OutFaces, const TMap<FVoxelViewKey, int32>* InSampleSteps,
+	const FVoxelViewKey* InOwnerRegion)
 {
 	OutFaces.Reset();
+	const auto IsIncludedOwner = [InOwnerRegion](FVoxelViewKey Owner)
+	{
+		if (!InOwnerRegion) return true;
+		while (Owner.Level < InOwnerRegion->Level) Owner = Owner.GetParent();
+		return Owner == *InOwnerRegion;
+	};
 	for (const FVoxelViewKey& Fine : InVisible)
 	{
 		if (Fine.Level > InMaximumLevel) continue;
@@ -103,7 +110,7 @@ void FVoxelVolumeTransitionPlanner::Build(
 				{
 					const int32* FineStep = InSampleSteps ? InSampleSteps->Find(Fine) : nullptr;
 					const int32* SameStep = InSampleSteps ? InSampleSteps->Find(Same) : nullptr;
-					if (Fine.Level > 0 && FineStep && SameStep && *FineStep > *SameStep)
+					if (Fine.Level > 0 && FineStep && SameStep && *FineStep > *SameStep && IsIncludedOwner(Fine))
 					{
 						OutFaces.Add({Fine, Same, static_cast<EVoxelVolumeFaceDirection>(Axis * 2 + (Sign < 0 ? 1 : 0)), Same.GetBounds().Min, Same.GetBounds().Max, 1});
 					}
@@ -119,6 +126,7 @@ void FVoxelVolumeTransitionPlanner::Build(
 					if (!InVisible.Contains(Coarse) ||
 						!(TouchesFace(FineBounds, Coarse.GetBounds(), Axis, Sign) ||
 						(Coarse.GetBounds().Min[Axis] <= FineBounds.Min[Axis] && Coarse.GetBounds().Max[Axis] >= FineBounds.Max[Axis]))) continue;
+					if (!IsIncludedOwner(Coarse)) break;
 					FVoxelVolumeTransitionFace& Face = OutFaces.AddDefaulted_GetRef();
 					Face.Owner = Coarse;
 					Face.Neighbor = Fine;

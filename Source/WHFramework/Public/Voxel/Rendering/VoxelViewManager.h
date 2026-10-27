@@ -94,6 +94,90 @@ struct WHFRAMEWORK_API FVoxelTerrainReadinessSnapshot
 	TArray<FVoxelTerrainTargetReadiness> Targets;
 };
 
+struct WHFRAMEWORK_API FVoxelProxyProbeScan
+{
+	int32 Total = 0;
+	int32 Scanned = 0;
+	int32 Matches = 0;
+	int32 FirstIndex = INDEX_NONE;
+};
+
+struct WHFRAMEWORK_API FVoxelProxyProbeSignature
+{
+	bool bPresent = false;
+	uint64 Value = 0;
+};
+
+struct WHFRAMEWORK_API FVoxelProxyPublicationState
+{
+	bool bAvailable = false;
+	FString Error;
+	uint64 WorldEpoch = 0;
+	uint64 Frame = 0;
+	uint64 GenerationIdentity = 0;
+	uint64 DesiredRevision = 0;
+	uint64 AppliedRevision = 0;
+	uint64 CoverageRevision = 0;
+	bool bDesiredSnapshot = false;
+	bool bAppliedSnapshot = false;
+	bool bCoverageSnapshot = false;
+	bool bDesiredWanted = false;
+	bool bAppliedWanted = false;
+	bool bCoverageWanted = false;
+	bool bInterestInputActive = false;
+	bool bCoverageActive = false;
+	bool bCoverageFull = false;
+	bool bCoverageDirty = false;
+	bool bDirtyFull = false;
+	bool bCoverageRetry = false;
+	bool bCoverageDrain = false;
+	double CoverageAgeSeconds = 0.0;
+	bool bGeometryFound = false;
+	FVoxelTerrainGeometry Geometry;
+	FVoxelCoverageBox Bounds;
+	bool bMeshReady = false;
+	bool bDataReady = false;
+	bool bAdmissionPresented = false;
+	bool bTerminalFailure = false;
+	FName DataAdmissionGate;
+	bool bKnownEmptyAvailable = false;
+	bool bKnownEmpty = false;
+	bool bIndexed = false;
+	bool bIndexWanted = false;
+	bool bIndexReady = false;
+	bool bIndexCommitted = false;
+	bool bOwned = false;
+	bool bSourceExists = false;
+	FGuid SourceId;
+	bool bHidden = false;
+	bool bHasPresentation = false;
+	bool bPresented = false;
+	bool bCommitted = false;
+	bool bGroupOpen = false;
+	bool bGroupActive = false;
+	bool bGroupBusy = false;
+	FVoxelProxyProbeScan PendingBoxes;
+	FVoxelCoverageBox FirstPendingBox;
+	FVoxelProxyProbeScan DirtyRects;
+	FVoxelProxyProbeScan ActiveRects;
+	FVoxelProxyProbeScan FailedRects;
+	FVoxelProxyProbeSignature DesiredTransition;
+	FVoxelProxyProbeSignature PendingTransition;
+	FVoxelProxyProbeSignature PreparedTransition;
+	FVoxelProxyProbeSignature BuiltTransition;
+	FVoxelProxyProbeScan Unsubmitted;
+	int32 RegionTotal = 0;
+	int32 RegionScanned = 0;
+	int32 OwnerRegionMatches = 0;
+	bool bOwnerRegionFound = false;
+	FVoxelViewKey OwnerRegion;
+	uint64 OwnerDesiredSignature = 0;
+	uint64 OwnerPendingSignature = 0;
+	bool bOwnerPlan = false;
+	uint64 OwnerPlanSignature = 0;
+	bool bOwnerPlanContainsKey = false;
+};
+
 struct WHFRAMEWORK_API FVoxelPrimaryFineReadiness
 {
 	int32 Required = 0;
@@ -158,6 +242,7 @@ public:
 	bool HasPrimaryRepresentation() const;
 	FVoxelRepresentationReadiness GetRepresentationReadiness() const;
 	FVoxelTerrainReadinessSnapshot CaptureTerrainReadiness() const;
+	FVoxelProxyPublicationState CaptureProxyPublicationState(const FVoxelViewKey& InKey, uint64 InExpectedEpoch) const;
 	TSharedPtr<const IVoxelTerrainPresentedSnapshot, ESPMode::ThreadSafe> CapturePresentedSnapshot() const;
 	bool IsFinePresented(const FIntVector& InSection) const;
 	bool IsLatestFinePresented(const FIntVector& InSection) const;

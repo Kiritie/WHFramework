@@ -927,6 +927,7 @@ struct FVoxelGenerationPlanCache::FHydrologyRegionOwner
 		: Config(InConfig), Climate(InClimate), Terrain(InTerrain), Consumer(InConsumer), Generation(InGeneration)
 	{
 		Plan.Key = InKey;
+		LastDiagnosticSeconds = FPlatformTime::Seconds();
 	}
 	~FHydrologyRegionOwner()
 	{
@@ -3095,7 +3096,8 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyPlan(const FVoxelHydrologyRegion
 				Owner->MissingTiles.Reset();
 				Owner->MissingTiles.Add(TopologyKey);
 				Owner->MissingIndex = 0;
-				return Stop(TEXT("Yielded: hydrology coverage requires macro topology"));
+				// 已记录缺失项，下一片可主动查询或构建；真实依赖等待仍会普通让出。
+				return Stop(TEXT("YieldedImmediate: hydrology coverage requires macro topology"));
 			}
 		if (!VoxelGenerationAllocation::RetainArray(Owner->Plan.TopologyPlans, int32(Count), OutError)) return Stop(OutError);
 		Owner->Plan.TopologyPlans.Reset();

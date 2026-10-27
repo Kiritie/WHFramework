@@ -122,4 +122,108 @@ bool FVoxelHydrologyGraphAllocationResumeTest::RunTest(const FString& Parameters
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHydrologyGraphReadGrowthTest,
+	"WHFramework.Voxel.Hydrology.RegionGraph.ReadGrowthAndResume",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHydrologyGraphReadGrowthTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	constexpr uint64 Generation = 198;
+	FString Error;
+	int32 Available = 192;
+	const auto Read = [&Available](const FIntPoint& InCell, FVoxelHydrologyRegionSample& OutCell, FString& OutError)
+	{
+		if (InCell.Y * 256 + InCell.X >= Available) return EVoxelHydrologyClosureRead::Pending;
+		OutCell.GroundZ = 8 + (InCell.X + InCell.Y) % 7;
+		OutCell.RainWeight = 5;
+		OutError.Reset();
+		return EVoxelHydrologyClosureRead::Ready;
+	};
+	FVoxelHydrologyRegionGraphBuild Partial;
+	if (!TestTrue(TEXT("创建完整大小区域图"), Partial.Initialize({}, 256, 256, 32, Generation, Error))) return false;
+	const auto PartialStep = Partial.Advance(Generation, Read, 1000, Error);
+	TestTrue(TEXT("缺少输入时暂停而不发布"), PartialStep == EVoxelHydrologyRegionStep::NeedInput && !Partial.IsReady());
+	TestTrue(TEXT("少量已读输入不预留整个区域的构建数组"), Partial.GetAllocatedBytes() < 256ull * 1024ull);
+	const uint64 BeforeWait = Partial.GetAllocatedBytes();
+	TestTrue(TEXT("继续等待不会增加原生正文"), Partial.Advance(Generation, Read, 1000, Error) == EVoxelHydrologyRegionStep::NeedInput &&
+		Partial.GetAllocatedBytes() == BeforeWait);
+
+	const auto CompleteRead = [](const FIntPoint& InCell, FVoxelHydrologyRegionSample& OutCell, FString& OutError)
+	{
+		OutCell.GroundZ = 8 + (InCell.X + InCell.Y) % 7;
+		OutCell.RainWeight = 5;
+		if (InCell.X == 0)
+		{
+			OutCell.GroundZ = -4;
+			OutCell.WaterZ = 0;
+			OutCell.WaterId = {9, 11};
+		}
+		OutError.Reset();
+		return EVoxelHydrologyClosureRead::Ready;
+	};
+	FVoxelHydrologyRegionGraphBuild Reference;
+	FVoxelHydrologyRegionGraphBuild Resumed;
+	if (!Reference.Initialize({}, 32, 32, 32, Generation, Error) || !Resumed.Initialize({}, 32, 32, 32, Generation, Error)) return false;
+	const auto Finish = [&](FVoxelHydrologyRegionGraphBuild& InBuild, const int32 InBudget)
+	{
+		for (int32 Attempt = 0; Attempt < 100000; ++Attempt)
+		{
+			const auto Step = InBuild.Advance(Generation, CompleteRead, InBudget, Error);
+			if (Step == EVoxelHydrologyRegionStep::Ready) return true;
+			if (Step != EVoxelHydrologyRegionStep::Yielded) return false;
+		}
+		return false;
+	};
+	if (!TestTrue(TEXT("小片和大片均完成实际图构建"), Finish(Reference, 4096) && Finish(Resumed, 17))) return false;
+	TestTrue(TEXT("增长和续跑保持完整图及指纹一致"), Reference.GetResult().HasEquivalentOutput(Resumed.GetResult()));
+
+	FVoxelTerrainResourceLimits Limits;
+	Limits.InputBytes = 1024 * 1024;
+	Limits.WorkingBytes = 1024 * 1024;
+	Limits.ResidentBytes = 2 * 1024 * 1024;
+	Limits.OverlapBytes = 64 * 1024;
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(Generation, FGuid::NewGuid(), 1, {}, 1);
+	auto PressureConsumer = Consumer;
+	PressureConsumer.OwnerId = FGuid::NewGuid();
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Working;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Resident;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Pressure;
+	const uint64 RootBytes = VoxelBoundedAllocation::SharedBytes<FVoxelHydrologyRegionGraphBuild>();
+	if (!FVoxelTerrainResources::Create(Limits, Consumer, Resources, Error) ||
+		!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, RootBytes, Working) ||
+		!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Resident, RootBytes, Resident)) return false;
+	FVoxelHydrologyRegionGraphBuild Pressured;
+	if (!Pressured.Initialize({}, 32, 32, 32, Generation, Error)) return false;
+	{
+		FVoxelGenerationAllocationScope Allocation(Resources, Consumer, Working, Resident, RootBytes);
+		if (!TestTrue(TEXT("读取首批真实输入"), Pressured.Advance(Generation, CompleteRead, 257, Error) == EVoxelHydrologyRegionStep::Yielded &&
+			Allocation.ValidateRetainedBytes(Pressured.GetAllocatedBytes(), Error))) return false;
+	}
+	const uint64 Used = Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Working)];
+	if (!TestTrue(TEXT("保留真实资源竞争"), Used + 1 < Limits.WorkingBytes && Resources->Acquire(PressureConsumer,
+		EVoxelTerrainResourcePool::Working, Limits.WorkingBytes - Used - 1, Pressure))) return false;
+	{
+		FVoxelGenerationAllocationScope Allocation(Resources, Consumer, Working, Resident, RootBytes, Pressured.GetAllocatedBytes());
+		if (!TestTrue(TEXT("读取扩容受阻时保持原容量和续跑状态"),
+			Pressured.Advance(Generation, CompleteRead, 1, Error) == EVoxelHydrologyRegionStep::CapacityBlocked &&
+			Working->Bytes() == RootBytes + Pressured.GetAllocatedBytes() &&
+			Resident->Bytes() == RootBytes + Pressured.GetAllocatedBytes())) return false;
+	}
+	Pressure.Reset();
+	bool bFinished = false;
+	for (int32 Attempt = 0; Attempt < 10000 && !bFinished; ++Attempt)
+	{
+		FVoxelGenerationAllocationScope Allocation(Resources, Consumer, Working, Resident, RootBytes, Pressured.GetAllocatedBytes());
+		const auto Step = Pressured.Advance(Generation, CompleteRead, 256, Error);
+		if (!Allocation.ValidateRetainedBytes(Pressured.GetAllocatedBytes(), Error)) return false;
+		if (Step == EVoxelHydrologyRegionStep::Ready) bFinished = true;
+		else if (Step != EVoxelHydrologyRegionStep::Yielded) return false;
+	}
+	if (!TestTrue(TEXT("扩容恢复后完成原结果"), bFinished)) return false;
+	TestTrue(TEXT("受阻扩容没有改变图或指纹"), Pressured.GetResult().HasEquivalentOutput(Reference.GetResult()));
+	return true;
+}
+
 #endif

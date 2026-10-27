@@ -116,6 +116,51 @@ namespace VoxelHydrologyGraphCacheTests
 	}
 }
 
+class FVoxelHydrologyExteriorTestAccess
+{
+public:
+	static void Pause(FVoxelHydrologyComponentBuild& InBuild)
+	{
+		InBuild.bTestPauseAfterExteriorSnapshot = true;
+	}
+
+	static bool HasSnapshot(const FVoxelHydrologyComponentBuild& InBuild)
+	{
+		return InBuild.ExteriorRunoff.IsSet();
+	}
+
+	static FIntPoint Cell(const FVoxelHydrologyComponentBuild& InBuild)
+	{
+		return InBuild.ExteriorRunoff->Cell;
+	}
+
+	static FIntPoint Coordinate(const FVoxelHydrologyComponentBuild& InBuild)
+	{
+		return InBuild.ExteriorRunoff->Coordinate;
+	}
+
+	static uint64 Fingerprint(const FVoxelHydrologyComponentBuild& InBuild)
+	{
+		return InBuild.ExteriorRunoff->Fingerprint;
+	}
+
+	static void CorruptFingerprint(FVoxelHydrologyComponentBuild& InBuild)
+	{
+		InBuild.ExteriorRunoff->Fingerprint ^= 1;
+	}
+
+	static bool Matches(const FVoxelHydrologyComponentBuild& InBuild, const FVoxelHydrologyNetworkRunoff& InRunoff)
+	{
+		if (!InBuild.ExteriorRunoff.IsSet()) return false;
+		const auto& Snapshot = InBuild.ExteriorRunoff.GetValue();
+		const auto* Cell = InRunoff.Find(Snapshot.Cell);
+		return Cell && Snapshot.Coordinate == InRunoff.Coordinate && Snapshot.Generation == InRunoff.Generation &&
+			Snapshot.Fingerprint == InRunoff.Fingerprint && Snapshot.Control.Control == Cell->Control &&
+			Snapshot.Control.Accumulation == Cell->Accumulation && Snapshot.Control.IncomingRainWeight == Cell->IncomingRainWeight &&
+			Snapshot.Control.MaxChildRainWeight == Cell->MaxChildRainWeight;
+	}
+};
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHydrologyGraphCacheNetworkTest,
 	"WHFramework.Voxel.Hydrology.GraphCache.PublicationAndNetwork",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -1007,6 +1052,188 @@ bool FVoxelHydrologySharedRegionalComponentCancellationTest::RunTest(const FStri
 	const double Deadline = FPlatformTime::Seconds() + 2.0;
 	while (Resources->Snapshot().LeaseCount && FPlatformTime::Seconds() < Deadline) FPlatformProcess::Sleep(0.001f);
 	TestEqual(TEXT("取消及重置不会遗留组件或输入租约"), Resources->Snapshot().LeaseCount, 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelHydrologyExteriorSnapshotLifecycleTest,
+	"WHFramework.Voxel.Hydrology.GraphCache.ExteriorSnapshotLifecycle",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelHydrologyExteriorSnapshotLifecycleTest::RunTest(const FString& Parameters)
+{
+	using namespace VoxelHydrologyGraphCacheTests;
+	(void)Parameters;
+	FString Error;
+	const auto Consumer = FVoxelGenerationConsumerKey::Section(423, FGuid::NewGuid(), 1, {}, 1);
+	FVoxelGenerationConsumerScope Identity(Consumer);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+	TSharedPtr<const FVoxelGenerationRuntimeConfig, ESPMode::ThreadSafe> Config;
+	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
+	if (!Setup(Consumer, Resources, Config, Cache, Error, true)) { AddError(Error); return false; }
+	FVoxelGenerationCacheRetention Retention;
+	Retention.Revision = 1;
+	Cache->UpdateRetention(Retention);
+	TMap<FVoxelHydrologyRegionKey, TSharedPtr<FVoxelHydrologyPlan, ESPMode::ThreadSafe>> Topology;
+	const auto Lookup = [&](const FVoxelHydrologyRegionKey& Key) -> const FVoxelHydrologyPlan*
+	{
+		if (const auto* Existing = Topology.Find(Key)) return Existing->Get();
+		const int64 MinimumX = int64(Key.Coordinate.X) * Side;
+		const int64 MinimumY = int64(Key.Coordinate.Y) * Side;
+		if (MinimumX < MIN_int32 || MinimumY < MIN_int32 ||
+			MinimumX + Side - 1 > MAX_int32 || MinimumY + Side - 1 > MAX_int32) return nullptr;
+		const auto Plan = MakeShared<FVoxelHydrologyPlan, ESPMode::ThreadSafe>();
+		auto& Grid = Plan->Grid;
+		Grid.WorldMinCell = FIntPoint(int32(MinimumX), int32(MinimumY));
+		Grid.Width = Side;
+		Grid.Height = Side;
+		Grid.CellSize = 32;
+		Grid.GroundPlane.SetNum(Side * Side);
+		Grid.RainWeight.Init(3, Side * Side);
+		for (int32 Index = 0; Index < Side * Side; ++Index)
+		{
+			const FIntPoint Cell = Grid.ToWorldHydrologyCell(Index);
+			const bool bWet = Cell.X <= -2 * Side || Cell.Y <= -2 * Side ||
+				Cell.X >= 2 * Side - 1 || Cell.Y >= 2 * Side - 1;
+			Grid.GroundPlane[Index] = bWet ? -4 : 8 + 4 * (2 * Side - 1 - Cell.X) + 32 * FMath::Abs(Cell.Y);
+			if (bWet) Grid.OceanOutlets.Add(Index, 0);
+		}
+		Topology.Add(Key, Plan);
+		return &Plan.Get();
+	};
+	const auto Request = [](const FVoxelHydrologyRegionKey& Key, FString& OutError)
+	{
+		OutError = FString::Printf(TEXT("Yielded: fixture requires unavailable topology (%d,%d)"), Key.Coordinate.X, Key.Coordinate.Y);
+		return false;
+	};
+	struct FBuilder
+	{
+		TSharedPtr<FVoxelHydrologyComponentBuild, ESPMode::ThreadSafe> Body;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Working;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Resident;
+	};
+	const uint64 RootBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelHydrologyComponentBuild>();
+	FIntPoint Seed(-Side + 1, -Side + 1);
+	const auto Create = [&](FBuilder& Out)
+	{
+		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Working, RootBytes, Out.Working) ||
+			!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Resident, RootBytes, Out.Resident)) return false;
+		Out.Body = MakeShared<FVoxelHydrologyComponentBuild, ESPMode::ThreadSafe>(Config.ToSharedRef(), *Cache, Seed);
+		return true;
+	};
+	const auto Advance = [&](FBuilder& InBuilder, const TAtomic<bool>* Cancel = nullptr)
+	{
+		FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), InBuilder.Body.Get(),
+			[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+			{
+				static_cast<const FVoxelHydrologyComponentBuild*>(Context)->VisitSources(Visit);
+			});
+		FVoxelGenerationAllocationScope Allocation(Resources, Consumer, InBuilder.Working, InBuilder.Resident,
+			RootBytes, InBuilder.Body->GetAllocatedBytes());
+		if (!Allocation.Check(Error)) return EVoxelHydrologyComponentStep::Failed;
+		const auto Step = InBuilder.Body->Advance(Lookup, 256, Error, Cancel);
+		if (Step != EVoxelHydrologyComponentStep::CapacityBlocked &&
+			!Allocation.ValidateRetainedBytes(InBuilder.Body->GetAllocatedBytes(), Error)) return EVoxelHydrologyComponentStep::Failed;
+		return Step;
+	};
+	const auto AwaitSnapshot = [&](FBuilder& InBuilder)
+	{
+		FVoxelHydrologyExteriorTestAccess::Pause(*InBuilder.Body);
+		for (int32 Attempt = 0; Attempt < 300000; ++Attempt)
+		{
+			const auto Step = Advance(InBuilder);
+			if (FVoxelHydrologyExteriorTestAccess::HasSnapshot(*InBuilder.Body))
+				return Step == EVoxelHydrologyComponentStep::Yielded;
+			if (Step != EVoxelHydrologyComponentStep::Yielded) return false;
+		}
+		return false;
+	};
+	const auto Finish = [&](FBuilder& InBuilder)
+	{
+		for (int32 Attempt = 0; Attempt < 300000; ++Attempt)
+		{
+			const auto Step = Advance(InBuilder);
+			if (Step == EVoxelHydrologyComponentStep::Ready) return true;
+			if (Step != EVoxelHydrologyComponentStep::Yielded) return false;
+		}
+		return false;
+	};
+	FBuilder Tested;
+	bool bFoundExterior = false;
+	for (const FIntPoint Candidate : {FIntPoint(-Side + 1, -Side + 1), FIntPoint(-Side + 1, 1),
+		FIntPoint(1, -Side + 1), FIntPoint(1, 1)})
+	{
+		Seed = Candidate;
+		if (!Create(Tested)) return false;
+		if (AwaitSnapshot(Tested))
+		{
+			bFoundExterior = true;
+			break;
+		}
+		if (!Error.IsEmpty()) { AddError(Error); return false; }
+		Tested = {};
+	}
+	if (!TestTrue(TEXT("真实跨区出口已读取汇水并在渠道前暂停"), bFoundExterior)) return false;
+	const FIntPoint Cell = FVoxelHydrologyExteriorTestAccess::Cell(*Tested.Body);
+	const FIntPoint Coordinate = FVoxelHydrologyExteriorTestAccess::Coordinate(*Tested.Body);
+	const uint64 Fingerprint = FVoxelHydrologyExteriorTestAccess::Fingerprint(*Tested.Body);
+	TSharedPtr<const FVoxelHydrologyNetworkRunoff, ESPMode::ThreadSafe> Runoff;
+	if (!TestTrue(TEXT("暂停快照对应正式缓存发布的外区汇水"),
+		Cache->AdvanceHydrologyRunoff({Coordinate}, Config.ToSharedRef(), Lookup, Request, Runoff, Error) &&
+		Runoff.IsValid() && FVoxelHydrologyExteriorTestAccess::Matches(*Tested.Body, *Runoff))) return false;
+	TWeakPtr<const FVoxelHydrologyNetworkRunoff, ESPMode::ThreadSafe> Retired = Runoff;
+	Runoff.Reset();
+	const auto State = Resources->Snapshot();
+	const uint64 Limit = State.Limits.ResidentBytes - State.Limits.OverlapBytes;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Pressure;
+	if (!TestTrue(TEXT("在原驻留预算中施加真实压力"), State.Used[int32(EVoxelTerrainResourcePool::Resident)] + 1 < Limit &&
+		Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Resident,
+			Limit - State.Used[int32(EVoxelTerrainResourcePool::Resident)] - 1, Pressure))) return false;
+	Maintain(*Cache);
+	if (!TestTrue(TEXT("无外部读者的原汇水正文在压力下真实退休"), !Retired.IsValid())) return false;
+	if (!TestTrue(TEXT("退休不改变当前出口和冻结指纹"), FVoxelHydrologyExteriorTestAccess::HasSnapshot(*Tested.Body) &&
+		FVoxelHydrologyExteriorTestAccess::Cell(*Tested.Body) == Cell &&
+		FVoxelHydrologyExteriorTestAccess::Fingerprint(*Tested.Body) == Fingerprint)) return false;
+	Pressure.Reset();
+	if (!TestTrue(TEXT("实际缓存退休后继续完整生成"), Finish(Tested))) { AddError(Error); return false; }
+	FBuilder Reference;
+	if (!Create(Reference) || !TestTrue(TEXT("参考组件完整生成"), Finish(Reference))) { AddError(Error); return false; }
+	TestTrue(TEXT("跨片快照与参考组件的水位、河床、曲线和完整指纹一致"),
+		Tested.Body->GetResult().HasEquivalentOutput(Reference.Body->GetResult()));
+
+	FBuilder Conflict;
+	if (!Create(Conflict) || !TestTrue(TEXT("身份冲突注入前进入真实出口读取"), AwaitSnapshot(Conflict))) { AddError(Error); return false; }
+	FVoxelHydrologyExteriorTestAccess::CorruptFingerprint(*Conflict.Body);
+	bool bConflict = false;
+	for (int32 Attempt = 0; Attempt < 300000; ++Attempt)
+	{
+		const auto Step = Advance(Conflict);
+		if (Step == EVoxelHydrologyComponentStep::Failed)
+		{
+			bConflict = Error == TEXT("HydrologyComponentConflict: exterior channel and runoff identities differ");
+			break;
+		}
+		if (Step != EVoxelHydrologyComponentStep::Yielded) break;
+	}
+	TestTrue(TEXT("注入的渠道与汇水身份冲突拒绝发布"), bConflict);
+	FBuilder Canceled;
+	if (!Create(Canceled) || !TestTrue(TEXT("取消前真实进入出口等待"), AwaitSnapshot(Canceled))) { AddError(Error); return false; }
+	TAtomic<bool> Cancel{true};
+	TestTrue(TEXT("等待中的原消费者取消不发布正文"), Advance(Canceled, &Cancel) == EVoxelHydrologyComponentStep::Canceled);
+	FBuilder Reset;
+	if (!Create(Reset) || !TestTrue(TEXT("换代前真实进入出口等待"), AwaitSnapshot(Reset))) { AddError(Error); return false; }
+	Cache->Reset();
+	TestTrue(TEXT("换代后的出口快照不能继续发布"), Advance(Reset) == EVoxelHydrologyComponentStep::Canceled);
+	Tested = {};
+	Reference = {};
+	Conflict = {};
+	Canceled = {};
+	Reset = {};
+	Retired.Reset();
+	Cache.Reset();
+	Config.Reset();
+	const double Deadline = FPlatformTime::Seconds() + 2.0;
+	while (Resources->Snapshot().LeaseCount && FPlatformTime::Seconds() < Deadline) FPlatformProcess::Sleep(0.001f);
+	TestEqual(TEXT("所有原始工作、驻留和依赖租约均归还"), Resources->Snapshot().LeaseCount, 0);
 	return true;
 }
 

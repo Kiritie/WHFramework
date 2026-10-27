@@ -1847,6 +1847,20 @@ FVoxelTerrainReadinessSnapshot UVoxelModule::CaptureTerrainReadiness() const
 	return ViewManager ? ViewManager->CaptureTerrainReadiness() : FVoxelTerrainReadinessSnapshot{};
 }
 
+FVoxelProxyPublicationState UVoxelModule::CaptureProxyPublicationState(const FVoxelViewKey& InKey, const uint64 InExpectedEpoch) const
+{
+	if (!IsInGameThread())
+	{
+		FVoxelProxyPublicationState State;
+		State.Error = TEXT("Proxy probe must be queried on the game thread");
+		return State;
+	}
+	if (ViewManager) return ViewManager->CaptureProxyPublicationState(InKey, InExpectedEpoch);
+	FVoxelProxyPublicationState State;
+	State.Error = TEXT("Proxy view manager is unavailable");
+	return State;
+}
+
 TMap<FName, FVoxelPlanDiagnostics> UVoxelModule::GetPlanDiagnostics() const
 {
 	TMap<FName, FVoxelPlanDiagnostics> Result;

@@ -143,6 +143,87 @@ bool FVoxelCoverageChangedRangeTest::RunTest(const FString& InParameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCoverageEmptyRootGenerationTest,
+	"WHFramework.Voxel.FineRefactor.Coverage.EmptyRootGeneration",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelCoverageEmptyRootGenerationTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	FString Error;
+	const auto Local = VoxelCoveragePersistentTest::Record(FIntVector(-1, 0, -1), 1);
+	FVoxelCoverageIndex Index;
+	const FVoxelCoverageIndex Empty = Index;
+	FVoxelCoverageLocalSnapshot LocalGuard;
+	Index.Capture(Local.Min, Local.Max, LocalGuard, false);
+	if (!TestTrue(TEXT("空索引局部守卫有效"), Index.IsCurrent(LocalGuard))) return false;
+	FVoxelCoverageLocalSnapshot DeferredGuard;
+	auto Deferred = Index.CaptureSteps(Local.Min, Local.Max, DeferredGuard, false);
+	FVoxelCoverageLocalSnapshot FullGuard;
+	auto Full = Index.CaptureAllSteps(FullGuard, false);
+	for (int32 Step = 0; Step < 8192 && !Full.IsComplete(); ++Step) Full.Resume();
+	if (!TestTrue(TEXT("空索引全范围守卫完成"), Full.IsComplete() && Index.IsCurrent(FullGuard))) return false;
+	if (!TestTrue(TEXT("空索引插入本地记录"), Index.Upsert(Local, Error))) return false;
+	TestFalse(TEXT("插入立即撤销旧空局部守卫"), Index.IsCurrent(LocalGuard));
+	if (!TestTrue(TEXT("最后记录的路径确实独占"), Index.CanRemoveWithoutAllocation(Local.Geometry.Key))) return false;
+	if (!TestTrue(TEXT("独占路径删除最后记录"), Index.Remove(Local.Geometry.Key))) return false;
+	TestEqual(TEXT("删除后真实索引无记录"), Index.NumRecords(), 0);
+	TestEqual(TEXT("删除后节点和原根均可退休"), Index.NumIndexNodes(), 0);
+	TestFalse(TEXT("删空根不能复活旧空局部守卫"), Index.IsCurrent(LocalGuard));
+	TestFalse(TEXT("删空根不能复活旧全范围守卫"), Index.IsCurrent(FullGuard));
+	TestFalse(TEXT("删空根不能复活旧冻结范围"), Index.IsRangeCurrent(Empty, Local.Min, Local.Max));
+	for (int32 Step = 0; Step < 8192 && !Deferred.IsComplete(); ++Step) Deferred.Resume();
+	if (!TestTrue(TEXT("延迟执行的空根捕获完整结束"), Deferred.IsComplete())) return false;
+	TestTrue(TEXT("延迟捕获仍属于原空冻结根"), Empty.IsCurrent(DeferredGuard));
+	TestFalse(TEXT("延迟捕获的旧空守卫不能通过新根"), Index.IsCurrent(DeferredGuard));
+	FVoxelCoverageLocalSnapshot Fresh;
+	Index.Capture(Local.Min, Local.Max, Fresh, false);
+	TestTrue(TEXT("删空后的新空守卫有效"), Index.IsCurrent(Fresh));
+
+	FVoxelCoverageIndex Cow;
+	FVoxelCoverageLocalSnapshot CowEmptyGuard;
+	Cow.Capture(Local.Min, Local.Max, CowEmptyGuard, false);
+	if (!Cow.Upsert(Local, Error)) return false;
+	const FVoxelCoverageIndex RetainedRoot = Cow;
+	TestFalse(TEXT("冻结根时不能原地删除"), Cow.CanRemoveWithoutAllocation(Local.Geometry.Key));
+	if (!Cow.Remove(Local.Geometry.Key)) return false;
+	TestFalse(TEXT("COW 删空仍拒绝旧空守卫"), Cow.IsCurrent(CowEmptyGuard));
+	TestTrue(TEXT("COW 删空保留旧冻结根正文"), RetainedRoot.Find(Local.Geometry.Key).IsValid());
+
+	FVoxelCoverageIndex Base;
+	FVoxelCoverageIndex Left = Base;
+	FVoxelCoverageIndex Right = Base;
+	Left.Reset();
+	Right.Reset();
+	FVoxelCoverageLocalSnapshot LeftGuard;
+	Left.Capture(Local.Min, Local.Max, LeftGuard, false);
+	TestTrue(TEXT("重置分支接受自己的守卫"), Left.IsCurrent(LeftGuard));
+	TestFalse(TEXT("独立重置的复制分支不能共用空守卫"), Right.IsCurrent(LeftGuard));
+	TestFalse(TEXT("独立重置的复制分支不能共用冻结范围"), Right.IsRangeCurrent(Left, Local.Min, Local.Max));
+
+	FVoxelCoverageIndex LeftDrop = Base;
+	FVoxelCoverageIndex RightDrop = Base;
+	if (!LeftDrop.Upsert(Local, Error) || !RightDrop.Upsert(Local, Error)) return false;
+	if (!TestTrue(TEXT("两个复制分支的删除路径均独占"),
+		LeftDrop.CanRemoveWithoutAllocation(Local.Geometry.Key) && RightDrop.CanRemoveWithoutAllocation(Local.Geometry.Key))) return false;
+	if (!LeftDrop.Remove(Local.Geometry.Key) || !RightDrop.Remove(Local.Geometry.Key)) return false;
+	FVoxelCoverageLocalSnapshot LeftDropGuard;
+	LeftDrop.Capture(Local.Min, Local.Max, LeftDropGuard, false);
+	TestFalse(TEXT("独立删空的复制分支不能共用空守卫"), RightDrop.IsCurrent(LeftDropGuard));
+	TestFalse(TEXT("独立删空的复制分支不能共用冻结范围"), RightDrop.IsRangeCurrent(LeftDrop, Local.Min, Local.Max));
+
+	FVoxelCoverageIndex Scoped;
+	const auto Far = VoxelCoveragePersistentTest::Record(FIntVector(-1024, 0, -1), 1);
+	if (!Scoped.Upsert(Local, Error)) return false;
+	FVoxelCoverageLocalSnapshot ScopedGuard;
+	Scoped.Capture(Local.Min, Local.Max, ScopedGuard, false);
+	if (!Scoped.Upsert(Far, Error)) return false;
+	TestTrue(TEXT("普通远处插入不撤销本地守卫"), Scoped.IsCurrent(ScopedGuard));
+	if (!Scoped.Remove(Far.Geometry.Key)) return false;
+	TestTrue(TEXT("仍有本地记录时远处删除不撤销本地守卫"), Scoped.IsCurrent(ScopedGuard));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelCoverageIdentityIsolationTest,
 	"WHFramework.Voxel.FineRefactor.Coverage.IdentityIsolation",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

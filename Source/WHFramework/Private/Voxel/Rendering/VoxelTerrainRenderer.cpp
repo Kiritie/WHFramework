@@ -1850,35 +1850,41 @@ namespace
 				const FVoxelTerrainRenderChunk* PendingChunk = nullptr;
 				int32 PendingFirstTriangle = 0;
 				int32 PendingTriangleCount = 0;
-				FMeshBatch* PendingMesh = nullptr;
-				const FVoxelTerrainRenderChunk* PendingMeshChunk = nullptr;
-				const auto FlushMesh = [&]()
+				TMap<const FVoxelTerrainRenderChunk*, FMeshBatch*> PendingMeshes;
+				TArray<FMeshBatch*> OrderedMeshes;
+				const auto FlushMeshes = [&]()
 				{
-					if (!PendingMesh) return;
-					InCollector.AddMesh(ViewIndex, *PendingMesh);
-					++SubmittedBatches;
-					PendingMesh = nullptr;
-					PendingMeshChunk = nullptr;
+					for (FMeshBatch* Mesh : OrderedMeshes)
+					{
+						InCollector.AddMesh(ViewIndex, *Mesh);
+						++SubmittedBatches;
+					}
+					OrderedMeshes.Reset();
+					PendingMeshes.Reset();
 				};
 				const auto Submit = [&](const FVoxelTerrainRenderChunk* Chunk,
 					const int32 FirstTriangle, const int32 TriangleCount)
 				{
 					TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainSubmitDraw);
-					if (PendingMesh && (PendingMeshChunk != Chunk || PendingMesh->Elements.Num() == 32)) FlushMesh();
-					if (PendingMesh)
+					const bool bCanGroup = (Chunk->Relevance.bOpaque || Chunk->Relevance.bMasked) &&
+						!Chunk->Relevance.bNormalTranslucency && !Chunk->Relevance.bSeparateTranslucency &&
+						!Chunk->Relevance.bPostMotionBlurTranslucency;
+					if (!bCanGroup) FlushMeshes();
+					FMeshBatch** Existing = bCanGroup ? PendingMeshes.Find(Chunk) : nullptr;
+					if (Existing && (*Existing)->Elements.Num() < 32)
 					{
-						FMeshBatchElement Element = PendingMesh->Elements[0];
+						FMeshBatchElement Element = (*Existing)->Elements[0];
 						Element.FirstIndex = FirstTriangle * 3;
 						Element.NumPrimitives = TriangleCount;
-						PendingMesh->Elements.Add(Element);
+						(*Existing)->Elements.Add(Element);
 						GPUSceneDraws += bGPUSceneContents && Chunk->bGPUSceneStreams && FeatureLevel == Chunk->FeatureLevel ? 1 : 0;
 						++SubmittedDraws;
 						DrawnTriangles += TriangleCount;
 						return;
 					}
 					FMeshBatch& Mesh = InCollector.AllocateMesh();
-					PendingMesh = &Mesh;
-					PendingMeshChunk = Chunk;
+					OrderedMeshes.Add(&Mesh);
+					if (bCanGroup) PendingMeshes.Add(Chunk, &Mesh);
 					FMeshBatchElement& Element = Mesh.Elements[0];
 					Mesh.VertexFactory = &Chunk->VertexFactory;
 					Mesh.MaterialRenderProxy = Chunk->Material;
@@ -1922,9 +1928,7 @@ namespace
 					DrawnTriangles += TriangleCount;
 					DrawnBounds += Chunk->WorldBounds;
 					if (!FirstDrawnChunk) FirstDrawnChunk = Chunk;
-					if (!(Chunk->Relevance.bOpaque || Chunk->Relevance.bMasked) ||
-						Chunk->Relevance.bNormalTranslucency || Chunk->Relevance.bSeparateTranslucency ||
-						Chunk->Relevance.bPostMotionBlurTranslucency) FlushMesh();
+					if (!bCanGroup) FlushMeshes();
 				};
 				const auto Draw = [&](const FVoxelTerrainRenderChunk* Chunk,
 					const int32 FirstTriangle, const int32 TriangleCount)
@@ -2017,7 +2021,7 @@ namespace
 				};
 				CoarseVisit(CoarseVisit, Snapshot->CoarseRoot);
 				if (PendingChunk) Submit(PendingChunk, PendingFirstTriangle, PendingTriangleCount);
-				FlushMesh();
+				FlushMeshes();
 #if !UE_BUILD_SHIPPING
 				const double Now = FPlatformTime::Seconds();
 				if (Now - LastDrawDiagnosticSeconds >= 5.0)

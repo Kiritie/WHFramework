@@ -224,7 +224,7 @@ private:
 		int32 Next = INDEX_NONE;
 	};
 
-	bool Allocate(FString& OutError);
+	bool AllocateReadCapacity(int32 InCapacity, FString& OutError);
 	FIntPoint Position(int32 InIndex) const;
 	uint8 BoundaryFaces(int32 InIndex) const;
 	bool IsTerminal(int32 InIndex) const;
@@ -245,6 +245,7 @@ private:
 	TArray<int32> Leaves;
 	EStage Stage = EStage::None;
 	int32 CellCount = 0;
+	int32 ReadCapacity = 0;
 	int32 Cursor = 0;
 	int32 NodeCount = 0;
 	int32 SummaryHalfEdges = 0;
