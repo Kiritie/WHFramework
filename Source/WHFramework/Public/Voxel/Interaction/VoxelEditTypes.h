@@ -36,13 +36,14 @@ struct WHFRAMEWORK_API FVoxelEditIntent
     FVector Origin = FVector::ZeroVector;
     FVector Direction = FVector::ForwardVector;
     FIntVector ExpectedTarget = FIntVector::ZeroValue;
+    FIntVector ExpectedPlacementAnchor = FIntVector::ZeroValue;
     FPrimaryAssetId ExpectedItemID;
     FGuid ExpectedInventoryId;
     FInventorySlotKey InventorySlot;
     uint64 ExpectedInventoryRevision = 0;
     uint32 ExpectedInventoryGeneration = 1;
     uint64 ExpectedRevision = 0;
-	uint8 PlacementQuarterTurns = 0;
+	uint8 PlacementYaw = 0;
 };
 
 struct WHFRAMEWORK_API FVoxelEditReply
@@ -54,6 +55,7 @@ struct WHFRAMEWORK_API FVoxelEditReply
 
 struct WHFRAMEWORK_API FVoxelInteractionPlan
 {
+    bool bNeedsData = false;
     EVoxelEditAction Action = EVoxelEditAction::None;
     uint64 RequestId = 0;
     FGuid EventId;

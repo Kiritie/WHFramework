@@ -1,5 +1,6 @@
 #include "Voxel/VoxelModule.h"
 #include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryItemRegistry.h"
 #include "Voxel/Interaction/VoxelInventoryDomainBridge.h"
 #include "Voxel/Save/InventoryVoxelEntityCodec.h"
 #include "Misc/SecureHash.h"
@@ -40,6 +41,7 @@
 #include "Voxel/Geometry/VoxelShapeRegistry.h"
 #include "Voxel/Agent/VoxelAgentComponent.h"
 #include "Voxel/Interaction/VoxelEditTransaction.h"
+#include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Network/VoxelModuleNetworkComponent.h"
 #include "Voxel/Network/VoxelOverlayReplica.h"
 #include "Voxel/Map/VoxelMapTileCache.h"
@@ -3168,7 +3170,7 @@ bool UVoxelModule::PlacementOverlapsActors(const FVoxelInteractionPlan& InPlan) 
 		{
 			continue;
 		}
-		const FVoxelResolvedShape& Shape = Shapes->Get(Definition->Shape, Edit.Value.State);
+		const FVoxelResolvedShape& Shape = Definition->GetShape(*Shapes, Edit.Value.State);
 		for (const FBox& Box : Shape.CollisionBoxes)
 		{
 			const FVector Center = (FVector(Edit.Position) + Box.GetCenter()) * BlockSize();
@@ -3324,19 +3326,23 @@ FVoxelEditReply UVoxelModule::ExecuteIntent(
         PlaceType = Definition->TypeId;
     }
     FVoxelInteractionPlan Plan;
-	if (InIntent.PlacementQuarterTurns > 3)
+	if (InIntent.PlacementYaw > 3)
 	{
 		Reply.Reason = TEXT("Voxel.InvalidPlacementRotation");
 		return Reply;
 	}
-	const FVector PlacementDirection = InIntent.Action == EVoxelEditAction::Place ?
-		InIntent.Direction.RotateAngleAxis(InIntent.PlacementQuarterTurns * 90.0, FVector::UpVector) : InIntent.Direction;
-    if(!BuildInteractionPlan(Hit, InIntent.Action, PlaceType, PlacementDirection, InSource, Plan, Reply.Reason) ||
+    if(!BuildInteractionPlan(Hit, InIntent.Action, PlaceType, InIntent.PlacementYaw, InSource, Plan, Reply.Reason) ||
         !ValidateInteractionPlan(Plan, Reply.Reason))
     {
         return Reply;
     }
     Plan.Action = InIntent.Action;
+    if (InIntent.Action == EVoxelEditAction::Place && Plan.ObjectAnchor != InIntent.ExpectedPlacementAnchor)
+    {
+        Reply.Code = EVoxelEditCode::Stale;
+        Reply.Reason = TEXT("Voxel.PlacementAnchorChanged");
+        return Reply;
+    }
     Plan.RequestId = InIntent.RequestId;
     const FString EventText = FString::Printf(TEXT("Voxel/%s/%s/%s/%llu/%d"),
         *System->GetWorldEpoch().ToString(EGuidFormats::Digits), *System->GetStoreId().ToString(EGuidFormats::Digits), *Snapshot.OwnerId.ToString(EGuidFormats::Digits),
@@ -3376,9 +3382,46 @@ FVoxelEditReply UVoxelModule::ExecuteIntent(
 }
 
 
-bool UVoxelModule::BuildInteractionPlan(const FVoxelTraceResult& InHit, EVoxelEditAction InAction, uint16 InPlaceType, const FVector& InViewDirection, AActor* InSource, FVoxelInteractionPlan& OutPlan, FString& OutError)
+EVoxelEditCode UVoxelModule::PreviewPlacement(const FVoxelEditIntent& InIntent, AActor* InSource, FVoxelInteractionPlan& OutPlan, FString& OutError)
 {
-	return FVoxelEditTransaction::Build(*Runtime, *Registry.GetSnapshot(), *Shapes, InHit, InAction, InPlaceType, InViewDirection, BlockSize(), OutPlan, OutError);
+	OutPlan = {};
+	if (!IsReady() || !InSource || InSource->GetWorld() != GetWorld() || InIntent.Action != EVoxelEditAction::Place || InIntent.PlacementYaw > 3)
+	{
+		return EVoxelEditCode::Rejected;
+	}
+	const UInventoryWorldSubsystem* System = GetWorld()->GetSubsystem<UInventoryWorldSubsystem>();
+	const FInventoryItemDefinition* Item = System ? System->GetRegistry().Find(InIntent.ExpectedItemID) : nullptr;
+	const FVoxelRuntimeDefinition* Definition = Item ? Registry.GetSnapshot()->Find(Item->PlaceableVoxelId) : nullptr;
+	if (!Definition)
+	{
+		OutError = TEXT("Inventory.ItemNotPlaceable");
+		return EVoxelEditCode::Rejected;
+	}
+	const FVoxelTraceResult Hit = Trace(InIntent.Origin, InIntent.Direction);
+	if (Hit.Status == EVoxelTraceStatus::NeedsData) return EVoxelEditCode::NeedsData;
+	if (Hit.Status != EVoxelTraceStatus::Hit || Hit.Index != InIntent.ExpectedTarget) return EVoxelEditCode::Stale;
+	if (!BuildInteractionPlan(Hit, EVoxelEditAction::Place, Definition->TypeId, InIntent.PlacementYaw, InSource, OutPlan, OutError))
+	{
+		return OutPlan.bNeedsData ? EVoxelEditCode::NeedsData : EVoxelEditCode::Rejected;
+	}
+	for (const FVoxelCellEdit& Cell : OutPlan.Cells)
+	{
+		for (uint8 Face = 0; Face < 6; ++Face)
+		{
+			FVoxelBlockState Neighbor;
+			if (!Runtime->TryGetBlock(Cell.Position + VoxelCoord::Direction(Face), Neighbor)) return EVoxelEditCode::NeedsData;
+		}
+	}
+	if (OutPlan.ObjectAnchor != InIntent.ExpectedPlacementAnchor || !ValidateInteractionPlan(OutPlan, OutError) || PlacementOverlapsActors(OutPlan))
+	{
+		return EVoxelEditCode::Rejected;
+	}
+	return EVoxelEditCode::Accepted;
+}
+
+bool UVoxelModule::BuildInteractionPlan(const FVoxelTraceResult& InHit, EVoxelEditAction InAction, uint16 InPlaceType, uint8 InPlacementYaw, AActor* InSource, FVoxelInteractionPlan& OutPlan, FString& OutError)
+{
+	return FVoxelEditTransaction::Build(*Runtime, *Registry.GetSnapshot(), *Shapes, InHit, InAction, InPlaceType, InPlacementYaw, BlockSize(), OutPlan, OutError);
 }
 
 void UVoxelModule::OnInteractionCommitted(const FVoxelInteractionPlan& InPlan, AActor* InSource)

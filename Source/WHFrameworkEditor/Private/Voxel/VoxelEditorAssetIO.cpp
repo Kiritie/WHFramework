@@ -25,7 +25,8 @@ bool FVoxelEditorAssetIO::Save(UObject* Asset,FString& Error)
 {
     if(!Asset){Error=TEXT("Cannot save a null asset");return false;}
     UPackage* Package=Asset->GetOutermost();
-    const FString File=FPackageName::LongPackageNameToFilename(Package->GetName(),FPackageName::GetAssetPackageExtension());
+    const FString Extension = Package->ContainsMap() ? FPackageName::GetMapPackageExtension() : FPackageName::GetAssetPackageExtension();
+    const FString File=FPackageName::LongPackageNameToFilename(Package->GetName(),Extension);
     if(!IFileManager::Get().MakeDirectory(*FPaths::GetPath(File),true))
     {Error=TEXT("Cannot create asset output directory: ")+File;return false;}
     FSavePackageArgs Args;Args.TopLevelFlags=RF_Public|RF_Standalone;Args.SaveFlags=SAVE_NoError;

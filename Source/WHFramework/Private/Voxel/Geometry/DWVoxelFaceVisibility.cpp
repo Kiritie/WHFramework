@@ -54,6 +54,6 @@ bool VoxelFaceVisibility::ShouldRender(
 		(Current->RenderGroup == EVoxelRenderGroup::Water ||
 			Current->RenderGroup == EVoxelRenderGroup::Translucent);
 	if (!Neighbor->bOccludes && !bSameTransparent) return true;
-	const FVoxelResolvedShape* Shape = InShapes.Find(Neighbor->Shape, InNeighbor.State);
+	const FVoxelResolvedShape* Shape = Neighbor->FindShape(InShapes, InNeighbor.State);
 	return !Shape || !CoversQuad(*Shape, InFace ^ 1, InQuad);
 }

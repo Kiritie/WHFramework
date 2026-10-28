@@ -3,27 +3,27 @@
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
 #include "Voxel/Chunks/VoxelSectionKey.h"
 bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime&W,const FVoxelRegistrySnapshot&R,const FVoxelShapeRegistry&Shapes,
-    const FVoxelTraceResult&H,EVoxelEditAction Action,uint16 PlaceType,const FVector&View,double Size,FVoxelInteractionPlan&O,FString&Error)
+    const FVoxelTraceResult&H,EVoxelEditAction Action,uint16 PlaceType,uint8 PlacementYaw,double Size,FVoxelInteractionPlan&O,FString&Error)
 {
-    if(!W.IsServer()||H.Status!=EVoxelTraceStatus::Hit||H.bStartedInside||!R.IsValid(H.State)||Size<=0)
+    if((!W.IsServer()&&Action!=EVoxelEditAction::Place)||H.Status!=EVoxelTraceStatus::Hit||H.bStartedInside||!R.IsValid(H.State)||Size<=0||PlacementYaw>3)
     {Error=TEXT("Invalid interaction target");return false;}
     FVoxelInteractionPlan P;P.Action=Action;P.ObjectAnchor=H.Index;TMap<FIntVector,int32>Map;
     auto Read=[&](const FIntVector&Pos,FVoxelBlockState&State)->bool
-    {if(const int32*I=Map.Find(Pos)){State=P.Cells[*I].Value;return true;}return W.TryGetBlock(Pos,State);};
+    {if(const int32*I=Map.Find(Pos)){State=P.Cells[*I].Value;return true;}const bool Ready=W.TryGetBlock(Pos,State);O.bNeedsData|=!Ready;return Ready;};
     auto Write=[&](const FIntVector&Pos,FVoxelBlockState State)->bool
     {
         if(!R.IsValid(State))return false;
         if(int32*I=Map.Find(Pos)){P.Cells[*I].Value=State;return true;}
-        FVoxelBlockState Old;if(!W.TryGetBlock(Pos,Old))return false;
+        FVoxelBlockState Old;if(!W.TryGetBlock(Pos,Old)){O.bNeedsData=true;return false;}
         FVoxelCellEdit E;E.Position=Pos;E.Expected=Old;E.Value=State;Map.Add(Pos,P.Cells.Add(E));return true;
     };
     auto Supports=[&](const FIntVector&Pos,uint8 Face)->bool
     {FVoxelBlockState B;if(!Read(Pos,B)||B.IsAir())return false;const auto*D=R.Find(B.TypeId);
-        return D&&D->bSolid&&(Shapes.Get(D->Shape,B.State).OcclusionMask&(1u<<Face));};
+        return D&&D->bSolid&&(D->GetShape(Shapes, B.State).OcclusionMask&(1u<<Face));};
     auto Replaceable=[&](const FIntVector&Pos)->bool
     {FVoxelBlockState B;if(!Read(Pos,B))return false;const auto*D=R.Find(B.TypeId);return D&&(B.IsAir()||D->bReplaceable);};
     const auto*HitDef=R.Find(H.State.TypeId);FIntVector Target=H.Index;
-    uint8 Yaw=uint8((FMath::RoundToInt(FMath::Atan2(View.Y,View.X)/(PI*.5))+4)&3);
+    const uint8 Yaw=PlacementYaw;
     if(Action==EVoxelEditAction::BreakPulse)
     {
         if(!HitDef->bBreakable){Error=TEXT("Block is not breakable");return false;}
@@ -100,7 +100,7 @@ bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime&W,const FVoxelRegistr
             if(D->Shape==EVoxelShapeKind::CrossPlant&&!Supports(Target-FIntVector(0,0,1),4))
             {Error=TEXT("Plant needs a solid supporting block");return false;}
         }
-        if(!Write(Target,State))return false;P.Cost=1;
+        if(!Write(Target,State))return false;P.Cost=1;P.ObjectAnchor=Target;
     }
     else{Error=TEXT("Action is not a block mutation");return false;}
     // 有支撑依赖的方块不自动吞掉掉落：移除其支撑时，要求玩家先拆除依附块。
@@ -133,7 +133,7 @@ bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime&W,const FVoxelRegistr
         if(B.IsAir()||R.Find(B.TypeId)->Shape!=EVoxelShapeKind::Pane)continue;uint8 Mask=0;
         for(uint8 F=0;F<4;++F){FVoxelBlockState N;if(!Read(Q+VoxelCoord::Direction(F),N))return false;
             const auto*D=R.Find(N.TypeId);if(D&&!N.IsAir()&&(D->Shape==EVoxelShapeKind::Pane||
-                (D->bSolid&&(Shapes.Get(D->Shape,N.State).OcclusionMask&(1u<<(F^1))))))Mask|=uint8(1u<<F);}
+                (D->bSolid&&(D->GetShape(Shapes, N.State).OcclusionMask&(1u<<(F^1))))))Mask|=uint8(1u<<F);}
         B.State=VoxelState::WithConnections(0,Mask);if(!Write(Q,B))return false;
     }
     P.Cells.RemoveAll([](const FVoxelCellEdit&E){return E.Expected==E.Value;});
@@ -151,7 +151,7 @@ bool FVoxelEditTransaction::ValidateBatch(const FVoxelWorldRuntime&W,const FVoxe
     }
     auto Read=[&](const FIntVector&P,FVoxelBlockState&B){if(const int32*I=Map.Find(P)){B=Candidate[*I].Value;return true;}return W.TryGetBlock(P,B);};
     auto Supports=[&](const FIntVector&P,uint8 F){FVoxelBlockState B;if(!Read(P,B)||B.IsAir())return false;const auto*D=R.Find(B.TypeId);
-        return D&&D->bSolid&&(Shapes.Get(D->Shape,B.State).OcclusionMask&(1u<<F));};
+        return D&&D->bSolid&&(D->GetShape(Shapes, B.State).OcclusionMask&(1u<<F));};
     TSet<FIntVector>Inspect;for(const auto&E:Candidate){Inspect.Add(E.Position);for(uint8 F=0;F<6;++F)Inspect.Add(E.Position+VoxelCoord::Direction(F));}
     for(const auto&P:Inspect)
     {
@@ -166,7 +166,7 @@ bool FVoxelEditTransaction::ValidateBatch(const FVoxelWorldRuntime&W,const FVoxe
         if(D->Shape==EVoxelShapeKind::Pane)
         {
             uint8 Mask=0;for(uint8 F=0;F<4;++F){FVoxelBlockState N;if(!Read(P+VoxelCoord::Direction(F),N))return false;const auto*ND=R.Find(N.TypeId);
-                if(ND&&!N.IsAir()&&(ND->Shape==EVoxelShapeKind::Pane||(ND->bSolid&&(Shapes.Get(ND->Shape,N.State).OcclusionMask&(1u<<(F^1))))))Mask|=uint8(1u<<F);}
+                if(ND&&!N.IsAir()&&(ND->Shape==EVoxelShapeKind::Pane||(ND->bSolid&&(ND->GetShape(Shapes, N.State).OcclusionMask&(1u<<(F^1))))))Mask|=uint8(1u<<F);}
             B.State=VoxelState::WithConnections(0,Mask);
             if(int32*I=Map.Find(P))Candidate[*I].Value=B;
             else{FVoxelBlockState Old;if(!W.TryGetBlock(P,Old))return false;if(Old!=B){FVoxelCellEdit E;E.Position=P;E.Expected=Old;E.Value=B;Map.Add(P,Candidate.Add(E));}}

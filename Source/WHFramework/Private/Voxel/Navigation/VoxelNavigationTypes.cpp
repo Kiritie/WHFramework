@@ -1,4 +1,4 @@
-﻿#include "Voxel/Navigation/VoxelNavigationTypes.h"
+#include "Voxel/Navigation/VoxelNavigationTypes.h"
 
 #include "Voxel/Geometry/VoxelShapeRegistry.h"
 #include "Voxel/Collision/VoxelCollisionPresenter.h"
@@ -329,7 +329,7 @@ bool FVoxelNavigationSurfaceBuilder::Build(const FVoxelSectionSnapshot& InSectio
 						}
 						const FVoxelRuntimeDefinition* OverheadBlock = InRegistry.Find(Overhead.TypeId);
 						if (!OverheadBlock || OverheadBlock->Shape == EVoxelShapeKind::Fluid ||
-							(OverheadBlock->bSolid && !InShapes.Get(OverheadBlock->Shape, Overhead.State).CollisionBoxes.IsEmpty()))
+							(OverheadBlock->bSolid && !OverheadBlock->GetShape(InShapes, Overhead.State).CollisionBoxes.IsEmpty()))
 						{
 							bClear = false;
 							break;
@@ -339,7 +339,7 @@ bool FVoxelNavigationSurfaceBuilder::Build(const FVoxelSectionSnapshot& InSectio
 					{
 						continue;
 					}
-					for (const FVoxelShapeQuad& Quad : InShapes.Get(Block->Shape, State.State).Quads)
+					for (const FVoxelShapeQuad& Quad : Block->GetShape(InShapes, State.State).Quads)
 					{
 						if (Quad.Face == 4 && !InEmit(Cell, Quad))
 						{

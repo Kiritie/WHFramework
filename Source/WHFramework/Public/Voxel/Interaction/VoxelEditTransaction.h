@@ -8,6 +8,6 @@ public:
     static bool ValidateBatch(const FVoxelWorldRuntime& World,const FVoxelRegistrySnapshot& Registry,
         const FVoxelShapeRegistry& Shapes,TArray<FVoxelCellEdit>& Cells,FString& Error);
     static bool Build(const FVoxelWorldRuntime& World,const FVoxelRegistrySnapshot& Registry,const FVoxelShapeRegistry& Shapes,
-        const FVoxelTraceResult& Hit,EVoxelEditAction Action,uint16 PlaceType,const FVector& ViewDirection,double BlockSize,
+        const FVoxelTraceResult& Hit,EVoxelEditAction Action,uint16 PlaceType,uint8 PlacementYaw,double BlockSize,
         FVoxelInteractionPlan& Out,FString& Error);
 };

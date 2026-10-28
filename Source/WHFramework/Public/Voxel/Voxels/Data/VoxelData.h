@@ -6,6 +6,21 @@
 #include "VoxelData.generated.h"
 class USoundBase;
 class UStaticMesh;
+
+USTRUCT()
+struct WHFRAMEWORK_API FVoxelStateGeometry
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere)
+    int32 State = 0;
+
+    UPROPERTY(EditAnywhere)
+    TArray<FBox> CollisionBoxes;
+
+    UPROPERTY(EditAnywhere)
+    TArray<FBox> SelectionBoxes;
+};
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FVoxelBakedFaceRef
 {
@@ -27,6 +42,8 @@ public:
     virtual void OnReset_Implementation()override;
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel") FName BlockName;
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel") EVoxelShapeKind Shape=EVoxelShapeKind::FullCube;
+    UPROPERTY(EditAnywhere)
+    TArray<FVoxelStateGeometry> StateGeometry;
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel") EVoxelRenderGroup RenderGroup=EVoxelRenderGroup::Opaque;
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel") bool bSolid=true;
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel") bool bOccludes=true;

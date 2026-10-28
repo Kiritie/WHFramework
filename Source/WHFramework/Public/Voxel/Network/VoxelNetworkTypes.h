@@ -10,7 +10,7 @@
 class UPackageMap;
 class FVoxelTerrainResourceLease;
 
-static constexpr uint32 VoxelProtocolVersion = 11;
+static constexpr uint32 VoxelProtocolVersion = 12;
 
 USTRUCT()
 struct WHFRAMEWORK_API FVoxelRPCPacket

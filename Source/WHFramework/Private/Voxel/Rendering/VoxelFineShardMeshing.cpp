@@ -1,4 +1,4 @@
-﻿#include "Voxel/Rendering/VoxelFineShardBuild.h"
+#include "Voxel/Rendering/VoxelFineShardBuild.h"
 
 #include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Geometry/DWVoxelFaceVisibility.h"
@@ -112,7 +112,7 @@ namespace
 						continue;
 					}
 					const auto* Definition = InRegistry.Find(Block.TypeId);
-					const auto* Shape = Definition ? InShapes.Find(Definition->Shape, Block.State) : nullptr;
+					const auto* Shape = Definition ? Definition->FindShape(InShapes, Block.State) : nullptr;
 					if (!Shape)
 					{
 						return false;
@@ -274,7 +274,7 @@ namespace
 					{
 						continue;
 					}
-					const auto* Shape = InShapes.Find(Definition->Shape, Block.State);
+					const auto* Shape = Definition->FindShape(InShapes, Block.State);
 					if (!Shape)
 					{
 						return false;

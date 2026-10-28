@@ -278,6 +278,7 @@ public:
 	UVoxelSceneRegion* GetSceneRegionForActor(AActor* InActor, const FIntVector& InSection);
 
 	FVoxelTraceResult Trace(const FVector& InStart, const FVector& InDirection, double InDistance = 600.0) const;
+	EVoxelEditCode PreviewPlacement(const FVoxelEditIntent& InIntent, AActor* InSource, FVoxelInteractionPlan& OutPlan, FString& OutError);
 	bool VerifyView(
 		APlayerController* InController,
 		AActor* InAuthorizedObserver,
@@ -327,7 +328,7 @@ protected:
 		const FVoxelTraceResult& InHit,
 		EVoxelEditAction InAction,
 		uint16 InPlaceType,
-		const FVector& InViewDirection,
+		uint8 InPlacementYaw,
 		AActor* InSource,
 		FVoxelInteractionPlan& OutPlan,
 		FString& OutError);

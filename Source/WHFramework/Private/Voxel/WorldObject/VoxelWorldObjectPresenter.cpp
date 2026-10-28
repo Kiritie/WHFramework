@@ -27,6 +27,12 @@ void AVoxelWorldObjectPresenter::Initialize(UVoxelWorldObjectDefinition* InDefin
 	if (GetNetMode() != NM_DedicatedServer)
 	{
 		Mesh->SetStaticMesh(Definition->Mesh.LoadSynchronous());
+		auto ApplyMaterials = [&](UStaticMeshComponent& Component)
+		{
+			for (int32 Index = 0; Index < Definition->MaterialOverrides.Num() && Index < Component.GetNumMaterials(); ++Index)
+				if (UMaterialInterface* Material = Definition->MaterialOverrides[Index].LoadSynchronous()) Component.SetMaterial(Index, Material);
+		};
+		ApplyMaterials(*Mesh);
 		if (Definition->LightIntensity > 0.f)
 		{
 			for (int32 Index = 0; Index < Mesh->GetNumMaterials(); ++Index)
@@ -40,6 +46,7 @@ void AVoxelWorldObjectPresenter::Initialize(UVoxelWorldObjectDefinition* InDefin
 			Component->SetupAttachment(RootComponent);
 			Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			Component->SetStaticMesh(Part.Mesh.LoadSynchronous());
+			ApplyMaterials(*Component);
 			Component->SetRelativeLocation(Part.ClosedOffset);
 			Component->RegisterComponent();
 			VisualMeshes.Add(Component);

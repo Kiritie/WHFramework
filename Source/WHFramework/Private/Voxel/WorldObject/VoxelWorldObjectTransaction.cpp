@@ -27,7 +27,7 @@ bool FVoxelWorldObjectTransaction::HasSupport(const FVoxelWorldObjectDefinitionR
 		const FVoxelRuntimeDefinition* Block = InBlocks.Find(State.TypeId);
 		const uint8 Face = RotatedDirection.X > 0 ? 1 : RotatedDirection.X < 0 ? 0 : RotatedDirection.Y > 0 ? 3 : RotatedDirection.Y < 0 ? 2 : RotatedDirection.Z > 0 ? 5 : 4;
 		if (!Block || !Block->bSolid) return false;
-		const FVoxelResolvedShape& Shape = InShapes.Get(Block->Shape, State.State);
+		const FVoxelResolvedShape& Shape = Block->GetShape(InShapes, State.State);
 		if (Shape.OcclusionMask & (1u << Face)) return true;
 		return Shape.CollisionBoxes.ContainsByPredicate([Face](const FBox& Box)
 		{
@@ -44,9 +44,10 @@ bool FVoxelWorldObjectTransaction::HasSupport(const FVoxelWorldObjectDefinitionR
 	bool bAnyCeiling = false;
 	const bool bNeedsFloor = InDefinition.SupportMode == EVoxelWorldObjectSupportMode::AnyFloor || InDefinition.SupportMode == EVoxelWorldObjectSupportMode::EveryFloorCell || InDefinition.SupportMode == EVoxelWorldObjectSupportMode::FloorAndBackWall;
 	const bool bNeedsBack = InDefinition.SupportMode == EVoxelWorldObjectSupportMode::BackWall || InDefinition.SupportMode == EVoxelWorldObjectSupportMode::FloorAndBackWall;
+	const bool bExplicitFloor = InDefinition.Parts.ContainsByPredicate([](const FVoxelWorldObjectPart& Part) { return Part.bNeedsFloor; });
 	for (const FVoxelWorldObjectPart& Part : InDefinition.Parts)
 	{
-		if (bNeedsFloor && !Occupied.Contains(Part.Offset - FIntVector(0, 0, 1)))
+		if (bNeedsFloor && (bExplicitFloor ? Part.bNeedsFloor : !Occupied.Contains(Part.Offset - FIntVector(0, 0, 1))))
 		{
 			const bool bSolid = Supported(Part.Offset, FIntVector(0, 0, -1));
 			bAnyFloor |= bSolid;
@@ -116,9 +117,9 @@ const FVoxelBlockEntityState* FVoxelWorldObjectTransaction::FindEntity(const FVo
 	return Section && Section->Status == EVoxelSectionStatus::DataReady ? Section->Entities.Find(VoxelCoord::Linear(VoxelCoord::Local(InAnchor))) : nullptr;
 }
 
-bool FVoxelWorldObjectTransaction::Build(const FVoxelWorldRuntime& InWorld, const FVoxelRegistrySnapshot& InBlocks, const FVoxelShapeRegistry& InShapes, const FVoxelWorldObjectRegistry& InObjects, const FVoxelTraceResult& InHit, EVoxelEditAction InAction, uint16 InPlaceType, const FVector& InView, FVoxelInteractionPlan& OutPlan, FString& OutError)
+bool FVoxelWorldObjectTransaction::Build(const FVoxelWorldRuntime& InWorld, const FVoxelRegistrySnapshot& InBlocks, const FVoxelShapeRegistry& InShapes, const FVoxelWorldObjectRegistry& InObjects, const FVoxelTraceResult& InHit, EVoxelEditAction InAction, uint16 InPlaceType, uint8 InPlacementYaw, FVoxelInteractionPlan& OutPlan, FString& OutError)
 {
-	if (!InWorld.IsServer() || InHit.Status != EVoxelTraceStatus::Hit || InHit.bStartedInside || !InBlocks.IsValid(InHit.State))
+	if ((!InWorld.IsServer() && InAction != EVoxelEditAction::Place) || InHit.Status != EVoxelTraceStatus::Hit || InHit.bStartedInside || !InBlocks.IsValid(InHit.State) || InPlacementYaw > 3)
 	{
 		OutError = TEXT("Invalid authoritative world object request");
 		return false;
@@ -136,7 +137,7 @@ bool FVoxelWorldObjectTransaction::Build(const FVoxelWorldRuntime& InWorld, cons
 		}
 		Object.DefinitionId = Definition->Id;
 		Object.Anchor = InBlocks.Find(InHit.State.TypeId)->bReplaceable ? InHit.Index : InHit.PlacementIndex;
-		Object.Yaw = uint8((FMath::RoundToInt(FMath::Atan2(InView.Y, InView.X) / (PI * .5)) + 4) & 3);
+		Object.Yaw = InPlacementYaw;
 		Plan.Cost = 1;
 	}
 	else
@@ -173,6 +174,7 @@ bool FVoxelWorldObjectTransaction::Build(const FVoxelWorldRuntime& InWorld, cons
 		Edit.Position = Object.Anchor + FVoxelWorldObjectRegistry::Rotate(Definition->Parts[Index].Offset, Object.Yaw);
 		if (!VoxelCoord::IsValid(Edit.Position) || !InWorld.TryGetBlock(Edit.Position, Edit.Expected))
 		{
+			OutPlan.bNeedsData = VoxelCoord::IsValid(Edit.Position);
 			OutError = TEXT("Complete footprint must be loaded before editing");
 			return false;
 		}
@@ -193,7 +195,7 @@ bool FVoxelWorldObjectTransaction::Build(const FVoxelWorldRuntime& InWorld, cons
 		}
 		Plan.Cells.Add(Edit);
 	}
-	if (AnchorBlock->EntityKind && InAction != EVoxelEditAction::Use)
+	if (InWorld.IsServer() && AnchorBlock->EntityKind && InAction != EVoxelEditAction::Use)
 	{
 		FVoxelEntityEdit Entity;
 		Entity.Position = Object.Anchor;

@@ -1,6 +1,7 @@
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "Ability/Inventory/InventoryPickupActor.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
+#include "Voxel/Geometry/VoxelShapeRegistry.h"
 bool FVoxelBakedFaceRef::ToRuntime(FVoxelRuntimeFaceRef&O)const
 {
     if(Bank<0||Bank>65535||Layer<0||Layer>65535||Frames<1||Frames>256||FPS<0||FPS>60||Layer+Frames>65536)return false;
@@ -27,6 +28,46 @@ bool UVoxelData::ValidateDefinition(bool Render,FString&E)const
     {
         E = TEXT("An entity variant requires a registered entity kind");
         return false;
+    }
+    if ((!StateGeometry.IsEmpty() && Shape != EVoxelShapeKind::ObjectPart) || StateGeometry.Num() > VoxelState::MaxObjectParts * 8)
+    {
+        E = TEXT("Object geometry has an invalid shape or state count");
+        return false;
+    }
+    TSet<int32> GeometryStates;
+    for (const FVoxelStateGeometry& Geometry : StateGeometry)
+    {
+        if (Geometry.State < 0 || Geometry.State > MAX_uint16 || (Geometry.State & VoxelState::ObjectLockedMask) ||
+            !FVoxelShapeRegistry::IsValidState(Shape, uint16(Geometry.State)) || GeometryStates.Contains(Geometry.State) ||
+            Geometry.CollisionBoxes.Num() > 128 || Geometry.SelectionBoxes.Num() > 128)
+        {
+            E = TEXT("Object geometry state is duplicated or invalid");
+            return false;
+        }
+        GeometryStates.Add(Geometry.State);
+        for (const TArray<FBox>* Boxes : {&Geometry.CollisionBoxes, &Geometry.SelectionBoxes})
+        {
+            for (const FBox& Box : *Boxes)
+            {
+                if (!Box.IsValid || Box.Min.ContainsNaN() || Box.Max.ContainsNaN() || Box.Min.GetMin() < -UE_SMALL_NUMBER ||
+                    Box.Max.GetMax() > 1.0 + UE_SMALL_NUMBER || Box.GetSize().GetMin() <= 0.)
+                {
+                    E = TEXT("Object geometry must remain inside its owning cell");
+                    return false;
+                }
+            }
+        }
+    }
+    for (int32 State : GeometryStates)
+    {
+        for (uint8 Yaw = 0; Yaw < 4; ++Yaw)
+        {
+            if (!GeometryStates.Contains((State & ~3) | Yaw))
+            {
+                E = TEXT("Object geometry requires all four rotations");
+                return false;
+            }
+        }
     }
     if (EntityKind != 0)
     {

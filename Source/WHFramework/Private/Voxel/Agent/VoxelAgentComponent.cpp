@@ -1,4 +1,4 @@
-﻿#include "Voxel/Agent/VoxelAgentComponent.h"
+#include "Voxel/Agent/VoxelAgentComponent.h"
 
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
@@ -251,10 +251,12 @@ bool UVoxelAgentComponent::MakeIntent(
 
 	OutIntent.Action =
 		InAction;
-	OutIntent.PlacementQuarterTurns = InAction == EVoxelEditAction::Place ? PlacementQuarterTurns : 0;
+	OutIntent.PlacementYaw = InAction == EVoxelEditAction::Place ? PlacementYaw : 0;
 
 	OutIntent.ExpectedTarget =
 		Hit.Index;
+	const FVoxelRuntimeDefinition* HitDefinition = VoxelModule->GetRegistry()->Find(Hit.State.TypeId);
+	OutIntent.ExpectedPlacementAnchor = HitDefinition && HitDefinition->bReplaceable ? Hit.Index : Hit.PlacementIndex;
 
 	const FVoxelSectionKey SectionKey =
 		VoxelCoord::Section(
@@ -313,6 +315,15 @@ bool UVoxelAgentComponent::MakeIntent(
             if(const FInventorySlotState* Slot = View->FindSlot(OutIntent.InventorySlot))
             {
                 OutIntent.ExpectedItemID = Slot->Item.ItemId;
+                const UInventoryWorldSubsystem* System = GetWorld()->GetSubsystem<UInventoryWorldSubsystem>();
+                const FInventoryItemDefinition* Item = System ? System->GetRegistry().Find(Slot->Item.ItemId) : nullptr;
+                const FVoxelRuntimeDefinition* Placed = Item ? VoxelModule->GetRegistry()->Find(Item->PlaceableVoxelId) : nullptr;
+                if (HitDefinition && Placed && HitDefinition->Shape == EVoxelShapeKind::Slab && Placed->Shape == EVoxelShapeKind::Slab &&
+                    Hit.State.TypeId == Placed->TypeId && !(Hit.State.State & 0x800) &&
+                    ((!(Hit.State.State & 8) && Hit.Normal.Z > .5) || ((Hit.State.State & 8) && Hit.Normal.Z < -.5)))
+                {
+                    OutIntent.ExpectedPlacementAnchor = Hit.Index;
+                }
             }
         }
     }
@@ -352,6 +363,7 @@ bool UVoxelAgentComponent::Send(
 
 		LastRequest =
 			InIntent.RequestId;
+		if (InIntent.Action == EVoxelEditAction::Place) LastPlacementRequest = InIntent.RequestId;
 
 		const FVoxelEditReply Reply =
 			VoxelModule->
@@ -386,6 +398,7 @@ bool UVoxelAgentComponent::Send(
 
 	LastRequest =
 		InIntent.RequestId;
+	if (InIntent.Action == EVoxelEditAction::Place) LastPlacementRequest = InIntent.RequestId;
 
 	return Network->
 		SubmitIntent(
@@ -469,7 +482,18 @@ bool UVoxelAgentComponent::CanRotateSelected() const
 	const FInventoryItemDefinition* Item = Slot && !Slot->bLocked && !Slot->Item.IsEmpty() && System ? System->GetRegistry().Find(Slot->Item.ItemId) : nullptr;
 	const FVoxelRuntimeDefinition* Definition = Item && VoxelModule->GetRegistry() ? VoxelModule->GetRegistry()->Find(Item->PlaceableVoxelId) : nullptr;
 	return Definition && (Definition->Shape == EVoxelShapeKind::FullCube || Definition->Shape == EVoxelShapeKind::Stair ||
-		Definition->Shape == EVoxelShapeKind::Door || Definition->Shape == EVoxelShapeKind::Trapdoor);
+		Definition->Shape == EVoxelShapeKind::Door || Definition->Shape == EVoxelShapeKind::Trapdoor || Definition->Shape == EVoxelShapeKind::ObjectPart);
+}
+
+bool UVoxelAgentComponent::CapturePlacement(FVoxelEditIntent& OutIntent) const
+{
+	OutIntent = {};
+	return MakeIntent(EVoxelEditAction::Place, OutIntent) && OutIntent.ExpectedItemID.IsValid();
+}
+
+bool UVoxelAgentComponent::SubmitPlacement(const FVoxelEditIntent& InIntent)
+{
+	return InIntent.Action == EVoxelEditAction::Place && Send(InIntent);
 }
 
 bool UVoxelAgentComponent::RotateSelected(int32 InQuarterTurns)
@@ -478,16 +502,19 @@ bool UVoxelAgentComponent::RotateSelected(int32 InQuarterTurns)
 	{
 		return false;
 	}
-	PlacementQuarterTurns = uint8((int32(PlacementQuarterTurns) + (InQuarterTurns > 0 ? 1 : 3)) & 3);
+	PlacementYaw = uint8((int32(PlacementYaw) + (InQuarterTurns > 0 ? 1 : 3)) & 3);
 	OnPlacementChanged.Broadcast();
 	return true;
 }
 
 void UVoxelAgentComponent::ResetPlacementRotation()
 {
-	if (PlacementQuarterTurns != 0)
+	FVector Origin;
+	FVector Direction;
+	const uint8 Yaw = View(Origin, Direction) ? uint8((FMath::RoundToInt(FMath::Atan2(Direction.Y, Direction.X) / (PI * .5)) + 4) & 3) : 0;
+	if (PlacementYaw != Yaw)
 	{
-		PlacementQuarterTurns = 0;
+		PlacementYaw = Yaw;
 		OnPlacementChanged.Broadcast();
 	}
 }
@@ -531,6 +558,10 @@ bool UVoxelAgentComponent::UseTarget()
 void UVoxelAgentComponent::OnReply(
 	const FVoxelEditReply& InReply)
 {
+	if (InReply.RequestId == LastPlacementRequest)
+	{
+		OnPlacementReply.Broadcast(InReply);
+	}
 	if (InReply.RequestId ==
 			LastRequest &&
 		InReply.Code !=

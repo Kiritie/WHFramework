@@ -40,7 +40,7 @@ FVoxelTraceResult FVoxelRaycast::Trace(const FVoxelWorldRuntime&W,const FVoxelRe
             FVoxelBlockState State;if(!W.TryGetBlock(Cell,State)){O.Status=EVoxelTraceStatus::NeedsData;O.Index=Cell;return O;}
             if(!State.IsAir())
             {
-                const auto*Def=R.Find(State.TypeId);const auto*Shape=Def?H.Find(Def->Shape,State.State):nullptr;
+                const auto*Def=R.Find(State.TypeId);const auto*Shape=Def?Def->FindShape(H, State.State):nullptr;
                 if(!Shape){O.Status=EVoxelTraceStatus::Invalid;return O;}FVector LocalStart=S-FVector(Cell);
                 double Best=Inf;FVector BestN(0,0,0);bool Inside=false;
                 auto Accept=[&](double T,const FVector&N,bool IsInside){if(T>=Enter-1e-9&&T<=Exit+1e-9&&T<Best){Best=T;BestN=N;Inside=IsInside;}};

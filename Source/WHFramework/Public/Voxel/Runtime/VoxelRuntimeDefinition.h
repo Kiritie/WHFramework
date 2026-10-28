@@ -4,6 +4,7 @@
 #include "Voxel/Runtime/VoxelBlockState.h"
 #include "Voxel/Geometry/VoxelShapeTypes.h"
 #include "Voxel/Rendering/VoxelRenderTypes.h"
+class FVoxelShapeRegistry;
 struct WHFRAMEWORK_API FVoxelRuntimeDefinition
 {
     FName BlockName;
@@ -17,5 +18,8 @@ struct WHFRAMEWORK_API FVoxelRuntimeDefinition
     uint16 EntityKind=0;uint8 EntityVariant=0;
     FVoxelRuntimeFaceRef Faces[6];
     FVoxelRuntimeFaceRef UpperFaces[6];
+    TMap<uint16, FVoxelResolvedShape> StateGeometry;
+    const FVoxelResolvedShape* FindShape(const FVoxelShapeRegistry& InShapes, uint16 InState) const;
+    const FVoxelResolvedShape& GetShape(const FVoxelShapeRegistry& InShapes, uint16 InState) const;
     const FVoxelRuntimeFaceRef& Face(uint16 State,uint8 MaterialFace)const;
 };

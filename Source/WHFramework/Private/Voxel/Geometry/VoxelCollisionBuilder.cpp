@@ -1,4 +1,4 @@
-﻿#include "Voxel/Geometry/VoxelCollisionBuilder.h"
+#include "Voxel/Geometry/VoxelCollisionBuilder.h"
 #include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
@@ -78,7 +78,7 @@ bool FVoxelCollisionBuilder::VisitBoxes(
 			Filled[Index] = 1;
 			continue;
 		}
-		const auto* Shape = InShapes.Find(Definition->Shape, State.State);
+		const auto* Shape = Definition->FindShape(InShapes, State.State);
 		if (!Shape) return false;
 		const FVector Position(VoxelCoord::Unlinear(uint16(Index)));
 		for (const FBox& Box : Shape->CollisionBoxes)

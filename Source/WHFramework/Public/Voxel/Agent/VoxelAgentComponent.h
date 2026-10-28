@@ -14,6 +14,8 @@ class UCharacterMovementComponent;
 class UVoxelModule;
 class UVoxelModuleNetworkComponent;
 
+DECLARE_MULTICAST_DELEGATE_OneParam(FVoxelPlacementReply, const FVoxelEditReply&);
+
 UCLASS(
 	ClassGroup = (Voxel),
 	meta = (BlueprintSpawnableComponent))
@@ -66,12 +68,15 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	bool PlaceSelected();
+	bool CapturePlacement(FVoxelEditIntent& OutIntent) const;
+	bool SubmitPlacement(const FVoxelEditIntent& InIntent);
 
 	bool CanRotateSelected() const;
 	bool RotateSelected(int32 InQuarterTurns);
 	void ResetPlacementRotation();
-	uint8 GetPlacementQuarterTurns() const { return PlacementQuarterTurns; }
+	uint8 GetPlacementYaw() const { return PlacementYaw; }
 	FSimpleMulticastDelegate OnPlacementChanged;
+	FVoxelPlacementReply OnPlacementReply;
 
 	UFUNCTION(BlueprintCallable)
 	bool PlaceItem(
@@ -184,7 +189,7 @@ private:
 
 	bool bHeld = false;
 	bool bBreakActive = false;
-	uint8 PlacementQuarterTurns = 0;
+	uint8 PlacementYaw = 0;
 
 	uint64 ObservedWorldEpoch = 0;
 
@@ -192,4 +197,5 @@ private:
 	double LastPulse = -10.0;
 	uint64 NextLocalID = 1;
 	uint64 LastRequest = 0;
+	uint64 LastPlacementRequest = 0;
 };

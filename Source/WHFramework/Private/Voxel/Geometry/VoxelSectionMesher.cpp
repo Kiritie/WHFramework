@@ -508,8 +508,8 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
                         if (State.IsAir()) return true;
                         const auto* Definition = R.Find(State.TypeId);
                         const auto* OtherDefinition = Other.IsAir() ? nullptr : R.Find(Other.TypeId);
-                        const auto* Shape = Definition ? H.Find(Definition->Shape, State.State) : nullptr;
-                        const auto* OtherShape = OtherDefinition ? H.Find(OtherDefinition->Shape, Other.State) : nullptr;
+                        const auto* Shape = Definition ? Definition->FindShape(H, State.State) : nullptr;
+                        const auto* OtherShape = OtherDefinition ? OtherDefinition->FindShape(H, Other.State) : nullptr;
                         if (!Definition || !Shape || (!Other.IsAir() && (!OtherDefinition || !OtherShape))) return false;
                         if (!Shape->Quads.ContainsByPredicate([OutputFace](const FVoxelShapeQuad& Quad)
                             { return Quad.bBoundary && Quad.Face == OutputFace; })) return true;
@@ -610,7 +610,7 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
     {
         if((I&63)==0&&Cancel&&Cancel->Load())return false;
         auto B=FVoxelBlockState::Unpack(S.Blocks[I]);if(B.IsAir())continue;const auto*D=R.Find(B.TypeId);
-        if(D->Shape==EVoxelShapeKind::FullCube)continue;const auto*Shape=H.Find(D->Shape,B.State);if(!Shape)return false;
+        if(D->Shape==EVoxelShapeKind::FullCube)continue;const auto*Shape=D->FindShape(H, B.State);if(!Shape)return false;
         FIntVector P=FIntVector(I % Side, (I / Side) % Side, I / (Side * Side));for(const auto&Q:Shape->Quads)
         {
             if(Q.bBoundary&&!Visible(S,R,H,P,B,Q.Face,&Q))continue;

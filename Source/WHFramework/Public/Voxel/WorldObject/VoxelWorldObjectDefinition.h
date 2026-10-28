@@ -6,6 +6,7 @@
 
 class AVoxelWorldObjectPresenter;
 class UStaticMesh;
+class UMaterialInterface;
 
 UENUM(BlueprintType)
 enum class EVoxelWorldObjectSupportMode : uint8
@@ -112,6 +113,9 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	FTransform MeshTransform;
+
+	UPROPERTY(EditAnywhere)
+	TArray<TSoftObjectPtr<UMaterialInterface>> MaterialOverrides;
 
 	UPROPERTY(EditAnywhere, meta = (ClampMin = "0"))
 	float MaterializationRadius = 4800.f;

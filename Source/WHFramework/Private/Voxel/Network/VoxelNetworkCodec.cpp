@@ -1,4 +1,4 @@
-﻿#include "Voxel/Network/VoxelNetworkCodec.h"
+#include "Voxel/Network/VoxelNetworkCodec.h"
 #include "Voxel/Save/InventoryVoxelEntityCodec.h"
 #include "Voxel/Network/VoxelGeometryWire.h"
 #include "Voxel/Generation/VoxelManifestCodec.h"
@@ -711,7 +711,7 @@ bool FVoxelNetworkCodec::EncodeIntent(
 	TArray<uint8>& OutBytes)
 {
 	if (InIntent.RequestId == 0 || !InIntent.InventoryStoreId.IsValid() ||
-		InIntent.PlacementQuarterTurns > 3 ||
+		InIntent.PlacementYaw > 3 ||
 		static_cast<uint8>(InIntent.Action) > static_cast<uint8>(EVoxelEditAction::Use) ||
 		InIntent.Origin.ContainsNaN() ||
 		InIntent.Direction.ContainsNaN())
@@ -740,6 +740,7 @@ bool FVoxelNetworkCodec::EncodeIntent(
 		Writer.I32(FMath::RoundToInt(Direction[Axis] * 1000000));
 	}
 	WriteVector(Writer, InIntent.ExpectedTarget);
+	WriteVector(Writer, InIntent.ExpectedPlacementAnchor);
 	Writer.String(InIntent.ExpectedItemID.IsValid() ? InIntent.ExpectedItemID.ToString() : FString(), 256);
 	Writer.Guid(InIntent.ExpectedInventoryId);
 	Writer.String(InIntent.InventorySlot.Group.IsValid() ? InIntent.InventorySlot.Group.ToString() : FString(), 256);
@@ -747,7 +748,7 @@ bool FVoxelNetworkCodec::EncodeIntent(
 	Writer.U64(InIntent.ExpectedInventoryRevision);
 	Writer.U32(InIntent.ExpectedInventoryGeneration);
 	Writer.U64(InIntent.ExpectedRevision);
-	Writer.U8(InIntent.PlacementQuarterTurns);
+	Writer.U8(InIntent.PlacementYaw);
 	return Writer.Finish(OutBytes);
 }
 
@@ -778,6 +779,7 @@ bool FVoxelNetworkCodec::DecodeIntent(
 		Value.Direction[Axis] = static_cast<double>(Reader.I32()) / 1000000.0;
 	}
 	Value.ExpectedTarget = ReadVector(Reader);
+	Value.ExpectedPlacementAnchor = ReadVector(Reader);
 	const FString ItemId = Reader.String(256);
 	Value.ExpectedItemID = ItemId.IsEmpty() ? FPrimaryAssetId() : FPrimaryAssetId(ItemId);
 	Value.ExpectedInventoryId = Reader.Guid();
@@ -787,10 +789,10 @@ bool FVoxelNetworkCodec::DecodeIntent(
 	Value.ExpectedInventoryRevision = Reader.U64();
 	Value.ExpectedInventoryGeneration = Reader.U32();
 	Value.ExpectedRevision = Reader.U64();
-	Value.PlacementQuarterTurns = Reader.U8();
+	Value.PlacementYaw = Reader.U8();
 	const double DirectionLength = Value.Direction.SizeSquared();
 	if (!Reader.End() ||
-		Value.PlacementQuarterTurns > 3 ||
+		Value.PlacementYaw > 3 ||
 		DirectionLength < 0.99 ||
 		DirectionLength > 1.01 ||
 		(!ItemId.IsEmpty() && !Value.ExpectedItemID.IsValid()) ||
