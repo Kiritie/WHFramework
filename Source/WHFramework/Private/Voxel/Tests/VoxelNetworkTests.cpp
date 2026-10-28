@@ -163,7 +163,7 @@ bool FVoxelNetworkRepresentationDataCodecTest::RunTest(const FString& InParamete
 	Surface.Geometry = {{EVoxelTerrainRepresentation::Surface, FIntVector(Surface.Key.Coordinate.X, Surface.Key.Coordinate.Y, 0), Surface.Key.Level},
 		Surface.Step, -128, 128, 17, 23};
 	Surface.GroundZ = { 1, 2, 3, 4 }; Surface.WaterZ = { 4, 3, 2, 1 };
-	Surface.SurfaceMaterial = { 5, 6, 7, 8 }; Surface.Biome = { 9, 10, 11, 12 };
+	Surface.SurfaceStates = { FVoxelBlockState(5, 0), FVoxelBlockState(6, 0), FVoxelBlockState(7, 0), FVoxelBlockState(8, 0) }; Surface.Biome = { 9, 10, 11, 12 };
 	Surface.Flags = { 0, 1, 2, 4 };
 	Surface.DistantCells.Add({FIntVector(128, -160, 5), FIntVector(144, -144, 21),
 		FVoxelBlockState(3, 9), {17, 23}});
@@ -190,7 +190,7 @@ bool FVoxelNetworkRepresentationDataCodecTest::RunTest(const FString& InParamete
 	Macro.Height = { 11, 12, 13, 14 }; Macro.WaterHeight = { 5, 6, 7, 8 };
 	Macro.WaterKind = {uint8(EVoxelWaterKind::River), uint8(EVoxelWaterKind::Lake),
 		uint8(EVoxelWaterKind::Ocean), uint8(EVoxelWaterKind::None)};
-	Macro.SurfaceClass = { 1, 2, 3, 4 }; Macro.ForestCoverage = { 5, 6, 7, 8 };
+	Macro.SurfaceStates = { FVoxelBlockState(1, 0), FVoxelBlockState(2, 0), FVoxelBlockState(3, 0), FVoxelBlockState(4, 0) }; Macro.ForestCoverage = { 5, 6, 7, 8 };
 	Macro.SnowCoverage = { 8, 7, 6, 5 };
 	Macro.LargeStructures.Add({ FIntPoint(4, 5), 6, 7, 8 });
 	Macro.DistantCells.Add({FIntVector(-128, 512, 12), FIntVector(-80, 560, 58),

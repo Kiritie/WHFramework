@@ -1028,6 +1028,8 @@ bool FVoxelGenerationPipeline::SampleColumns(
 	const bool bInUseColumnCache,
 	const FVoxelTerrainResourceLease* InOutputLease) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SampleColumns);
+
 	FVoxelGenerationBounds Bounds;
 	int32 Count = 0;
 	if (!MakeColumnGridBounds(Config->Recipe->Settings, InOrigin,
@@ -1192,6 +1194,8 @@ bool FVoxelGenerationPipeline::BuildCoarseOverlay(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_BuildCoarseOverlay);
+
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	FVoxelGenerationConsumerKey Consumer;
 	if (!ResolveAllocation(Resources, Consumer, OutError)) return false;

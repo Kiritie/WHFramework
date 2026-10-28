@@ -199,7 +199,7 @@ bool FVoxelMeshCoverageClipTest::RunTest(const FString& InParameters)
 	const auto Config = VoxelTest::MakeGenerationConfig();
 	const auto Registry = VoxelTest::MakeRegistry();
 	const TArray<int32> Heights = { 10, 10, 10, 10 };
-	const TArray<uint16> Materials = { 1, 1, 1, 1 };
+	const TArray<FVoxelBlockState> Materials = { FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0) };
 	FVoxelSectionMeshResult Source;
 	FString Error;
 	if (!TestTrue(TEXT("Coarse test surface builds"), FVoxelHeightfieldMesher::BuildBlockyTerrain(
@@ -471,8 +471,8 @@ bool FVoxelHeightfieldTransitionEdgeTest::RunTest(const FString& InParameters)
 	Dry.Init(MIN_int32, 9);
 	TArray<uint8> DryKind;
 	DryKind.Init(static_cast<uint8>(EVoxelWaterKind::None), 9);
-	TArray<uint16> Materials;
-	Materials.Init(1, 9);
+	TArray<FVoxelBlockState> Materials;
+	Materials.Init(FVoxelBlockState(1, 0), 9);
 	FVoxelHeightfieldTileView Coarse;
 	Coarse.Key = {EVoxelHeightfieldRepresentation::Surface, FIntPoint(0, 0), 2};
 	Coarse.Side = 3;
@@ -480,7 +480,7 @@ bool FVoxelHeightfieldTransitionEdgeTest::RunTest(const FString& InParameters)
 	Coarse.Ground = CoarseGround;
 	Coarse.Water = Dry;
 	Coarse.WaterKind = DryKind;
-	Coarse.Material = Materials;
+	Coarse.SurfaceStates = Materials;
 	FVoxelHeightfieldTileView FineA;
 	FineA.Key = {EVoxelHeightfieldRepresentation::Surface, FIntPoint(2, 0), 1};
 	FineA.Origin = FIntPoint(8, 0);
@@ -489,7 +489,7 @@ bool FVoxelHeightfieldTransitionEdgeTest::RunTest(const FString& InParameters)
 	FineA.Ground = FineGroundA;
 	FineA.Water = Dry;
 	FineA.WaterKind = DryKind;
-	FineA.Material = Materials;
+	FineA.SurfaceStates = Materials;
 	FVoxelHeightfieldTileView FineB = FineA;
 	FineB.Key.Coordinate = FIntPoint(2, 1);
 	FineB.Origin = FIntPoint(8, 4);
@@ -555,8 +555,8 @@ bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParamete
 	RiverKind.Init(static_cast<uint8>(EVoxelWaterKind::River), 9);
 	TArray<uint8> DryKind;
 	DryKind.Init(static_cast<uint8>(EVoxelWaterKind::None), 9);
-	TArray<uint16> Material;
-	Material.Init(1, 9);
+	TArray<FVoxelBlockState> Material;
+	Material.Init(FVoxelBlockState(1, 0), 9);
 	FVoxelHeightfieldTileView Owner;
 	Owner.Key = {EVoxelHeightfieldRepresentation::Macro, FIntPoint(0, 0), 0};
 	Owner.Side = 3;
@@ -564,7 +564,7 @@ bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParamete
 	Owner.Ground = HighGround;
 	Owner.Water = OwnerWater;
 	Owner.WaterKind = RiverKind;
-	Owner.Material = Material;
+	Owner.SurfaceStates = Material;
 	FVoxelHeightfieldTileView Neighbor;
 	Neighbor.Key = {EVoxelHeightfieldRepresentation::Surface, FIntPoint(4, 0), 0};
 	Neighbor.Origin = FIntPoint(16, 0);
@@ -573,7 +573,7 @@ bool FVoxelHeightfieldTransitionInvariantTest::RunTest(const FString& InParamete
 	Neighbor.Ground = LowGround;
 	Neighbor.Water = Dry;
 	Neighbor.WaterKind = DryKind;
-	Neighbor.Material = Material;
+	Neighbor.SurfaceStates = Material;
 	TArray<FVoxelHeightfieldTileView> Views = {Owner, Neighbor};
 	TArray<FVoxelHeightfieldTransitionEdge> Edges;
 	FString Error;
@@ -1289,7 +1289,7 @@ bool FVoxelSurfaceProxyOverlayTest::RunTest(const FString& InParameters)
 		MaterialOverlay, MakeSurfaceRegistry());
 	FVoxelSurfaceTileData MaterialEdit;
 	TestTrue(TEXT("Remapped material overlay builds"), RemappedBuilder.Build(Key, MaterialEdit, Error, nullptr, nullptr, nullptr, FixtureGeometry(Key, 1)));
-	TestEqual(TEXT("Overlay material remains in recipe symbol domain"), MaterialEdit.SurfaceMaterial[0], uint16(3));
+	TestEqual(TEXT("Overlay material retains runtime identity"), MaterialEdit.SurfaceStates[0].Pack(), uint32(1));
 	return true;
 }
 
@@ -1314,7 +1314,7 @@ bool FVoxelMacroOverlayTest::RunTest(const FString& InParameters)
 		return false;
 	}
 	TestEqual(TEXT("Edited top reaches distant representation"), Macro.Height[0], 511);
-	TestEqual(TEXT("Edited material reaches distant representation"), Macro.SurfaceClass[0], uint16(1));
+	TestEqual(TEXT("Edited material reaches distant representation"), Macro.SurfaceStates[0].Pack(), uint32(1));
 	TestEqual(TEXT("Macro preserves coarse sampling scale"), Macro.Step, 64);
 	return true;
 }
@@ -1338,7 +1338,7 @@ bool FVoxelMacroWaterMeshTest::RunTest(const FString& InParameters)
 	Macro.WaterKind = {uint8(EVoxelWaterKind::Ocean),
 		uint8(EVoxelWaterKind::None), uint8(EVoxelWaterKind::None),
 		uint8(EVoxelWaterKind::None)};
-	Macro.SurfaceClass = { 1, 1, 1, 1 };
+	Macro.SurfaceStates = { FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0) };
 	Macro.ForestCoverage = { 0, 0, 0, 0 };
 	FVoxelSectionMeshResult Mesh;
 	FString Error;
@@ -1379,7 +1379,7 @@ bool FVoxelBlockyFlatTest::RunTest(const FString& InParameters)
 	const TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry =
 		VoxelTest::MakeRegistry();
 	const TArray<int32> Heights = { 10, 10, 10, 10, 10, 10, 10, 10, 10 };
-	const TArray<uint16> Materials = { 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+	const TArray<FVoxelBlockState> Materials = { FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0) };
 	FVoxelSectionMeshResult Mesh;
 	FString Error;
 	TestTrue(TEXT("Flat blocky terrain builds"), FVoxelHeightfieldMesher::BuildBlockyTerrain(
@@ -1410,7 +1410,7 @@ bool FVoxelBlockyStepTest::RunTest(const FString& InParameters)
 	const TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry =
 		VoxelTest::MakeRegistry();
 	const TArray<int32> Heights = { 10, 4, 4, 10, 4, 4, 10, 4, 4 };
-	const TArray<uint16> Materials = { 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+	const TArray<FVoxelBlockState> Materials = { FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0) };
 	FVoxelSectionMeshResult Mesh;
 	FString Error;
 	TestTrue(TEXT("Stepped blocky terrain builds"), FVoxelHeightfieldMesher::BuildBlockyTerrain(
@@ -1446,7 +1446,7 @@ bool FVoxelBlockyNoSlopeTest::RunTest(const FString& InParameters)
 	const TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry =
 		VoxelTest::MakeRegistry();
 	const TArray<int32> Heights = { 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-	const TArray<uint16> Materials = { 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+	const TArray<FVoxelBlockState> Materials = { FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0) };
 	FVoxelSectionMeshResult Mesh;
 	FString Error;
 	TestTrue(TEXT("Irregular blocky terrain builds"), FVoxelHeightfieldMesher::BuildBlockyTerrain(
@@ -1604,7 +1604,7 @@ bool FVoxelSurfaceStateTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("Cleared column has no phantom water"), Data.WaterZ[0], MIN_int32);
 	FVoxelSectionMeshResult Mesh;
 	const TArray<int32> EmptyHeights { MIN_int32, MIN_int32, MIN_int32, MIN_int32 };
-	const TArray<uint16> EmptyMaterials { 0, 0, 0, 0 };
+	const TArray<FVoxelBlockState> EmptyMaterials { FVoxelBlockState(0, 0), FVoxelBlockState(0, 0), FVoxelBlockState(0, 0), FVoxelBlockState(0, 0) };
 	TestTrue(TEXT("Empty terrain mesh builds"), FVoxelHeightfieldMesher::BuildBlockyTerrain(
 		2, 4, EmptyHeights, EmptyMaterials, *Config, *Registry, Mesh, Error));
 	TestEqual(TEXT("Empty terrain has no artificial cap or wall"), Mesh.Batches.Num(), 0);
@@ -1618,7 +1618,7 @@ bool FVoxelHeightfieldHaloSeamTest::RunTest(const FString& InParameters)
 	const auto Config = VoxelTest::MakeGenerationConfig();
 	const auto Registry = VoxelTest::MakeRegistry();
 	const TArray<int32> Heights { 10, 4, 10, 4 };
-	const TArray<uint16> Materials { 1, 1, 1, 1 };
+	const TArray<FVoxelBlockState> Materials { FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0) };
 	FVoxelSectionMeshResult Mesh;
 	FString Error;
 	TestTrue(TEXT("Single tile with lower positive neighbor builds"), FVoxelHeightfieldMesher::BuildBlockyTerrain(
@@ -1651,8 +1651,8 @@ bool FVoxelHeightfieldHaloSeamTest::RunTest(const FString& InParameters)
 	Neighbor.WaterZ.Init(MIN_int32, 4);
 	Owner.Flags.Init(0, 4);
 	Neighbor.Flags.Init(0, 4);
-	Owner.SurfaceMaterial.Init(1, 4);
-	Neighbor.SurfaceMaterial.Init(1, 4);
+	Owner.SurfaceStates.Init(FVoxelBlockState(1, 0), 4);
+	Neighbor.SurfaceStates.Init(FVoxelBlockState(1, 0), 4);
 	const auto OwnerView = FVoxelHeightfieldTransitionBuilder::MakeView(Owner);
 	const auto NeighborView = FVoxelHeightfieldTransitionBuilder::MakeView(Neighbor);
 	const TArray<FVoxelHeightfieldTileView> Views{OwnerView, NeighborView};
@@ -1678,7 +1678,7 @@ bool FVoxelHeightfieldNoUnconditionalSkirtTest::RunTest(const FString& InParamet
 	const auto Config = VoxelTest::MakeGenerationConfig();
 	const auto Registry = VoxelTest::MakeRegistry();
 	const TArray<int32> Heights { 100, 0, 100, 0 };
-	const TArray<uint16> Materials { 1, 1, 1, 1 };
+	const TArray<FVoxelBlockState> Materials { FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0), FVoxelBlockState(1, 0) };
 	FVoxelSectionMeshResult Mesh;
 	FString Error;
 	if (!TestTrue(TEXT("Heightfield with a steep LOD boundary builds"),

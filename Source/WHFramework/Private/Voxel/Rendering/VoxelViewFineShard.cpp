@@ -14,10 +14,10 @@
 namespace
 {
 	TAutoConsoleVariable<int32> CVarVoxelFineWorkerMicrosteps(
-		TEXT("voxel.Fine.WorkerMicrosteps"), 8,
+		TEXT("voxel.Fine.WorkerMicrosteps"), 32,
 		TEXT("同一次后台执行最多推进的 Fine 微步骤数量；1 保留单步执行。"), ECVF_Default);
 	TAutoConsoleVariable<float> CVarVoxelFineWorkerSliceMilliseconds(
-		TEXT("voxel.Fine.WorkerSliceMilliseconds"), 2.0f,
+		TEXT("voxel.Fine.WorkerSliceMilliseconds"), 8.0f,
 		TEXT("Fine 后台微步骤之间的让出时间；不抢占正在执行的单一步骤。"), ECVF_Default);
 }
 
@@ -48,6 +48,7 @@ struct FVoxelViewManager::FF0FineWorker
 
 	FVoxelTaskResult Advance(const TAtomic<bool>& InCancel)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_F0FineWorkerAdvance);
 		const int32 MaximumSteps = FMath::Clamp(CVarVoxelFineWorkerMicrosteps.GetValueOnAnyThread(), 1, 64);
 		const double RequestedSlice = CVarVoxelFineWorkerSliceMilliseconds.GetValueOnAnyThread();
 		const double SliceMilliseconds = FMath::IsFinite(RequestedSlice) ? FMath::Clamp(RequestedSlice, 0.1, 8.0) : 2.0;
@@ -182,6 +183,7 @@ struct FVoxelViewManager::FFineShardWorker
 
 	FVoxelTaskResult Advance(const TAtomic<bool>& InCancel)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineShardWorkerAdvance);
 		const int32 MaximumSteps = FMath::Clamp(CVarVoxelFineWorkerMicrosteps.GetValueOnAnyThread(), 1, 64);
 		const double RequestedSlice = CVarVoxelFineWorkerSliceMilliseconds.GetValueOnAnyThread();
 		const double SliceMilliseconds = FMath::IsFinite(RequestedSlice) ? FMath::Clamp(RequestedSlice, 0.1, 8.0) : 2.0;
@@ -642,27 +644,60 @@ void FVoxelViewManager::ProcessFineShardAdmissions(const double InDeadline)
 	const auto& Keys = Interest.PublicationInputs->FineShards;
 	TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<64>> Candidates;
 	TArray<FVoxelFineShardKey, TInlineAllocator<64>> Captured;
-	TArray<int32, TInlineAllocator<64>> CapturedIndices;
-	const int32 ScanCount = FMath::Min(64, Keys.Num());
-	for (int32 Scans = 0; Scans < ScanCount && FPlatformTime::Seconds() < ScanDeadline; ++Scans)
+	int32 Submitted = 0;
+	int32 MeshReady = 0;
+	int32 Failed = 0;
+	int32 CapacityWaiting = 0;
+	int32 DependencyWaiting = 0;
+	int32 NewSlots = 0;
+	const bool bReportProgress = FPlatformTime::Seconds() >= NextInterestProgressLog;
+	ON_SCOPE_EXIT
 	{
-		if (FineShardAdmissionCursor >= Keys.Num()) FineShardAdmissionCursor = 0;
-		const int32 KeyIndex = FineShardAdmissionCursor++;
-		const FVoxelFineShardKey Key = Keys[KeyIndex];
+		if (bReportProgress)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Voxel Fine admission sample: slots=%d sampledNew=%d submitted=%d meshReady=%d failed=%d capacityWaiting=%d dependencyWaiting=%d candidates=%d workerMicrosteps=%d workerSliceMilliseconds=%.3f"),
+				FineShardSlots.Num(), NewSlots, Submitted, MeshReady, Failed, CapacityWaiting, DependencyWaiting, Candidates.Num(),
+				CVarVoxelFineWorkerMicrosteps.GetValueOnGameThread(), CVarVoxelFineWorkerSliceMilliseconds.GetValueOnGameThread());
+		}
+	};
+	const TOptional<FVoxelFineShardKey> Continuation = FineShardAdmissionContinuation;
+	FineShardAdmissionContinuation.Reset();
+	const auto CaptureCandidate = [&](const FVoxelFineShardKey& Key)
+	{
 		const auto* Demand = Interest.FineShardDemands.Find(Key);
-		if (!Demand) continue;
+		if (!Demand) return;
 		FFineShardSlot* Slot = FineShardSlots.Find(Key);
-		if (Slot && (Slot->bSubmitted || Slot->Build.IsMeshReady() || !Slot->Build.GetFailure().IsEmpty() ||
-			IsFineShardAdmissionWaiting(*Slot) || (!Slot->PendingRequest.IsSet() && !Slot->bDependencyWake))) continue;
+		if (Slot)
+		{
+			if (Slot->bSubmitted) { ++Submitted; return; }
+			if (Slot->Build.IsMeshReady()) { ++MeshReady; return; }
+			if (!Slot->Build.GetFailure().IsEmpty()) { ++Failed; return; }
+			if (IsFineShardAdmissionWaiting(*Slot)) { ++CapacityWaiting; return; }
+			if (!Slot->PendingRequest.IsSet() && !Slot->bDependencyWake) { ++DependencyWaiting; return; }
+		}
+		else ++NewSlots;
 		FVoxelTerrainServiceCandidate& Candidate = Candidates.AddDefaulted_GetRef();
 		Candidate.Index = Captured.Add(Key);
-		CapturedIndices.Add(KeyIndex);
 		Candidate.Priority = Demand->ServicePriority;
 		Candidate.FirstQueuedSeconds = Slot ? Slot->FirstQueuedSeconds : Demand->FirstQueuedSeconds;
 		Candidate.Sequence = Slot ? Slot->QueueSequence : Demand->QueueSequence;
 		Candidate.EstimatedMicroseconds = FineShardAdmissionCostMicroseconds;
 		Candidate.bRunnable = true;
 		Candidate.bPublicationContinuation = Slot && Module.HasGenerationFactConsumer(Slot->Consumer);
+	};
+	if (Continuation.IsSet())
+	{
+		CaptureCandidate(Continuation.GetValue());
+		if (!Candidates.IsEmpty()) FineShardAdmissionContinuation = Continuation;
+	}
+	const int32 ScanCount = FMath::Min(64 - Candidates.Num(), Keys.Num());
+	for (int32 Scans = 0; Scans < ScanCount && FPlatformTime::Seconds() < ScanDeadline; ++Scans)
+	{
+		if (FineShardAdmissionCursor >= Keys.Num()) FineShardAdmissionCursor = 0;
+		const FVoxelFineShardKey Key = Keys[FineShardAdmissionCursor++];
+		++FineShardAdmissionScans;
+		if (Continuation.IsSet() && Key == Continuation.GetValue()) continue;
+		CaptureCandidate(Key);
 	}
 	FVoxelTerrainServiceCapacity Capacity;
 	Capacity.MaximumWaitSeconds = Module.GetViewSettings().Fine.MaximumBackgroundWaitSeconds;
@@ -685,6 +720,10 @@ void FVoxelViewManager::ProcessFineShardAdmissions(const double InDeadline)
 		}
 		if (Charge.bOverdueOpportunity) Module.GetTerrainFrameContext().ConsumeOverdueOpportunity();
 		const double Started = FPlatformTime::Seconds();
+		++FineShardAdmissionAttempts;
+		if (Continuation.IsSet() && Captured[Chosen] == Continuation.GetValue()) ++FineShardAdmissionContinuationAttempts;
+		if (FineShardAdmissionContinuation.IsSet() && Captured[Chosen] == FineShardAdmissionContinuation.GetValue())
+			FineShardAdmissionContinuation.Reset();
 		RequestFineShard(Captured[Chosen]);
 		const double Actual = FMath::Max(1.0, (FPlatformTime::Seconds() - Started) * 1000000.0);
 		verify(FineShardAdmissionSelection.Settle(Charge.Serial, Actual));
@@ -699,8 +738,8 @@ void FVoxelViewManager::ProcessFineShardAdmissions(const double InDeadline)
 			!Slot->bWaitingAdmissionCapacity && (Slot->PendingRequest.IsSet() || Slot->bDependencyWake) &&
 			Module.HasGenerationFactConsumer(Slot->Consumer))
 		{
-			// 仍可推进的消费者回到下轮扫描窗口，先收尾已保留的捕获与租约。
-			FineShardAdmissionCursor = CapturedIndices[Chosen];
+			// 消费者续跑保留独立候选，不回退新需求的轮转扫描。
+			FineShardAdmissionContinuation = Captured[Chosen];
 		}
 		Candidates[Chosen].bRunnable = false;
 	}

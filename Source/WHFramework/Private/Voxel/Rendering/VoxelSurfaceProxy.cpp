@@ -157,7 +157,7 @@ bool FVoxelSurfaceProxyBuilder::Build(
 
 	Data.GroundZ.SetNumUninitialized(Count);
 	Data.WaterZ.SetNumUninitialized(Count);
-	Data.SurfaceMaterial.SetNumUninitialized(Count);
+	Data.SurfaceStates.SetNumUninitialized(Count);
 	Data.Biome.SetNumUninitialized(Count);
 	Data.Flags.Init(0, Count);
 
@@ -213,8 +213,12 @@ bool FVoxelSurfaceProxyBuilder::Build(
 		Data.WaterZ[Index] =
 			Column.SurfaceWaterZ;
 
-		Data.SurfaceMaterial[Index] =
-			Column.SurfaceMaterial;
+		if (!Config->ToRuntime(Column.SurfaceMaterial, Data.SurfaceStates[Index]) ||
+			!Registry->Find(Data.SurfaceStates[Index].TypeId))
+		{
+			OutError = TEXT("Natural surface material cannot resolve to the runtime registry");
+			return false;
+		}
 
 		Data.Biome[Index] =
 			Column.BiomeIndex;
@@ -297,6 +301,8 @@ bool FVoxelSurfaceProxyBuilder::CaptureModifiedBlocks(
 	const TAtomic<bool>* InCancel,
 	FVoxelGenerationWorkspace& InWorkspace) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SurfaceCaptureModified);
+
 	const FVoxelTreeGenerationSettings& Trees = Config->Recipe->Settings.Ecology.Tree;
 	const FVoxelGenerationBounds Bounds = DistantInfluenceBounds(InData, Settings, Trees);
 	int64 Count = 0;
@@ -345,6 +351,8 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SurfaceDistantCells);
+
 	const int32 Step = InOutData.Step;
 	const int32 Side = InOutData.GetTileSide();
 	const FIntPoint Origin = InOutData.GetBuildOrigin();
@@ -391,6 +399,7 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 			OutError = TEXT("Canceled");
 			return false;
 		}
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SurfaceStructureBand);
 		FVoxelCoarseOverlayCapture Band;
 		if (!Generator->BuildCoarseOverlay(FIntVector(Origin.X, Origin.Y,
 			static_cast<int32>(BaseZ)), StructureStep, StructureSide,
@@ -430,6 +439,7 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 	};
 	if (Trees.bEnabled && FMath::Max(Trees.MaxHeight, Trees.CrownRadius * 2 + 1) >= Step)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SurfaceDistantTrees);
 		FVoxelBlockState Trunk;
 		FVoxelBlockState Leaves;
 		if (!Config->ToRuntime(Config->Recipe->Ecology.TreeTrunk, Trunk) ||
@@ -798,6 +808,8 @@ bool FVoxelSurfaceProxyBuilder::ApplyModifiedSurface(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SurfaceApplyModified);
+
 	if (InModifiedBlocks.IsEmpty())
 	{
 		return true;
@@ -865,7 +877,7 @@ bool FVoxelSurfaceProxyBuilder::ApplyModifiedSurface(
 			// 地面和水分别解析；非实体装饰不能成为地表，清空整列不能保留旧高度。
 			InOutData.GroundZ[Index] = MIN_int32;
 			InOutData.WaterZ[Index] = MIN_int32;
-			InOutData.SurfaceMaterial[Index] = 0;
+			InOutData.SurfaceStates[Index] = Config->Air;
 			HighestCandidate = FMath::Min(HighestCandidate, Settings.MaxZ - 1);
 			for (int32 Z = HighestCandidate; Z >= Settings.MinZ; --Z)
 			{
@@ -902,14 +914,8 @@ bool FVoxelSurfaceProxyBuilder::ApplyModifiedSurface(
 				{
 					continue;
 				}
-				uint32 PackedSymbol = 0;
-				if (!Config->ToSymbol(State, PackedSymbol))
-				{
-					OutError = TEXT("Modified voxel surface material is not present in the generation recipe");
-					return false;
-				}
 				InOutData.GroundZ[Index] = Z;
-				InOutData.SurfaceMaterial[Index] = static_cast<uint16>(PackedSymbol & 0xffffu);
+				InOutData.SurfaceStates[Index] = State;
 				break;
 			}
 

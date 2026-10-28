@@ -9,6 +9,7 @@
 #include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/Rendering/VoxelWaterView.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
+#include "Voxel/Geometry/VoxelShapeRegistry.h"
 
 namespace
 {
@@ -141,7 +142,7 @@ FVoxelHeightfieldTileView FVoxelHeightfieldTransitionBuilder::MakeView(
 	View.Ground = InData.GroundZ;
 	View.Water = InData.WaterZ;
 	View.SurfaceFlags = InData.Flags;
-	View.Material = InData.SurfaceMaterial;
+	View.SurfaceStates = InData.SurfaceStates;
 	View.ZBias = -0.02;
 	return View;
 }
@@ -160,7 +161,7 @@ FVoxelHeightfieldTileView FVoxelHeightfieldTransitionBuilder::MakeView(
 	View.Ground = InData.Height;
 	View.Water = InData.WaterHeight;
 	View.WaterKind = InData.WaterKind;
-	View.Material = InData.SurfaceClass;
+	View.SurfaceStates = InData.SurfaceStates;
 	View.ZBias = -0.05;
 	return View;
 }
@@ -181,7 +182,7 @@ bool FVoxelHeightfieldTransitionBuilder::BuildEdges(
 		if (View.Key.Representation == EVoxelHeightfieldRepresentation::None ||
 			View.Side < 2 || View.Step <= 0 || View.Ground.Num() != Count ||
 			View.Water.Num() != Count || View.WaterKindCount() != Count ||
-			View.Material.Num() != Count)
+			View.SurfaceStates.Num() != Count)
 		{
 			OutError = TEXT("Heightfield transition tile view is invalid");
 			return false;
@@ -678,7 +679,7 @@ bool FVoxelHeightfieldTransitionBuilder::BuildMesh(
 			InOwner.Ground.Num() != InOwner.Side * InOwner.Side ||
 			InOwner.Water.Num() != InOwner.Ground.Num() ||
 			InOwner.WaterKindCount() != InOwner.Ground.Num() ||
-			InOwner.Material.Num() != InOwner.Ground.Num())
+			InOwner.SurfaceStates.Num() != InOwner.Ground.Num())
 		{
 			OutError = TEXT("Heightfield transition owner is stale or invalid");
 			return false;
@@ -711,7 +712,7 @@ bool FVoxelHeightfieldTransitionBuilder::BuildMesh(
 			Neighbor->Ground.Num() != Neighbor->Side * Neighbor->Side ||
 			Neighbor->Water.Num() != Neighbor->Ground.Num() ||
 			Neighbor->WaterKindCount() != Neighbor->Ground.Num() ||
-			Neighbor->Material.Num() != Neighbor->Ground.Num())
+			Neighbor->SurfaceStates.Num() != Neighbor->Ground.Num())
 		{
 			OutError = TEXT("Heightfield transition edge has stale or invalid ownership");
 			return false;
@@ -737,12 +738,10 @@ bool FVoxelHeightfieldTransitionBuilder::BuildMesh(
 			{
 				const bool bOwnerHigher = OwnerHeight > NeighborHeight;
 				const auto Direction = bOwnerHigher ? Edge.Direction : NeighborDirection;
-				FVoxelBlockState State;
-				if (!InConfig.ToRuntime(bOwnerHigher ? InOwner.Material[OwnerIndex] : Neighbor->Material[NeighborIndex], State))
-				{ OutError = TEXT("Boundary material is invalid"); return false; }
+				const FVoxelBlockState State = bOwnerHigher ? InOwner.SurfaceStates[OwnerIndex] : Neighbor->SurfaceStates[NeighborIndex];
 				const auto* Definition = InRegistry.Find(State.TypeId);
 				if (!Definition) { OutError = TEXT("Boundary material is absent from registry"); return false; }
-				AppendFace(Mesh, *Definition, Definition->Face(State.State, FaceIndex(Direction)), Direction,
+				AppendFace(Mesh, *Definition, Definition->Face(State.State, FVoxelShapeRegistry::RotateFace(FaceIndex(Direction), uint8((4 - (State.State & 3)) & 3))), Direction,
 					InOwner, Fixed, int32(Position), End, FMath::Min(OwnerHeight, NeighborHeight), FMath::Max(OwnerHeight, NeighborHeight), TexturePeriod, InCapacity);
 			}
 			Position = End;

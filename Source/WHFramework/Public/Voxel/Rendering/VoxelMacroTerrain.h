@@ -37,7 +37,7 @@ struct WHFRAMEWORK_API FVoxelMacroTileData
 	TArray<int32> Height;
 	TArray<int32> WaterHeight;
 	TArray<uint8> WaterKind;
-	TArray<uint16> SurfaceClass;
+	TArray<FVoxelBlockState> SurfaceStates;
 	TArray<uint8> ForestCoverage;
 	TArray<uint8> SnowCoverage;
 	TArray<FVoxelMacroStructureProxy> LargeStructures;

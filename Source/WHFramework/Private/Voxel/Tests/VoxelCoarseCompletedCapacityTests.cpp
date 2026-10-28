@@ -99,7 +99,7 @@ bool FVoxelCoarseCompletedCapacityTest::RunTest(const FString& Parameters)
 	}
 	MinimumRetained += RetainCoarseTestArray(Result.Surface->GroundZ);
 	MinimumRetained += RetainCoarseTestArray(Result.Surface->WaterZ);
-	MinimumRetained += RetainCoarseTestArray(Result.Surface->SurfaceMaterial);
+	MinimumRetained += RetainCoarseTestArray(Result.Surface->SurfaceStates);
 	MinimumRetained += RetainCoarseTestArray(Result.Surface->Biome);
 	MinimumRetained += RetainCoarseTestArray(Result.Surface->Flags);
 	MinimumRetained += RetainCoarseTestArray(Result.Surface->DistantCells);
@@ -110,7 +110,7 @@ bool FVoxelCoarseCompletedCapacityTest::RunTest(const FString& Parameters)
 	MinimumRetained += RetainCoarseTestArray(Result.Macro->Height);
 	MinimumRetained += RetainCoarseTestArray(Result.Macro->WaterHeight);
 	MinimumRetained += RetainCoarseTestArray(Result.Macro->WaterKind);
-	MinimumRetained += RetainCoarseTestArray(Result.Macro->SurfaceClass);
+	MinimumRetained += RetainCoarseTestArray(Result.Macro->SurfaceStates);
 	MinimumRetained += RetainCoarseTestArray(Result.Macro->ForestCoverage);
 	MinimumRetained += RetainCoarseTestArray(Result.Macro->SnowCoverage);
 	MinimumRetained += RetainCoarseTestArray(Result.Macro->LargeStructures);

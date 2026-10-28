@@ -338,7 +338,7 @@ private:
 		{
 			AddArray(InData.GroundZ);
 			AddArray(InData.WaterZ);
-			AddArray(InData.SurfaceMaterial);
+			AddArray(InData.SurfaceStates);
 			AddArray(InData.Biome);
 			AddArray(InData.Flags);
 			AddArray(InData.DistantCells);
@@ -356,7 +356,7 @@ private:
 			AddArray(InData.Height);
 			AddArray(InData.WaterHeight);
 			AddArray(InData.WaterKind);
-			AddArray(InData.SurfaceClass);
+			AddArray(InData.SurfaceStates);
 			AddArray(InData.ForestCoverage);
 			AddArray(InData.SnowCoverage);
 			AddArray(InData.LargeStructures);

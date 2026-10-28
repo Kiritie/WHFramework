@@ -50,7 +50,7 @@ bool FVoxelMacroTerrainBuilder::Build(
 
 	Data.Height.SetNumUninitialized(Count);
 	Data.WaterHeight.SetNumUninitialized(Count);
-	Data.SurfaceClass.SetNumUninitialized(Count);
+	Data.SurfaceStates.SetNumUninitialized(Count);
 	Data.ForestCoverage.SetNumUninitialized(Count);
 	Data.SnowCoverage.SetNumUninitialized(Count);
 
@@ -92,7 +92,7 @@ bool FVoxelMacroTerrainBuilder::Build(
 
 		Data.WaterHeight[Index] = Surface.WaterZ[Index];
 
-		Data.SurfaceClass[Index] = Surface.SurfaceMaterial[Index];
+		Data.SurfaceStates[Index] = Surface.SurfaceStates[Index];
 
 		const FVoxelEcologySample EcologySample = Ecology.Sample(Column);
 

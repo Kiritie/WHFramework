@@ -849,7 +849,7 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	Surface->Revision = 1;
 	Surface->GroundZ.Init(32, Surface->GetVertexCount());
 	Surface->WaterZ.Init(MIN_int32, Surface->GetVertexCount());
-	Surface->SurfaceMaterial.Init(0, Surface->GetVertexCount());
+	Surface->SurfaceStates.Init(FVoxelBlockState(0, 0), Surface->GetVertexCount());
 	Surface->Flags.Init(0, Surface->GetVertexCount());
 	ScopedManager.SurfaceData.Add(SurfaceKey, Surface);
 	ScopedManager.SurfaceRevisions.Add(SurfaceKey, 1);
@@ -929,12 +929,12 @@ bool FVoxelHeightfieldLocalDependenciesTest::RunTest(const FString& InParameters
 {
 	(void)InParameters;
 	TArray<int32> Ground, Water;
-	TArray<uint16> Materials;
+	TArray<FVoxelBlockState> Materials;
 	TArray<uint8> WaterKinds;
 	WaterKinds.Init(0, 33 * 33);
 	Ground.Init(32, 33 * 33);
 	Water.Init(MIN_int32, 33 * 33);
-	Materials.Init(0, 33 * 33);
+	Materials.Init(FVoxelBlockState(0, 0), 33 * 33);
 	TArray<FVoxelHeightfieldTileView> Views;
 	const auto AddView = [&](FIntPoint Coordinate, FIntPoint Origin, int32 Step)
 	{
@@ -947,7 +947,7 @@ bool FVoxelHeightfieldLocalDependenciesTest::RunTest(const FString& InParameters
 		View.Ground = Ground;
 		View.Water = Water;
 		View.WaterKind = WaterKinds;
-		View.Material = Materials;
+		View.SurfaceStates = Materials;
 	};
 	AddView({-1, 0}, {-32, 0}, 1);
 	AddView({0, 0}, {0, 0}, 2);

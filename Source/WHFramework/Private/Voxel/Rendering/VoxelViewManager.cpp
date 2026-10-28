@@ -693,6 +693,10 @@ void FVoxelViewManager::Tick(
 			AdmissionPriorities.Num(), AdmissionPriorities.IsEmpty() ? -1 : AdmissionPriorities[0],
 			Accepted.AdmissionLanes[0].Num(), Accepted.AdmissionLanes[1].Num(), Accepted.AdmissionLanes[2].Num(), Accepted.AdmissionLanes[3].Num(),
 			Module.GetViewSettings().Budget.AdmissionMilliseconds);
+		UE_LOG(LogTemp, Display, TEXT("Voxel Fine admission scan: cursor=%d total=%d scanned=%llu attempts=%llu continuationAttempts=%llu continuation=%d"),
+			FineShardAdmissionCursor, Accepted.PublicationInputs ? Accepted.PublicationInputs->FineShards.Num() : 0,
+			FineShardAdmissionScans, FineShardAdmissionAttempts, FineShardAdmissionContinuationAttempts,
+			FineShardAdmissionContinuation.IsSet());
 	}
 #endif
 	FrameTimings.PublishPrepareMilliseconds = TerrainFrameBudget.GetTiming(EVoxelPublishPhase::Prepare).Milliseconds;
@@ -1027,6 +1031,21 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly, const d
 		bInDataOnly ? Policy.Budget.DataAdmissionPerFrame : Policy.Budget.SurfaceAdmissionPerFrame,
 		bInDataOnly ? Policy.Budget.DataAdmissionPerFrame : Policy.Budget.MacroAdmissionPerFrame};
 	int32 Submitted[4] = {};
+	int32 Scanned[4] = {};
+	int32 Eligible[4] = {};
+	int32 Attempted[4] = {};
+	const bool bReportProgress = FPlatformTime::Seconds() >= NextInterestProgressLog;
+	ON_SCOPE_EXIT
+	{
+		if (bReportProgress)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Voxel service admission scan: dataOnly=%d scanned=%d/%d/%d/%d eligible=%d/%d/%d/%d attempted=%d/%d/%d/%d submitted=%d/%d/%d/%d"),
+				bInDataOnly, Scanned[0], Scanned[1], Scanned[2], Scanned[3],
+				Eligible[0], Eligible[1], Eligible[2], Eligible[3],
+				Attempted[0], Attempted[1], Attempted[2], Attempted[3],
+				Submitted[0], Submitted[1], Submitted[2], Submitted[3]);
+		}
+	};
 	const double Deadline = FMath::Min(InDeadline, TerrainDeadline(Policy.Budget.AdmissionMilliseconds));
 	const double StartedScanning = FPlatformTime::Seconds();
 	if (StartedScanning >= Deadline) return;
@@ -1057,6 +1076,7 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly, const d
 			Scan %= Lane.Num();
 			const int32 LaneIndex = Scan;
 			const int32 Index = Lane[Scan++];
+			++Scanned[Kind];
 			const auto& Admission = Admissions[Index];
 			FVoxelTaskKey Identity;
 			const FVoxelTerrainGeometry* Geometry = nullptr;
@@ -1102,7 +1122,7 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly, const d
 				AdmissionAges[Stage].Remove(Identity);
 				continue;
 			}
-			if (Scheduler.Has(Identity.Stamp, Identity.Kind) || Limits[Kind] <= 0) continue;
+			if (Scheduler.Has(Identity.Stamp, Identity.Kind) || HasDeferredRepresentation(Identity.Stamp) || Limits[Kind] <= 0) continue;
 			if (!bInDataOnly && Geometry && Module.IsAuthority())
 			{
 				const EVoxelTaskKind DataKind = Admission.Kind == EVoxelViewAdmissionKind::VoxelProxy ? EVoxelTaskKind::GenerateVoxelProxy :
@@ -1137,12 +1157,13 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly, const d
 				AdmissionCostEstimates[Stage][Kind] : 25.0;
 			Candidate.bRunnable = true;
 			Candidates.Add(Candidate);
+			++Eligible[Kind];
 			Identities.Add(Identity);
 			CandidateAdmissions.Add(Index);
 			if (FirstCandidate == INDEX_NONE) FirstCandidate = LaneIndex;
 		}
-		// 未获准的近处正文保留扫描前沿；已排队/完成项会在下轮跳过，不循环预取整幅远景。
-		if (FirstCandidate != INDEX_NONE) Scan = FirstCandidate;
+		// 数据续跑保留已捕获事实的前沿；网格输入已完整，失败候选不能挡住后续 owner。
+		if (bInDataOnly && FirstCandidate != INDEX_NONE) Scan = FirstCandidate;
 	}
 	if (Candidates.IsEmpty() || FPlatformTime::Seconds() >= Deadline) return;
 	const uint64 BeforeSelection = Resources->ReleaseVersionExcludingOwner(GetServiceControlConsumer());
@@ -1185,6 +1206,7 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly, const d
 		const FVoxelViewAdmission* Admission = &Admissions[CandidateAdmissions[Selected]];
 		const int32 Kind = int32(Admission->Kind);
 		const double Started = FPlatformTime::Seconds();
+		++Attempted[Kind];
 		bool bSubmitted = false;
 		if (!bInDataOnly) bSubmitted = TrySubmitAdmission(*Admission);
 		else switch (Admission->Kind)
@@ -3464,6 +3486,10 @@ void FVoxelViewManager::Reset()
 	FineShardBackingReleaseVersion = 0;
 	FineShardBackingAdmission = EVoxelTerrainResourceAdmission::Granted;
 	FineShardAdmissionCursor = 0;
+	FineShardAdmissionContinuation.Reset();
+	FineShardAdmissionScans = 0;
+	FineShardAdmissionAttempts = 0;
+	FineShardAdmissionContinuationAttempts = 0;
 	FineShardPresentationCursor = 0;
 	check(TaskOwnerIncarnation != MAX_uint64);
 	++TaskOwnerIncarnation;
@@ -4569,9 +4595,21 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 
 bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const int32 InPriority, const bool bDataOnly)
 {
+	const bool bReportAdmission = !bDataOnly && FPlatformTime::Seconds() >= NextInterestProgressLog;
+	const TCHAR* MeshAdmissionStage = TEXT("Wanted");
+	FString MeshAdmissionError;
+	ON_SCOPE_EXIT
+	{
+		if (bReportAdmission)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Voxel Surface mesh admission: coordinate=(%d,%d) level=%d stage=%s error=%s"),
+				InKey.Coordinate.X, InKey.Coordinate.Y, InKey.Level, MeshAdmissionStage, *MeshAdmissionError);
+		}
+	};
 	const bool bInitialData = bDataOnly && GetInputRoot().bInitialLayout;
 	if (GetInputRoot().bInitialLayout && !GetInputRoot().SurfaceWanted.Contains(InKey)) return false;
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewRequestSurface);
+	MeshAdmissionStage = TEXT("Geometry");
 	const auto* DesiredGeometry = GetViewInterest().FindGeometry(InKey);
 	if (!DesiredGeometry)
 		return false;
@@ -4639,6 +4677,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 
 	Request.Stamp = MakeRepresentationStamp(Geometry, Request.Stamp.Revision);
 	Request.GenerationConsumer = MakeCoarseGenerationConsumer(Geometry, Request.Stamp);
+	MeshAdmissionStage = TEXT("Consumer");
 	if (!Request.GenerationConsumer.IsValid()) return false;
 	FVoxelGenerationConsumerScope ConsumerScope(Request.GenerationConsumer);
 
@@ -4646,6 +4685,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	Request.DistanceScore = MinimumObserverDistanceCells(SurfaceWorldCenter(InKey));
 	Request.ForwardScore = 0.0;
 
+	MeshAdmissionStage = TEXT("ExistingTaskOrDeferred");
 	if (Scheduler.Has(Request.Stamp, Request.Kind) || HasDeferredRepresentation(Request.Stamp))
 	{
 		return false;
@@ -4662,12 +4702,17 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	}
 	else
 	{
+		MeshAdmissionStage = PreparedData.Contains(DataKey) ? TEXT("PreparedRevision") : TEXT("PreparedMissing");
 		Prepared = FindPreparedData(DataKey);
-		if (!Prepared || !Prepared->Surface || Prepared->Surface->Geometry != Geometry)
-			return false;
+		if (!Prepared) return false;
+		MeshAdmissionStage = TEXT("PreparedPayload");
+		if (!Prepared->Surface) return false;
+		MeshAdmissionStage = TEXT("PreparedGeometry");
+		if (Prepared->Surface->Geometry != Geometry) return false;
 	}
 
 	const FVoxelGenerationSettings Settings = Module.GetManifest().Settings;
+	MeshAdmissionStage = TEXT("SamplingBounds");
 	FVoxelFineOverlayCapture OverlayCapture;
 	const int32 Step = Geometry.SampleStepCells;
 	const int32 Margin = FMath::Max(Step, Settings.Ecology.Tree.bEnabled ? Settings.Ecology.Tree.CrownRadius : 0);
@@ -4699,6 +4744,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	Request.InputBytes = Prepared ? Prepared->ResultBytes() : OverlayCapture.AllocatedBytes();
 
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("BuildStorage"));
+	MeshAdmissionStage = TEXT("BuildStorage");
 	const auto BuildStorage = CreateCoarseBuildStorage(Scheduler, Request, Geometry,
         VoxelBoundedAllocation::WorkerSharedBytes<FVoxelHeightfieldPageBuild>() +
         VoxelBoundedAllocation::WorkerSharedBytes<FVoxelHeightfieldPageMesh>() +
@@ -4751,16 +4797,22 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	TSharedPtr<FVoxelHeightfieldPageMesh, ESPMode::ThreadSafe> PageMesh;
 	if (!bDataOnly)
 	{
+		MeshAdmissionStage = TEXT("MeshCounterOrPlan");
 		PageMesh = VoxelBoundedAllocation::MakeWorkerShared<FVoxelHeightfieldPageMesh>(BuildStorage->MetadataLease);
 		FString Error;
 		const uint64 RetainedBytes = Prepared->Surface->EstimatedMeshBytes + 64ull * 1024ull;
 		if (Prepared->Surface->EstimatedMeshBytes == 0)
 		{
 			MeshEstimate = VoxelBoundedAllocation::MakeWorkerShared<FHeightfieldMeshEstimate>(BuildStorage->MetadataLease);
-			if (!MeshEstimate->Counter.Initialize(Geometry, Error, 0, true, BuildStorage->WorkingCapacityBytes, GeometryLimit)) return false;
+			if (!MeshEstimate->Counter.Initialize(Geometry, Error, 0, true, BuildStorage->WorkingCapacityBytes, GeometryLimit))
+			{
+				MeshAdmissionError = Error;
+				return false;
+			}
 		}
 		else if (!PageMesh->Initialize(Geometry, Error, RetainedBytes, false, BuildStorage->WorkingCapacityBytes, GeometryLimit))
 		{
+			MeshAdmissionError = Error;
 			Scheduler.ObserveDemand(Request.Kind, Request.Stamp, EVoxelTaskBlockReason::Oversized);
 			return false;
 		}
@@ -4769,6 +4821,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 		Request.ReservedBytes = 1;
 	}
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("CompletionCapacity"));
+	MeshAdmissionStage = TEXT("CompletionCapacity");
 	if ((bDataOnly || !MeshEstimate) && !AdmitCoarseCompletion(Scheduler, Request, BuildStorage)) return false;
 	{
 		FString CallbackBindingError;
@@ -4919,9 +4972,11 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 
 	if (bDataOnly)
 		return EnqueuePreparedData(MoveTemp(Request), BuildStorage->GeometryCapacityBytes);
+	MeshAdmissionStage = TEXT("Enqueue");
 	if (!EnqueueViewTask(MoveTemp(Request)))
 		return false;
 	RemovePreparedData(DataKey);
+	MeshAdmissionStage = TEXT("Submitted");
 	return true;
 }
 
@@ -7141,7 +7196,6 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 			bHeightfieldTopologyDirty = true;
 		}
 	};
-	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewHandoff);
 	const double ResolveStart = FPlatformTime::Seconds();
 	const auto ContentSnapshot = Module.GetRuntime()->GetChangeHierarchy().CaptureVersionSnapshot();
 	PrepareFineShardPresentations();
@@ -7461,7 +7515,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 								 TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> Common = nullptr) -> FVoxelGameThreadContinuation
 	{
 		bool bSuccess = false;
-		if (bActiveCoverageFull)
+		if (bActiveCoverageFull || GetInputRoot().bInitialLayout)
 		{
 			co_await Publisher->SetCoverageSteps(Group, SourceId, MoveTemp(Boxes), Common, bSuccess);
 		}
@@ -7478,7 +7532,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 									   TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> Common) -> FVoxelGameThreadContinuation
 	{
 		bool bSuccess = false;
-		if (bActiveCoverageFull)
+		if (bActiveCoverageFull || GetInputRoot().bInitialLayout)
 		{
 			co_await Publisher->SetSharedCoverageSteps(Group, SourceId, Common, bSuccess);
 		}
@@ -7740,6 +7794,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 	co_await VoxelMeshClipper::NormalizeBoxesSteps(ProxySurfaceBoxes);
 	const auto CommonHeightfieldBoxes = MakeShared<TArray<FBox>, ESPMode::ThreadSafe>(FineBoxes);
 	CommonHeightfieldBoxes->Append(ProxySurfaceBoxes);
+	co_await VoxelMeshClipper::NormalizeBoxesSteps(*CommonHeightfieldBoxes);
 	const auto CommonTransitionBoxes = MakeShared<TArray<FBox>, ESPMode::ThreadSafe>();
 	for (FBox Bounds : *CommonHeightfieldBoxes)
 	{
@@ -8159,9 +8214,10 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 		UE_LOG(LogTemp, Display, TEXT("Voxel coverage phase elapsed ms: plan=%.3f boxes=%.3f actors=%.3f commit=%.3f"), PlanMilliseconds, BoxesMilliseconds,
 			SourcesMilliseconds, (Now - ResolveStart) * 1000.0 - PlanMilliseconds - BoxesMilliseconds - SourcesMilliseconds);
 		// boxes 总阶段还包含高度场拓扑及交接；单独计量，避免误判为排序耗时。
-		UE_LOG(LogTemp, Display, TEXT("Voxel coverage boxes elapsed ms: heightfieldPlan=%.3f normalize=%.3f raw=%d/%d/%d compact=%d/%d/%d"),
+		UE_LOG(LogTemp, Display, TEXT("Voxel coverage boxes elapsed ms: heightfieldPlan=%.3f normalize=%.3f raw=%d/%d/%d compact=%d/%d/%d commonHeightfield=%d commonTransition=%d initialLayout=%d fullMaskInputs=%d"),
 			HeightfieldPlanMilliseconds, NormalizeMilliseconds, RawFineBoxes, RawProxyBoxes, RawProxySurfaceBoxes,
-			FineBoxes.Num(), ProxyBoxes.Num(), ProxySurfaceBoxes.Num());
+			FineBoxes.Num(), ProxyBoxes.Num(), ProxySurfaceBoxes.Num(), CommonHeightfieldBoxes->Num(), CommonTransitionBoxes->Num(),
+			bInitialLayout, bActiveCoverageFull || bInitialLayout);
 		NextTimingLog = Now + 5.0;
 	}
 }

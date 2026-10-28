@@ -49,7 +49,7 @@ uint64 FVoxelHeightfieldPageBuild::MaximumRetainedBytes() const
 	const int32 Count = Side * Side;
 	// Surface + Water 和 Macro 共用较大的 Surface 输出容量模型。
 	return WorkerSharedBytes<FVoxelHeightfieldPageBuild>() + ArrayBytes<FVoxelTerrainBuildShard>(Parts * Parts) +
-		4 * ArrayBytes<int32>(Count) + 2 * ArrayBytes<uint16>(Count) + 2 * ArrayBytes<uint8>(Count) +
+		4 * ArrayBytes<int32>(Count) + ArrayBytes<FVoxelBlockState>(Count) + ArrayBytes<uint16>(Count) + 2 * ArrayBytes<uint8>(Count) +
 		MaximumDistantBytes();
 }
 
@@ -78,9 +78,9 @@ bool FVoxelHeightfieldPageBuild::Advance(const FVoxelSurfaceProxyBuilder& InBuil
 		SurfacePage.Side = int32(Geometry.Key.SideCells() / SurfacePage.Step) + 1;
 		const int32 Count = SurfacePage.Side * SurfacePage.Side;
 		SurfacePage.GroundZ.Reserve(Count); SurfacePage.WaterZ.Reserve(Count);
-		SurfacePage.SurfaceMaterial.Reserve(Count); SurfacePage.Biome.Reserve(Count); SurfacePage.Flags.Reserve(Count);
+		SurfacePage.SurfaceStates.Reserve(Count); SurfacePage.Biome.Reserve(Count); SurfacePage.Flags.Reserve(Count);
 		SurfacePage.GroundZ.SetNumUninitialized(Count); SurfacePage.WaterZ.SetNumUninitialized(Count);
-		SurfacePage.SurfaceMaterial.SetNumUninitialized(Count); SurfacePage.Biome.SetNumUninitialized(Count);
+		SurfacePage.SurfaceStates.SetNumUninitialized(Count); SurfacePage.Biome.SetNumUninitialized(Count);
 		SurfacePage.Flags.SetNumUninitialized(Count);
 		SurfacePage.DistantCells.Reserve(MaximumWindowDistantCells * Shards.Num());
 		bAllocated = true;
@@ -92,7 +92,7 @@ bool FVoxelHeightfieldPageBuild::Advance(const FVoxelSurfaceProxyBuilder& InBuil
 	const FIntPoint Offset = Part.LocalMinCells / SurfacePage.Step;
 	CopyGrid(Part.GroundZ, Part.Side, SurfacePage.GroundZ, SurfacePage.Side, Offset);
 	CopyGrid(Part.WaterZ, Part.Side, SurfacePage.WaterZ, SurfacePage.Side, Offset);
-	CopyGrid(Part.SurfaceMaterial, Part.Side, SurfacePage.SurfaceMaterial, SurfacePage.Side, Offset);
+	CopyGrid(Part.SurfaceStates, Part.Side, SurfacePage.SurfaceStates, SurfacePage.Side, Offset);
 	CopyGrid(Part.Biome, Part.Side, SurfacePage.Biome, SurfacePage.Side, Offset);
 	CopyGrid(Part.Flags, Part.Side, SurfacePage.Flags, SurfacePage.Side, Offset);
 	SurfacePage.Revision = FMath::Max(SurfacePage.Revision, Part.Revision);
@@ -119,9 +119,9 @@ bool FVoxelHeightfieldPageBuild::Advance(const FVoxelMacroTerrainBuilder& InBuil
 		MacroPage.Side = int32(Geometry.Key.SideCells() / MacroPage.Step) + 1;
 		const int32 Count = MacroPage.Side * MacroPage.Side;
 		MacroPage.Height.Reserve(Count); MacroPage.WaterHeight.Reserve(Count); MacroPage.WaterKind.Reserve(Count);
-		MacroPage.SurfaceClass.Reserve(Count); MacroPage.ForestCoverage.Reserve(Count); MacroPage.SnowCoverage.Reserve(Count);
+		MacroPage.SurfaceStates.Reserve(Count); MacroPage.ForestCoverage.Reserve(Count); MacroPage.SnowCoverage.Reserve(Count);
 		MacroPage.Height.SetNumUninitialized(Count); MacroPage.WaterHeight.SetNumUninitialized(Count);
-		MacroPage.WaterKind.SetNumUninitialized(Count); MacroPage.SurfaceClass.SetNumUninitialized(Count);
+		MacroPage.WaterKind.SetNumUninitialized(Count); MacroPage.SurfaceStates.SetNumUninitialized(Count);
 		MacroPage.ForestCoverage.SetNumUninitialized(Count); MacroPage.SnowCoverage.SetNumUninitialized(Count);
 		MacroPage.DistantCells.Reserve(MaximumWindowDistantCells * Shards.Num());
 		bAllocated = true;
@@ -134,7 +134,7 @@ bool FVoxelHeightfieldPageBuild::Advance(const FVoxelMacroTerrainBuilder& InBuil
 	CopyGrid(Part.Height, Part.Side, MacroPage.Height, MacroPage.Side, Offset);
 	CopyGrid(Part.WaterHeight, Part.Side, MacroPage.WaterHeight, MacroPage.Side, Offset);
 	CopyGrid(Part.WaterKind, Part.Side, MacroPage.WaterKind, MacroPage.Side, Offset);
-	CopyGrid(Part.SurfaceClass, Part.Side, MacroPage.SurfaceClass, MacroPage.Side, Offset);
+	CopyGrid(Part.SurfaceStates, Part.Side, MacroPage.SurfaceStates, MacroPage.Side, Offset);
 	CopyGrid(Part.ForestCoverage, Part.Side, MacroPage.ForestCoverage, MacroPage.Side, Offset);
 	CopyGrid(Part.SnowCoverage, Part.Side, MacroPage.SnowCoverage, MacroPage.Side, Offset);
 	MacroPage.Revision = FMath::Max(MacroPage.Revision, Part.Revision);

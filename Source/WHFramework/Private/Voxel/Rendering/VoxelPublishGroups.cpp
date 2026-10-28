@@ -348,6 +348,16 @@ void FVoxelPublishBoundsIndex::Add(const int32 InOrdinal, const FBox& InBounds)
 	double Side = 800.0;
 	const double Extent = FMath::Max(InBounds.Max.X - InBounds.Min.X, InBounds.Max.Y - InBounds.Min.Y);
 	while (Side < Extent && Level < 31) { ++Level; Side *= 2.0; }
+	uint8 RequiredRootLevel = Level;
+	double RootSide = Side;
+	while (RequiredRootLevel < 31 &&
+		(InBounds.Min.X < -RootSide || InBounds.Min.Y < -RootSide ||
+		 InBounds.Max.X >= RootSide || InBounds.Max.Y >= RootSide))
+	{
+		++RequiredRootLevel;
+		RootSide *= 2.0;
+	}
+	RootLevel = FMath::Max(RootLevel, RequiredRootLevel);
 	const FIntPoint Min(FMath::FloorToInt(InBounds.Min.X / Side), FMath::FloorToInt(InBounds.Min.Y / Side));
 	const FIntPoint Max(FMath::FloorToInt(InBounds.Max.X / Side), FMath::FloorToInt(InBounds.Max.Y / Side));
 	for (int32 Y = Min.Y; Y <= Max.Y; ++Y)
@@ -369,8 +379,8 @@ void FVoxelPublishBoundsIndex::BeginQuery(const FBox& InBounds, FQuery& OutQuery
 {
 	OutQuery = {};
 	OutQuery.Bounds = InBounds;
-	if (!InBounds.IsValid) return;
-	for (int32 Y : {-1, 0}) for (int32 X : {-1, 0}) OutQuery.Stack.Add({FIntPoint(X, Y), 31});
+	if (!InBounds.IsValid || Bounds.IsEmpty()) return;
+	for (int32 Y : {-1, 0}) for (int32 X : {-1, 0}) OutQuery.Stack.Add({FIntPoint(X, Y), RootLevel});
 }
 
 bool FVoxelPublishBoundsIndex::AdvanceQuery(FQuery& InOutQuery, int32& OutOrdinal) const

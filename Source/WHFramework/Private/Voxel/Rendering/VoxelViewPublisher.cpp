@@ -2867,6 +2867,13 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 			PendingPlan ? PendingPlan->Cursor : -1, PendingPlan ? PendingPlan->SelectedKeys.Num() : 0,
 			PendingPlan ? PendingPlan->BlockedComponents.Num() : 0, Publications.Num(), PriorityPlan ? PriorityPlan->Phase : -1,
 			ReadyPrepareGroups.Num(), ReadyCommitGroups.Num(), ActiveNativeGroups, MaximumNativeGroups, PendingPlan ? PendingPlan->Graph.GetComparedFootprints() : 0);
+		if (PriorityPlan)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Publisher priority continuation: phase=%d cursor=%d/%d publications=%d inner=%d revision=%llu/%llu queryActive=%d queryStack=%d querySeen=%d"),
+				PriorityPlan->Phase, PriorityPlan->Cursor, PriorityPlan->Groups.Num(), PriorityPlan->Publications.Num(),
+				PriorityPlan->InnerCursor, PriorityPlan->Revision, PriorityRevision, PriorityPlan->bSpatialQueryActive,
+				PriorityPlan->SpatialQuery.Stack.Num(), PriorityPlan->SpatialQuery.Seen.Num());
+		}
 		int32 LoggedGroups = 0;
 		const int32 DiagnosticLimit = MaximumNativeGroups + 6;
 		// 先显示真正占用槽位的组，再显示最旧等待组，避免关键等待被截断。

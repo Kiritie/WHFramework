@@ -49,7 +49,7 @@ struct WHFRAMEWORK_API FVoxelSurfaceTileData
 	uint64 Revision = 0;
 	TArray<int32> GroundZ;
 	TArray<int32> WaterZ;
-	TArray<uint16> SurfaceMaterial;
+	TArray<FVoxelBlockState> SurfaceStates;
 	TArray<uint16> Biome;
 	TArray<uint8> Flags;
 	TArray<FVoxelDistantCell> DistantCells;

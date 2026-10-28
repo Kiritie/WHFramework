@@ -6,6 +6,7 @@
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelWaterView.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
+#include "Voxel/Geometry/VoxelShapeRegistry.h"
 
 namespace
 {
@@ -33,23 +34,14 @@ namespace
 	}
 
 	bool ResolveFace(
-		const uint16 InSymbol,
+		const FVoxelBlockState InState,
 		const uint8 InFaceIndex,
-		const FVoxelGenerationRuntimeConfig& InConfig,
 		const FVoxelRegistrySnapshot& InRegistry,
 		const FVoxelRuntimeDefinition*& OutDefinition,
 		const FVoxelRuntimeFaceRef*& OutFace,
 		FString& OutError)
 	{
-		FVoxelBlockState State;
-
-		if (!InConfig.ToRuntime(InSymbol, State))
-		{
-			OutError = TEXT("Blocky heightfield contains an invalid material symbol");
-			return false;
-		}
-
-		OutDefinition = InRegistry.Find(State.TypeId);
+		OutDefinition = InRegistry.Find(InState.TypeId);
 
 		if (!OutDefinition)
 		{
@@ -57,7 +49,8 @@ namespace
 			return false;
 		}
 
-		OutFace = &OutDefinition->Face(State.State, InFaceIndex);
+		const uint8 MaterialFace = FVoxelShapeRegistry::RotateFace(InFaceIndex, uint8((4 - (InState.State & 3)) & 3));
+		OutFace = &OutDefinition->Face(InState.State, MaterialFace);
 		return true;
 	}
 
@@ -295,7 +288,7 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 	const int32 InVertexSide,
 	const int32 InStep,
 	TConstArrayView<int32> InHeights,
-	TConstArrayView<uint16> InMaterials,
+	TConstArrayView<FVoxelBlockState> InMaterials,
 	const FVoxelGenerationRuntimeConfig& InConfig,
 	const FVoxelRegistrySnapshot& InRegistry,
 	FVoxelSectionMeshResult& OutMesh,
@@ -376,7 +369,6 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 			if (!ResolveFace(
 					InMaterials[CellIndex(InMaterialX, InMaterialY)],
 					InFaceIndex,
-					InConfig,
 					InRegistry,
 					Definition,
 					Face,
@@ -586,7 +578,7 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 	if (InMacro.Side < 2 || InMacro.Step <= 0 ||
 		InMacro.WaterHeight.Num() != Count || InMacro.Height.Num() != Count ||
 		InMacro.WaterKind.Num() != Count ||
-		InMacro.SurfaceClass.Num() != Count ||
+		InMacro.SurfaceStates.Num() != Count ||
 		(!InMacro.ForestCoverage.IsEmpty() && InMacro.ForestCoverage.Num() != Count))
 	{
 		OutError = TEXT("Invalid macro water input");
@@ -613,7 +605,7 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 		for (int32 X = Window.Min.X; X < Window.Max.X; ++X)
 		{
 			const int32 Index = X + Y * InMacro.Side;
-			if (InMacro.SurfaceClass[Index] == InConfig.Recipe->Palette.Grass &&
+			if (InMacro.SurfaceStates[Index].TypeId == InConfig.Grass.TypeId &&
 				(InMacro.WaterHeight[Index] == MIN_int32 || InMacro.WaterHeight[Index] < InMacro.Height[Index]))
 			{
 				TopTints[(X - Window.Min.X) + Window.Width() * (Y - Window.Min.Y)] = FMath::Lerp(FLinearColor::White, LeafTint,
@@ -623,7 +615,7 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 	}
 	FVoxelSectionMeshResult Mesh;
 	if (!BuildBlockyTerrain(
-		InMacro.Side, InMacro.Step, InMacro.Height, InMacro.SurfaceClass,
+		InMacro.Side, InMacro.Step, InMacro.Height, InMacro.SurfaceStates,
 		InConfig, InRegistry, Mesh, OutError, InCancel, {}, -0.05,
 		InMaximumTextureStretchCells, TopTints, Window))
 	{

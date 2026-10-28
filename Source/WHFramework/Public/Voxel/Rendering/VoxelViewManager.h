@@ -378,6 +378,10 @@ private:
 	uint64 NextFineShardIncarnation = 0;
 	uint64 NextFineShardSequence = 0;
 	int32 FineShardAdmissionCursor = 0;
+	TOptional<FVoxelFineShardKey> FineShardAdmissionContinuation;
+	uint64 FineShardAdmissionScans = 0;
+	uint64 FineShardAdmissionAttempts = 0;
+	uint64 FineShardAdmissionContinuationAttempts = 0;
 	int32 FineShardPresentationCursor = 0;
 	FVoxelTerrainWorkSelection FineShardAdmissionSelection;
 	FVoxelTerrainWorkSelection FineShardPresentationSelection;

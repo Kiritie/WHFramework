@@ -133,7 +133,7 @@ namespace NativeHeightfieldInterface
 		const int32 Side = Surface ? Surface->Side : Macro->Side, Step = Surface ? Surface->Step : Macro->Step;
 		const FIntPoint Origin = Surface ? Surface->GetBuildOrigin() : Macro->GetBuildOrigin();
 		const TConstArrayView<int32> Ground = Surface ? MakeArrayView(Surface->GroundZ) : MakeArrayView(Macro->Height);
-		const TConstArrayView<uint16> Materials = Surface ? MakeArrayView(Surface->SurfaceMaterial) : MakeArrayView(Macro->SurfaceClass);
+		const TConstArrayView<FVoxelBlockState> Materials = Surface ? MakeArrayView(Surface->SurfaceStates) : MakeArrayView(Macro->SurfaceStates);
 		const TConstArrayView<FVoxelDistantCell> DistantCells = Surface ? MakeArrayView(Surface->DistantCells) : MakeArrayView(Macro->DistantCells);
 		const auto WaterData = Source.FrozenWater;
 		const TConstArrayView<int32> WaterGround = Macro ? MakeArrayView(Macro->Height) : WaterData ? MakeArrayView(WaterData->GroundZ) : TConstArrayView<int32>();
@@ -175,9 +175,13 @@ namespace NativeHeightfieldInterface
 			const int32 CellX = FMath::FloorToInt((Sample.X - Origin.X) / Step), CellY = FMath::FloorToInt((Sample.Y - Origin.Y) / Step);
 			if (CellX < 0 || CellY < 0 || CellX >= Side - 1 || CellY >= Side - 1) return false;
 			const int32 GroundIndex = CellX + CellY * Side;
-			FVoxelBlockState GroundState;
-			if (!Config.ToRuntime(Materials[GroundIndex], GroundState)) return false;
+			const FVoxelBlockState GroundState = Materials[GroundIndex];
 			const auto* GroundDefinition = GroundState.IsAir() ? nullptr : Registry.Find(GroundState.TypeId);
+			if (!GroundState.IsAir() && !GroundDefinition)
+			{
+				Error = TEXT("Native heightfield ground material is absent from registry");
+				return false;
+			}
 			const double Height = !GroundDefinition || Ground[GroundIndex] == MIN_int32 ? -MAX_dbl : Ground[GroundIndex] + 1.0 + (Surface ? -.02 : -.05);
 			const FVoxelRuntimeDefinition* WaterDefinition = nullptr;
 			for (const auto& Definition : Registry.Definitions) if (Definition.RenderGroup == EVoxelRenderGroup::Water) { WaterDefinition = &Definition; break; }

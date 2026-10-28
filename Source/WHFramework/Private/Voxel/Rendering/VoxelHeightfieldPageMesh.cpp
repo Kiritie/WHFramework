@@ -99,7 +99,7 @@ bool FVoxelHeightfieldPageMesh::Advance(const FVoxelSurfaceTileData& InData,
 		InData.Key != FVoxelSurfaceTileKey{FIntPoint(Geometry.Key.Coordinate.X, Geometry.Key.Coordinate.Y), Geometry.Key.Level} ||
 		InData.LocalMinCells != FIntPoint::ZeroValue || InData.Side < 2 || InData.Side > 257 ||
 		InData.Step != Geometry.SampleStepCells || int64(InData.Side - 1) * InData.Step != Geometry.Key.SideCells() ||
-		InData.GroundZ.Num() != InData.Side * InData.Side || InData.SurfaceMaterial.Num() != InData.GroundZ.Num() ||
+		InData.GroundZ.Num() != InData.Side * InData.Side || InData.SurfaceStates.Num() != InData.GroundZ.Num() ||
 		InWater.Key != InData.Key || InWater.Step != InData.Step || InWater.Side != InData.Side ||
 		InWater.GroundZ.Num() != InData.GroundZ.Num() || InWater.WaterZ.Num() != InData.GroundZ.Num() ||
 		InWater.WaterKind.Num() != InData.GroundZ.Num() ||
@@ -125,7 +125,7 @@ bool FVoxelHeightfieldPageMesh::Advance(const FVoxelSurfaceTileData& InData,
 	{
 		FVoxelSectionMeshResult Water;
 		if (!FVoxelHeightfieldMesher::BuildBlockyTerrain(InData.Side, InData.Step, InData.GroundZ,
-			InData.SurfaceMaterial, InConfig, InRegistry, Part, OutError, InCancel, {}, -0.02,
+			InData.SurfaceStates, InConfig, InRegistry, Part, OutError, InCancel, {}, -0.02,
 			InTextureStretch, {}, Window) ||
 			!FVoxelHeightfieldMesher::BuildWater(InWater, InRegistry, Water, OutError, InCancel, InTextureStretch, Window)) return false;
 		for (auto& Batch : Water.Batches)
@@ -163,7 +163,7 @@ bool FVoxelHeightfieldPageMesh::Advance(const FVoxelMacroTileData& InData,
 		InData.LocalMinCells != FIntPoint::ZeroValue || InData.Side < 2 || InData.Side > 257 ||
 		InData.Step != Geometry.SampleStepCells || int64(InData.Side - 1) * InData.Step != Geometry.Key.SideCells() ||
 		InData.Height.Num() != InData.Side * InData.Side || InData.WaterHeight.Num() != InData.Height.Num() ||
-		InData.WaterKind.Num() != InData.Height.Num() || InData.SurfaceClass.Num() != InData.Height.Num() ||
+		InData.WaterKind.Num() != InData.Height.Num() || InData.SurfaceStates.Num() != InData.Height.Num() ||
 		InData.ForestCoverage.Num() != InData.Height.Num() || InData.SnowCoverage.Num() != InData.Height.Num() ||
 		!FMath::IsFinite(InTextureStretch) || InTextureStretch <= 0.0)
 	{

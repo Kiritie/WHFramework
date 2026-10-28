@@ -2017,18 +2017,8 @@ bool FVoxelGenerationPlanCoordinator::FClosureDemand::Contains(const FVoxelGener
 bool FVoxelGenerationPlanCoordinator::SetFactDependencies(const FVoxelGenerationPlanDependency& InDependency, FString& OutError)
 {
 	const auto& State = Storage->States.FindChecked(InDependency);
-	bool bSame = PriorityGraph.GetDependencyCount(State.PriorityNode) == State.Prerequisites.Num();
-	for (const auto& Prerequisite : State.Prerequisites)
-	{
-		const auto* Child = Storage->States.Find(Prerequisite);
-		if (!Child)
-		{
-			OutError = TEXT("CapacityBlocked: generation read closure registration incomplete");
-			return false;
-		}
-		bSame &= PriorityGraph.HasDependency(State.PriorityNode, Child->PriorityNode);
-	}
-	if (bSame)
+	// 同一事实的前置只追加；删除子事实会同步移除图边，数量相同即直接边仍完整。
+	if (PriorityGraph.GetDependencyCount(State.PriorityNode) == State.Prerequisites.Num())
 	{
 		OutError.Reset();
 		return true;

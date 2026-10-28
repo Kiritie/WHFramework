@@ -49,7 +49,7 @@ public:
 		int32 InVertexSide,
 		int32 InStep,
 		TConstArrayView<int32> InHeights,
-		TConstArrayView<uint16> InMaterials,
+		TConstArrayView<FVoxelBlockState> InMaterials,
 		const FVoxelGenerationRuntimeConfig& InConfig,
 		const FVoxelRegistrySnapshot& InRegistry,
 		FVoxelSectionMeshResult& OutMesh,

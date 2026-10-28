@@ -48,7 +48,7 @@ struct FVoxelHeightfieldTileView
 	TConstArrayView<uint8> SurfaceFlags;
 	uint8 GetWaterKind(int32 InIndex) const;
 	int32 WaterKindCount() const { return SurfaceFlags.IsEmpty() ? WaterKind.Num() : SurfaceFlags.Num(); }
-	TConstArrayView<uint16> Material;
+	TConstArrayView<FVoxelBlockState> SurfaceStates;
 	double ZBias = 0.0;
 
 	int32 CellSide() const

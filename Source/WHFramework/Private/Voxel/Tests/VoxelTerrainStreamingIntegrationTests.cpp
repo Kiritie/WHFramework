@@ -349,7 +349,7 @@ bool FVoxelHeightfieldWindowIntegrationTest::RunTest(const FString& InParameters
 	Data.Step = 1;
 	const int32 Count = Data.Side * Data.Side;
 	Data.GroundZ.SetNum(Count);
-	Data.SurfaceMaterial.Init(Config->Grass.TypeId, Count);
+	Data.SurfaceStates.Init(Config->Grass, Count);
 	Data.WaterZ.Init(MIN_int32, Count);
 	Data.Flags.Init(0, Count);
 	for (int32 Y = 0; Y < Data.Side; ++Y)
@@ -364,7 +364,7 @@ bool FVoxelHeightfieldWindowIntegrationTest::RunTest(const FString& InParameters
 	if (!FVoxelWaterViewBuilder().Build(Data, Water, Error)) { AddError(Error); return false; }
 	FVoxelSectionMeshResult Whole, WaterMesh, Sliced;
 	if (!FVoxelHeightfieldMesher::BuildBlockyTerrain(Data.Side, Data.Step, Data.GroundZ,
-		Data.SurfaceMaterial, *Config, *Registry, Whole, Error) ||
+		Data.SurfaceStates, *Config, *Registry, Whole, Error) ||
 		!FVoxelHeightfieldMesher::BuildWater(Water, *Registry, WaterMesh, Error)) { AddError(Error); return false; }
 	Whole.Batches.Append(MoveTemp(WaterMesh.Batches));
 	FVoxelHeightfieldPageMesh Page;
@@ -417,7 +417,7 @@ bool FVoxelHeightfieldCapacityIntegrationTest::RunTest(const FString& InParamete
 	Data.Step = 1;
 	const int32 Count = Data.Side * Data.Side;
 	Data.GroundZ.Init(8, Count);
-	Data.SurfaceMaterial.Init(Config->Grass.TypeId, Count);
+	Data.SurfaceStates.Init(Config->Grass, Count);
 	Data.WaterZ.Init(MIN_int32, Count);
 	Data.Flags.Init(0, Count);
 	FString Error;

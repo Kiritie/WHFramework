@@ -351,7 +351,7 @@ uint64 FVoxelTaskResult::ResultBytes() const
 	if (Surface)
 	{
 		Bytes += sizeof(FVoxelSurfaceTileData) + Surface->GroundZ.GetAllocatedSize() +
-			Surface->WaterZ.GetAllocatedSize() + Surface->SurfaceMaterial.GetAllocatedSize() +
+			Surface->WaterZ.GetAllocatedSize() + Surface->SurfaceStates.GetAllocatedSize() +
 			Surface->Biome.GetAllocatedSize() + Surface->Flags.GetAllocatedSize() + Surface->DistantCells.GetAllocatedSize();
 	}
 	if (Water)
@@ -363,7 +363,7 @@ uint64 FVoxelTaskResult::ResultBytes() const
 	{
 		Bytes += sizeof(FVoxelMacroTileData) + Macro->Height.GetAllocatedSize() + Macro->WaterHeight.GetAllocatedSize() +
 			Macro->WaterKind.GetAllocatedSize() +
-			Macro->SurfaceClass.GetAllocatedSize() + Macro->ForestCoverage.GetAllocatedSize() + Macro->SnowCoverage.GetAllocatedSize() +
+			Macro->SurfaceStates.GetAllocatedSize() + Macro->ForestCoverage.GetAllocatedSize() + Macro->SnowCoverage.GetAllocatedSize() +
 			Macro->LargeStructures.GetAllocatedSize() + Macro->DistantCells.GetAllocatedSize();
 	}
 
@@ -831,34 +831,43 @@ void FVoxelTaskScheduler::ChangedQueueAdmission()
 
 EVoxelTaskBlockReason FVoxelTaskScheduler::SelectPendingDisplacements(const FVoxelTaskRequest& InRequest, int32* OutPendingLimit)
 {
+	const int32 Lane = TerrainLane(InRequest);
+	constexpr int32 LaneCount = static_cast<int32>(EVoxelTaskServiceLane::Count);
+	int32 Counts[LaneCount] = {};
+	int32 CoarseCounts[LaneCount] = {};
+	int32 PendingCoarseTerrainTasks = 0;
+	for (const FVoxelTaskRequest& Existing : Pending)
+	{
+		const int32 ExistingLane = TerrainLane(Existing);
+		++Counts[ExistingLane];
+		if (Existing.WorkClass != EVoxelWorkClass::Critical &&
+			(IsCoarseTerrainKind(Existing.Kind) || IsRepresentationDataKind(Existing.Kind) || Existing.Kind == EVoxelTaskKind::BuildVoxelProxy))
+		{
+			++PendingCoarseTerrainTasks;
+			++CoarseCounts[ExistingLane];
+		}
+	}
 	if ((IsCoarseTerrainKind(InRequest.Kind) || IsRepresentationDataKind(InRequest.Kind) ||
 		InRequest.Kind == EVoxelTaskKind::BuildVoxelProxy) && InRequest.WorkClass != EVoxelWorkClass::Critical)
 	{
-		int32 PendingCoarseTerrainTasks = 0;
-
-		for (const FVoxelTaskRequest& PendingRequest : Pending)
+		constexpr EVoxelTaskServiceLane CoarseLanes[] = {
+			EVoxelTaskServiceLane::ProxyData, EVoxelTaskServiceLane::SurfaceData, EVoxelTaskServiceLane::MacroData,
+			EVoxelTaskServiceLane::ProxyMesh, EVoxelTaskServiceLane::SurfaceMesh, EVoxelTaskServiceLane::MacroMesh};
+		const int32 ReservedPerCoarseLane = Budget.MaxPendingCoarseTerrainTasks >= UE_ARRAY_COUNT(CoarseLanes) ? 1 : 0;
+		int32 CoarseLimit = Budget.MaxPendingCoarseTerrainTasks;
+		for (const auto CoarseLane : CoarseLanes)
 		{
-			PendingCoarseTerrainTasks +=
-				(PendingRequest.WorkClass != EVoxelWorkClass::Critical &&
-					(IsCoarseTerrainKind(PendingRequest.Kind) || IsRepresentationDataKind(PendingRequest.Kind) ||
-						PendingRequest.Kind == EVoxelTaskKind::BuildVoxelProxy))
-					? 1
-					: 0;
+			const int32 Index = static_cast<int32>(CoarseLane);
+			if (Index != Lane) CoarseLimit -= FMath::Max(0, ReservedPerCoarseLane - CoarseCounts[Index]);
 		}
-
-		if (PendingCoarseTerrainTasks >=
-			Budget.MaxPendingCoarseTerrainTasks)
+		if (PendingCoarseTerrainTasks >= CoarseLimit)
 		{
 			return EVoxelTaskBlockReason::PendingCapacity;
 		}
 	}
 
 	const bool bBackground = IsBackgroundTerrainWork(InRequest.Kind, InRequest.WorkClass, InRequest.TerrainStage);
-	const int32 Lane = TerrainLane(InRequest);
-	constexpr int32 LaneCount = static_cast<int32>(EVoxelTaskServiceLane::Count);
 	const int32 ReservedPerLane = Budget.MaxPendingTasks >= LaneCount - 1 ? 1 : 0;
-	int32 Counts[LaneCount] = {};
-	for (const auto& Existing : Pending) ++Counts[TerrainLane(Existing)];
 	int32 PendingLimit = Budget.MaxPendingTasks;
 	for (int32 Index = 1; Index < LaneCount - 1; ++Index)
 		if (Index != Lane) PendingLimit -= FMath::Max(0, ReservedPerLane - Counts[Index]);
@@ -2293,12 +2302,13 @@ void FVoxelTaskScheduler::Pump()
 		Capacity.NearReservedWorkers = FMath::Min(Budget.CriticalReservedTasks, MaximumWorkers);
 		Capacity.bAllowOverdueOpportunity = FrameContext ? FrameContext->IsOverdueOpportunityAvailable() :
 			bUnframedOverdueOpportunityAvailable;
-		Capacity.bPreserveDistanceOrder = true;
+		Capacity.bPreserveDistanceOrder = false;
 		for (const FRunning& Task : Running)
 		{
 			Capacity.RunningNearWorkers += Task.bServiceNear ? 1 : 0;
 		}
 		WorkerCandidates.Reset();
+		double OldestRunnableWaitSeconds = 0.0;
 		for (int32 Index = 0; Index < Pending.Num(); ++Index)
 		{
 			FVoxelTaskRequest& Request = Pending[Index];
@@ -2343,6 +2353,10 @@ void FVoxelTaskScheduler::Pump()
 			{
 				Request.FirstRunnableSeconds = Now;
 			}
+			if (bRunnable)
+			{
+				OldestRunnableWaitSeconds = FMath::Max(OldestRunnableWaitSeconds, Now - Request.FirstRunnableSeconds);
+			}
 			FVoxelTerrainServiceCandidate& Candidate = WorkerCandidates.AddDefaulted_GetRef();
 			Candidate.Index = Index;
 			Candidate.Priority = ResolveServicePriority(Request);
@@ -2375,6 +2389,7 @@ void FVoxelTaskScheduler::Pump()
 					Request.FirstRunnableSeconds = Now;
 				}
 				Candidate.FirstQueuedSeconds = Request.FirstRunnableSeconds;
+				OldestRunnableWaitSeconds = FMath::Max(OldestRunnableWaitSeconds, Now - Request.FirstRunnableSeconds);
 			}
 			BestIndex = WorkerSelection.Select(WorkerCandidates, Capacity, Now, Charge);
 			if (BestIndex != INDEX_NONE)
@@ -2441,6 +2456,13 @@ void FVoxelTaskScheduler::Pump()
 		}
 		// 已接纳任务只消费原授额；调度与续跑不再向 Geometry 账本索取执行容量。
 		check(!ControlConsumer.IsValid() || Pending[BestIndex].ExecutionReservation);
+		if (FrameContext && FrameContext->GetFrameCounter() % 240 == 0)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Voxel worker dispatch: kind=%d band=%d distance=%.3f runnableWaitSeconds=%.6f oldestRunnableWaitSeconds=%.6f overdue=%d pending=%d workers=%d/%d preserveDistanceOrder=%d"),
+				int32(Pending[BestIndex].Kind), int32(Charge.Band), Pending[BestIndex].DistanceScore,
+				Now - Pending[BestIndex].FirstRunnableSeconds, OldestRunnableWaitSeconds, Charge.bOverdueOpportunity,
+				Pending.Num(), Running.Num(), MaximumWorkers, Capacity.bPreserveDistanceOrder);
+		}
 		if (Charge.bOverdueOpportunity)
 		{
 			if (FrameContext) FrameContext->ConsumeOverdueOpportunity();

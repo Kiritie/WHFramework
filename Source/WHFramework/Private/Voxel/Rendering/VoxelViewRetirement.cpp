@@ -56,6 +56,7 @@ void FVoxelViewManager::ResetRetirementContinuation()
 
 void FVoxelViewManager::CleanupRetiredRepresentations(const double InNow)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewRetire);
 	const double Start = FPlatformTime::Seconds();
 	const double Deadline = TerrainDeadline(0.25);
 	ON_SCOPE_EXIT { LastRetireMilliseconds = (FPlatformTime::Seconds() - Start) * 1000.0; };
@@ -176,7 +177,6 @@ bool FVoxelViewManager::ReleaseRetirementGeometry(const FVoxelTerrainSpatialKey&
 
 FVoxelGameThreadContinuation FVoxelViewManager::CleanupRetiredRepresentationSteps(const double InNow, const FVoxelPublishGroupKey Candidate)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewRetire);
 
 	auto CanRetire = [InNow](const double InLastWanted, const bool bReplacementReady, const bool bInsideDomain)
 	{

@@ -130,4 +130,5 @@ public:
 private:
 	TMap<FKey, FNode> Nodes;
 	TMap<int32, FBox> Bounds;
+	uint8 RootLevel = 0;
 };
