@@ -30,11 +30,24 @@ namespace
 	}
 }
 
-void FVoxelVolumeTransitionPlanner::GatherCoverageRegions(const TSet<FVoxelViewKey>& InVisible,
+bool FVoxelVolumeTransitionPlanner::SameInputs(const TSet<FVoxelViewKey>& InNodes, const TMap<FVoxelViewKey, int32>& InSampleSteps,
+	const TSet<FVoxelViewKey>& InOtherNodes, const TMap<FVoxelViewKey, int32>& InOtherSampleSteps)
+{
+	if (InNodes.Num() != InOtherNodes.Num() || !InNodes.Includes(InOtherNodes) ||
+		InSampleSteps.Num() != InOtherSampleSteps.Num()) return false;
+	for (const auto& Pair : InSampleSteps)
+	{
+		const int32* Other = InOtherSampleSteps.Find(Pair.Key);
+		if (!Other || *Other != Pair.Value) return false;
+	}
+	return true;
+}
+
+void FVoxelVolumeTransitionPlanner::GatherCoverageRegions(const TSet<FVoxelViewKey>& InVisible, const uint8 InRegionLevel,
 	TMap<FVoxelViewKey, TSet<FVoxelViewKey>>& OutRegions)
 {
 	OutRegions.Reset();
-	uint8 Level = 6;
+	uint8 Level = InRegionLevel;
 	for (const auto& Key : InVisible) Level = FMath::Max(Level, Key.Level);
 	TMap<FVoxelViewKey, TSet<FVoxelViewKey>> Owned;
 	for (const auto& Key : InVisible)
@@ -154,10 +167,10 @@ void FVoxelVolumeTransitionPlanner::Build(
 }
 
 FVoxelGameThreadContinuation FVoxelVolumeTransitionPlanner::GatherCoverageRegionsSteps(
-	const TSet<FVoxelViewKey>& InVisible, TMap<FVoxelViewKey, TSet<FVoxelViewKey>>& OutRegions)
+	const TSet<FVoxelViewKey>& InVisible, const uint8 InRegionLevel, TMap<FVoxelViewKey, TSet<FVoxelViewKey>>& OutRegions)
 {
 	OutRegions.Reset();
-	uint8 Level = 6;
+	uint8 Level = InRegionLevel;
 	for (const auto& Key : InVisible)
 	{
 		co_await FVoxelGameThreadContinuation::Yield();

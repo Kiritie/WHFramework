@@ -91,6 +91,7 @@ class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 	friend class FVoxelPublishEstimateRecoveryTest;
 	friend class FVoxelInterestInputBudgetTest;
 	friend class FVoxelManagerLocalCoverageTest;
+	friend class FVoxelVolumePlanInputReuseTest;
 	friend class FVoxelConcurrentPublishCommitTest;
 	friend class FVoxelNetworkWorldControlTest;
 	friend class FVoxelEmptyTransitionConvergenceTest;
@@ -189,8 +190,9 @@ public:
 	FVoxelGenerationConsumerKey GetTerrainTaskControlConsumer() const;
 	TSharedPtr<FVoxelPhysicsRetirement, ESPMode::ThreadSafe> GetPhysicsRetirement();
 	FVoxelGenerationDependencyStatus EnsureGenerationFacts(const FVoxelGenerationConsumerKey& InConsumer,
-		const FVoxelGenerationBounds& InBounds, const FVoxelTerrainServicePriority& InPriority);
+		const FVoxelGenerationBounds& InBounds, const FVoxelTerrainServicePriority& InPriority, bool bInAllowContinuation = false);
 	void ReleaseGenerationFacts(const FVoxelGenerationConsumerKey& InConsumer);
+	bool HasGenerationFactConsumer(const FVoxelGenerationConsumerKey& InConsumer) const;
 	TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> GetRegistry() const;
 	TSharedPtr<const FVoxelShapeRegistry, ESPMode::ThreadSafe> GetShapes() const;
 	UVoxelMaterialSet* GetMaterialSet() const;

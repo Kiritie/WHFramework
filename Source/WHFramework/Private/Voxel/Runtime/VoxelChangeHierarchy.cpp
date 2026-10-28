@@ -4,6 +4,7 @@
 #include "Voxel/Rendering/VoxelViewLod.h"
 #include "Voxel/Rendering/VoxelMacroTerrain.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 uint64 FVoxelChangeHierarchySnapshot::GetSectionRevision(const FIntVector& InSection) const
 {
@@ -268,6 +269,7 @@ bool FVoxelChangeHierarchy::CanReleaseGeometryWithoutAllocation(const FVoxelTerr
 
 bool FVoxelChangeHierarchy::RegisterFineShard(const FVoxelFineShardKey& InKey, FString& OutError, bool* OutAdded)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineIndexRegistration);
 	if (!InKey.Validate(OutError) || (InKey.SideCells != 16 && InKey.SideCells != 32 && InKey.SideCells != 64))
 		return Storage.Fail(EVoxelTerrainResourceAdmission::InvalidRequest, OutError);
 	FWriteScopeLock Scope(Lock);
@@ -766,6 +768,7 @@ struct FVoxelChangeHierarchy::FFineNodeDeleter
 bool FVoxelChangeHierarchy::MeasureNativeInput(uint64& OutBytes, int32& OutCount,
 	const FVoxelCoverageIndex* InCandidate, const FVoxelCoverageIndex* InRetainedOutput, FString& OutError) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineNativeInputMeasure);
 	const auto Resources = Storage.GetResources();
 	uint64 Bytes = Storage.GetBytes();
 	int32 Count = Storage.GetLeaseCount();
@@ -825,6 +828,7 @@ bool FVoxelChangeHierarchy::PrepareCoverageRequirements(FVoxelCoverageIndex& InC
 bool FVoxelChangeHierarchy::PinFineShard(const FVoxelFineShardKey& InKey,
 	TSharedPtr<const void, ESPMode::ThreadSafe>& OutToken, FString& OutError)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FinePinRegistration);
 	check(IsInGameThread());
 	if (!InKey.Validate(OutError)) return Storage.Fail(EVoxelTerrainResourceAdmission::InvalidRequest, OutError);
 	const auto Resources = Storage.GetResources();
@@ -833,10 +837,10 @@ bool FVoxelChangeHierarchy::PinFineShard(const FVoxelFineShardKey& InKey,
 		return Storage.Fail(EVoxelTerrainResourceAdmission::InvalidRequest, OutError);
 	uint64 RequiredBytes = 0;
 	int32 RequiredCount = 0;
-	if (!MeasureNativeInput(RequiredBytes, RequiredCount, nullptr, nullptr, OutError)) return false;
 	using FStateDeleter = TChangeSharedDeleter<FFineReleaseState>;
 	if (!FineReleaseState)
 	{
+		if (!MeasureNativeInput(RequiredBytes, RequiredCount, nullptr, nullptr, OutError)) return false;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		if (Resources)
 		{

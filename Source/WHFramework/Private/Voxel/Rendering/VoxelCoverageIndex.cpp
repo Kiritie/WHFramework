@@ -2,6 +2,7 @@
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 namespace
 {
@@ -464,6 +465,7 @@ bool FVoxelCoverageIndex::AccumulateRetainedInputs(const FVoxelTerrainResources&
 	TConstArrayView<const FVoxelCoverageIndex*> InIndexes, TConstArrayView<uint64> InExcludedSerials,
 	uint64& InOutBytes, int32& InOutLeaseCount)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_CoverageRetainedInputs);
 	// 最多三十二份冻结根；每层最多三十二条 COW 路径，记录只在同空间槽出现。
 	if (InIndexes.Num() > 32 || InOutLeaseCount < 0) return false;
 	uint64 Ancestors[32 * (RootLevel + 4)] = {};
@@ -496,6 +498,49 @@ bool FVoxelCoverageIndex::AccumulateRetainedInputs(const FVoxelTerrainResources&
 			else bDifferent |= Shared != Nodes[Index];
 		}
 		if (!Shared) return true;
+		if (bDifferent)
+		{
+			const FNode* Independent[32] = {};
+			int32 IndependentCount = 0;
+			bool bDisjoint = true;
+			for (int32 Index = 0; Index < InIndexes.Num() && bDisjoint; ++Index)
+			{
+				const FNode* Node = Nodes[Index];
+				if (!Node) continue;
+				if (Node->AggregateLedger != &InResources) { bDisjoint = false; break; }
+				bool bRepeated = false;
+				for (int32 Previous = 0; Previous < IndependentCount; ++Previous)
+				{
+					const FNode* Other = Independent[Previous];
+					if (Node == Other) { bRepeated = true; break; }
+					if (Node->MinimumSerial <= Other->MaximumSerial && Other->MinimumSerial <= Node->MaximumSerial)
+					{
+						bDisjoint = false;
+						break;
+					}
+				}
+				if (!bDisjoint) break;
+				if (bRepeated) continue;
+				for (const uint64 Serial : InExcludedSerials)
+					if (Serial >= Node->MinimumSerial && Serial <= Node->MaximumSerial) bDisjoint = false;
+				for (int32 Ancestor = 0; Ancestor < AncestorCount; ++Ancestor)
+					if (Ancestors[Ancestor] >= Node->MinimumSerial && Ancestors[Ancestor] <= Node->MaximumSerial) bDisjoint = false;
+				Independent[IndependentCount++] = Node;
+			}
+			// 租约编号区间不交才可相加；共享 COW 路径及排除项继续沿原路径精确去重。
+			if (bDisjoint)
+			{
+				for (int32 Index = 0; Index < IndependentCount; ++Index)
+				{
+					const FNode* Node = Independent[Index];
+					if (Node->AggregateInputBytes > MAX_uint64 - InOutBytes ||
+						Node->AggregateLeaseCount > MAX_int32 - InOutLeaseCount) return false;
+					InOutBytes += Node->AggregateInputBytes;
+					InOutLeaseCount += Node->AggregateLeaseCount;
+				}
+				return true;
+			}
+		}
 		if (!bDifferent && Shared->AggregateLedger == &InResources)
 		{
 			bool bExcludedRange = false;

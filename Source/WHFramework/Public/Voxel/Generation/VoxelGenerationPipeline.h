@@ -71,7 +71,7 @@ public:
 		const TAtomic<bool>* InCancel = nullptr,
 		const FVoxelTerrainResourceLease* InOutputLease = nullptr) const;
 
-	// 保留完整 Section 事实预检，只计算窗口内实际消费的格子；失败不改写调用者输出。
+	// 按实际消费窗口准备事实和采样；跨界依赖由生成器扩展，失败不改写调用者输出。
 	bool GenerateSectionWindow(
 		const FIntVector& InSectionCoordinate,
 		const FVoxelSectionWindow& InWindow,

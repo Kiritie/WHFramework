@@ -565,6 +565,7 @@ FVoxelOverlayPreflightStatus FVoxelGenerationPipeline::EnsureOverlayConsumerRead
 	const EVoxelWorkClass InWorkClass,
 	const FVoxelTerrainServicePriority& InPriority) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanOverlayConsumer);
 	return Overlay ? Overlay->EnsureConsumerReady(InConsumer, InBounds, InWorkClass, InPriority) : FVoxelOverlayPreflightStatus();
 }
 
@@ -656,10 +657,8 @@ bool FVoxelGenerationPipeline::GenerateSectionWindow(
 	const FIntVector WorldMin(int32(WideMin.X), int32(WideMin.Y), int32(WideMin.Z));
 
 	const FVoxelGenerationBounds Bounds {
-		WorldMin,
-		WorldMin +
-			FIntVector(
-				SectionSide)
+		WorldMin + InWindow.Min,
+		WorldMin + InWindow.Max
 	};
 
 	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);

@@ -865,6 +865,7 @@ void FVoxelViewPublisher::StartCommittedGroups()
 
 void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherPendingPlan);
 	if (!PendingPlan)
 	{
 		if (PendingGroups.IsEmpty()) return;
@@ -1032,6 +1033,7 @@ void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 
 void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication, const double InDeadlineSeconds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherPreparedPlan);
 	if (!Publication->Plan) { Publication->Plan = MakeUnique<FPreparedPlan>(); return; }
 	auto& Plan = *Publication->Plan;
 	auto& Footprints = Plan.Footprints;
@@ -1480,6 +1482,7 @@ void FVoxelViewPublisher::DeferSaturatedGroups(const FPublicationRef& Publicatio
 
 void FVoxelViewPublisher::AdvancePriorities()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherPriorities);
 	if (!PriorityPlan)
 	{
 		PriorityPlan = MakeUnique<FPriorityPlan>();
@@ -1920,6 +1923,7 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::PrepareCoverageSteps(FPublicat
 
 bool FVoxelViewPublisher::AdmitCoveragePreparation(const FPublicationRef& InPublication, const double InDeadline)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherCoveragePreparation);
 	if (InPublication->bCoveragePrepared || InPublication->bCanceled || FPlatformTime::Seconds() >= InDeadline) return false;
 	bool bAdvanced = false;
 	if (!InPublication->CoverageWork.IsValid())
@@ -1960,6 +1964,7 @@ bool FVoxelViewPublisher::HigherBuildPriority(const FPublication& Publication, c
 
 bool FVoxelViewPublisher::AdmitBuilds(const FPublicationRef& InPublication, const double InDeadline)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherBuildAdmission);
 	if (!InPublication->bCoveragePrepared || !InPublication->bGroupsPrepared ||
 		FPlatformTime::Seconds() >= InDeadline) return false;
 	bool bAdvanced = false;
@@ -2034,22 +2039,7 @@ bool FVoxelViewPublisher::CommitReadyGroups(const FPublicationRef& Publication, 
 		});
 		if (!bCurrent)
 		{
-			for (const auto& Key : Group.Keys) { SetOwnerActive(Key, Publication->Serial, false); RetryOwners.AddUnique(Key); }
-			for (const int32 Index : Group.UpdateIndices)
-			{
-				ReleaseSourceGeneration(Publication->Updates[Index].SourceId, Publication->Serial);
-				for (const auto& Component : Publication->Updates[Index].Components) if (Component) Component->DestroyComponent();
-				Publication->Updates[Index].Components.Reset();
-				Publication->Updates[Index].Source.Reset();
-				Publication->Updates[Index].NativeMesh.Reset();
-				if (Publication->PreparedMeshes.IsValidIndex(Index)) Publication->PreparedMeshes[Index].Reset();
-			}
-			for (const auto SourceId : Group.VisibilitySources) ReleaseSourceGeneration(SourceId, Publication->Serial);
-			Group.bCommitted = true;
-			ReleaseNativeGroup(Group);
-			for (const auto& Key : Group.Keys) SetOwnerActive(Key, Publication->Serial, false);
-			bFirstOwnersDirty = true;
-			bActiveBusyKeysDirty = true;
+			DiscardReadyGroup(Publication, Group);
 			bAdvanced = true;
 			continue;
 		}
@@ -2082,6 +2072,36 @@ bool FVoxelViewPublisher::CommitReadyGroups(const FPublicationRef& Publication, 
 		Publication->bFinished = true;
 	}
 	return bAdvanced;
+}
+
+void FVoxelViewPublisher::DiscardReadyGroup(const FPublicationRef& InPublication, FGroup& InGroup)
+{
+	check(InGroup.PreparedUpdates == InGroup.UpdateIndices.Num());
+	for (const int32 Index : InGroup.UpdateIndices)
+	{
+		FUpdate& Update = InPublication->Updates[Index];
+		check(!Update.bNativeMeshPending);
+		ReleaseSourceGeneration(Update.SourceId, InPublication->Serial);
+		for (const auto& Component : Update.Components)
+		{
+			if (Component) Component->DestroyComponent();
+		}
+		Update.Components.Reset();
+		Update.Source.Reset();
+		Update.NativeMesh.Reset();
+		if (InPublication->PreparedMeshes.IsValidIndex(Index)) InPublication->PreparedMeshes[Index].Reset();
+	}
+	for (const auto SourceId : InGroup.VisibilitySources) ReleaseSourceGeneration(SourceId, InPublication->Serial);
+	InGroup.bCommitted = true;
+	InGroup.NativeTransaction.Invalidate();
+	ReleaseNativeGroup(InGroup);
+	for (const auto& Key : InGroup.Keys)
+	{
+		SetOwnerActive(Key, InPublication->Serial, false);
+		RetryOwners.AddUnique(Key);
+	}
+	bFirstOwnersDirty = true;
+	bActiveBusyKeysDirty = true;
 }
 
 bool FVoxelViewPublisher::CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup)
@@ -2496,22 +2516,35 @@ void FVoxelViewPublisher::QueueReadyGroup(const FPublicationRef& InPublication, 
 
 void FVoxelViewPublisher::InvalidateDependencyProofs(FPublication& InPublication)
 {
-	check(InPublication.GroupRevision < MAX_uint64 && DependencyProofRevision < MAX_uint64);
+	check(InPublication.GroupRevision < MAX_uint64);
 	++InPublication.GroupRevision;
-	++DependencyProofRevision;
+	// 自身范围变化使原查询失效；新批次不会成为既有批次的旧代依赖。
+	for (FGroup& Group : InPublication.Groups)
+	{
+		Group.DependencyNextSerial = 0;
+		Group.bDependencyQueryActive = false;
+		Group.DependencyQuery = {};
+	}
+	if (InPublication.Serial == 0) return;
+	for (const FPublicationRef& Publication : Publications)
+	{
+		if (Publication->Serial <= InPublication.Serial || Publication->bFinished || Publication->bCanceled) continue;
+		for (FGroup& Group : Publication->Groups)
+		{
+			// 尚未访问变更批次的查询继续原进度，已越过的证明只回退到该批次。
+			if (Group.DependencyNextSerial <= InPublication.Serial &&
+				(!Group.bDependencyQueryActive || Group.DependencyQuerySerial < InPublication.Serial)) continue;
+			Group.DependencyNextSerial = InPublication.Serial;
+			Group.bDependencyQueryActive = false;
+			Group.DependencyQuery = {};
+		}
+	}
 }
 
 bool FVoxelViewPublisher::HasOlderDependency(const FPublicationRef& InPublication, const FGroup& InGroup,
 	bool* bOutNeedsContinuation) const
 {
 	if (bOutNeedsContinuation) *bOutNeedsContinuation = false;
-	if (InGroup.DependencyProofRevision != DependencyProofRevision)
-	{
-		InGroup.DependencyProofRevision = DependencyProofRevision;
-		InGroup.DependencyNextSerial = 0;
-		InGroup.bDependencyQueryActive = false;
-		InGroup.DependencyQuery = {};
-	}
 	int32 Operations = 0;
 	for (const auto& Older : Publications)
 	{
@@ -2574,6 +2607,7 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 	FVoxelTerrainServiceCharge& OutCharge, const bool bInCommit, const double InDeadline, bool* bOutAdvanced)
 {
 	OutCharge = {};
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherSelectReady);
 	if (bOutAdvanced) *bOutAdvanced = false;
 	FVoxelTerrainServiceCandidateSet Candidates;
 	int32& Cursor = ReadySelectionCursors[bInCommit ? 1 : 0];
@@ -2592,7 +2626,7 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 			if (bInCommit) Cursor = 0;
 			return Index;
 		}
-		const FGroup& Group = Ready.Publication->Groups[Ready.GroupIndex];
+		FGroup& Group = Ready.Publication->Groups[Ready.GroupIndex];
 		++Scanned;
 		if (Group.bCommitted)
 		{
@@ -2618,9 +2652,22 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 			Cursor = 0;
 			return Index;
 		}
+		if (bInCommit && Group.NativeTransaction.IsValid() && !Group.bNativeSubmitted &&
+			!TerrainRenderer->IsTransactionPending(Group.NativeTransaction))
+		{
+			// 已完成准备的组独立收尾，保留同批其他有效组及其冻结输入。
+			UE_LOG(LogTemp, Display, TEXT("Publisher abandoned native transaction: serial=%llu group=%d transaction=%s updates=%d groups=%d"),
+				Ready.Publication->Serial, Ready.GroupIndex, *Group.NativeTransaction.ToString(),
+				Group.UpdateIndices.Num(), Ready.Publication->Groups.Num());
+			DiscardReadyGroup(Ready.Publication, Group);
+			Cursor = 0;
+			return Index;
+		}
 		if (!Group.bPriorityReady) continue;
+		const bool bNeedsNativeAdmission = !Group.bNativeAdmitted && HasNativeGroupWork(Ready.Publication.Get(), Group);
+		const bool bCheckCoverageGate = bInCommit || bNeedsNativeAdmission;
 		// 失败证明只依赖门禁状态、绑定和本组结构；无关资源/其他owner不使它失效。
-		if (bInCommit && CommitGateStateRevision &&
+		if (bCheckCoverageGate && CommitGateStateRevision &&
 			Group.CommitGateBlockedBindingRevision == CommitGateBindingRevision &&
 			Group.CommitGateBlockedRevision == *CommitGateStateRevision &&
 			Group.CommitGateBlockedGroupRevision == Ready.Publication->GroupRevision)
@@ -2633,7 +2680,7 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 		if (bNear && NearHeadFound[Band]) continue;
 		if (!Group.bNativeAdmitted)
 		{
-			if (HasNativeGroupWork(Ready.Publication.Get(), Group) && ActiveNativeGroups >= MaximumNativeGroups) continue;
+			if (bNeedsNativeAdmission && ActiveNativeGroups >= MaximumNativeGroups) continue;
 			// 完成所需的旧代先准入，否则新代持有槽位和资源会反过来阻塞它的前置依赖。
 			if (Group.Keys.ContainsByPredicate([this, &Ready](const auto& Key)
 			{
@@ -2675,7 +2722,8 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 					Current <= Update.NativeAdmissionVersion) continue;
 			}
 		}
-		if (bInCommit)
+		// 新组通过覆盖门禁后再占槽；已经准入的准备工作继续沿原所有权续跑。
+		if (bCheckCoverageGate)
 		{
 			const uint64 GateRevision = CommitGateStateRevision ? *CommitGateStateRevision : 0;
 			const uint64 GateBindingRevision = CommitGateBindingRevision;
@@ -2687,6 +2735,9 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 				Group.CommitGateBlockedGroupRevision = GateGroupRevision;
 				continue;
 			}
+		}
+		if (bInCommit)
+		{
 			const bool bCurrent = !Group.Keys.ContainsByPredicate([&Ready](const auto& Key)
 			{
 				const auto Validation = Ready.Publication->Validations.FindRef(Key);
@@ -2792,6 +2843,7 @@ void FVoxelViewPublisher::RebuildFirstOwners()
 
 void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommit, const double InDeadlineSeconds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherTick);
 	check(PublisherTickSerial < MAX_uint64);
 	++PublisherTickSerial;
 	const double ServiceStarted = FPlatformTime::Seconds();
@@ -3035,8 +3087,9 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 				ReadyCommitGroups.RemoveAt(ReadyIndex, 1, EAllowShrinking::No);
 				if (Ready.Publication->bCanceled || !Ready.Publication->Groups.IsValidIndex(Ready.GroupIndex)) return true;
 				Ready.Publication->Groups[Ready.GroupIndex].bCommitQueued = false;
+				const bool bRetired = Ready.Publication->Groups[Ready.GroupIndex].bCommitted;
 				const bool bAdvanced = CommitReadyGroups(Ready.Publication, CommittedGroups, Deadline,
-					OwnerFirstSerial, Ready.GroupIndex);
+					OwnerFirstSerial, Ready.GroupIndex) || bRetired;
 				if (!bAdvanced)
 				{
 					Ready.Publication->Groups[Ready.GroupIndex].CommitWaitTick = PublisherTickSerial;

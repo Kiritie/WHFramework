@@ -2,6 +2,7 @@
 
 #include "Misc/ScopeExit.h"
 #include "HAL/PlatformTime.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/Caves/VoxelCaveGenerator.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
@@ -237,6 +238,7 @@ bool FVoxelGenerationPlanCoordinator::GatherForBounds(
 	FVoxelGenerationPlanDependencyCapture& OutDependencies,
 	FString& OutError) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanGatherBounds);
 	if (!InBounds.IsValid() || !Config->Recipe || !InConsumer.IsValid() || InConsumer.WorldEpoch != WorldEpoch)
 	{
 		OutError = TEXT("Voxel plan preflight received invalid bounds, recipe or consumer");
@@ -617,6 +619,7 @@ bool FVoxelGenerationPlanCoordinator::RetainDependencies(
 	const FIntPoint& InCenter, const FVoxelGenerationConsumerKey& InConsumer,
 	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>& OutRetention, FString& OutError) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanRetainDependencies);
 	if (!Config->Recipe || !InConsumer.IsValid() || InConsumer.WorldEpoch != WorldEpoch)
 	{
 		OutError = TEXT("InvalidConsumer: generation cache retention");
@@ -732,6 +735,7 @@ bool FVoxelGenerationPlanCoordinator::IsCached(
 
 void FVoxelGenerationPlanCoordinator::RefreshQueuedPriorities()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanRefreshQueuedPriorities);
 	if (!Storage) return;
 	Scheduler.UpdateServicePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
 		EVoxelWorkClass& WorkClass, FVoxelTerrainServicePriority& Priority)
@@ -1428,6 +1432,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 	TConstArrayView<FVoxelGenerationPlanDependency> InDependencies, const EVoxelWorkClass InWorkClass,
 	const FVoxelTerrainServicePriority& Priority, const FVoxelGenerationConsumerKey& InConsumer)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanNaturalEnsure);
 	check(IsInGameThread());
 	if (!InConsumer.IsValid() || InConsumer.WorldEpoch != WorldEpoch || !Priority.SourceStableKey.IsValid() ||
 		!FMath::IsFinite(Priority.DistanceCells) || Priority.DistanceCells < 0.0 || !FMath::IsFinite(Priority.ForwardScore) ||
@@ -1793,6 +1798,7 @@ void FVoxelGenerationPlanCoordinator::SetConsumerWakeCallback(TFunction<void(con
 
 void FVoxelGenerationPlanCoordinator::ResolveDonations(FState& InOutState)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanResolveDonations);
 	InOutState.WorkClass = EVoxelWorkClass::Background;
 	InOutState.ServicePriority = {};
 	const FDonation* Best = nullptr;
@@ -2052,6 +2058,7 @@ bool FVoxelGenerationPlanCoordinator::SetFactDependencies(const FVoxelGeneration
 bool FVoxelGenerationPlanCoordinator::RegisterClosure(const FVoxelGenerationPlanDependency& InDependency,
 	FClosureRegistration& InRegistration, FString& OutError)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanRegisterClosure);
 	if (auto* Existing = Storage->States.Find(InDependency); Existing && Existing->PriorityNode.IsValid())
 	{
 		if (Existing->bRegistering)
@@ -2059,6 +2066,8 @@ bool FVoxelGenerationPlanCoordinator::RegisterClosure(const FVoxelGenerationPlan
 			OutError = TEXT("生成事实的采样依赖形成循环");
 			return false;
 		}
+		// 当前 Ensure 只在完整登记后加入 Desired；共享前置不再重复遍历，作用域结束即清除。
+		if (Existing->bDesired) return true;
 		Existing->bRegistering = true;
 		ON_SCOPE_EXIT
 		{
@@ -2130,6 +2139,7 @@ bool FVoxelGenerationPlanCoordinator::ArePrerequisitesReady(const FState& InStat
 
 void FVoxelGenerationPlanCoordinator::AdvancePriorityDonations()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanAdvanceDonations);
 	PriorityGraph.Advance(128, [this](const FGuid& Node, const FVoxelTerrainServicePriority& Priority)
 	{
 		const auto* Fact = Storage->PriorityFacts.Find(Node);

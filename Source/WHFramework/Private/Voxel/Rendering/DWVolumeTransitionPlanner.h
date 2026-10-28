@@ -18,9 +18,12 @@ struct FVoxelVolumeTransitionFace
 class FVoxelVolumeTransitionPlanner
 {
 public:
-	static void GatherCoverageRegions(const TSet<FVoxelViewKey>& InVisible,
+	static bool SameInputs(const TSet<FVoxelViewKey>& InNodes, const TMap<FVoxelViewKey, int32>& InSampleSteps,
+		const TSet<FVoxelViewKey>& InOtherNodes, const TMap<FVoxelViewKey, int32>& InOtherSampleSteps);
+	static void GatherCoverageRegions(const TSet<FVoxelViewKey>& InVisible, uint8 InRegionLevel,
 		TMap<FVoxelViewKey, TSet<FVoxelViewKey>>& OutRegions);
-	static FVoxelGameThreadContinuation GatherCoverageRegionsSteps(const TSet<FVoxelViewKey>& InVisible, TMap<FVoxelViewKey, TSet<FVoxelViewKey>>& OutRegions);
+	static FVoxelGameThreadContinuation GatherCoverageRegionsSteps(const TSet<FVoxelViewKey>& InVisible, uint8 InRegionLevel,
+		TMap<FVoxelViewKey, TSet<FVoxelViewKey>>& OutRegions);
 
 	static void Build(
 		const TSet<FVoxelViewKey>& InVisible,

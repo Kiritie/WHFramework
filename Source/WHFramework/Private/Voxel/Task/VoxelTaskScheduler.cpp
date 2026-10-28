@@ -829,6 +829,117 @@ void FVoxelTaskScheduler::ChangedQueueAdmission()
 	++QueueAdmissionVersion;
 }
 
+EVoxelTaskBlockReason FVoxelTaskScheduler::SelectPendingDisplacements(const FVoxelTaskRequest& InRequest, int32* OutPendingLimit)
+{
+	if ((IsCoarseTerrainKind(InRequest.Kind) || IsRepresentationDataKind(InRequest.Kind) ||
+		InRequest.Kind == EVoxelTaskKind::BuildVoxelProxy) && InRequest.WorkClass != EVoxelWorkClass::Critical)
+	{
+		int32 PendingCoarseTerrainTasks = 0;
+
+		for (const FVoxelTaskRequest& PendingRequest : Pending)
+		{
+			PendingCoarseTerrainTasks +=
+				(PendingRequest.WorkClass != EVoxelWorkClass::Critical &&
+					(IsCoarseTerrainKind(PendingRequest.Kind) || IsRepresentationDataKind(PendingRequest.Kind) ||
+						PendingRequest.Kind == EVoxelTaskKind::BuildVoxelProxy))
+					? 1
+					: 0;
+		}
+
+		if (PendingCoarseTerrainTasks >=
+			Budget.MaxPendingCoarseTerrainTasks)
+		{
+			return EVoxelTaskBlockReason::PendingCapacity;
+		}
+	}
+
+	const bool bBackground = IsBackgroundTerrainWork(InRequest.Kind, InRequest.WorkClass, InRequest.TerrainStage);
+	const int32 Lane = TerrainLane(InRequest);
+	constexpr int32 LaneCount = static_cast<int32>(EVoxelTaskServiceLane::Count);
+	const int32 ReservedPerLane = Budget.MaxPendingTasks >= LaneCount - 1 ? 1 : 0;
+	int32 Counts[LaneCount] = {};
+	for (const auto& Existing : Pending) ++Counts[TerrainLane(Existing)];
+	int32 PendingLimit = Budget.MaxPendingTasks;
+	for (int32 Index = 1; Index < LaneCount - 1; ++Index)
+		if (Index != Lane) PendingLimit -= FMath::Max(0, ReservedPerLane - Counts[Index]);
+	if (OutPendingLimit)
+	{
+		*OutPendingLimit = PendingLimit;
+	}
+	DisplacedIndices.Reset();
+	uint64 RemainingInput = QueuedInputBytes + RunningContinuationInputBytes;
+	const double AdmissionNow = FPlatformTime::Seconds();
+	const auto HasAgePriority = [AdmissionNow](const FVoxelTaskRequest& First, const FVoxelTaskRequest& Second)
+	{
+		return AdmissionNow - First.QueuedAt >= 0.5 && First.Sequence < Second.Sequence &&
+			Second.WorkClass != EVoxelWorkClass::Critical;
+	};
+	while (Pending.Num() - DisplacedIndices.Num() >= PendingLimit ||
+		RemainingInput > Budget.MaxInputBytes ||
+		InRequest.InputBytes > Budget.MaxInputBytes - FMath::Min(RemainingInput, Budget.MaxInputBytes))
+	{
+		int32 Worst = INDEX_NONE;
+		for (int32 Index = 0; Index < Pending.Num(); ++Index)
+		{
+			if (DisplacedIndices.Contains(Index)) continue;
+			const FVoxelTaskRequest& Existing = Pending[Index];
+			const int32 ExistingLane = TerrainLane(Existing);
+			const int32 Reserve = ExistingLane == static_cast<int32>(EVoxelTaskServiceLane::Other) ? 0 : ReservedPerLane;
+			if (ExistingLane != INDEX_NONE && ExistingLane != Lane && Counts[ExistingLane] <= Reserve)
+				continue;
+			const bool bExistingBackground = IsBackgroundTerrainWork(Existing.Kind, Existing.WorkClass, Existing.TerrainStage);
+			const bool bMayReplace = (!bBackground && bExistingBackground) ||
+				(bBackground == bExistingBackground && ((IsHigherPriority(InRequest, Existing) && !HasAgePriority(Existing, InRequest)) ||
+					HasAgePriority(InRequest, Existing) ||
+					(Counts[Lane] == 0 && Counts[ExistingLane] > Reserve)));
+			if (bMayReplace && (Worst == INDEX_NONE || IsHigherPriority(Pending[Worst], Existing))) Worst = Index;
+		}
+		if (Worst == INDEX_NONE)
+		{
+			++Diagnostics.CapacityDeferrals;
+			return RemainingInput > Budget.MaxInputBytes ||
+				InRequest.InputBytes > Budget.MaxInputBytes - FMath::Min(RemainingInput, Budget.MaxInputBytes)
+				? EVoxelTaskBlockReason::InputMemory : EVoxelTaskBlockReason::PendingCapacity;
+		}
+		DisplacedIndices.Add(Worst);
+		RemainingInput -= Pending[Worst].InputBytes;
+		const int32 ExistingLane = TerrainLane(Pending[Worst]);
+		if (ExistingLane != INDEX_NONE) --Counts[ExistingLane];
+	}
+	return EVoxelTaskBlockReason::None;
+}
+
+bool FVoxelTaskScheduler::CanEnqueue(FVoxelTaskRequest& InRequest)
+{
+	check(IsInGameThread());
+	if (bStopped || InRequest.Kind == EVoxelTaskKind::None || InRequest.WorkClass == EVoxelWorkClass::None ||
+		(ControlConsumer.IsValid() && !bAllowPassive && InRequest.Stamp.WorldEpoch != ControlConsumer.WorldEpoch) ||
+		!PrepareAdmission({InRequest.Kind, InRequest.Stamp}))
+	{
+		return false;
+	}
+	auto& Attempt = FindOrAddAdmission({InRequest.Kind, InRequest.Stamp});
+	InRequest.QueuedAt = Attempt.FirstRequested;
+	InRequest.Sequence = Attempt.Sequence;
+	if (InRequest.ReservedBytes > Budget.MaxReservedBytes || InRequest.InputBytes > Budget.MaxInputBytes)
+	{
+		Attempt.Blocked = EVoxelTaskBlockReason::Oversized;
+		return false;
+	}
+	if (!PrepareQueues(1))
+	{
+		Attempt.Blocked = BackingAdmission == EVoxelTerrainResourceAdmission::CapacityUnachievable ?
+			EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory;
+		return false;
+	}
+	const EVoxelTaskBlockReason QueueBlock = SelectPendingDisplacements(InRequest);
+	if (QueueBlock != EVoxelTaskBlockReason::None)
+	{
+		Attempt.Blocked = QueueBlock;
+	}
+	return QueueBlock == EVoxelTaskBlockReason::None;
+}
+
 bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 {
 	check(IsInGameThread());
@@ -913,37 +1024,6 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 		return Reject(EVoxelTaskBlockReason::Dependency);
 	}
 
-	if ((IsCoarseTerrainKind(InRequest.Kind) || IsRepresentationDataKind(InRequest.Kind) ||
-		InRequest.Kind == EVoxelTaskKind::BuildVoxelProxy) && InRequest.WorkClass != EVoxelWorkClass::Critical)
-	{
-		int32 PendingCoarseTerrainTasks = 0;
-
-		for (const FVoxelTaskRequest& PendingRequest : Pending)
-		{
-			PendingCoarseTerrainTasks +=
-				(PendingRequest.WorkClass != EVoxelWorkClass::Critical &&
-					(IsCoarseTerrainKind(PendingRequest.Kind) || IsRepresentationDataKind(PendingRequest.Kind) ||
-						PendingRequest.Kind == EVoxelTaskKind::BuildVoxelProxy))
-					? 1
-					: 0;
-		}
-
-		if (PendingCoarseTerrainTasks >=
-			Budget.MaxPendingCoarseTerrainTasks)
-		{
-			return Reject(EVoxelTaskBlockReason::PendingCapacity);
-		}
-	}
-
-	const bool bBackground = IsBackgroundTerrainWork(InRequest.Kind, InRequest.WorkClass, InRequest.TerrainStage);
-	const int32 Lane = TerrainLane(InRequest);
-	constexpr int32 LaneCount = static_cast<int32>(EVoxelTaskServiceLane::Count);
-	const int32 ReservedPerLane = Budget.MaxPendingTasks >= LaneCount - 1 ? 1 : 0;
-	int32 Counts[LaneCount] = {};
-	for (const auto& Existing : Pending) ++Counts[TerrainLane(Existing)];
-	int32 PendingLimit = Budget.MaxPendingTasks;
-	for (int32 Index = 1; Index < LaneCount - 1; ++Index)
-		if (Index != Lane) PendingLimit -= FMath::Max(0, ReservedPerLane - Counts[Index]);
 	// 先完整验证替换集合，再取消旧请求，内存不足不能导致部分取消后仍然拒绝新请求。
 	{
 		TGuardValue<uint64> InputGuard(RequiredAdmissionInputBytes, CallbackInputs);
@@ -954,46 +1034,13 @@ bool FVoxelTaskScheduler::Enqueue(FVoxelTaskRequest&& InRequest)
 				EVoxelTaskBlockReason::Oversized : EVoxelTaskBlockReason::InputMemory);
 		}
 	}
-	DisplacedIndices.Reset();
-	uint64 RemainingInput = QueuedInputBytes + RunningContinuationInputBytes;
-	const double AdmissionNow = FPlatformTime::Seconds();
-	const auto HasAgePriority = [AdmissionNow](const FVoxelTaskRequest& First, const FVoxelTaskRequest& Second)
+	int32 PendingLimit = 0;
+	const EVoxelTaskBlockReason QueueBlock = SelectPendingDisplacements(InRequest, &PendingLimit);
+	if (QueueBlock != EVoxelTaskBlockReason::None)
 	{
-		return AdmissionNow - First.QueuedAt >= 0.5 && First.Sequence < Second.Sequence &&
-			Second.WorkClass != EVoxelWorkClass::Critical;
-	};
-	while (Pending.Num() - DisplacedIndices.Num() >= PendingLimit ||
-		RemainingInput > Budget.MaxInputBytes ||
-		InRequest.InputBytes > Budget.MaxInputBytes - FMath::Min(RemainingInput, Budget.MaxInputBytes))
-	{
-		int32 Worst = INDEX_NONE;
-		for (int32 Index = 0; Index < Pending.Num(); ++Index)
-		{
-			if (DisplacedIndices.Contains(Index)) continue;
-			const FVoxelTaskRequest& Existing = Pending[Index];
-			const int32 ExistingLane = TerrainLane(Existing);
-			const int32 Reserve = ExistingLane == static_cast<int32>(EVoxelTaskServiceLane::Other) ? 0 : ReservedPerLane;
-			if (ExistingLane != INDEX_NONE && ExistingLane != Lane && Counts[ExistingLane] <= Reserve)
-				continue;
-			const bool bExistingBackground = IsBackgroundTerrainWork(Existing.Kind, Existing.WorkClass, Existing.TerrainStage);
-			const bool bMayReplace = (!bBackground && bExistingBackground) ||
-				(bBackground == bExistingBackground && ((IsHigherPriority(InRequest, Existing) && !HasAgePriority(Existing, InRequest)) ||
-					HasAgePriority(InRequest, Existing) ||
-					(Counts[Lane] == 0 && Counts[ExistingLane] > Reserve)));
-			if (bMayReplace && (Worst == INDEX_NONE || IsHigherPriority(Pending[Worst], Existing))) Worst = Index;
-		}
-		if (Worst == INDEX_NONE)
-		{
-			++Diagnostics.CapacityDeferrals;
-			return Reject(RemainingInput > Budget.MaxInputBytes ||
-				InRequest.InputBytes > Budget.MaxInputBytes - FMath::Min(RemainingInput, Budget.MaxInputBytes)
-				? EVoxelTaskBlockReason::InputMemory : EVoxelTaskBlockReason::PendingCapacity);
-		}
-		DisplacedIndices.Add(Worst);
-		RemainingInput -= Pending[Worst].InputBytes;
-		const int32 ExistingLane = TerrainLane(Pending[Worst]);
-		if (ExistingLane != INDEX_NONE) --Counts[ExistingLane];
+		return Reject(QueueBlock);
 	}
+	const double AdmissionNow = FPlatformTime::Seconds();
 	EVoxelTaskBlockReason NativeBlocked;
 	const auto NativeAdmission = ReserveNativeExecution(InRequest, NativeBlocked);
 	if (NativeAdmission != EVoxelTerrainResourceAdmission::Granted)

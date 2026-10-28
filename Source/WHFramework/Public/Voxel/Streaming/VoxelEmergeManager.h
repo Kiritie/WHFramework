@@ -70,8 +70,9 @@ public:
 		bool& bOutNeedsAdvance);
 	uint64 GetWaitingPlanConsumers(EVoxelGenerationPlanKind InKind) const;
 	FVoxelGenerationDependencyStatus EnsureGenerationFacts(const FVoxelGenerationConsumerKey& InConsumer,
-		const FVoxelGenerationBounds& InBounds, const FVoxelTerrainServicePriority& InPriority);
+		const FVoxelGenerationBounds& InBounds, const FVoxelTerrainServicePriority& InPriority, bool bInAllowContinuation = false);
 	void ReleaseGenerationFacts(const FVoxelGenerationConsumerKey& InConsumer);
+	bool HasGenerationFactConsumer(const FVoxelGenerationConsumerKey& InConsumer) const;
 	void SetExternalConsumerWakeCallback(TFunction<void(const FVoxelGenerationConsumerKey&)> InCallback);
 	// 非视觉 Runtime 数据消费者共用原接纳/生成/Overlay 主链，并持有稳定实例 pin。
 	bool AcquireDataDemand(
@@ -228,6 +229,10 @@ private:
 		FVoxelGenerationBounds Bounds;
 		FVoxelGenerationPlanDependencyCapture Dependencies;
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
+		TOptional<FVoxelTerrainServicePriority> ContinuationPriority;
+		uint64 WakeSerial = 0;
+		uint64 NaturalWakeSerial = 0;
+		bool bNaturalReady = false;
 		int32 SampleStep = 0;
 		TOptional<FVoxelTerrainGeometry> SamplingGeometry;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SampleRetentionStorageLease;

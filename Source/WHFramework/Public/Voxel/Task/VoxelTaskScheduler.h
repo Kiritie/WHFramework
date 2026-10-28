@@ -633,6 +633,8 @@ public:
 	FVoxelTaskScheduler(const FVoxelTaskScheduler&) = delete;
 	FVoxelTaskScheduler& operator=(const FVoxelTaskScheduler&) = delete;
 
+	// 预检当前队列容量与优先级，不置换旧任务；Enqueue仍执行最终校验。
+	bool CanEnqueue(FVoxelTaskRequest& InRequest);
 	bool Enqueue(FVoxelTaskRequest&& InRequest);
 	uint64 GetQueueAdmissionVersion() const;
 	void SetPaused(bool bInPaused);
@@ -822,6 +824,7 @@ private:
 	void RemoveAdmission(const FVoxelTaskKey& InKey);
 	void ClearAdmissions();
 	bool PrepareQueues(int32 InAdditionalTasks);
+	EVoxelTaskBlockReason SelectPendingDisplacements(const FVoxelTaskRequest& InRequest, int32* OutPendingLimit = nullptr);
 	void FreeBacking();
 	void FlushSectionIdleNotifications();
 	void RefreshBlockReasons();

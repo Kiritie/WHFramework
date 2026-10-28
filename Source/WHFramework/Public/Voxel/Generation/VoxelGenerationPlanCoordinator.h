@@ -63,6 +63,7 @@ struct WHFRAMEWORK_API FVoxelGenerationDependencyStatus
 	bool bReady = false;
 	bool bFailed = false;
 	FString Error;
+	bool bNeedsAdvance = false;
 };
 
 class WHFRAMEWORK_API FVoxelGenerationPlanCoordinator

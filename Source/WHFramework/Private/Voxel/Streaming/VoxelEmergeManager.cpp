@@ -1664,7 +1664,7 @@ void FVoxelEmergeManager::SetRemoteOverlayResolver(TFunction<bool(const FIntVect
 
 FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureGenerationFacts(
 	const FVoxelGenerationConsumerKey& InConsumer, const FVoxelGenerationBounds& InBounds,
-	const FVoxelTerrainServicePriority& InPriority)
+	const FVoxelTerrainServicePriority& InPriority, const bool bInAllowContinuation)
 {
 	check(IsInGameThread());
 	if (!InConsumer.IsValid() || InConsumer.WorldEpoch != Runtime.Epoch() || !InBounds.IsValid())
@@ -1719,9 +1719,38 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureGenerationFacts(
 		}
 	}
 	const EVoxelWorkClass WorkClass = InPriority.Band <= EVoxelTerrainServiceBand::P1 ? EVoxelWorkClass::Critical : EVoxelWorkClass::Visible;
+	if (Consumer->ContinuationPriority.IsSet() && !bInAllowContinuation)
+	{
+		Consumer->ContinuationPriority.Reset();
+	}
+	if (bInAllowContinuation && Consumer->ContinuationPriority.IsSet())
+	{
+		const bool bNaturalReady = Consumer->bNaturalReady;
+		const bool bPriorityChanged = Consumer->ContinuationPriority.GetValue() != InPriority;
+		const uint64 NaturalWakeSerial = Consumer->NaturalWakeSerial;
+		const auto Overlay = Generator->EnsureOverlayConsumerReady(InConsumer, InBounds, WorkClass, InPriority);
+		Consumer = ExternalFactConsumers.Find(InConsumer);
+		if (!Consumer) return {};
+		Consumer->ContinuationPriority.Reset();
+		if (Overlay.bFailed) return {false, true, Overlay.Error};
+		const bool bReady = bNaturalReady && Overlay.bReady;
+		return {bReady, false, {}, !bReady && (bPriorityChanged || Consumer->WakeSerial != NaturalWakeSerial)};
+	}
+	const uint64 NaturalWakeSerial = Consumer->WakeSerial;
 	const auto Natural = PlanCoordinator->Ensure(Consumer->Dependencies.Values, WorkClass, InPriority, InConsumer);
-	const auto Overlay = Generator->EnsureOverlayConsumerReady(InConsumer, InBounds, WorkClass, InPriority);
 	if (Natural.bFailed) return Natural;
+	Consumer = ExternalFactConsumers.Find(InConsumer);
+	if (!Consumer) return {};
+	if (bInAllowContinuation)
+	{
+		if (!Natural.Error.IsEmpty()) return Natural;
+		// 保留同一Consumer的输入与租约，下一次预算机会只推进Overlay。
+		Consumer->ContinuationPriority = InPriority;
+		Consumer->NaturalWakeSerial = NaturalWakeSerial;
+		Consumer->bNaturalReady = Natural.bReady;
+		return {false, false, {}, true};
+	}
+	const auto Overlay = Generator->EnsureOverlayConsumerReady(InConsumer, InBounds, WorkClass, InPriority);
 	if (Overlay.bFailed) return {false, true, Overlay.Error};
 	return {Natural.bReady && Overlay.bReady, false, {}};
 }
@@ -1732,6 +1761,12 @@ void FVoxelEmergeManager::ReleaseGenerationFacts(const FVoxelGenerationConsumerK
 	PlanCoordinator->ReleaseConsumer(InConsumer);
 	Generator->ReleaseOverlayConsumer(InConsumer);
 	ExternalFactConsumers.Remove(InConsumer);
+}
+
+bool FVoxelEmergeManager::HasGenerationFactConsumer(const FVoxelGenerationConsumerKey& InConsumer) const
+{
+	check(IsInGameThread());
+	return InConsumer.IsValid() && InConsumer.WorldEpoch == Runtime.Epoch() && ExternalFactConsumers.Contains(InConsumer);
 }
 
 void FVoxelEmergeManager::SetExternalConsumerWakeCallback(TFunction<void(const FVoxelGenerationConsumerKey&)> InCallback)
@@ -2738,6 +2773,11 @@ FVoxelEmergeManager::~FVoxelEmergeManager()
 void FVoxelEmergeManager::OnGenerationFactsReady(const FVoxelGenerationConsumerKey& InConsumer)
 {
 	if (InConsumer.WorldEpoch != Runtime.Epoch()) return;
+	if (auto* Consumer = ExternalFactConsumers.Find(InConsumer))
+	{
+		check(Consumer->WakeSerial < MAX_uint64);
+		++Consumer->WakeSerial;
+	}
 	if (InConsumer.Kind == EVoxelGenerationConsumerKind::WorldFact)
 	{
 		Generator->NotifyOverlayPlanningDependencyReady(InConsumer);

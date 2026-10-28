@@ -167,6 +167,7 @@ struct FVoxelVolumeTransitionBuild
 			}
 		}
 		Result.bSuccess = Result.bContinue = true;
+		Result.bContinueImmediately = true;
 		return Result;
 	}
 };

@@ -325,6 +325,7 @@ void UVoxelModule::OnRefresh(
 	const float InDeltaSeconds,
 	const bool bInEditor)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ModuleRefresh);
 	if (IsWorldSaveSuspended()) return;
 	Super::OnRefresh(
 		InDeltaSeconds,
@@ -1676,10 +1677,15 @@ FVoxelTerrainFrameContext& UVoxelModule::GetTerrainFrameContext()
 }
 
 FVoxelGenerationDependencyStatus UVoxelModule::EnsureGenerationFacts(const FVoxelGenerationConsumerKey& InConsumer,
-	const FVoxelGenerationBounds& InBounds, const FVoxelTerrainServicePriority& InPriority)
+	const FVoxelGenerationBounds& InBounds, const FVoxelTerrainServicePriority& InPriority, const bool bInAllowContinuation)
 {
-	return EmergeManager ? EmergeManager->EnsureGenerationFacts(InConsumer, InBounds, InPriority) :
+	return EmergeManager ? EmergeManager->EnsureGenerationFacts(InConsumer, InBounds, InPriority, bInAllowContinuation) :
 		FVoxelGenerationDependencyStatus{false, true, TEXT("地形事实Owner尚未初始化")};
+}
+
+bool UVoxelModule::HasGenerationFactConsumer(const FVoxelGenerationConsumerKey& InConsumer) const
+{
+	return EmergeManager && EmergeManager->HasGenerationFactConsumer(InConsumer);
 }
 
 void UVoxelModule::ReleaseGenerationFacts(const FVoxelGenerationConsumerKey& InConsumer)

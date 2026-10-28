@@ -313,6 +313,7 @@ namespace
 
 bool FVoxelViewManager::ReserveFineShardSlots(const int32 InCount, FString& OutError)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineSlotBacking);
 	if (InCount < 0)
 	{
 		OutError = TEXT("InvalidRequest: Fine slot count");
@@ -330,23 +331,35 @@ bool FVoxelViewManager::ReserveFineShardSlots(const int32 InCount, FString& OutE
 			TEXT("CapacityBlocked: Fine slot backing waits for an external release") : TEXT("Oversized: Fine slot backing is unreachable");
 		return false;
 	}
-	const int32 Capacity = InCount;
-	uint64 FinalBytes = FineShardSlots.GetAllocatedSize() + FineShardSlotOrder.GetAllocatedSize();
-	for (const auto& Queue : FinePresentationQueues) FinalBytes += Queue.GetAllocatedSize();
-	uint64 PeakBytes = FinalBytes;
-	const auto CountGrowth = [&FinalBytes, &PeakBytes](const uint64 OldBytes, const uint64 NewBytes)
-	{
-		if (NewBytes <= OldBytes) return;
-		PeakBytes = FMath::Max(PeakBytes, FinalBytes + NewBytes);
-		FinalBytes = FinalBytes - OldBytes + NewBytes;
-	};
-	CountGrowth(FineShardSlots.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelFineShardKey, FFineShardSlot>(Capacity));
-	const uint64 SparseBytes = VoxelBoundedAllocation::SparseArrayBytes<FVoxelFineShardKey>(Capacity);
-	CountGrowth(FineShardSlotOrder.GetAllocatedSize(), SparseBytes);
-	for (const auto& Queue : FinePresentationQueues) CountGrowth(Queue.GetAllocatedSize(), SparseBytes);
+	int32 Capacity = int32(FMath::Max<int64>(InCount,
+		FMath::Min<int64>(MAX_int32, FMath::Max<int64>(64, int64(FineShardBackingCapacity) * 2))));
+	uint64 FinalBytes = 0;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Candidate;
-	FineShardBackingAdmission = FineShardBackingLease ? FineShardBackingLease->TryResize(PeakBytes) :
-		Resources->TryAcquire(Owner, EVoxelTerrainResourcePool::Input, PeakBytes, Candidate);
+	const auto ReserveBacking = [&](const int32 InCapacity)
+	{
+		FinalBytes = FineShardSlots.GetAllocatedSize() + FineShardSlotOrder.GetAllocatedSize();
+		for (const auto& Queue : FinePresentationQueues) FinalBytes += Queue.GetAllocatedSize();
+		uint64 PeakBytes = FinalBytes;
+		const auto CountGrowth = [&FinalBytes, &PeakBytes](const uint64 OldBytes, const uint64 NewBytes)
+		{
+			if (NewBytes <= OldBytes) return;
+			PeakBytes = FMath::Max(PeakBytes, FinalBytes + NewBytes);
+			FinalBytes = FinalBytes - OldBytes + NewBytes;
+		};
+		CountGrowth(FineShardSlots.GetAllocatedSize(), VoxelBoundedAllocation::MapBytes<FVoxelFineShardKey, FFineShardSlot>(InCapacity));
+		const uint64 SparseBytes = VoxelBoundedAllocation::SparseArrayBytes<FVoxelFineShardKey>(InCapacity);
+		CountGrowth(FineShardSlotOrder.GetAllocatedSize(), SparseBytes);
+		for (const auto& Queue : FinePresentationQueues) CountGrowth(Queue.GetAllocatedSize(), SparseBytes);
+		FineShardBackingAdmission = FineShardBackingLease ? FineShardBackingLease->TryResize(PeakBytes) :
+			Resources->TryAcquire(Owner, EVoxelTerrainResourcePool::Input, PeakBytes, Candidate);
+		return FineShardBackingAdmission == EVoxelTerrainResourceAdmission::Granted;
+	};
+	// 增长余量不能阻塞当前真实需求；授额不足时只申请本次所需的容量。
+	if (!ReserveBacking(Capacity) && Capacity > InCount)
+	{
+		Capacity = InCount;
+		ReserveBacking(Capacity);
+	}
 	if (FineShardBackingAdmission != EVoxelTerrainResourceAdmission::Granted)
 	{
 		FineShardBackingRejectedCount = InCount;
@@ -375,6 +388,7 @@ bool FVoxelViewManager::ReserveFineShardSlots(const int32 InCount, FString& OutE
 
 bool FVoxelViewManager::EnsureFineShardRegistration(const FVoxelFineShardKey& InKey)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineRegistration);
 	auto* Slot = FineShardSlots.Find(InKey);
 	if (!Slot || !Slot->Build.GetFailure().IsEmpty() || IsFineShardAdmissionWaiting(*Slot)) return false;
 	if (Slot->RegistrationLease) return true;
@@ -628,11 +642,13 @@ void FVoxelViewManager::ProcessFineShardAdmissions(const double InDeadline)
 	const auto& Keys = Interest.PublicationInputs->FineShards;
 	TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<64>> Candidates;
 	TArray<FVoxelFineShardKey, TInlineAllocator<64>> Captured;
+	TArray<int32, TInlineAllocator<64>> CapturedIndices;
 	const int32 ScanCount = FMath::Min(64, Keys.Num());
 	for (int32 Scans = 0; Scans < ScanCount && FPlatformTime::Seconds() < ScanDeadline; ++Scans)
 	{
 		if (FineShardAdmissionCursor >= Keys.Num()) FineShardAdmissionCursor = 0;
-		const FVoxelFineShardKey Key = Keys[FineShardAdmissionCursor++];
+		const int32 KeyIndex = FineShardAdmissionCursor++;
+		const FVoxelFineShardKey Key = Keys[KeyIndex];
 		const auto* Demand = Interest.FineShardDemands.Find(Key);
 		if (!Demand) continue;
 		FFineShardSlot* Slot = FineShardSlots.Find(Key);
@@ -640,11 +656,13 @@ void FVoxelViewManager::ProcessFineShardAdmissions(const double InDeadline)
 			IsFineShardAdmissionWaiting(*Slot) || (!Slot->PendingRequest.IsSet() && !Slot->bDependencyWake))) continue;
 		FVoxelTerrainServiceCandidate& Candidate = Candidates.AddDefaulted_GetRef();
 		Candidate.Index = Captured.Add(Key);
+		CapturedIndices.Add(KeyIndex);
 		Candidate.Priority = Demand->ServicePriority;
 		Candidate.FirstQueuedSeconds = Slot ? Slot->FirstQueuedSeconds : Demand->FirstQueuedSeconds;
 		Candidate.Sequence = Slot ? Slot->QueueSequence : Demand->QueueSequence;
 		Candidate.EstimatedMicroseconds = FineShardAdmissionCostMicroseconds;
 		Candidate.bRunnable = true;
+		Candidate.bPublicationContinuation = Slot && Module.HasGenerationFactConsumer(Slot->Consumer);
 	}
 	FVoxelTerrainServiceCapacity Capacity;
 	Capacity.MaximumWaitSeconds = Module.GetViewSettings().Fine.MaximumBackgroundWaitSeconds;
@@ -677,12 +695,20 @@ void FVoxelViewManager::ProcessFineShardAdmissions(const double InDeadline)
 			return;
 		}
 		FineShardAdmissionCostMicroseconds = FMath::Lerp(FineShardAdmissionCostMicroseconds, Actual, 0.15);
+		if (const auto* Slot = FineShardSlots.Find(Captured[Chosen]); Slot && !Slot->bSubmitted &&
+			!Slot->bWaitingAdmissionCapacity && (Slot->PendingRequest.IsSet() || Slot->bDependencyWake) &&
+			Module.HasGenerationFactConsumer(Slot->Consumer))
+		{
+			// 仍可推进的消费者回到下轮扫描窗口，先收尾已保留的捕获与租约。
+			FineShardAdmissionCursor = CapturedIndices[Chosen];
+		}
 		Candidates[Chosen].bRunnable = false;
 	}
 }
 
 bool FVoxelViewManager::RequestFineShard(const FVoxelFineShardKey& InKey)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineRequest);
 	const auto* Demand = GetViewInterest().FineShardDemands.Find(InKey);
 	const auto Generator = Module.GetGenerator();
 	const auto Registry = Module.GetRegistry();
@@ -741,19 +767,24 @@ bool FVoxelViewManager::RequestFineShard(const FVoxelFineShardKey& InKey)
 	const auto Consumer = Slot->Consumer;
 	const auto FactResources = Scheduler.GetRuntimeResources();
 	const uint64 BeforeFacts = FactResources->ReleaseVersionExcludingOwner(Consumer);
-	const auto Facts = Module.EnsureGenerationFacts(Consumer, Bounds, Priority);
+	FVoxelGenerationDependencyStatus Facts;
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineFacts);
+		Facts = Module.EnsureGenerationFacts(Consumer, Bounds, Priority, true);
+	}
 	Slot = FineShardSlots.Find(InKey);
 	if (!Slot || Slot->Consumer != Consumer || !Slot->Build.IsCurrent(Attempt)) return false;
 	if (Facts.bFailed) return RejectFineShardAdmission(InKey, Attempt, Facts.Error, 0);
 	if (!Facts.bReady)
 	{
 		if (Facts.Error.StartsWith(TEXT("CapacityBlocked"))) WaitFineShardAdmission(*Slot, FactResources, BeforeFacts);
-		else Slot->bDependencyWake = false;
+		else Slot->bDependencyWake = Facts.bNeedsAdvance;
 		return false;
 	}
 	FString Error;
 	if (!Slot->PendingCapture.IsSet())
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineOverlayCapture);
 		FVoxelFineOverlayCapture Capture;
 		if (!Module.CaptureFineOverlays(Bounds, Capture, Error, &Consumer))
 		{
@@ -763,6 +794,7 @@ bool FVoxelViewManager::RequestFineShard(const FVoxelFineShardKey& InKey)
 		}
 		Slot->PendingCapture.Emplace(MoveTemp(Capture));
 	}
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineRequestAssembly);
 	const uint64 CaptureBytes = VoxelBoundedAllocation::WorkerSharedBytes<FFineShardWorker>() +
 		VoxelBoundedAllocation::SharedBytes<TAtomic<bool>>() +
 		VoxelBoundedAllocation::SharedBytes<FVoxelFineOverlayReadResult>() +

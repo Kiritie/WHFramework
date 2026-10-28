@@ -108,6 +108,7 @@ bool FVoxelViewManager::BeginInterestWorkspace(TSharedPtr<const FVoxelInterestSe
 	InterestWorkspace->Root = MakeShared<FInterestInputRoot, ESPMode::ThreadSafe>();
 	InterestWorkspace->Root->ResourceLease = MoveTemp(Lease);
 	auto& Root = *InterestWorkspace->Root;
+	Root.bInitialLayout = !AppliedInputRoot || Current.bInitialLayout;
 	Root.FineWanted.Reserve(Inputs.Fine.Num());
 	Root.ProxyWanted.Reserve(Inputs.Proxy.Num());
 	Root.IndexedTerrainRoots.Reserve(Inputs.Roots.Num());
@@ -191,6 +192,7 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 			AddOne(Inputs.Proxy, [this, &Workspace](const FVoxelViewKey& Key)
 			{
 				Workspace.Root->ProxyWanted.Add(Key);
+				Workspace.Root->MaximumProxyLevel = FMath::Max(Workspace.Root->MaximumProxyLevel, Key.Level);
 				if (!GetInputRoot().ProxyWanted.Contains(Key)) Workspace.ChangedCoverage.Add({1, Key.Coordinate, Key.Level});
 			});
 			break;
@@ -276,6 +278,7 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 					++Workspace.Cursor;
 					break;
 				}
+				Workspace.bGeometryChanged = true;
 				auto& Hierarchy = Module.GetRuntime()->GetChangeHierarchy();
 				const auto Owner = Hierarchy.GetControlConsumer();
 				const uint64 Before = Scheduler.GetRuntimeResources()->ReleaseVersionExcludingOwner(Owner);
@@ -328,6 +331,12 @@ bool FVoxelViewManager::TryCommitInterestRoot()
 	}
 	const double Start = FPlatformTime::Seconds();
 	if (!TerrainFrameBudget.TryStart(EVoxelPublishPhase::Plan, Start, BoundInterestOperationEstimate(Module, InterestMicrostepEstimateMilliseconds))) return false;
+	if (InterestWorkspace->PreviousSnapshot && !InterestWorkspace->PreviousSnapshot->Geometry.IsEmpty() &&
+		(InterestWorkspace->bGeometryChanged || !InterestWorkspace->ChangedCoverage.IsEmpty() ||
+			!InterestWorkspace->Retirements.IsEmpty() || !InterestWorkspace->LayoutChanges.IsEmpty()))
+	{
+		InterestWorkspace->Root->bInitialLayout = false;
+	}
 	// 同一次GT步骤交换全部Wanted、根索引、布局与查询快照。
 	auto Previous = MoveTemp(AppliedInputRoot);
 	AppliedInputRoot = MoveTemp(InterestWorkspace->Root);

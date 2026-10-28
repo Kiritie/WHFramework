@@ -8,6 +8,7 @@
 #include "Voxel/Rendering/VoxelViewManager.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
+#include "Voxel/Rendering/VoxelMaterialSet.h"
 #include "Voxel/Rendering/VoxelSurfaceProxy.h"
 #include "Voxel/Rendering/DWVolumeTransitionPlanner.h"
 #include "Voxel/Rendering/DWHeightfieldTransitionBuilder.h"
@@ -35,7 +36,7 @@ bool FVoxelCoverageRegionHaloTest::RunTest(const FString& InParameters)
 		const FVoxelViewKey Interior{FIntVector(80 + Offset, 0, 0), 0};
 		const TSet<FVoxelViewKey> Nodes{Owner, Boundary, Interior};
 		TMap<FVoxelViewKey, TSet<FVoxelViewKey>> Regions;
-		FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Nodes, Regions);
+		FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Nodes, 6, Regions);
 		FVoxelViewKey Region = Owner;
 		while (Region.Level < 6) Region = Region.GetParent();
 		const auto& Local = Regions.FindChecked(Region);
@@ -165,7 +166,7 @@ bool FVoxelVolumeRegionFaceFilterTest::RunTest(const FString& InParameters)
 				NeighborhoodSteps.Add(Key, Key == Center ? 4 : 2);
 			}
 	TMap<FVoxelViewKey, TSet<FVoxelViewKey>> Regions;
-	FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Neighborhood, Regions);
+	FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Neighborhood, 6, Regions);
 	const TSet<FVoxelViewKey>* CenterLocal = Regions.Find(Center);
 	if (TestNotNull(TEXT("The central region exists"), CenterLocal))
 	{
@@ -202,6 +203,234 @@ bool FVoxelVolumeRegionFaceFilterTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Empty input clears previously produced output"), ResetFaces.IsEmpty());
 	TestTrue(TEXT("Empty input matches the previous region filter"),
 		CompareToPrevious(TEXT("empty input"), EmptyNodes, 6, nullptr, &Center).IsEmpty());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelVolumeRegionPartitionTest,
+	"WHFramework.Voxel.Rendering.VolumeRegionPartition",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelVolumeRegionPartitionTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	const auto FaceIdentity = [](const FVoxelVolumeTransitionFace& Face)
+	{
+		return FString::Printf(TEXT("%s:%d/%s:%d/%d/%s/%s/%d"),
+			*Face.Owner.Coordinate.ToString(), int32(Face.Owner.Level), *Face.Neighbor.Coordinate.ToString(), int32(Face.Neighbor.Level),
+			int32(Face.Direction), *Face.Min.ToString(), *Face.Max.ToString(), Face.Ratio);
+	};
+	FRandomStream Random(20261027);
+	int32 ComparedFaces = 0;
+	for (const uint8 MaximumLevel : {uint8(2), uint8(5), uint8(7)})
+	{
+		TSet<FVoxelViewKey> Nodes;
+		TArray<FVoxelViewKey> Pending;
+		for (int32 Z = -1; Z <= 1; ++Z)
+			for (int32 Y = -2; Y <= 1; ++Y)
+				for (int32 X = -2; X <= 1; ++X)
+					Pending.Add({FIntVector(X, Y, Z), MaximumLevel});
+		while (!Pending.IsEmpty())
+		{
+			const FVoxelViewKey Node = Pending.Pop(EAllowShrinking::No);
+			if (Node.Level > 1 && Random.RandRange(0, 3) == 0)
+			{
+				for (int32 Z = 0; Z < 2; ++Z)
+					for (int32 Y = 0; Y < 2; ++Y)
+						for (int32 X = 0; X < 2; ++X)
+							Pending.Add({Node.Coordinate * 2 + FIntVector(X, Y, Z), uint8(Node.Level - 1)});
+			}
+			else
+			{
+				Nodes.Add(Node);
+			}
+		}
+		TMap<FVoxelViewKey, int32> Steps;
+		for (const auto& Node : Nodes) Steps.Add(Node, 1 << Random.RandRange(0, 3));
+		TArray<FVoxelVolumeTransitionFace> GlobalFaces;
+		FVoxelVolumeTransitionPlanner::Build(Nodes, MaximumLevel, GlobalFaces, &Steps);
+		TArray<FString> Expected;
+		for (const auto& Face : GlobalFaces) Expected.Add(FaceIdentity(Face));
+		Expected.Sort();
+		TestTrue(TEXT("混合级别夹具实际包含接缝"), !Expected.IsEmpty());
+		for (const uint8 RequestedLevel : {uint8(1), MaximumLevel, uint8(MaximumLevel + 1)})
+		{
+			TMap<FVoxelViewKey, TSet<FVoxelViewKey>> Regions;
+			TMap<FVoxelViewKey, TSet<FVoxelViewKey>> ContinuedRegions;
+			FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Nodes, RequestedLevel, Regions);
+			auto Gather = FVoxelVolumeTransitionPlanner::GatherCoverageRegionsSteps(Nodes, RequestedLevel, ContinuedRegions);
+			for (int32 Step = 0; Step < 1000000 && !Gather.IsComplete(); ++Step) Gather.Resume();
+			if (!TestTrue(TEXT("分区续作完整结束"), Gather.IsComplete())) return false;
+			TestEqual(TEXT("同步和续作分区数量一致"), ContinuedRegions.Num(), Regions.Num());
+			TArray<FString> Actual;
+			for (const auto& Pair : Regions)
+			{
+				const auto* Continued = ContinuedRegions.Find(Pair.Key);
+				TestTrue(TEXT("同步和续作拥有完全相同的区域及完整halo"), Continued &&
+					Continued->Num() == Pair.Value.Num() && Continued->Includes(Pair.Value));
+				TestTrue(TEXT("区域不能小于其最粗输入节点"), Pair.Key.Level >= MaximumLevel);
+				TArray<FVoxelVolumeTransitionFace> Faces;
+				FVoxelVolumeTransitionPlanner::Build(Pair.Value, Pair.Key.Level, Faces, &Steps, &Pair.Key);
+				for (const auto& Face : Faces) Actual.Add(FaceIdentity(Face));
+			}
+			Actual.Sort();
+			TestTrue(FString::Printf(TEXT("最大级别%d分区级别%d完整面集合含所有字段且无重复或遗漏"),
+				int32(MaximumLevel), int32(RequestedLevel)), Actual == Expected);
+			ComparedFaces += Actual.Num();
+		}
+	}
+	const FVoxelViewKey Local{FIntVector(2, 2, 2), 1};
+	const FVoxelViewKey Other{FIntVector(24, 2, 2), 1};
+	TSet<FVoxelViewKey> BeforeNodes{Local, Other};
+	TSet<FVoxelViewKey> AfterNodes = BeforeNodes;
+	AfterNodes.Add({FIntVector(25, 2, 2), 1});
+	for (const uint8 RegionLevel : {uint8(5), uint8(6)})
+	{
+		TMap<FVoxelViewKey, TSet<FVoxelViewKey>> Before;
+		TMap<FVoxelViewKey, TSet<FVoxelViewKey>> After;
+		FVoxelVolumeTransitionPlanner::GatherCoverageRegions(BeforeNodes, RegionLevel, Before);
+		FVoxelVolumeTransitionPlanner::GatherCoverageRegions(AfterNodes, RegionLevel, After);
+		const FVoxelViewKey Region{FIntVector::ZeroValue, RegionLevel};
+		const auto& Initial = Before.FindChecked(Region);
+		const auto& Changed = After.FindChecked(Region);
+		const bool bSame = Initial.Num() == Changed.Num() && Initial.Includes(Changed);
+		TestEqual(TEXT("最粗Proxy级分区排除旧大区内远处变化，保留完整边界halo"), bSame, RegionLevel == 5);
+	}
+	AddInfo(FString::Printf(TEXT("逐字段比较%d个面，覆盖负坐标、三轴、混合级别、不同步长、超出请求级别的输入和同步/续作一致性"), ComparedFaces));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelVolumePlanInputReuseTest,
+	"WHFramework.Voxel.Rendering.VolumePlanInputReuse",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVoxelVolumePlanInputReuseTest::RunTest(const FString& InParameters)
+{
+	(void)InParameters;
+	UVoxelModule* Module = NewObject<UVoxelModule>();
+	FString Error;
+	if (!Module->Registry.Build({}, false, Error)) return false;
+	const auto Shapes = MakeShared<FVoxelShapeRegistry, ESPMode::ThreadSafe>();
+	Shapes->BuildDefaults();
+	Module->Shapes = Shapes;
+	Module->Generator = VoxelTest::MakeGenerator();
+	Module->Epoch = 29;
+	Module->GenerationConfig = VoxelTest::MakeGenerationConfig();
+	Module->Manifest.WorldId = FGuid::NewGuid();
+	Module->Manifest.Settings = Module->GenerationConfig->Recipe->Settings;
+	Module->Manifest.BaseSampleHash = 29;
+	const auto Control = FVoxelGenerationConsumerKey::Section(29, FGuid::NewGuid(), 1, {}, 1);
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> GeometryResources;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> FactResources;
+	TUniquePtr<FVoxelTaskScheduler> SchedulerOwner;
+	if (!TestTrue(TEXT("拓扑复用夹具使用原资源账本与调度器"),
+		FVoxelTerrainResources::Create({}, Control, GeometryResources, Error) &&
+		FVoxelTerrainResources::Create({}, Control, FactResources, Error) &&
+		FVoxelTaskScheduler::Create(GeometryResources.ToSharedRef(), FactResources.ToSharedRef(), Control, SchedulerOwner, Error) &&
+		SchedulerOwner->InitializeStatistics(29))) return false;
+	auto& Scheduler = *SchedulerOwner;
+	FVoxelTaskBudget Budget;
+	Budget.MaxConcurrentTasks = 2;
+	Budget.MaxCompletedResultsPerFrame = 8;
+	Scheduler.SetBudget(Budget);
+	FVoxelViewManager Manager(*Module, Scheduler, 29);
+	ON_SCOPE_EXIT { Scheduler.StopAndJoin(); Manager.Reset(); };
+	const uint64 BaselineResidentBytes = GeometryResources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)];
+	const FVoxelViewKey First{FIntVector(2, 0, 0), 1};
+	const FVoxelViewKey Second{FIntVector(3, 0, 0), 1};
+	Manager.GetInputRoot().MaximumProxyLevel = 5;
+	const FVoxelViewKey Region{FIntVector::ZeroValue, Manager.GetInputRoot().MaximumProxyLevel};
+	const TSet<FVoxelViewKey> Nodes{First, Second};
+	auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
+	for (const auto& Key : Nodes)
+	{
+		const FVoxelTerrainGeometry Geometry{{EVoxelTerrainRepresentation::VoxelProxy, Key.Coordinate, Key.Level}, 2,
+			Module->Manifest.Settings.MinZ, Module->Manifest.Settings.MaxZ, 29, Module->GetRegistry()->Hash};
+		Interest.Geometry.Add(Geometry.Key, Geometry);
+	}
+	TMap<FVoxelViewKey, int32> Steps{{First, 2}, {Second, 2}};
+	TMap<FVoxelViewKey, int32> ChangedSteps = Steps;
+	ChangedSteps[Second] = 4;
+	TestFalse(TEXT("相同节点但采样步长变化不等价"), FVoxelVolumeTransitionPlanner::SameInputs(Nodes, Steps, Nodes, ChangedSteps));
+	ChangedSteps.Remove(Second);
+	TestFalse(TEXT("缺失采样项不能按默认值匹配"), FVoxelVolumeTransitionPlanner::SameInputs(Nodes, Steps, Nodes, ChangedSteps));
+	const TSet<FVoxelViewKey> ChangedNodes{First, {FIntVector(4, 0, 0), 1}};
+	TestFalse(TEXT("相同数量但节点变化不等价"), FVoxelVolumeTransitionPlanner::SameInputs(Nodes, Steps, ChangedNodes, Steps));
+	TestTrue(TEXT("集合插入次序不改变精确输入等价性"), FVoxelVolumeTransitionPlanner::SameInputs(
+		Nodes, Steps, TSet<FVoxelViewKey>{Second, First}, TMap<FVoxelViewKey, int32>{{Second, 2}, {First, 2}}));
+	FVoxelCoverageRecord Record;
+	Record.Geometry = {{EVoxelTerrainRepresentation::Fine, FIntVector(4, 0, 0), 0}, 1, -256, 256, 29, 1};
+	Record.Geometry.Key.TryBounds(-256, 256, Record.Min, Record.Max);
+	Record.Stamp.ContentRevision = 1;
+	Record.bReady = true;
+	if (!TestTrue(TEXT("在相同区域建立真实内容版本守卫"), Manager.CoverageIndex.Upsert(Record, Error))) return false;
+	const auto Drain = [&Scheduler]()
+	{
+		const double Deadline = FPlatformTime::Seconds() + 10.0;
+		do
+		{
+			Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+			if (Scheduler.ActiveCount() == 0) return true;
+			FPlatformProcess::Sleep(0.001f);
+		} while (FPlatformTime::Seconds() < Deadline);
+		return false;
+	};
+	const auto InvalidateContent = [&]()
+	{
+		++Record.Stamp.ContentRevision;
+		return Manager.CoverageIndex.Upsert(Record, Error);
+	};
+	Manager.RebuildVolumeTransitions(Nodes);
+	if (!TestTrue(TEXT("初始区域拓扑已入队"), Manager.VolumeCoveragePlans.FindChecked(Region).PendingSignature != 0) ||
+		!TestTrue(TEXT("回调前变更区域内容"), InvalidateContent()) || !TestTrue(TEXT("初始规划正常结束"), Drain())) return false;
+	auto& State = Manager.VolumeCoveragePlans.FindChecked(Region);
+	TestFalse(TEXT("旧守卫失效时不能直接接纳计划"), State.Plan.IsValid());
+	if (!TestTrue(TEXT("成功计算的纯拓扑作为候选保留"), State.Candidate.IsValid())) return false;
+	TestTrue(TEXT("候选结果保持原Resident租约"),
+		GeometryResources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)] > BaselineResidentBytes);
+	auto Candidate = State.Candidate;
+	const uint64 CompletedBefore = Scheduler.GetDiagnostics().ByKind.FindRef(EVoxelTaskKind::BuildViewCoverage).Completed;
+	Manager.RebuildVolumeTransitions(Nodes);
+	TestTrue(TEXT("新覆盖步骤精确核验并复用原候选"), State.Plan == Candidate && !State.Candidate);
+	TestEqual(TEXT("精确复用不再次提交拓扑工作"), State.PendingSignature, uint64(0));
+	TestEqual(TEXT("精确复用没有增加后台拓扑完成数"),
+		Scheduler.GetDiagnostics().ByKind.FindRef(EVoxelTaskKind::BuildViewCoverage).Completed, CompletedBefore);
+	TestEqual(TEXT("复用计数对应实际接纳"), Manager.VolumeCandidatesPromoted, uint64(1));
+	TestFalse(TEXT("只有拓扑证明仍不能越过真实网格与接缝门禁"), Manager.PendingVolumeHandoffBoxes.IsEmpty());
+	Interest.Geometry.FindChecked({EVoxelTerrainRepresentation::VoxelProxy, Second.Coordinate, Second.Level}).SampleStepCells = 4;
+	Manager.RebuildVolumeTransitions(Nodes);
+	if (!TestTrue(TEXT("步长变化启动独立规划"), State.PendingSignature != 0) ||
+		!InvalidateContent() || !TestTrue(TEXT("步长规划完成并保留候选"), Drain())) return false;
+	if (!TestTrue(TEXT("新步长候选尚未接纳"), State.Candidate.IsValid())) return false;
+	auto OriginalPlan = State.Plan;
+	Interest.Geometry.FindChecked({EVoxelTerrainRepresentation::VoxelProxy, Second.Coordinate, Second.Level}).SampleStepCells = 8;
+	Manager.RebuildVolumeTransitions(Nodes);
+	TestTrue(TEXT("当前步长不匹配时丢弃候选且保留旧覆盖计划"), !State.Candidate && State.Plan == OriginalPlan && State.PendingSignature != 0);
+	TestEqual(TEXT("拒绝计数记录真实输入变化"), Manager.VolumeCandidatesRejected, uint64(1));
+	if (!TestTrue(TEXT("最新步长规划正常完成"), Drain())) return false;
+	TestTrue(TEXT("通过当前守卫的最新结果可接纳"), State.Plan != OriginalPlan);
+	auto CurrentPlan = State.Plan;
+	const auto Capacity = GeometryResources->Snapshot();
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Blocker;
+	if (!TestTrue(TEXT("夹具实际占满原Resident额度"), GeometryResources->Acquire(Control, EVoxelTerrainResourcePool::Resident,
+		Capacity.Limits.ResidentBytes - Capacity.Limits.OverlapBytes - Capacity.Used[int32(EVoxelTerrainResourcePool::Resident)], Blocker))) return false;
+	Interest.Geometry.FindChecked({EVoxelTerrainRepresentation::VoxelProxy, Second.Coordinate, Second.Level}).SampleStepCells = 4;
+	Manager.RebuildVolumeTransitions(Nodes);
+	TestTrue(TEXT("真实额度不足不能替换旧计划或发布未完成结果"), State.Plan == CurrentPlan && !State.Candidate && State.PendingSignature == 0);
+	Blocker.Reset();
+	Manager.RebuildVolumeTransitions(Nodes);
+	TestTrue(TEXT("归还原额度后可重新准入"), State.PendingSignature != 0);
+	Manager.Reset();
+	if (!TestTrue(TEXT("换代后的旧任务正常收尾"), Drain())) return false;
+	TestTrue(TEXT("旧代结果不能重新建立区域状态"), Manager.VolumeCoveragePlans.IsEmpty());
+	Scheduler.StopAndJoin();
+	Candidate.Reset();
+	OriginalPlan.Reset();
+	CurrentPlan.Reset();
+	const double RetirementDeadline = FPlatformTime::Seconds() + 2.0;
+	while (GeometryResources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)] != BaselineResidentBytes &&
+		FPlatformTime::Seconds() < RetirementDeadline) FPlatformProcess::Sleep(0.001f);
+	TestEqual(TEXT("重置和后台销毁后全部拓扑候选及计划Resident归还"),
+		GeometryResources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)], BaselineResidentBytes);
 	return true;
 }
 
@@ -246,6 +475,7 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	Budget.MaxCompletedResultsPerFrame = 1;
 	Scheduler.SetBudget(Budget);
 	FVoxelViewManager Manager(*Module, Scheduler, 7);
+	Manager.GetInputRoot().MaximumProxyLevel = 5;
 	const auto EnsureProxyInputs = [this, Module, &Scheduler, &Manager](const TSet<FVoxelViewKey>& InNodes)
 	{
 		auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
@@ -338,7 +568,13 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	TestFalse(TEXT("Completed topology still waits for actual body and frozen boundary preparation"), Manager.PendingVolumeHandoffBoxes.IsEmpty());
 	if (!EnsureProxyInputs(Nodes) || !PrepareTransitions(Nodes)) { Scheduler.StopAndJoin(); return false; }
 	TestTrue(TEXT("Prepared regions release all local handoff waits"), Manager.PendingVolumeHandoffBoxes.IsEmpty());
-	const FVoxelViewKey ReadOnlyRegion{FIntVector(31, 0, 0), 6};
+	const uint8 RegionLevel = Manager.GetInputRoot().MaximumProxyLevel;
+	const auto GetRegion = [RegionLevel](FVoxelViewKey Key)
+	{
+		while (Key.Level < RegionLevel) Key = Key.GetParent();
+		return Key;
+	};
+	const FVoxelViewKey ReadOnlyRegion = GetRegion({FIntVector(1000, 0, 0), 1});
 	const uint64 DistantSignature = Manager.VolumeCoveragePlans.FindChecked(ReadOnlyRegion).DesiredSignature;
 	Manager.bActiveCoverageFull = false;
 	Manager.ActiveDirtyCoverageRects = {{FIntPoint::ZeroValue, FIntPoint(1024, 1024)}};
@@ -352,14 +588,14 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	Manager.bActiveCoverageFull = true;
 	Manager.ActiveDirtyCoverageRects.Reset();
 	TMap<FVoxelViewKey, TSet<FVoxelViewKey>> Before, After;
-	FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Nodes, Before);
+	FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Nodes, RegionLevel, Before);
 	TSet<FVoxelViewKey> Changed = Nodes;
 	Changed.Add({FIntVector(1, 0, 0), 1});
-	FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Changed, After);
-	const FVoxelViewKey Distant{FIntVector(31, 0, 0), 6};
+	FVoxelVolumeTransitionPlanner::GatherCoverageRegions(Changed, RegionLevel, After);
+	const FVoxelViewKey Distant = ReadOnlyRegion;
 	TestTrue(TEXT("A local edit preserves distant planning inputs"),
 		Before.Contains(Distant) && After.Contains(Distant) && Before[Distant].Includes(After[Distant]) && Before[Distant].Num() == After[Distant].Num());
-	const FVoxelViewKey LocalRegion{FIntVector::ZeroValue, 6};
+	const FVoxelViewKey LocalRegion{FIntVector::ZeroValue, RegionLevel};
 	const auto InitialPlan = Manager.VolumeCoveragePlans.FindChecked(LocalRegion).Plan;
 	Changed = Nodes;
 	Changed.Add({FIntVector(8, 0, 0), 1});
@@ -674,6 +910,10 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	}
 	ScopedManager.RebuildHeightfieldTransitions({});
 	TestTrue(TEXT("The coalesced heightfield revision eventually releases its topology wait"), ScopedManager.PendingHeightfieldPlanOwners.IsEmpty());
+	ScopedManager.PendingVolumeHandoffBoxes.Add({FIntVector(-1000000), FIntVector(1000000)});
+	TestTrue(TEXT("动态高度场保留真实体积交接等待"), ScopedManager.VolumeHandoffAffectsHeightfield(SurfaceOwner));
+	ScopedManager.GetInputRoot().bInitialLayout = true;
+	TestFalse(TEXT("固定初始分区不等待其他表示的旧覆盖交接"), ScopedManager.VolumeHandoffAffectsHeightfield(SurfaceOwner));
 	ScopedScheduler.StopAndJoin();
 	ScopedManager.Reset();
 	FixtureWorld->DestroyWorld(false);
@@ -951,7 +1191,7 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 	Manager.Reset();
 	Source.Capabilities = EVoxelStreamingCapability::Data | EVoxelStreamingCapability::FineVisual;
 	Source.View.FineRadiusCells = 128;
-	Source.View.FineVerticalHalfExtentCells = 32;
+	Source.View.FineVerticalHalfExtentCells = 128;
 	Source.View.InitialChunkSideCells = 16;
 	FVoxelInterestManager Planner;
 	FVoxelInterestSet Interest = Planner.Compute(MakeArrayView(&Source, 1), Module->GetManifest(), Module->GetViewSettings());
@@ -971,6 +1211,8 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 	Manager.InterestMicrostepEstimateMilliseconds = 8.0;
 	Advance(1);
 	TestEqual(TEXT("A large interest is not applied in one publication slice"), Manager.AppliedInterestRevision, uint64(0));
+	TestTrue(TEXT("首个未提交工作区持有固定初始分区模式"),
+		Manager.InterestWorkspace && Manager.InterestWorkspace->Root->bInitialLayout);
 	TestTrue(TEXT("The first slice does not copy the complete Fine domain"), Manager.GetInputRoot().FineWanted.Num() < Interest.FineSections->Num());
 	Source.View.InitialChunkSideCells = 32;
 	Source.Center.X = 128;
@@ -981,6 +1223,7 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 	Manager.InterestMicrostepEstimateMilliseconds = 8.0;
 	for (int32 Slice = 0; Slice < 4096 && Manager.AppliedInterestRevision != 2; ++Slice) Advance(2);
 	TestEqual(TEXT("A superseded cursor converges to the latest interest"), Manager.AppliedInterestRevision, uint64(2));
+	TestFalse(TEXT("已有完整目标被移动替换后启用交接"), Manager.GetInputRoot().bInitialLayout);
 	TestTrue(TEXT("No Fine demand from the superseded interest remains"),
 		Manager.GetInputRoot().FineWanted.Num() == Interest.FineSections->Num() && Manager.GetInputRoot().FineWanted.Difference(*Interest.FineSections).IsEmpty());
 	TestTrue(TEXT("The complete 32-cell Page partition is accepted together"),
@@ -1018,6 +1261,7 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 	}
 	TestTrue(TEXT("The original moving snapshot completes before its queued successors"), bThirdSnapshotCompleted);
 	TestEqual(TEXT("The latest of several moving layouts is eventually adopted"), Manager.AppliedInterestRevision, uint64(8));
+	TestFalse(TEXT("移动改变分区后恢复新旧覆盖交接"), Manager.GetInputRoot().bInitialLayout);
 	TestTrue(TEXT("Latest layout owns the complete Fine partition"),
 		Manager.GetInputRoot().FineWanted.Num() == Interest.FineSections->Num() && Manager.GetInputRoot().FineWanted.Difference(*Interest.FineSections).IsEmpty());
 	for (const auto& Pair : Interest.Exact)
@@ -1070,6 +1314,116 @@ bool FVoxelInterestInputBudgetTest::RunTest(const FString& InParameters)
 	}
 	TestEqual(
 		TEXT("Retirement cannot start a coverage continuation while publication inputs are partially applied"), Manager.AppliedInterestRevision, uint64(9));
+	for (int32 Slice = 0; Slice < 4096 && Manager.CommittedWorkspaceEvents; ++Slice) Advance(9);
+	if (!TestFalse(TEXT("冻结拓扑域前完成旧发布事件"), Manager.CommittedWorkspaceEvents.IsValid())) return false;
+	const FVoxelViewKey LocalProxy{FIntVector(2, 0, 0), 1};
+	const FVoxelViewKey UnreadyProxy{FIntVector(4, 0, 0), 3};
+	auto ProxyInputs = MakeShared<FVoxelTerrainPublicationInputs, ESPMode::ThreadSafe>(*Interest.PublicationInputs);
+	for (const auto& Key : {LocalProxy, UnreadyProxy})
+	{
+		Interest.VoxelProxy.Add(Key);
+		ProxyInputs->Proxy.Add(Key);
+		const FVoxelTerrainGeometry Geometry{{EVoxelTerrainRepresentation::VoxelProxy, Key.Coordinate, Key.Level}, 2,
+			Module->Manifest.Settings.MinZ, Module->Manifest.Settings.MaxZ, Module->Manifest.BaseSampleHash, Module->GetRegistry()->Hash};
+		Interest.Geometry.Add(Geometry.Key, Geometry);
+		ProxyInputs->Geometry.Add(Geometry);
+	}
+	Interest.PublicationInputs = ProxyInputs;
+	Interest.PublicationRevision = 10;
+	QueueDesired(Interest);
+	if (!TestTrue(TEXT("冻结拓扑域使用正式发布输入工作区"),
+		Manager.BeginInterestWorkspace(Module->GetDesiredInterestSnapshot()))) return false;
+	Manager.AdvanceInterestWorkspace(FPlatformTime::Seconds());
+	TestEqual(TEXT("已到截止但未提交的游标不能提前替换拓扑域"), Manager.GetInputRoot().MaximumProxyLevel, uint8(0));
+	for (int32 Slice = 0; Slice < 4096 && Manager.AppliedInterestRevision != 10; ++Slice) Advance(10);
+	if (!TestEqual(TEXT("完整Proxy需求与原输入根一起接纳"), Manager.AppliedInterestRevision, uint64(10))) return false;
+	TestEqual(TEXT("尚未就绪的最高级别仍属于冻结拓扑域"), Manager.GetInputRoot().MaximumProxyLevel, uint8(3));
+	TestFalse(TEXT("冻结需求级别不伪造远端Proxy就绪"), Manager.VoxelProxyReady.Contains(UnreadyProxy));
+	Manager.bActiveCoverageFull = true;
+	Manager.RebuildVolumeTransitions({LocalProxy});
+	TestTrue(TEXT("只有低级节点就绪仍按完整冻结需求分区"),
+		Manager.VolumeCoveragePlans.Contains({FIntVector::ZeroValue, 3}));
+	const auto HeldCoverageRoot = Manager.AppliedInputRoot;
+	for (int32 Slice = 0; Slice < 4096 && Manager.CommittedWorkspaceEvents; ++Slice) Advance(10);
+	ProxyInputs = MakeShared<FVoxelTerrainPublicationInputs, ESPMode::ThreadSafe>(*Interest.PublicationInputs);
+	Interest.VoxelProxy.Remove(UnreadyProxy);
+	Interest.Geometry.Remove({EVoxelTerrainRepresentation::VoxelProxy, UnreadyProxy.Coordinate, UnreadyProxy.Level});
+	ProxyInputs->Proxy.Remove(UnreadyProxy);
+	ProxyInputs->Geometry.RemoveAll([UnreadyProxy](const FVoxelTerrainGeometry& Geometry)
+	{
+		return Geometry.Key == FVoxelTerrainSpatialKey{EVoxelTerrainRepresentation::VoxelProxy, UnreadyProxy.Coordinate, UnreadyProxy.Level};
+	});
+	Interest.PublicationInputs = ProxyInputs;
+	Interest.PublicationRevision = 11;
+	QueueDesired(Interest);
+	for (int32 Slice = 0; Slice < 4096 && Manager.AppliedInterestRevision != 11; ++Slice) Advance(11);
+	if (!TestEqual(TEXT("删除最高需求后新输入根可接纳"), Manager.AppliedInterestRevision, uint64(11))) return false;
+	TestEqual(TEXT("新需求重新计算拓扑域而不沿用已删上限"), Manager.GetInputRoot().MaximumProxyLevel, uint8(1));
+	Manager.CoverageInputRoot = HeldCoverageRoot;
+	{
+		TGuardValue<bool> ReadScope(Manager.bCoverageReadScope, true);
+		TestEqual(TEXT("旧覆盖续作仍读取其原冻结拓扑域"), Manager.GetInputRoot().MaximumProxyLevel, uint8(3));
+	}
+	Manager.CoverageInputRoot.Reset();
+	Manager.Reset();
+	const FVoxelViewKey DirectKey{FIntVector::ZeroValue, 1};
+	const FVoxelViewKey LaterKey{FIntVector(1000, 0, 0), 1};
+	Module->MaterialSet = NewObject<UVoxelMaterialSet>(Module);
+	FVoxelInterestSet DirectInterest;
+	const FVoxelTerrainGeometry DirectGeometry{{EVoxelTerrainRepresentation::VoxelProxy, DirectKey.Coordinate, DirectKey.Level}, 2,
+		Module->Manifest.Settings.MinZ, Module->Manifest.Settings.MaxZ, Module->Manifest.BaseSampleHash, Module->GetRegistry()->Hash};
+	DirectInterest.Geometry.Add(DirectGeometry.Key, DirectGeometry);
+	DirectInterest.VoxelProxy = {DirectKey, LaterKey};
+	Module->CurrentInterest = MakeShared<const FVoxelInterestSet, ESPMode::ThreadSafe>(MoveTemp(DirectInterest));
+	Manager.AppliedInterestSnapshot = Module->CurrentInterest;
+	Manager.GetInputRoot().bInitialLayout = true;
+	Manager.GetInputRoot().MaximumProxyLevel = 1;
+	Manager.GetInputRoot().ProxyWanted = {DirectKey, LaterKey};
+	const uint64 DirectBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelVoxelProxyData>() +
+		VoxelBoundedAllocation::ArrayBytes<FVoxelBlockState>(4096) + 6 * VoxelBoundedAllocation::ArrayBytes<FVoxelBlockState>(256);
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> DirectLease;
+	if (!TestTrue(TEXT("首次直出数据沿用原常驻租约"), GeometryResources->Acquire(Control,
+		EVoxelTerrainResourcePool::Resident, DirectBytes, DirectLease))) return false;
+	auto DirectData = VoxelBoundedAllocation::MakeWorkerShared<FVoxelVoxelProxyData>(DirectLease);
+	DirectData->ResourceLease = DirectLease;
+	DirectData->Key = DirectKey;
+	DirectData->Geometry = DirectGeometry;
+	DirectData->Revision = Module->Runtime->GetChangeHierarchy().GetVoxelProxyRevision(DirectKey);
+	DirectData->Cells.Init(FVoxelBlockState(), 4096);
+	for (int32 Face = 0; Face < 6; ++Face)
+	{
+		DirectData->Known[Face] = true;
+		DirectData->Halo[Face].Init(FVoxelBlockState(), 256);
+	}
+	bool bSurfaceCoverageComplete = false;
+	if (!TestTrue(TEXT("直出夹具经正式入口完成表面覆盖采集"),
+		DirectData->AdvanceSurfaceCoverage(16, bSurfaceCoverageComplete, FixtureError) && bSurfaceCoverageComplete)) return false;
+	auto DirectPrepared = MakeShared<FVoxelTaskResult, ESPMode::ThreadSafe>();
+	DirectPrepared->Kind = EVoxelTaskKind::GenerateVoxelProxy;
+	DirectPrepared->Stamp = Manager.MakeRepresentationStamp(DirectGeometry, DirectData->Revision);
+	DirectPrepared->VoxelProxy = DirectData;
+	DirectPrepared->PreparedRevisionAdmission = EVoxelTerrainResourceAdmission::Granted;
+	const FVoxelTaskKey DirectDataKey{DirectPrepared->Kind, DirectPrepared->Stamp};
+	Manager.PreparedData.Add(DirectDataKey, DirectPrepared);
+	Manager.PreparedDataBytes = DirectPrepared->ResultBytes() + sizeof(FVoxelTaskResult) + sizeof(FVoxelTaskKey);
+	Manager.VoxelProxyData.Add(DirectKey, DirectData);
+	TestFalse(TEXT("首次直出不提交无接缝基础网格"), Manager.RequestVoxelProxy(DirectKey, 0, false));
+	TestFalse(TEXT("数据到达不冒充网格就绪"), Manager.VoxelProxyReady.Contains(DirectKey));
+	const double DirectDeadline = FPlatformTime::Seconds() + 10.0;
+	while (!Manager.VoxelProxyReady.Contains(DirectKey) && FPlatformTime::Seconds() < DirectDeadline)
+	{
+		verify(BeginFrame());
+		Manager.RebuildVolumeTransitions({});
+		Manager.PumpVolumeTransitions(FPlatformTime::Seconds() + 0.05);
+		Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+		EndFrame();
+		FPlatformProcess::Sleep(0.001f);
+	}
+	TestTrue(TEXT("没有临时基础网格仍可通过真实调度器完成最终网格"), Manager.VoxelProxyReady.Contains(DirectKey));
+	TestTrue(TEXT("最终网格保留接缝准备签名"), Manager.PreparedVolumeSignatures.Contains(DirectKey));
+	TestFalse(TEXT("最终网格接纳后归还原数据准备队列额度"), Manager.PreparedData.Contains(DirectDataKey));
+	TestFalse(TEXT("远端尚无数据的目标不会阻止无关区域直出，也不伪造其就绪"), Manager.VoxelProxyReady.Contains(LaterKey));
+	TestEqual(TEXT("首次邻接计划包含尚无数据的完整目标域"), Manager.VolumeCoveragePlans.Num(), 2);
 	Scheduler.StopAndJoin();
 	Manager.Reset();
 	return true;

@@ -271,8 +271,10 @@ private:
 	struct FInterestInputRoot
 	{
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+		bool bInitialLayout = false;
 		TSet<FIntVector> FineWanted;
 		TSet<FVoxelViewKey> ProxyWanted;
+		uint8 MaximumProxyLevel = 0;
 		TSet<FVoxelSurfaceTileKey> SurfaceWanted;
 		TSet<FVoxelMacroTileKey> MacroWanted;
 		FVoxelCoverageIndex TerrainRootIndex;
@@ -293,6 +295,7 @@ private:
 		TArray<FVoxelFineShardKey> ChangedShardOwners;
 		int32 Phase = 0;
 		int32 Cursor = 0;
+		bool bGeometryChanged = false;
 		bool bWaitingHierarchyCapacity = false;
 		uint64 HierarchyCapacityVersion = 0;
 		EVoxelTerrainResourceAdmission HierarchyAdmission = EVoxelTerrainResourceAdmission::Granted;
@@ -465,6 +468,7 @@ private:
 	friend class FVoxelCriticalDependencyAdmissionTest;
 	friend class FVoxelFinePageObsoleteDirtyCleanupTest;
 	friend class FVoxelManagerLocalCoverageTest;
+	friend class FVoxelVolumePlanInputReuseTest;
 	friend class FVoxelCoverageDrainProgressTest;
 	friend class FVoxelInterestInputBudgetTest;
 	friend class FVoxelEmptyTransitionConvergenceTest;
@@ -530,6 +534,8 @@ private:
 	FVoxelGameThreadContinuation IsTerrainVolumeCoveredSteps(
 		FVoxelViewKey InNode, const FCoveragePassSnapshot& InSnapshot, bool bByFine, bool& OutCovered) const;
 
+	void ApplyTaskServicePriority(FVoxelTaskRequest& InRequest) const;
+	bool CanEnqueueViewTask(const FVoxelTaskRequest& InRequest);
 	bool EnqueueViewTask(FVoxelTaskRequest&& InRequest);
 	void RecordTerrainMesh(const FVoxelTerrainSpatialKey& InKey, const FVoxelSectionMeshResult& InMesh, double InBuildMilliseconds);
 	void LogRepresentationState(TConstArrayView<FVector> InObservers);
@@ -788,7 +794,15 @@ private:
 	TMap<FVoxelHeightfieldNodeKey, TLocalCoverageState<FVoxelHeightfieldCoveragePlan>> HeightfieldCoveragePlans;
 	TSet<FVoxelHeightfieldNodeKey> PendingHeightfieldPlanOwners;
 	uint64 VolumePlanSerial = 0;
-	TMap<FVoxelViewKey, TLocalCoverageState<FVoxelVolumeCoveragePlan>> VolumeCoveragePlans;
+	struct FVolumeCoverageState : TLocalCoverageState<FVoxelVolumeCoveragePlan>
+	{
+		TSharedPtr<const FVoxelVolumeCoveragePlan, ESPMode::ThreadSafe> Candidate;
+	};
+	TMap<FVoxelViewKey, FVolumeCoverageState> VolumeCoveragePlans;
+	uint64 VolumeCandidatesRetained = 0;
+	uint64 VolumeCandidatesPromoted = 0;
+	uint64 VolumeCandidatesRejected = 0;
+	uint64 VolumeCandidateGuardWaits = 0;
 	FVoxelCoverageIndex VolumePlanIndex;
 	TArray<FVoxelCoverageBox> PendingVolumeHandoffBoxes;
 	TArray<FVoxelPublishGroupKey> RetirementQueue;

@@ -235,7 +235,6 @@ private:
 		mutable uint64 CommitGateBlockedRevision = 0;
 		mutable uint64 CommitGateBlockedBindingRevision = 0;
 		mutable uint64 CommitGateBlockedGroupRevision = 0;
-		mutable uint64 DependencyProofRevision = 0;
 		mutable uint64 DependencyNextSerial = 0;
 		mutable uint64 DependencyQuerySerial = 0;
 		mutable uint64 DependencyQueryRevision = 0;
@@ -424,6 +423,7 @@ private:
 	bool CommitReadyGroups(const FPublicationRef& Publication, int32& InOutCommitted, double InDeadline,
 		const TMap<FVoxelPublishGroupKey, uint64>& InFirstOwners, int32 InGroupIndex = INDEX_NONE);
 	bool CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup);
+	void DiscardReadyGroup(const FPublicationRef& InPublication, FGroup& InGroup);
 	bool AdvanceNativeGroup(const FPublicationRef& InPublication, FGroup& InGroup, bool& bOutAdvanced);
 	void ReleaseNativeGroup(FGroup& InGroup);
 	bool IsNativeGeometryCurrent(const FVoxelTaskStamp& InStamp) const;
@@ -479,7 +479,6 @@ private:
 	int32 ReadySelectionCursors[2] = {};
 	uint64 PublisherTickSerial = 0;
 	uint64 CommitGateCacheHits = 0;
-	uint64 DependencyProofRevision = 1;
 	double NextReadyCandidateDiagnostic[2] = {};
 	uint64 PrepareReadinessRevision = 0;
 	uint64 CommitReadinessRevision = 0;
