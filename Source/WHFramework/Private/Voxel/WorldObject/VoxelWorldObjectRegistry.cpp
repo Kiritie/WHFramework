@@ -36,6 +36,32 @@ FVoxelBlockState FVoxelWorldObjectRegistry::PartState(const FVoxelWorldObjectDef
 	return {InDefinition.Types[InPart], uint16(InDefinition.Parts[InPart].State | InYaw | (InFlags & (InDefinition.ToggleMask | VoxelState::ObjectLockedMask)))};
 }
 
+int32 FVoxelWorldObjectRegistry::FindPartAtCell(const FVoxelWorldObjectDefinitionRuntime& InDefinition, const FIntVector& InAnchor, uint8 InYaw, const FIntVector& InCell)
+{
+	const int64 OffsetX = int64(InCell.X) - InAnchor.X;
+	const int64 OffsetY = int64(InCell.Y) - InAnchor.Y;
+	const int64 OffsetZ = int64(InCell.Z) - InAnchor.Z;
+	if (FMath::Abs(OffsetX) > MaximumPartOffsetCells || FMath::Abs(OffsetY) > MaximumPartOffsetCells ||
+		FMath::Abs(OffsetZ) > MaximumPartOffsetCells)
+	{
+		return INDEX_NONE;
+	}
+	const FIntVector Offset = Rotate(FIntVector(int32(OffsetX), int32(OffsetY), int32(OffsetZ)), uint8(0 - InYaw));
+	if (Offset.X < InDefinition.MinPartOffset.X || Offset.Y < InDefinition.MinPartOffset.Y || Offset.Z < InDefinition.MinPartOffset.Z ||
+		Offset.X > InDefinition.MaxPartOffset.X || Offset.Y > InDefinition.MaxPartOffset.Y || Offset.Z > InDefinition.MaxPartOffset.Z)
+	{
+		return INDEX_NONE;
+	}
+	for (int32 Part = 0; Part < InDefinition.Parts.Num(); ++Part)
+	{
+		if (Offset == InDefinition.Parts[Part].Offset)
+		{
+			return Part;
+		}
+	}
+	return INDEX_NONE;
+}
+
 int32 FVoxelWorldObjectRegistry::FindPartIndex(const FVoxelWorldObjectDefinitionRuntime& InDefinition, const FVoxelBlockState& InState)
 {
 	const uint16 Flags = uint16(VoxelState::FacingMask | InDefinition.ToggleMask | VoxelState::ObjectLockedMask);
@@ -92,7 +118,7 @@ bool FVoxelWorldObjectRegistry::Build(const FVoxelRegistrySnapshot& InBlocks, co
 			const FVoxelWorldObjectPart& Part = Definition.Parts[Index];
 			const FVoxelRuntimeDefinition* Block = InBlocks.Find(Part.BlockName);
 			if (!Block || Block->TypeId == 0 || (Index > 0 && Block->EntityKind != 0) || Offsets.Contains(Part.Offset) ||
-				Part.Offset.GetAbsMax() > 32 || Part.State < 0 || Part.State > MAX_uint16 ||
+				Part.Offset.GetAbsMax() > MaximumPartOffsetCells || Part.State < 0 || Part.State > MAX_uint16 ||
 				(Part.State & (VoxelState::FacingMask | Definition.ToggleMask)) || Candidate.TypeDefinitions.Contains(Block->TypeId))
 			{
 				OutError = FString::Printf(TEXT("Invalid world object part %s[%d]: block=%s type=%u entity=%u state=%d toggle=%u"),
@@ -117,6 +143,8 @@ bool FVoxelWorldObjectRegistry::Build(const FVoxelRegistrySnapshot& InBlocks, co
 			}
 			Offsets.Add(Part.Offset);
 			Signatures.Add(Signature);
+			Definition.MinPartOffset = Definition.MinPartOffset.ComponentMin(Part.Offset);
+			Definition.MaxPartOffset = Definition.MaxPartOffset.ComponentMax(Part.Offset);
 			Definition.PartIndices.Add(Signature, Index);
 			Definition.Types.Add(Block->TypeId);
 		}

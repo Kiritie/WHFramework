@@ -697,40 +697,9 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::EnsureEnvironm
 	return Status;
 }
 
-bool FVoxelGenerationPlanCoordinator::IsCached(
-	const FVoxelGenerationPlanDependency& InDependency) const
+bool FVoxelGenerationPlanCoordinator::IsCached(const FVoxelGenerationPlanDependency& InDependency) const
 {
-	switch (InDependency.Kind)
-	{
-	case EVoxelGenerationPlanKind::Hydrology:
-	{
-		FVoxelHydrologyPlanPtr Plan;
-		return Cache->FindHydrology(InDependency.HydrologyKey, Plan);
-	}
-
-	case EVoxelGenerationPlanKind::Cave:
-	{
-		FVoxelCavePlanPtr Plan;
-		return Cache->FindCave(InDependency.TileKey, Plan);
-	}
-	case EVoxelGenerationPlanKind::Structure:
-	{
-		FVoxelStructurePlanPtr Plan;
-		return Cache->FindStructure(InDependency.TileKey, Plan);
-	}
-	case EVoxelGenerationPlanKind::Feature:
-	{
-		FVoxelFeaturePlanPtr Plan;
-		return Cache->FindFeature(InDependency.TileKey, Plan);
-	}
-	case EVoxelGenerationPlanKind::Ecology:
-	{
-		FVoxelEcologyPlanPtr Plan;
-		return Cache->FindEcology(InDependency.EcologyKey, Plan);
-	}
-	default:
-		return false;
-	}
+	return Cache->HasPlan(InDependency.Kind, InDependency.Coordinate());
 }
 
 void FVoxelGenerationPlanCoordinator::RefreshQueuedPriorities()
@@ -938,6 +907,7 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 	const FVoxelGenerationPlanDependency& InDependency,
 	FState& InOutState)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanQueueAttempt);
 	if (!InOutState.PendingRequest.IsSet())
 	{
 		InOutState.PendingRequest.Emplace();
@@ -1463,11 +1433,14 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			});
 		FClosureRegistration Registration(*this);
 		FClosureDemand Desired(*this);
-		for (const auto& Dependency : InDependencies)
 		{
-			if (!RegisterClosure(Dependency, Registration, Error))
-				return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
-			Desired.Add(Dependency);
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureClosure);
+			for (const auto& Dependency : InDependencies)
+			{
+				if (!RegisterClosure(Dependency, Registration, Error))
+					return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
+				Desired.Add(Dependency);
+			}
 		}
 		FConsumerState* Consumer = Storage->Consumers.Find(InConsumer);
 		if (!Consumer)
@@ -1479,179 +1452,200 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			Consumer = &Storage->Consumers.Add(InConsumer);
 			Consumer->PriorityNode = Node;
 		}
-		bool bSame = Consumer->Dependencies.Num() == Desired.Count;
-		for (FGuid Node = Desired.Head; bSame && Node.IsValid();)
 		{
-			const auto& Dependency = Storage->PriorityFacts.FindChecked(Node);
-			bSame = Consumer->Dependencies.Contains(Dependency);
-			Node = Storage->States.FindChecked(Dependency).NextDesired;
-		}
-		if (!bSame)
-		{
-			int32 GrowthCount = 0;
-			for (FGuid Node = Desired.Head; Node.IsValid();)
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureBinding);
+			bool bSame = Consumer->Dependencies.Num() == Desired.Count;
+			for (FGuid Node = Desired.Head; bSame && Node.IsValid();)
 			{
-				const auto& State = Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Node));
-				if (!State.Donations.Contains(InConsumer) && State.Donations.Num() + 1 > State.DonationsCapacity) ++GrowthCount;
-				Node = State.NextDesired;
+				const auto& Dependency = Storage->PriorityFacts.FindChecked(Node);
+				bSame = Consumer->Dependencies.Contains(Dependency);
+				Node = Storage->States.FindChecked(Dependency).NextDesired;
 			}
-			FVoxelGenerationRequiredSourceScope PreviousDependenciesSource(&Resources.Get(), Consumer->DependenciesLease.Get());
-			FVoxelGenerationRequiredCapacity RequiredScratch;
-			if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, RequiredScratch, Error))
-				return {false, true, MoveTemp(Error)};
-			FVoxelGenerationWorkspace Scratch(Resources, ControlConsumer,
-				RequiredScratch.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], RequiredScratch.LeaseCount);
-			TSet<FGuid> DependencyNodes;
-			TArray<FDonationGrowth> Growth;
-			ON_SCOPE_EXIT
+			if (!bSame)
 			{
-				Scratch.FreeArray(Growth);
-				Scratch.FreeSet(DependencyNodes);
-			};
-			if (!Scratch.ReserveSet(DependencyNodes, Desired.Count, Error) ||
-				!Scratch.ReserveArray(Growth, GrowthCount, Error))
-				return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
-			// 新租约在本段只由Growth强持，提交前未向任何其它来源暴露，也不会调整池/字节。
-			// 因此可精确累加实际Input字节和原租约数，避免第N次授额重放前N-1个来源。
-			FVoxelGenerationRequiredCapacity GrowthCapacity;
-			FVoxelGenerationRequiredSourceScope GrowthSources(&Resources.Get(), &GrowthCapacity,
-				[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
+				int32 GrowthCount = 0;
+				for (FGuid Node = Desired.Head; Node.IsValid();)
 				{
-					const auto& Capacity = *static_cast<const FVoxelGenerationRequiredCapacity*>(Context);
-					if (Capacity.LeaseCount) Visit({Context, 0, EVoxelTerrainResourcePool::Input,
-						Capacity.Bytes[int32(EVoxelTerrainResourcePool::Input)], Capacity.LeaseCount});
-				});
-			const double DonationStarted = FPlatformTime::Seconds();
-			for (FGuid Node = Desired.Head; Node.IsValid();)
-			{
-				const auto& State = Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Node));
-				DependencyNodes.Add(Node);
-				if (!State.Donations.Contains(InConsumer) && State.Donations.Num() + 1 > State.DonationsCapacity)
+					const auto& State = Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Node));
+					if (!State.Donations.Contains(InConsumer) && State.Donations.Num() + 1 > State.DonationsCapacity) ++GrowthCount;
+					Node = State.NextDesired;
+				}
+				FVoxelGenerationRequiredSourceScope PreviousDependenciesSource(&Resources.Get(), Consumer->DependenciesLease.Get());
+				FVoxelGenerationRequiredCapacity RequiredScratch;
+				if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, RequiredScratch, Error))
+					return {false, true, MoveTemp(Error)};
+				FVoxelGenerationWorkspace Scratch(Resources, ControlConsumer,
+					RequiredScratch.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], RequiredScratch.LeaseCount);
+				TSet<FGuid> DependencyNodes;
+				TArray<FDonationGrowth> Growth;
+				ON_SCOPE_EXIT
 				{
-					FDonationGrowth Plan;
-					Plan.Node = Node;
-					Plan.Capacity = FMath::Max(State.Donations.Num() + 1, FMath::Max(4, State.DonationsCapacity * 2));
-					FVoxelGenerationRequiredSourceScope PreviousDonationSource(&Resources.Get(), State.DonationsLease.Get());
-					FVoxelGenerationRequiredCapacity Required;
-					if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, Required, Error))
-						return {false, true, MoveTemp(Error)};
-					const auto Admission = Resources->TryAcquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
-						VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FVoxelGenerationConsumerKey, FDonation>>(State.Donations, Plan.Capacity),
-						Plan.Lease, 0, Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
-					if (Admission != EVoxelTerrainResourceAdmission::Granted)
+					Scratch.FreeArray(Growth);
+					Scratch.FreeSet(DependencyNodes);
+				};
+				if (!Scratch.ReserveSet(DependencyNodes, Desired.Count, Error) ||
+					!Scratch.ReserveArray(Growth, GrowthCount, Error))
+					return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
+				// 新租约在本段只由Growth强持，提交前未向任何其它来源暴露，也不会调整池/字节。
+				// 因此可精确累加实际Input字节和原租约数，避免第N次授额重放前N-1个来源。
+				FVoxelGenerationRequiredCapacity GrowthCapacity;
+				FVoxelGenerationRequiredSourceScope GrowthSources(&Resources.Get(), &GrowthCapacity,
+					[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
 					{
-						return {false, Admission != EVoxelTerrainResourceAdmission::CapacityBlocked,
-							Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: generation donations") :
-							Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: generation donations and retained inputs") :
-							TEXT("InvalidRequest: generation donations")};
+						const auto& Capacity = *static_cast<const FVoxelGenerationRequiredCapacity*>(Context);
+						if (Capacity.LeaseCount) Visit({Context, 0, EVoxelTerrainResourcePool::Input,
+							Capacity.Bytes[int32(EVoxelTerrainResourcePool::Input)], Capacity.LeaseCount});
+					});
+				const double DonationStarted = FPlatformTime::Seconds();
+				for (FGuid Node = Desired.Head; Node.IsValid();)
+				{
+					const auto& State = Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Node));
+					DependencyNodes.Add(Node);
+					if (!State.Donations.Contains(InConsumer) && State.Donations.Num() + 1 > State.DonationsCapacity)
+					{
+						FDonationGrowth Plan;
+						Plan.Node = Node;
+						Plan.Capacity = FMath::Max(State.Donations.Num() + 1, FMath::Max(4, State.DonationsCapacity * 2));
+						FVoxelGenerationRequiredSourceScope PreviousDonationSource(&Resources.Get(), State.DonationsLease.Get());
+						FVoxelGenerationRequiredCapacity Required;
+						if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, Required, Error))
+							return {false, true, MoveTemp(Error)};
+						const auto Admission = Resources->TryAcquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
+							VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FVoxelGenerationConsumerKey, FDonation>>(State.Donations, Plan.Capacity),
+							Plan.Lease, 0, Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+						if (Admission != EVoxelTerrainResourceAdmission::Granted)
+						{
+							return {false, Admission != EVoxelTerrainResourceAdmission::CapacityBlocked,
+								Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: generation donations") :
+								Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: generation donations and retained inputs") :
+								TEXT("InvalidRequest: generation donations")};
+						}
+						EVoxelTerrainResourcePool GrantedPool;
+						uint64 GrantedBytes = 0;
+						uint64& PrefixBytes = GrowthCapacity.Bytes[int32(EVoxelTerrainResourcePool::Input)];
+						if (!Plan.Lease->ReadCapacity(GrantedPool, GrantedBytes) || GrantedPool != EVoxelTerrainResourcePool::Input ||
+							GrantedBytes > MAX_uint64 - PrefixBytes || GrowthCapacity.LeaseCount == MAX_int32)
+							return {false, true, TEXT("CapacityUnachievable: invalid owned donation prefix")};
+						PrefixBytes += GrantedBytes;
+						++GrowthCapacity.LeaseCount;
+						Growth.Add(MoveTemp(Plan));
 					}
+					Node = State.NextDesired;
+				}
+				if (Growth.Num() >= 1024)
+					UE_LOG(LogTemp, Display, TEXT("Voxel donation preparation: dependencies=%d growth=%d inputBytes=%llu leases=%d ms=%.3f"),
+						Desired.Count, Growth.Num(), GrowthCapacity.Bytes[int32(EVoxelTerrainResourcePool::Input)],
+						GrowthCapacity.LeaseCount, (FPlatformTime::Seconds() - DonationStarted) * 1000.0);
+				if (!PrepareMap<FVoxelGenerationPlanDependency, FSubscription>(Consumer->Dependencies, Desired.Count,
+					Consumer->Capacity, Consumer->DependenciesLease, Error)) return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
+				for (auto& Plan : Growth)
+				{
 					EVoxelTerrainResourcePool GrantedPool;
 					uint64 GrantedBytes = 0;
 					uint64& PrefixBytes = GrowthCapacity.Bytes[int32(EVoxelTerrainResourcePool::Input)];
 					if (!Plan.Lease->ReadCapacity(GrantedPool, GrantedBytes) || GrantedPool != EVoxelTerrainResourcePool::Input ||
-						GrantedBytes > MAX_uint64 - PrefixBytes || GrowthCapacity.LeaseCount == MAX_int32)
-						return {false, true, TEXT("CapacityUnachievable: invalid owned donation prefix")};
-					PrefixBytes += GrantedBytes;
-					++GrowthCapacity.LeaseCount;
-					Growth.Add(MoveTemp(Plan));
+						GrantedBytes > PrefixBytes || GrowthCapacity.LeaseCount <= 0)
+						return {false, true, TEXT("CapacityUnachievable: invalid donation ownership transfer")};
+					auto& State = Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Plan.Node));
+					State.Donations.Reserve(Plan.Capacity);
+					check(VoxelGenerationAllocation::AllocatedBytes(State.Donations) <= Plan.Lease->Bytes());
+					PrefixBytes -= GrantedBytes;
+					--GrowthCapacity.LeaseCount;
+					State.DonationsLease = MoveTemp(Plan.Lease);
+					State.DonationsCapacity = Plan.Capacity;
 				}
+				check(GrowthCapacity.LeaseCount == 0 && GrowthCapacity.Bytes[int32(EVoxelTerrainResourcePool::Input)] == 0);
+				if (!PriorityGraph.SetDependencies(Consumer->PriorityNode, DependencyNodes, Error))
+					return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
+			}
+			PriorityGraph.SetPriority(Consumer->PriorityNode, Priority);
+			Registration.Commit();
+		}
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsurePrune);
+			for (auto Edge = Consumer->Dependencies.CreateIterator(); Edge; ++Edge)
+			{
+				if (!Desired.Contains(Edge.Key()))
+				{
+					UnlinkSubscriptionWake(*Consumer, Edge.Value());
+					RemoveSubscription(Edge.Key(), InConsumer, Edge.Value().Id);
+					Edge.RemoveCurrent();
+				}
+			}
+		}
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureReadiness);
+			Status.bReady = true;
+			for (FGuid Node = Desired.Head; Node.IsValid();)
+			{
+				const auto Dependency = Storage->PriorityFacts.FindChecked(Node);
+				auto& State = Storage->States.FindChecked(Dependency);
+				FSubscription* Subscription = Consumer->Dependencies.Find(Dependency);
+				if (!Subscription)
+				{
+					checkf(NextSubscriptionId != MAX_uint64, TEXT("Generation subscription serial exhausted"));
+					Subscription = &Consumer->Dependencies.Add(Dependency);
+					Subscription->Id = ++NextSubscriptionId;
+				}
+				const auto Previous = State.ServicePriority;
+				const FDonation* ExistingDonation = State.Donations.Find(InConsumer);
+				if (!ExistingDonation || ExistingDonation->WorkClass != InWorkClass ||
+					ExistingDonation->Priority != Priority || ExistingDonation->SubscriptionId != Subscription->Id)
+				{
+					TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureDonationChange);
+					State.Donations.Add(InConsumer, {InWorkClass, Priority, Subscription->Id});
+					ResolveDonations(State);
+				}
+				if (State.bInFlight && Previous != State.ServicePriority) Cache->RecordPlanDonation(Dependency.Kind);
+				const bool bCached = IsCached(Dependency);
+				if (bCached)
+				{
+					if (State.PendingRequest.IsSet())
+					{
+						ClearPendingRequest(State);
+						WakeConsumers(Dependency);
+					}
+					State.State = EVoxelPlanDependencyState::Ready;
+					State.Error.Reset();
+				}
+				else if (State.State == EVoxelPlanDependencyState::Ready)
+					State.State = State.bInFlight ? EVoxelPlanDependencyState::Queued : EVoxelPlanDependencyState::Missing;
+				if (State.State == EVoxelPlanDependencyState::Failed)
+				{
+					Status.bFailed = true;
+					Status.Error = State.Error;
+				}
+				Status.bReady &= bCached;
 				Node = State.NextDesired;
 			}
-			if (Growth.Num() >= 1024)
-				UE_LOG(LogTemp, Display, TEXT("Voxel donation preparation: dependencies=%d growth=%d inputBytes=%llu leases=%d ms=%.3f"),
-					Desired.Count, Growth.Num(), GrowthCapacity.Bytes[int32(EVoxelTerrainResourcePool::Input)],
-					GrowthCapacity.LeaseCount, (FPlatformTime::Seconds() - DonationStarted) * 1000.0);
-			if (!PrepareMap<FVoxelGenerationPlanDependency, FSubscription>(Consumer->Dependencies, Desired.Count,
-				Consumer->Capacity, Consumer->DependenciesLease, Error)) return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
-			for (auto& Plan : Growth)
-			{
-				EVoxelTerrainResourcePool GrantedPool;
-				uint64 GrantedBytes = 0;
-				uint64& PrefixBytes = GrowthCapacity.Bytes[int32(EVoxelTerrainResourcePool::Input)];
-				if (!Plan.Lease->ReadCapacity(GrantedPool, GrantedBytes) || GrantedPool != EVoxelTerrainResourcePool::Input ||
-					GrantedBytes > PrefixBytes || GrowthCapacity.LeaseCount <= 0)
-					return {false, true, TEXT("CapacityUnachievable: invalid donation ownership transfer")};
-				auto& State = Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Plan.Node));
-				State.Donations.Reserve(Plan.Capacity);
-				check(VoxelGenerationAllocation::AllocatedBytes(State.Donations) <= Plan.Lease->Bytes());
-				PrefixBytes -= GrantedBytes;
-				--GrowthCapacity.LeaseCount;
-				State.DonationsLease = MoveTemp(Plan.Lease);
-				State.DonationsCapacity = Plan.Capacity;
-			}
-			check(GrowthCapacity.LeaseCount == 0 && GrowthCapacity.Bytes[int32(EVoxelTerrainResourcePool::Input)] == 0);
-			if (!PriorityGraph.SetDependencies(Consumer->PriorityNode, DependencyNodes, Error))
-				return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
-		}
-		PriorityGraph.SetPriority(Consumer->PriorityNode, Priority);
-		Registration.Commit();
-		for (auto Edge = Consumer->Dependencies.CreateIterator(); Edge; ++Edge)
-		{
-			if (!Desired.Contains(Edge.Key()))
-			{
-				UnlinkSubscriptionWake(*Consumer, Edge.Value());
-				RemoveSubscription(Edge.Key(), InConsumer, Edge.Value().Id);
-				Edge.RemoveCurrent();
-			}
-		}
-		Status.bReady = true;
-		for (FGuid Node = Desired.Head; Node.IsValid();)
-		{
-			const auto Dependency = Storage->PriorityFacts.FindChecked(Node);
-			auto& State = Storage->States.FindChecked(Dependency);
-			FSubscription* Subscription = Consumer->Dependencies.Find(Dependency);
-			if (!Subscription)
-			{
-				checkf(NextSubscriptionId != MAX_uint64, TEXT("Generation subscription serial exhausted"));
-				Subscription = &Consumer->Dependencies.Add(Dependency);
-				Subscription->Id = ++NextSubscriptionId;
-			}
-			const auto Previous = State.ServicePriority;
-			State.Donations.Add(InConsumer, {InWorkClass, Priority, Subscription->Id});
-			ResolveDonations(State);
-			PriorityGraph.SetPriority(Node, State.ServicePriority);
-			if (State.bInFlight && Previous != State.ServicePriority) Cache->RecordPlanDonation(Dependency.Kind);
-			const bool bCached = IsCached(Dependency);
-			if (bCached)
-			{
-				if (State.PendingRequest.IsSet())
-				{
-					ClearPendingRequest(State);
-					WakeConsumers(Dependency);
-				}
-				State.State = EVoxelPlanDependencyState::Ready;
-				State.Error.Reset();
-			}
-			else if (State.State == EVoxelPlanDependencyState::Ready)
-				State.State = State.bInFlight ? EVoxelPlanDependencyState::Queued : EVoxelPlanDependencyState::Missing;
-			if (State.State == EVoxelPlanDependencyState::Failed)
-			{
-				Status.bFailed = true;
-				Status.Error = State.Error;
-			}
-			Status.bReady &= bCached;
-			Node = State.NextDesired;
 		}
 		AdvancePriorityDonations();
-		for (FGuid Node = Desired.Head; Node.IsValid();)
 		{
-			const auto Dependency = Storage->PriorityFacts.FindChecked(Node);
-			auto& State = Storage->States.FindChecked(Dependency);
-			const FGuid Next = State.NextDesired;
-			if (State.State == EVoxelPlanDependencyState::Missing && !State.bInFlight && ArePrerequisitesReady(State)) Queue(Dependency, State);
-			if (Storage != Desired.CapturedStorage || !Storage || Storage->Owner != this || !Storage->Consumers.Contains(InConsumer))
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureQueue);
+			for (FGuid Node = Desired.Head; Node.IsValid();)
 			{
-				Status.bReady = false;
-				return Status;
+				const auto Dependency = Storage->PriorityFacts.FindChecked(Node);
+				auto& State = Storage->States.FindChecked(Dependency);
+				const FGuid Next = State.NextDesired;
+				if (State.State == EVoxelPlanDependencyState::Missing && !State.bInFlight)
+				{
+					if (State.PendingRequest.IsSet()) LinkPendingAdmission(State);
+					else if (ArePrerequisitesReady(State)) Queue(Dependency, State);
+				}
+				if (Storage != Desired.CapturedStorage || !Storage || Storage->Owner != this || !Storage->Consumers.Contains(InConsumer))
+				{
+					Status.bReady = false;
+					return Status;
+				}
+				const auto* Current = Storage->States.Find(Dependency);
+				if (Current && Current->State == EVoxelPlanDependencyState::Failed)
+				{
+					Status.bReady = false;
+					Status.bFailed = true;
+					Status.Error = Current->Error;
+				}
+				Node = Next;
 			}
-			const auto* Current = Storage->States.Find(Dependency);
-			if (Current && Current->State == EVoxelPlanDependencyState::Failed)
-			{
-				Status.bReady = false;
-				Status.bFailed = true;
-				Status.Error = Current->Error;
-			}
-			Node = Next;
 		}
 		RefreshQueuedPriorities();
 	}
@@ -1741,7 +1735,6 @@ void FVoxelGenerationPlanCoordinator::RemoveSubscription(const FVoxelGenerationP
 	}
 	State->Donations.Remove(InConsumer);
 	ResolveDonations(*State);
-	PriorityGraph.SetPriority(State->PriorityNode, State->ServicePriority);
 	if (!State->Donations.IsEmpty() || PriorityGraph.HasConsumers(State->PriorityNode))
 	{
 		return;
@@ -1800,7 +1793,7 @@ void FVoxelGenerationPlanCoordinator::ResolveDonations(FState& InOutState)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanResolveDonations);
 	InOutState.WorkClass = EVoxelWorkClass::Background;
-	InOutState.ServicePriority = {};
+	FVoxelTerrainServicePriority OwnPriority;
 	const FDonation* Best = nullptr;
 	for (const auto& Donation : InOutState.Donations)
 	{
@@ -1812,9 +1805,13 @@ void FVoxelGenerationPlanCoordinator::ResolveDonations(FState& InOutState)
 	}
 	if (Best)
 	{
-		InOutState.ServicePriority = Best->Priority;
+		OwnPriority = Best->Priority;
 		InOutState.WorkClass = Best->WorkClass;
 	}
+	PriorityGraph.SetPriority(InOutState.PriorityNode, OwnPriority);
+	const FVoxelTerrainServicePriority* Effective = PriorityGraph.Find(InOutState.PriorityNode);
+	check(Effective);
+	InOutState.ServicePriority = FVoxelTerrainWorkSelection::Promote(OwnPriority, *Effective);
 	InOutState.SourcePriority = InOutState.ServicePriority.SourcePriority;
 	InOutState.DistanceScore = InOutState.ServicePriority.DistanceCells;
 	InOutState.ForwardScore = InOutState.ServicePriority.ForwardScore;
@@ -1979,6 +1976,7 @@ FVoxelGenerationPlanCoordinator::FClosureDemand::FClosureDemand(FVoxelGeneration
 
 FVoxelGenerationPlanCoordinator::FClosureDemand::~FClosureDemand()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureDemandRelease);
 	if (Owner.Storage != CapturedStorage)
 	{
 		return;
@@ -2123,6 +2121,7 @@ bool FVoxelGenerationPlanCoordinator::RegisterClosure(const FVoxelGenerationPlan
 
 bool FVoxelGenerationPlanCoordinator::ArePrerequisitesReady(const FState& InState) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanPrerequisiteScan);
 	for (const auto& Dependency : InState.Prerequisites) if (!IsCached(Dependency)) return false;
 	return true;
 }

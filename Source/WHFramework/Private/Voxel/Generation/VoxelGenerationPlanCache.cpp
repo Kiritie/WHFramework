@@ -1568,6 +1568,70 @@ bool FVoxelGenerationPlanCache::FindNaturalColumn(const FIntPoint& InPosition, F
 	return OutEntry.IsValid();
 }
 
+bool FVoxelGenerationPlanCache::HasPlan(const EVoxelGenerationPlanKind InKind, const FIntVector& InCoordinate) const
+{
+	switch (InKind)
+	{
+	case EVoxelGenerationPlanKind::Hydrology:
+	{
+		FVoxelHydrologyRegionKey Key;
+		Key.Coordinate = FIntPoint(InCoordinate.X, InCoordinate.Y);
+		const FPlanShard& Shard = *PlanShards[PlanShardIndex(Key)];
+		FReadScopeLock Scope(Shard.Lock);
+		const auto* Found = Shard.Hydrology.Find(Key);
+		const bool bHit = Found && Found->IsValid();
+		RecordPlanLookup(InKind, bHit);
+		return bHit;
+	}
+	case EVoxelGenerationPlanKind::Cave:
+	{
+		FVoxelGenerationTileKey Key;
+		Key.Coordinate = InCoordinate;
+		const FPlanShard& Shard = *PlanShards[PlanShardIndex(Key)];
+		FReadScopeLock Scope(Shard.Lock);
+		const auto* Found = Shard.Caves.Find(Key);
+		const bool bHit = Found && Found->IsValid();
+		RecordPlanLookup(InKind, bHit);
+		return bHit;
+	}
+	case EVoxelGenerationPlanKind::Structure:
+	{
+		FVoxelGenerationTileKey Key;
+		Key.Coordinate = InCoordinate;
+		const FPlanShard& Shard = *PlanShards[PlanShardIndex(Key)];
+		FReadScopeLock Scope(Shard.Lock);
+		const auto* Found = Shard.Structures.Find(Key);
+		const bool bHit = Found && Found->IsValid();
+		RecordPlanLookup(InKind, bHit);
+		return bHit;
+	}
+	case EVoxelGenerationPlanKind::Feature:
+	{
+		FVoxelGenerationTileKey Key;
+		Key.Coordinate = InCoordinate;
+		const FPlanShard& Shard = *PlanShards[PlanShardIndex(Key)];
+		FReadScopeLock Scope(Shard.Lock);
+		const auto* Found = Shard.Features.Find(Key);
+		const bool bHit = Found && Found->IsValid();
+		RecordPlanLookup(InKind, bHit);
+		return bHit;
+	}
+	case EVoxelGenerationPlanKind::Ecology:
+	{
+		FVoxelEcologyTileKey Key;
+		Key.Coordinate = FIntPoint(InCoordinate.X, InCoordinate.Y);
+		const FPlanShard& Shard = *PlanShards[PlanShardIndex(Key)];
+		FReadScopeLock Scope(Shard.Lock);
+		const auto* Found = Shard.Ecology.Find(Key);
+		const bool bHit = Found && Found->IsValid();
+		RecordPlanLookup(InKind, bHit);
+		return bHit;
+	}
+	default:
+		return false;
+	}
+}
+
 bool FVoxelGenerationPlanCache::FindHydrology(
 	const FVoxelHydrologyRegionKey& InKey,
 	FVoxelHydrologyPlanPtr& OutPlan) const

@@ -447,8 +447,14 @@ void FVoxelViewPublisher::SetCommitCallbacks(TFunction<void()> InOnCommitted,
 		}
 		void Finish()
 		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherBatchFinish);
 			Remaining.Empty(); Group = {};
-			if (Finished) { auto Callback = MoveTemp(Finished); Callback(); }
+			if (Finished)
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherBatchFinishedCallback);
+				auto Callback = MoveTemp(Finished);
+				Callback();
+			}
 		}
 	};
 	if (!CommitCallbackLifetime) CommitCallbackLifetime = MakeShared<bool>(true);
@@ -459,7 +465,11 @@ void FVoxelViewPublisher::SetCommitCallbacks(TFunction<void()> InOnCommitted,
 	Batch->Finished = MoveTemp(InOnCommitted);
 	const auto Callback = MakeShared<FGroupCallback>([Batch](TConstArrayView<FVoxelPublishGroupKey> Keys)
 	{
-		if (Batch->Group) Batch->Group(Keys);
+		if (Batch->Group)
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherBatchGroupCallback);
+			Batch->Group(Keys);
+		}
 		for (const auto& Key : Keys) Batch->Remaining.Remove(Key);
 		if (Batch->Remaining.IsEmpty()) Batch->Finish();
 	});
@@ -883,6 +893,7 @@ void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 	const auto Next = [&Plan] { ++Plan.Phase; Plan.Cursor = 0; };
 	if (Plan.Phase == 0)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherPendingFootprints);
 		if (Plan.Cursor >= Plan.Groups.GetMaxIndex()) { Next(); return; }
 		const auto Id = FSetElementId::FromInteger(Plan.Cursor++);
 		if (!Plan.Groups.IsValidId(Id)) return;
@@ -919,11 +930,13 @@ void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 	}
 	if (Plan.Phase == 1)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherPendingGraph);
 		if (Plan.bCapacityFailure || Plan.Graph.Advance(32, InDeadlineSeconds)) Next();
 		return;
 	}
 	if (Plan.Phase == 2)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherPendingBlocked);
 		if (!Plan.Handles.IsValidIndex(Plan.Cursor)) { Next(); return; }
 		const int32 Index = Plan.Cursor++;
 		if (Plan.bCapacityFailure) return;
@@ -937,6 +950,7 @@ void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 	}
 	if (Plan.Phase == 3)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherPendingGroups);
 		if (!Plan.Handles.IsValidIndex(Plan.Cursor)) { Next(); return; }
 		const int32 Index = Plan.Cursor++;
 		const FGuid Handle = Plan.Handles[Index];
@@ -975,6 +989,7 @@ void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 	}
 	if (Plan.Phase == 4)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherPendingUpdates);
 		if (!Plan.Updates.IsValidIndex(Plan.Cursor)) { Next(); return; }
 		FUpdate Update = MoveTemp(Plan.Updates[Plan.Cursor++]);
 		if (!Entries.Contains(Update.SourceId)) return;
@@ -997,6 +1012,7 @@ void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 	}
 	if (Plan.Phase == 5)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherPendingVisibility);
 		if (Plan.Cursor >= Plan.Visibility.GetMaxIndex()) { Next(); return; }
 		const auto Id = FSetElementId::FromInteger(Plan.Cursor++);
 		if (!Plan.Visibility.IsValidId(Id)) return;
@@ -1015,11 +1031,13 @@ void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 	}
 	if (Plan.Phase == 6)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherPendingOwners);
 		if (!Plan.Footprints.IsValidIndex(Plan.Cursor)) { Next(); return; }
 		const auto Key = Plan.Footprints[Plan.Cursor++].Key;
 		if (Plan.SelectedKeys.Contains(Key)) SetOwnerActive(Key, Plan.Publication->Serial, true);
 		return;
 	}
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherPendingFinalize);
 	if (!Plan.Publication->Groups.IsEmpty())
 	{
 		Plan.Publication->bCoveragePrepared = Plan.Publication->Updates.IsEmpty();

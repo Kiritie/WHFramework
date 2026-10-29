@@ -26,6 +26,8 @@ struct WHFRAMEWORK_API FVoxelWorldObjectDefinitionRuntime
 	TMap<uint32, int32> PartIndices;
 	EVoxelWorldObjectSupportMode SupportMode = EVoxelWorldObjectSupportMode::None;
 	FIntVector Dimensions = FIntVector(1, 1, 1);
+	FIntVector MinPartOffset = FIntVector::ZeroValue;
+	FIntVector MaxPartOffset = FIntVector::ZeroValue;
 	FIntVector BackSupportDirection = FIntVector(0, -1, 0);
 	uint16 ToggleMask = 0;
 	TWeakObjectPtr<UVoxelWorldObjectDefinition> Source;
@@ -34,6 +36,8 @@ struct WHFRAMEWORK_API FVoxelWorldObjectDefinitionRuntime
 class WHFRAMEWORK_API FVoxelWorldObjectRegistry
 {
 public:
+	static constexpr int32 MaximumPartOffsetCells = 32;
+
 	bool Build(const FVoxelRegistrySnapshot& InBlocks, const TArray<UVoxelWorldObjectDefinition*>& InDefinitions, FString& OutError);
 	void Reset();
 	double GetMaxMaterializationRadius() const { return MaxMaterializationRadius; }
@@ -42,6 +46,7 @@ public:
 	bool Resolve(const FVoxelWorldRuntime& InWorld, const FIntVector& InCell, FVoxelWorldObjectInstance& OutObject, FString& OutError) const;
 	static FIntVector Rotate(const FIntVector& InOffset, uint8 InYaw);
 	static FVoxelBlockState PartState(const FVoxelWorldObjectDefinitionRuntime& InDefinition, int32 InPart, uint8 InYaw, uint16 InFlags = 0);
+	static int32 FindPartAtCell(const FVoxelWorldObjectDefinitionRuntime& InDefinition, const FIntVector& InAnchor, uint8 InYaw, const FIntVector& InCell);
 	static int32 FindPartIndex(const FVoxelWorldObjectDefinitionRuntime& InDefinition, const FVoxelBlockState& InState);
 
 private:

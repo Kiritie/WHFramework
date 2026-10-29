@@ -71,12 +71,14 @@ int32 FVoxelPublishGroupContinuation::FindRoot(int32 InIndex)
 void FVoxelPublishGroupContinuation::RefreshInterval(const int32 InNode)
 {
 	auto& Node = Intervals[InNode];
+	Node.MinimumFootprint = Node.Footprint;
 	Node.MaximumEnd = Footprints[Node.Footprint].Bounds.Max.X;
 	Node.MinimumY = Footprints[Node.Footprint].Bounds.Min.Y;
 	Node.MaximumY = Footprints[Node.Footprint].Bounds.Max.Y;
 	for (const int32 Child : {Node.Left, Node.Right})
 	{
 		if (Child == INDEX_NONE) continue;
+		Node.MinimumFootprint = FMath::Min(Node.MinimumFootprint, Intervals[Child].MinimumFootprint);
 		Node.MaximumEnd = FMath::Max(Node.MaximumEnd, Intervals[Child].MaximumEnd);
 		Node.MinimumY = FMath::Min(Node.MinimumY, Intervals[Child].MinimumY);
 		Node.MaximumY = FMath::Max(Node.MaximumY, Intervals[Child].MaximumY);
@@ -131,6 +133,7 @@ bool FVoxelPublishGroupContinuation::Add(const FVoxelPublishFootprint& InFootpri
 	{
 		FInterval Node;
 		Node.Footprint = Index;
+		Node.MinimumFootprint = Index;
 		uint32 Priority = static_cast<uint32>(Index + 1);
 		Priority ^= Priority >> 16;
 		Priority *= 0x7feb352du;
@@ -178,12 +181,12 @@ bool FVoxelPublishGroupContinuation::Advance(const int32 InMaximumOperations, co
 			}
 			if (QueryStack.IsEmpty()) { ++Cursor; bQueryStarted = false; continue; }
 			const auto& Node = Intervals[QueryStack.Pop(EAllowShrinking::No)];
-			if (Node.MaximumEnd < Current.Bounds.Min.X || Node.MaximumY < Current.Bounds.Min.Y ||
+			if (Node.MinimumFootprint >= Cursor || Node.MaximumEnd < Current.Bounds.Min.X || Node.MaximumY < Current.Bounds.Min.Y ||
 				Node.MinimumY > Current.Bounds.Max.Y) continue;
 			const auto& Other = Footprints[Node.Footprint];
-			if (Node.Left != INDEX_NONE) QueryStack.Add(Node.Left);
+			if (Node.Left != INDEX_NONE && Intervals[Node.Left].MinimumFootprint < Cursor) QueryStack.Add(Node.Left);
 			if (Other.Bounds.Min.X > Current.Bounds.Max.X) continue;
-			if (Node.Right != INDEX_NONE) QueryStack.Add(Node.Right);
+			if (Node.Right != INDEX_NONE && Intervals[Node.Right].MinimumFootprint < Cursor) QueryStack.Add(Node.Right);
 			if (Node.Footprint >= Cursor) continue;
 			++ComparedFootprints;
 			if (Interacts(Current, Other)) Parents[FindRoot(Node.Footprint)] = FindRoot(Cursor);

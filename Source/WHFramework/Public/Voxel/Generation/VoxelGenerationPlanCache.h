@@ -188,6 +188,8 @@ public:
 
 	bool FindNaturalColumn(const FIntPoint& InPosition, FVoxelNaturalColumnEntryPtr& OutEntry) const;
 
+	bool HasPlan(EVoxelGenerationPlanKind InKind, const FIntVector& InCoordinate) const;
+
 	bool FindHydrology(
 		const FVoxelHydrologyRegionKey& InKey,
 		FVoxelHydrologyPlanPtr& OutPlan) const;

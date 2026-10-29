@@ -1,6 +1,7 @@
 #include "Voxel/Streaming/VoxelEmergeManager.h"
 
 #include "EngineGlobals.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationQuery.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
@@ -637,8 +638,16 @@ void FVoxelEmergeManager::Tick(const FVoxelInterestSet& InInterest, const uint64
 	{
 		return;
 	}
-	Generator->AdvanceOverlayConsumerWakes(Deadline, 64);
-	PlanCoordinator->AdvanceConsumerWakes(Deadline, 64);
+	const double WakeStarted = FPlatformTime::Seconds();
+	const double NaturalDeadline = FMath::Min(Deadline, WakeStarted + FMath::Max(0.0, Deadline - WakeStarted) * 0.5);
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_EmergeNaturalWakes);
+		PlanCoordinator->AdvanceConsumerWakes(NaturalDeadline, 64);
+	}
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_EmergeOverlayWakes);
+		Generator->AdvanceOverlayConsumerWakes(Deadline, 64);
+	}
 	if (FPlatformTime::Seconds() >= Deadline)
 	{
 		return;

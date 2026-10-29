@@ -5891,6 +5891,7 @@ void FVoxelViewManager::CaptureCoverageCandidates(
 
 void FVoxelViewManager::RefreshIndexedCoverage(const FVoxelCoverageRect& InBounds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_CoverageRefreshIndexed);
 	FVoxelCoverageLocalSnapshot Snapshot;
 	CoverageIndex.Capture(FIntVector(InBounds.Min.X, InBounds.Min.Y, MIN_int32 + 1), FIntVector(InBounds.Max.X, InBounds.Max.Y, MAX_int32), Snapshot);
 	for (const auto& Record : Snapshot.Records)

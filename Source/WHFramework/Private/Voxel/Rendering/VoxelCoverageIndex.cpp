@@ -158,6 +158,7 @@ bool FVoxelCoverageIndex::Remove(const FVoxelTerrainSpatialKey& InKey, FString& 
 bool FVoxelCoverageIndex::Mutate(const FVoxelTerrainSpatialKey& InKey, const FVoxelCoverageRecord* InRecord,
 	TSharedPtr<const FVoxelCoverageRecord, ESPMode::ThreadSafe> InSharedRecord, FString& OutError)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_CoverageMutate);
 	LastResourceAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
 	const auto Existing = Find(InKey);
 	if (InRecord)
@@ -180,8 +181,9 @@ bool FVoxelCoverageIndex::Mutate(const FVoxelTerrainSpatialKey& InKey, const FVo
 		Existing->Stamp != InRecord->Stamp || Existing->bWanted != InRecord->bWanted ||
 		Existing->bReady != InRecord->bReady || Existing->bHasGeometry != InRecord->bHasGeometry;
 	const int32 PathCount = RootLevel - Target.Level + 1;
+	const bool bUniquePath = InRecord && CanRemoveWithoutAllocation(InKey);
 	const uint64 RecordBytes = InRecord ? VoxelBoundedAllocation::WorkerSharedBytes<FVoxelCoverageRecord>() : 0;
-	const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FRoot>() +
+	const uint64 Bytes = bUniquePath ? RecordBytes : VoxelBoundedAllocation::WorkerSharedBytes<FRoot>() +
 		uint64(PathCount) * VoxelBoundedAllocation::WorkerSharedBytes<FNode>() + RecordBytes;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Grant = StorageLease;
 	if (Resources)
@@ -199,7 +201,7 @@ bool FVoxelCoverageIndex::Mutate(const FVoxelTerrainSpatialKey& InKey, const FVo
 		}
 		OldInput += AdditionalRequiredInputBytes; OldLeaseCount += AdditionalRequiredLeaseCount;
 		LastResourceAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, Bytes, Grant,
-			PathCount + (InRecord ? 1 : 0), OldInput, OldLeaseCount);
+			bUniquePath ? 0 : PathCount + (InRecord ? 1 : 0), OldInput, OldLeaseCount);
 		if (LastResourceAdmission != EVoxelTerrainResourceAdmission::Granted)
 		{
 			OutError = LastResourceAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: CoverageIndex changed path") :
@@ -214,10 +216,47 @@ bool FVoxelCoverageIndex::Mutate(const FVoxelTerrainSpatialKey& InKey, const FVo
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RecordLease;
 	if (InRecord && (Grant || !InSharedRecord))
 	{
-		RecordLease = TakeLease(RecordBytes);
+		RecordLease = bUniquePath ? Grant : TakeLease(RecordBytes);
 		InSharedRecord = RecordLease ? VoxelBoundedAllocation::MakeWorkerShared<FVoxelCoverageRecord>(RecordLease, *InRecord) :
 			MakeShared<FVoxelCoverageRecord, ESPMode::ThreadSafe>(*InRecord);
 	}
+	if (bUniquePath)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_CoverageMutateUnique);
+		Serial = NextVoxelCoverageVersion.IncrementExchange() + 1;
+		check(Serial != 0);
+		const int32 Slot = RootSlot(Target);
+		FRoot* Mutable = const_cast<FRoot*>(Root.Get());
+		auto Replace = [&](auto&& Self, FNodePtr& Link, const uint8 Level) -> void
+		{
+			FNode* Node = const_cast<FNode*>(Link.Get());
+			if (Level == Target.Level)
+			{
+				Node->Records[RecordSlot] = MoveTemp(InSharedRecord);
+				Node->RecordLeases[RecordSlot] = MoveTemp(RecordLease);
+				if (bInputsChanged) Node->RecordVersions[RecordSlot][0] = Node->OwnVersions[0] = Serial;
+				Node->RecordVersions[RecordSlot][1] = Node->OwnVersions[1] = Serial;
+			}
+			else
+			{
+				const int32 Child = ChildSlot(Target, Level);
+				Self(Self, Node->Children[Child], uint8(Level - 1));
+				if (bInputsChanged) Node->ChildVersions[Child][0] = Serial;
+				Node->ChildVersions[Child][1] = Serial;
+			}
+			if (bInputsChanged) Node->SubtreeVersions[0] = Serial;
+			Node->SubtreeVersions[1] = Serial;
+			RefreshNode(*Node);
+		};
+		Replace(Replace, Mutable->Nodes[Slot], RootLevel);
+		if (bInputsChanged) Mutable->Versions[Slot][0] = Serial;
+		Mutable->Versions[Slot][1] = Serial;
+		if (bInputsChanged) MembershipVersion = Serial;
+		LastResourceAdmission = EVoxelTerrainResourceAdmission::Granted;
+		OutError.Reset();
+		return true;
+	}
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_CoverageMutateCopy);
 	auto Candidate = Grant ? VoxelBoundedAllocation::MakeWorkerShared<FRoot>(Grant) : MakeShared<FRoot, ESPMode::ThreadSafe>();
 	if (Root) *Candidate = *Root;
 	Candidate->Lease = Grant;

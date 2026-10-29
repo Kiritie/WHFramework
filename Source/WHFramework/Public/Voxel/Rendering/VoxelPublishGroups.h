@@ -51,6 +51,7 @@ private:
 	struct FInterval
 	{
 		int32 Footprint = INDEX_NONE;
+		int32 MinimumFootprint = INDEX_NONE;
 		int32 Left = INDEX_NONE;
 		int32 Right = INDEX_NONE;
 		uint32 Priority = 0;
