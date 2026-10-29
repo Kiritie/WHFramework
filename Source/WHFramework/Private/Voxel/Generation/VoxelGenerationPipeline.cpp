@@ -632,9 +632,11 @@ bool FVoxelGenerationPipeline::GenerateSectionWindow(
 	const TArrayView<FVoxelBlockState> OutBaseBlocks,
 	FString& OutError,
 	const TAtomic<bool>* InCancel,
-	const FVoxelTerrainResourceLease* InOutputLease) const
+	const FVoxelTerrainResourceLease* InOutputLease,
+	const bool bInAllowPartialOutput) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_GenerateSection);
+	TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_GenerateSectionDirectSpan, bInAllowPartialOutput);
 
 	constexpr int32 SectionSide = 16;
 	const int32 SectionCellCount = InWindow.Num();
@@ -699,12 +701,16 @@ bool FVoxelGenerationPipeline::GenerateSectionWindow(
 	FVoxelGenerationWorkspace Workspace(Resources, Consumer,
 		RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes);
 	TArray<FVoxelBlockState> Blocks;
-	if (!Workspace.ReserveArray(Blocks, SectionCellCount, OutError))
+	TArrayView<FVoxelBlockState> WindowBlocks = OutBaseBlocks;
+	if (!bInAllowPartialOutput)
 	{
-		return false;
+		if (!Workspace.ReserveArray(Blocks, SectionCellCount, OutError))
+		{
+			return false;
+		}
+		Blocks.SetNumUninitialized(SectionCellCount);
+		WindowBlocks = MakeArrayView(Blocks);
 	}
-	Blocks.SetNumUninitialized(
-		SectionCellCount);
 
 	// 一列共享同一份自然采样，每格仍执行完整生成阶段，避免反复争用列缓存锁。
 	uint32 Symbols[SectionSide];
@@ -719,7 +725,7 @@ bool FVoxelGenerationPipeline::GenerateSectionWindow(
 			}
 			for (int32 Z = InWindow.Min.Z; Z < InWindow.Max.Z; ++Z)
 			{
-				if (!Config->ToRuntime(Symbols[Z - InWindow.Min.Z], Blocks[InWindow.Index(FIntVector(X, Y, Z))]))
+				if (!Config->ToRuntime(Symbols[Z - InWindow.Min.Z], WindowBlocks[InWindow.Index(FIntVector(X, Y, Z))]))
 				{
 					OutError = TEXT("Voxel generation returned an invalid recipe symbol");
 					return false;
@@ -728,7 +734,7 @@ bool FVoxelGenerationPipeline::GenerateSectionWindow(
 		}
 	}
 
-	if (Overlay && !Overlay->ApplySectionWindow(InSectionCoordinate, InWindow, MakeArrayView(Blocks),
+	if (Overlay && !Overlay->ApplySectionWindow(InSectionCoordinate, InWindow, WindowBlocks,
 		OutError, InCancel))
 	{
 		return false;
@@ -739,7 +745,10 @@ bool FVoxelGenerationPipeline::GenerateSectionWindow(
 		OutError = TEXT("Canceled");
 		return false;
 	}
-	CopyPipelineOutput(Blocks, OutBaseBlocks);
+	if (!bInAllowPartialOutput)
+	{
+		CopyPipelineOutput(Blocks, OutBaseBlocks);
+	}
 
 	OutError.Reset();
 	return true;
@@ -797,7 +806,7 @@ bool FVoxelGenerationPipeline::SampleColumn(
 
 bool FVoxelGenerationPipeline::EnumerateTrees(
 	const FVoxelGenerationBounds& InBounds,
-	TFunctionRef<void(const FIntVector&, int32, FVoxelStableId)> InVisit,
+	TFunctionRef<void(const FIntVector&, int32, FVoxelStableId, const FVoxelColumnSample&)> InVisit,
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
@@ -819,10 +828,14 @@ bool FVoxelGenerationPipeline::EnumerateTrees(
 		}
 		return true;
 	};
-	auto SampleBase = [&](const FIntVector& Position, uint32& Symbol)
+	auto SampleBase = [&](const FIntVector& Position, const FVoxelColumnSample& Column, uint32& Symbol)
 	{
-		FVoxelColumnSample Column;
-		if (!SampleColumn(Position, Column)) return false;
+		if (InCancel && InCancel->Load())
+		{
+			bSampleFailed = true;
+			FirstSampleError = TEXT("Canceled");
+			return false;
+		}
 		Symbol = Position.Z <= Column.SurfaceZ ? Config->Recipe->Palette.Stone : Config->Recipe->Palette.Air;
 		return true;
 	};
@@ -830,9 +843,9 @@ bool FVoxelGenerationPipeline::EnumerateTrees(
 	int32 Candidates = 0;
 	int32 Accepted = 0;
 	Ecology.EnumerateTrees(InBounds, SampleColumn, SampleBase,
-		[&](const FIntVector& Anchor, const int32 Height, const FVoxelStableId Id)
+		[&](const FIntVector& Anchor, const int32 Height, const FVoxelStableId Id, const FVoxelColumnSample& Column)
 		{
-			InVisit(Anchor, Height, Id);
+			InVisit(Anchor, Height, Id, Column);
 		}, Candidates, Accepted, InCancel);
 	if (bSampleFailed)
 	{
@@ -1017,6 +1030,16 @@ bool FVoxelGenerationPipeline::SampleEnvironments(
 	return true;
 }
 
+bool FVoxelGenerationPipeline::SampleEnvironmentColumns(
+	const FIntPoint& InOrigin, const int32 InWidth, const int32 InHeight, const int32 InStep,
+	const TArrayView<FVoxelColumnSample> OutColumns, FString& OutError,
+	const TAtomic<bool>* InCancel, const bool bInUseColumnCache,
+	const FVoxelTerrainResourceLease* InOutputLease) const
+{
+	return SampleColumnGrid(InOrigin, InWidth, InHeight, InStep, OutColumns, OutError,
+		InCancel, bInUseColumnCache, InOutputLease, true);
+}
+
 bool FVoxelGenerationPipeline::SampleColumns(
 	const FIntPoint& InOrigin,
 	const int32 InWidth,
@@ -1028,7 +1051,18 @@ bool FVoxelGenerationPipeline::SampleColumns(
 	const bool bInUseColumnCache,
 	const FVoxelTerrainResourceLease* InOutputLease) const
 {
+	return SampleColumnGrid(InOrigin, InWidth, InHeight, InStep, OutColumns, OutError,
+		InCancel, bInUseColumnCache, InOutputLease, false);
+}
+
+bool FVoxelGenerationPipeline::SampleColumnGrid(
+	const FIntPoint& InOrigin, const int32 InWidth, const int32 InHeight, const int32 InStep,
+	const TArrayView<FVoxelColumnSample> OutColumns, FString& OutError,
+	const TAtomic<bool>* InCancel, const bool bInUseColumnCache,
+	const FVoxelTerrainResourceLease* InOutputLease, const bool bInEnvironmentOnly) const
+{
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SampleColumns);
+	TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_SampleEnvironmentColumns, bInEnvironmentOnly);
 
 	FVoxelGenerationBounds Bounds;
 	int32 Count = 0;
@@ -1081,11 +1115,16 @@ bool FVoxelGenerationPipeline::SampleColumns(
 	FVoxelGenerationWorkspace Workspace(Resources, Consumer,
 		RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes);
 	TArray<FVoxelColumnSample> Columns;
-	if (!Workspace.ReserveArray(Columns, Count, OutError))
+	TArrayView<FVoxelColumnSample> SampledColumns = OutColumns;
+	if (!bInEnvironmentOnly)
 	{
-		return false;
+		if (!Workspace.ReserveArray(Columns, Count, OutError))
+		{
+			return false;
+		}
+		Columns.SetNumUninitialized(Count);
+		SampledColumns = MakeArrayView(Columns);
 	}
-	Columns.SetNumUninitialized(Count);
 
 	int32 Index = 0;
 
@@ -1106,11 +1145,11 @@ bool FVoxelGenerationPipeline::SampleColumns(
 			X < InWidth;
 			++X)
 		{
-			if (!Query.SampleColumn(
-				static_cast<int32>(static_cast<int64>(InOrigin.X) + static_cast<int64>(X) * InStep),
-				static_cast<int32>(static_cast<int64>(InOrigin.Y) + static_cast<int64>(Y) * InStep),
-				Columns[Index++],
-				OutError))
+			const int32 WorldX = static_cast<int32>(static_cast<int64>(InOrigin.X) + static_cast<int64>(X) * InStep);
+			const int32 WorldY = static_cast<int32>(static_cast<int64>(InOrigin.Y) + static_cast<int64>(Y) * InStep);
+			FVoxelColumnSample& Column = SampledColumns[Index++];
+			if (!(bInEnvironmentOnly ? Query.SampleEnvironmentColumn(WorldX, WorldY, Column, OutError, InCancel) :
+				Query.SampleColumn(WorldX, WorldY, Column, OutError)))
 			{
 				return false;
 			}
@@ -1122,7 +1161,10 @@ bool FVoxelGenerationPipeline::SampleColumns(
 		OutError = TEXT("Canceled");
 		return false;
 	}
-	CopyPipelineOutput(Columns, OutColumns);
+	if (!bInEnvironmentOnly)
+	{
+		CopyPipelineOutput(Columns, OutColumns);
+	}
 
 	OutError.Reset();
 	return true;

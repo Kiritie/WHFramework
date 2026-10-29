@@ -404,6 +404,7 @@ private:
 	void RefreshTaskPriorities();
 	bool AdmitCoveragePreparation(const FPublicationRef& Publication, double InDeadline = MAX_dbl);
 	FVoxelGameThreadContinuation PrepareCoverageSteps(FPublication& InPublication);
+	static bool IsProjectedCoveragePrepared(const FPublication* InPublication, const FUpdate* InUpdate);
 	const FUpdate* FindProjectedUpdate(FVoxelViewSourceId InSourceId, uint64 InBeforeSerial = MAX_uint64,
 		const FPublication** OutPublication = nullptr) const;
 	bool CaptureCoverageSource(FVoxelViewSourceId InSourceId, bool bInRetainPresented, FUpdate& OutSource) const;

@@ -1938,6 +1938,17 @@ FVoxelGenerationDependencyStatus UVoxelModule::EnsureEnvironmentGeometry(
 		: FVoxelGenerationDependencyStatus{false, true, TEXT("Voxel world is unavailable")};
 }
 
+void UVoxelModule::VisitGenerationFactSources(const FVoxelGenerationConsumerKey& InConsumer, FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+{
+	if (EmergeManager) EmergeManager->VisitGenerationFactSources(InConsumer, InVisit);
+}
+
+TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe> UVoxelModule::GetEnvironmentGeometryInputs(
+	const FVoxelGenerationConsumerKey& InConsumer, const FVoxelTerrainGeometry& InGeometry) const
+{
+	return EmergeManager ? EmergeManager->GetEnvironmentGeometryInputs(InConsumer, InGeometry) : nullptr;
+}
+
 FVoxelGenerationDependencyStatus UVoxelModule::EnsureEnvironmentBounds(
 	const FVoxelGenerationBounds& InBounds, const EVoxelWorkClass InWorkClass,
 	const int32 InSourcePriority, const double InDistanceScore, const double InForwardScore)

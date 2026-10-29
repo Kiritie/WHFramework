@@ -13,6 +13,7 @@ public:
 
 private:
 	FVoxelTerrainGeometry Geometry;
+	FVoxelProxyColumnWorkspace Columns;
 	TArray<FVoxelTerrainBuildShard> Shards;
 	FVoxelVoxelProxyData Page;
 	bool bAllocated = false;

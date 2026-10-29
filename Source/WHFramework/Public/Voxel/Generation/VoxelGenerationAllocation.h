@@ -42,7 +42,8 @@ public:
 	FVoxelGenerationRequiredSourceScope(
 		const FVoxelTerrainResources* InResources,
 		const void* InContext,
-		FEnumerate InEnumerate);
+		FEnumerate InEnumerate,
+		const TAtomic<bool>* InCancel = nullptr);
 	FVoxelGenerationRequiredSourceScope(
 		const FVoxelTerrainResources* InResources,
 		const FVoxelTerrainResourceLease* InLease);
@@ -69,10 +70,12 @@ private:
 		TArrayView<FVoxelGenerationSourceIdentity> InIdentities = {});
 	static void Enumerate(const FVoxelTerrainResources& InResources, FVisit InVisit);
 	static FVoxelGenerationRequiredSourceScope*& ActiveScopeSlot();
+	static const TAtomic<bool>* ActiveCancellation();
 	FVoxelGenerationRequiredSourceScope* Previous = nullptr;
 	const FVoxelTerrainResources* Resources = nullptr;
 	const void* Context = nullptr;
 	FEnumerate Enumerator = nullptr;
+	const TAtomic<bool>* Cancellation = nullptr;
 };
 
 /** 原账本的正文构建上下文；只保存聚合字节，不另建容器跟踪表。 */

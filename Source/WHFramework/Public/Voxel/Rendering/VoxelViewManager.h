@@ -23,6 +23,8 @@ class FVoxelTaskScheduler;
 class FVoxelGenerationPipeline;
 class FVoxelGenerationCacheRetentionLease;
 struct FVoxelGenerationBounds;
+struct FVoxelGenerationDependencyStatus;
+struct FVoxelOverlayPreflightStatus;
 class FVoxelViewPublisher;
 class UVoxelMeshComponent;
 class UVoxelModule;
@@ -510,6 +512,9 @@ private:
 	bool IsRepresentationStampCurrent(const FVoxelTaskStamp& InStamp) const;
 	bool HasDeferredRepresentation(const FVoxelTaskStamp& InStamp) const;
 	void PrunePreparedData();
+	bool CheckCoarsePreflight(const FVoxelGenerationDependencyStatus& InStatus, const FVoxelTaskRequest& InRequest, const TCHAR* InStage);
+	bool CheckCoarsePreflight(const FVoxelOverlayPreflightStatus& InStatus, const FVoxelTaskRequest& InRequest, const TCHAR* InStage);
+	bool CheckCoarsePreflight(bool bInReady, bool bInFailed, const FString& InError, const FVoxelTaskRequest& InRequest, const TCHAR* InStage);
 	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> RetainPreparedEnvironment(
 		const FVoxelTaskKey& InKey, const FVoxelGenerationPipeline& InGenerator,
 		const FVoxelGenerationBounds& InBounds);
@@ -613,11 +618,7 @@ private:
 	bool IsMacroInsideRenderDomain(const FVoxelMacroTileKey& InKey) const;
 	static bool HasRenderableMesh(const FVoxelSectionMeshResult& InMesh);
 	bool TryResolveFineWithoutMesh(const FIntVector& InSection, uint64 InRevision);
-	static bool BuildVoxelProxySnapshot(
-		const FVoxelVoxelProxyData& InData,
-		uint64 InRecipeHash,
-		FVoxelSectionSnapshot& OutSnapshot,
-		FString& OutError);
+
 
 	bool RequestFine(const FIntVector& InSection, uint64 InRevision);
 	bool RequestVoxelProxy(const FVoxelViewKey& InKey, int32 InPriority, bool bDataOnly = false);

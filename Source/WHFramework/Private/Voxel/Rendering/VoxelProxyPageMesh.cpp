@@ -1,5 +1,6 @@
 ﻿#include "Voxel/Rendering/VoxelProxyPageMesh.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 bool FVoxelProxyPageMesh::Initialize(const FVoxelTerrainGeometry& InGeometry, FString& OutError,
 	const uint64 InRetainedBytes, const bool bInCountOnly, const uint64 InPieceLimit, const uint64 InGeometryLimit)
@@ -58,7 +59,7 @@ bool FVoxelProxyPageMesh::Advance(const FVoxelVoxelProxyData& InData, const FVox
 		InData.Key != FVoxelViewKey{Geometry.Key.Coordinate, Geometry.Key.Level} ||
 		InData.LocalMinCells != FIntVector::ZeroValue || InData.GridSide <= 0 || InData.GridSide > 128 ||
 		int64(InData.GridSide) * Geometry.SampleStepCells != Geometry.Key.SideCells() ||
-		InData.Cells.Num() != int64(InData.GridSide) * InData.GridSide * InData.GridSide ||
+		!InData.Cells.Validate(InData.GridSide) ||
 		!FMath::IsFinite(InTextureRepeats) || InTextureRepeats <= 0.0)
 	{
 		OutError = TEXT("Proxy mesh input does not match its actual geometry");
@@ -76,6 +77,14 @@ bool FVoxelProxyPageMesh::Advance(const FVoxelVoxelProxyData& InData, const FVox
 	const auto Shard = Shards[NextShard];
 	const FIntVector Offset = Shard.LocalMinCells / Geometry.SampleStepCells;
 	const int32 Side = Shard.CellCounts.X, PageSide = InData.GridSide;
+	const auto* Interior = InRegistry.Find(InData.Cells.GetInterior().TypeId);
+	if ((InData.Cells.GetInterior().IsAir() || (Interior && Interior->Shape == EVoxelShapeKind::FullCube && Interior->bOccludes)) &&
+		!InData.Cells.MayHaveSurface(Offset, Side))
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ProxySkipInteriorWindow);
+		++NextShard;
+		return true;
+	}
 	const uint64 ClipScratch = FVoxelSectionMesher::TransitionClipScratchBytes(InContext, Offset, Side);
 	if (ClipScratch > PieceLimit) return SplitWindow(OutError);
 	const int32 BatchBound = int32(FMath::Min(int64(6) * Side * Side * Side, int64(12) * InRegistry.Definitions.Num()));

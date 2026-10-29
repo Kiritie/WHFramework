@@ -462,10 +462,10 @@ bool FVoxelProxyWindowIntegrationTest::RunTest(const FString& InParameters)
 	Data.Cells.Init(FVoxelBlockState{}, 32 * 32 * 32);
 	for (int32 Z = 0; Z < 19; ++Z)
 		for (int32 Y = 0; Y < 32; ++Y)
-			for (int32 X = 0; X < 32; ++X) Data.Cells[X + 32 * (Y + 32 * Z)].TypeId = 1;
+			for (int32 X = 0; X < 32; ++X) Data.Cells[X + 32 * (Y + 32 * Z)] = FVoxelBlockState(1, 0);
 	FVoxelSectionSnapshot Snapshot;
 	Snapshot.GridSide = 32;
-	for (const auto& Cell : Data.Cells) Snapshot.Blocks.Add(Cell.Pack());
+	for (int32 Index = 0; Index < Data.Cells.Num(); ++Index) Snapshot.Blocks.Add(Data.Cells[Index].Pack());
 	for (int32 Face = 0; Face < 6; ++Face)
 	{
 		Data.Known[Face] = Snapshot.Known[Face] = true;

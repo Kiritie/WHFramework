@@ -112,11 +112,12 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
 
+	// 树根列只在当前visitor调用内有效，后续处理直接消费本次采样。
 	void EnumerateTrees(
 		const FVoxelGenerationBounds& InBounds,
 		TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
-		TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
-		TFunctionRef<void(const FIntVector&, int32, FVoxelStableId)> InVisit,
+		TFunctionRef<bool(const FIntVector&, const FVoxelColumnSample&, uint32&)> InSampleBaseSymbol,
+		TFunctionRef<void(const FIntVector&, int32, FVoxelStableId, const FVoxelColumnSample&)> InVisit,
 		int32& OutCandidates,
 		int32& OutAccepted,
 		const TAtomic<bool>* InCancel = nullptr,

@@ -183,7 +183,7 @@ public:
 	uint64 AllocatedBytes() const;
 	bool IsCapacityResumable() const;
 	EVoxelFineCapacityReason GetCapacityReason() const;
-	static FVoxelFineMeshEstimate MinimumPieceMemory(int32 InSideCells, int32 InPrimitiveBound);
+	static FVoxelFineMeshEstimate MinimumPieceMemory(int32 InSideCells, int32 InBatchBound);
 	static bool Slice(const FVoxelFineShardSamples& InSource, const FVoxelFineShardKey& InWindow,
 		FVoxelSectionSnapshot& OutSnapshot, FString& OutError);
 
@@ -210,6 +210,7 @@ private:
 	uint64 CompletedVolume = 0;
 	int32 BlockedPendingCount = 0;
 	int32 BlockedPieceCount = 0;
+	int32 MaximumBatchCount = 0;
 	double TextureRepeatsPerCell = 1.0;
 	EVoxelFineBuildProgress State = EVoxelFineBuildProgress::None;
 	EVoxelFineCapacityReason CapacityReason = EVoxelFineCapacityReason::None;

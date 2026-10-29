@@ -1632,6 +1632,264 @@ bool FVoxelGenerationPlanCache::HasPlan(const EVoxelGenerationPlanKind InKind, c
 	}
 }
 
+void FVoxelGenerationPlanCache::HasPlans(TArrayView<FVoxelGenerationPlanAvailabilityQuery> InOutQueries) const
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanCacheAvailabilityBatch);
+	uint64 Hits[5] = {};
+	uint64 Misses[5] = {};
+	for (int32 First = 0; First < InOutQueries.Num();)
+	{
+		const int32 Count = FMath::Min(MaximumAvailabilityBatch, InOutQueries.Num() - First);
+		auto Queries = InOutQueries.Slice(First, Count);
+		int32 Heads[ShardCount];
+		int32 Next[MaximumAvailabilityBatch];
+		for (int32& Head : Heads) Head = INDEX_NONE;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			auto& Query = Queries[Index];
+			Query.bReady = false;
+			int32 ShardIndex = INDEX_NONE;
+			switch (Query.Kind)
+			{
+			case EVoxelGenerationPlanKind::Hydrology:
+			{
+				FVoxelHydrologyRegionKey Key;
+				Key.Coordinate = FIntPoint(Query.Coordinate.X, Query.Coordinate.Y);
+				ShardIndex = PlanShardIndex(Key);
+				break;
+			}
+			case EVoxelGenerationPlanKind::Ecology:
+			{
+				FVoxelEcologyTileKey Key;
+				Key.Coordinate = FIntPoint(Query.Coordinate.X, Query.Coordinate.Y);
+				ShardIndex = PlanShardIndex(Key);
+				break;
+			}
+			case EVoxelGenerationPlanKind::Cave:
+			case EVoxelGenerationPlanKind::Structure:
+			case EVoxelGenerationPlanKind::Feature:
+			{
+				FVoxelGenerationTileKey Key;
+				Key.Coordinate = Query.Coordinate;
+				ShardIndex = PlanShardIndex(Key);
+				break;
+			}
+			default:
+				continue;
+			}
+			Next[Index] = Heads[ShardIndex];
+			Heads[ShardIndex] = Index;
+		}
+		for (int32 ShardIndex = 0; ShardIndex < ShardCount; ++ShardIndex)
+		{
+			if (Heads[ShardIndex] == INDEX_NONE) continue;
+			const FPlanShard& Shard = *PlanShards[ShardIndex];
+			FReadScopeLock Scope(Shard.Lock);
+			for (int32 Index = Heads[ShardIndex]; Index != INDEX_NONE; Index = Next[Index])
+			{
+				auto& Query = Queries[Index];
+				const auto IsPresent = [](const auto* Found) { return Found && Found->IsValid(); };
+				switch (Query.Kind)
+				{
+				case EVoxelGenerationPlanKind::Hydrology:
+				{
+					FVoxelHydrologyRegionKey Key;
+					Key.Coordinate = FIntPoint(Query.Coordinate.X, Query.Coordinate.Y);
+					Query.bReady = IsPresent(Shard.Hydrology.Find(Key));
+					break;
+				}
+				case EVoxelGenerationPlanKind::Ecology:
+				{
+					FVoxelEcologyTileKey Key;
+					Key.Coordinate = FIntPoint(Query.Coordinate.X, Query.Coordinate.Y);
+					Query.bReady = IsPresent(Shard.Ecology.Find(Key));
+					break;
+				}
+				case EVoxelGenerationPlanKind::Cave:
+				case EVoxelGenerationPlanKind::Structure:
+				case EVoxelGenerationPlanKind::Feature:
+				{
+					FVoxelGenerationTileKey Key;
+					Key.Coordinate = Query.Coordinate;
+					if (Query.Kind == EVoxelGenerationPlanKind::Cave) Query.bReady = IsPresent(Shard.Caves.Find(Key));
+					else if (Query.Kind == EVoxelGenerationPlanKind::Structure) Query.bReady = IsPresent(Shard.Structures.Find(Key));
+					else Query.bReady = IsPresent(Shard.Features.Find(Key));
+					break;
+				}
+				default:
+					break;
+				}
+				++(Query.bReady ? Hits[static_cast<int32>(Query.Kind)] : Misses[static_cast<int32>(Query.Kind)]);
+			}
+		}
+		First += Count;
+	}
+	for (int32 Kind = 0; Kind < UE_ARRAY_COUNT(Hits); ++Kind)
+	{
+		if (Hits[Kind]) PlanHits[Kind].AddExchange(Hits[Kind]);
+		if (Misses[Kind]) PlanMisses[Kind].AddExchange(Misses[Kind]);
+	}
+}
+
+bool FVoxelGenerationEnvironmentInputs::IsCurrent(const FVoxelGenerationPlanCache& InCache, const FVoxelGenerationConsumerKey& InConsumer) const
+{
+	return Cache.Get() == &InCache && Consumer == InConsumer && ResourceLease && Retention &&
+		CacheGeneration == InCache.GetHydrologyGeneration() && !Plans.IsEmpty();
+}
+
+void FVoxelGenerationEnvironmentInputs::VisitRequiredSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+{
+	FVoxelGenerationRequiredSourceScope::VisitLease(ResourceLease.Get(), InVisit);
+	if (Retention) FVoxelGenerationRequiredSourceScope::VisitLease(&Retention->GetResourceLease().Get(), InVisit);
+	for (const auto& Source : Sources)
+		FVoxelGenerationRequiredSourceScope::VisitLease(Source.Get(), InVisit);
+}
+
+bool FVoxelGenerationPlanCache::CaptureEnvironmentInputs(const FVoxelGenerationConsumerKey& InConsumer, const int32 InCount,
+	TFunctionRef<FVoxelHydrologyRegionKey(int32)> InKeyAt,
+	const TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>& InRetention,
+	TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe>& OutInputs, FString& OutError) const
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_EnvironmentInputsCapture);
+	if (!Resources || !InConsumer.IsValid() || InConsumer.WorldEpoch != ControlConsumer.WorldEpoch ||
+		!InRetention || !InRetention->GetResourceLease()->IsOwnedBy(*Resources) || InCount <= 0 || InCount > (1 << 20))
+	{
+		OutError = TEXT("InvalidRequest: environment completed inputs");
+		return false;
+	}
+	const uint64 Generation = GetHydrologyGeneration();
+	if (bHydrologyResetting.Load()) { OutError = TEXT("Canceled: environment cache reset"); return false; }
+	struct FEnvironmentInputSources
+	{
+		const FVoxelGenerationPlanCache* Cache;
+		const FVoxelGenerationCacheRetentionLease* Retention;
+		const FVoxelGenerationEnvironmentInputs* Previous;
+		int32 Count;
+		TFunctionRef<FVoxelHydrologyRegionKey(int32)> KeyAt;
+	};
+	const FEnvironmentInputSources CapturedSources{this, InRetention.Get(), OutInputs.Get(), InCount, InKeyAt};
+	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), &CapturedSources,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			const auto& Captured = *static_cast<const FEnvironmentInputSources*>(InContext);
+			uint64 Bytes;
+			int32 Count;
+			Captured.Cache->GetRequiredInputCapacity(Bytes, Count);
+			if (Count) InVisit({Captured.Cache, 0, EVoxelTerrainResourcePool::Input, Bytes, Count});
+			FVoxelGenerationRequiredSourceScope::VisitLease(&Captured.Retention->GetResourceLease().Get(), InVisit);
+			if (Captured.Previous) Captured.Previous->VisitRequiredSources(InVisit);
+			// 精确保留范围覆盖当前全局读端；授额最低输入仍枚举原计划真实来源。
+			for (int32 Index = 0; Index < Captured.Count; ++Index)
+			{
+				FVoxelHydrologyPlanPtr Plan;
+				if (Captured.Cache->FindHydrology(Captured.KeyAt(Index), Plan) && Plan)
+					Plan->VisitHydrologyLeases([InVisit](const FVoxelTerrainResourceLease* InLease)
+					{
+						FVoxelGenerationRequiredSourceScope::VisitLease(InLease, InVisit);
+					});
+			}
+		});
+	FVoxelGenerationRequiredCapacity Required;
+	if (!FVoxelGenerationRequiredSourceScope::Collect(*Resources, nullptr, Required, OutError)) return false;
+	// 只量当前计划闭包，避免按整个 Cache 的来源数量分配每个完成输入目录。
+	FVoxelGenerationRequiredCapacity PlanSources;
+	if (!FVoxelGenerationRequiredSourceScope::Measure(&CapturedSources,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			const auto& Captured = *static_cast<const FEnvironmentInputSources*>(InContext);
+			for (int32 Index = 0; Index < Captured.Count; ++Index)
+			{
+				FVoxelHydrologyPlanPtr Plan;
+				if (Captured.Cache->FindHydrology(Captured.KeyAt(Index), Plan) && Plan)
+					Plan->VisitHydrologyLeases([InVisit](const FVoxelTerrainResourceLease* InLease)
+					{
+						FVoxelGenerationRequiredSourceScope::VisitLease(InLease, InVisit);
+					});
+			}
+		}, PlanSources, OutError)) return false;
+	if (PlanSources.LeaseCount <= 0 || PlanSources.LeaseCount > MAX_int32 / 4)
+	{
+		OutError = TEXT("CapacityUnachievable: environment source directory");
+		return false;
+	}
+	using FLeaseOwner = TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>;
+	const int32 SourceSlots = int32(FMath::RoundUpToPowerOfTwo(uint32(PlanSources.LeaseCount) * 2));
+	const uint64 SourceIndexBytes = VoxelBoundedAllocation::ArrayBytes<int32>(SourceSlots);
+	const uint64 RetainedBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelGenerationEnvironmentInputs>() +
+		VoxelBoundedAllocation::ArrayBytes<FVoxelHydrologyPlanPtr>(InCount) +
+		VoxelBoundedAllocation::ArrayBytes<FLeaseOwner>(PlanSources.LeaseCount);
+	const uint64 Bytes = RetainedBytes + SourceIndexBytes;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Metadata;
+	const auto Admission = Resources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Input, Bytes, Metadata, 0,
+		Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
+	if (Admission != EVoxelTerrainResourceAdmission::Granted)
+	{
+		OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: environment completed inputs") :
+			Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable: environment completed inputs") :
+			TEXT("InvalidRequest: environment completed input grant");
+		return false;
+	}
+	auto Candidate = VoxelBoundedAllocation::MakeWorkerShared<FVoxelGenerationEnvironmentInputs>(Metadata);
+	Candidate->ResourceLease = MoveTemp(Metadata);
+	Candidate->Cache = AsShared();
+	Candidate->Retention = InRetention;
+	Candidate->Consumer = InConsumer;
+	Candidate->CacheGeneration = Generation;
+	Candidate->Plans.Reserve(InCount);
+	check(Candidate->Plans.GetAllocatedSize() <= VoxelBoundedAllocation::ArrayBytes<FVoxelHydrologyPlanPtr>(InCount));
+	Candidate->Sources.Reserve(PlanSources.LeaseCount);
+	check(Candidate->Sources.GetAllocatedSize() <= VoxelBoundedAllocation::ArrayBytes<FLeaseOwner>(PlanSources.LeaseCount));
+	// 哈希槽只用于捕获；先计入授额，释放后归还容量。
+	TArray<int32> SourceIndex;
+	SourceIndex.Reserve(SourceSlots);
+	SourceIndex.SetNumZeroed(SourceSlots);
+	check(SourceIndex.GetAllocatedSize() <= SourceIndexBytes);
+	for (int32 Index = 0; Index < InCount; ++Index)
+	{
+		const auto Key = InKeyAt(Index);
+		FVoxelHydrologyPlanPtr Plan;
+		if (!FindHydrology(Key, Plan) || !Plan || Plan->Key != Key)
+		{
+			OutError = TEXT("DependencyNotReady: environment completed hydrology input");
+			return false;
+		}
+		bool bInvalidLease = !Plan->ResourceLease;
+		Plan->VisitHydrologyLeaseOwners([&](const FLeaseOwner& InLease)
+		{
+			if (!InLease || bInvalidLease) { bInvalidLease = true; return; }
+			const uint64 Serial = InLease->Serial();
+			uint32 Slot = GetTypeHash(Serial) & (SourceSlots - 1);
+			for (int32 Probe = 0; Probe < SourceSlots; ++Probe, Slot = (Slot + 1) & (SourceSlots - 1))
+			{
+				int32& Entry = SourceIndex[Slot];
+				if (Entry && Candidate->Sources[Entry - 1]->Serial() == Serial) return;
+				if (Entry) continue;
+				EVoxelTerrainResourcePool Pool;
+				uint64 PlanBytes;
+				if (Candidate->Sources.Num() >= PlanSources.LeaseCount || !InLease->IsOwnedBy(*Resources) ||
+					!InLease->ReadCapacity(Pool, PlanBytes) || Pool >= EVoxelTerrainResourcePool::Count)
+				{ bInvalidLease = true; return; }
+				Entry = Candidate->Sources.Add(InLease) + 1;
+				return;
+			}
+			bInvalidLease = true;
+		});
+		if (bInvalidLease) { OutError = TEXT("InvalidResource: environment hydrology input lease"); return false; }
+		Candidate->Plans.Add(MoveTemp(Plan));
+	}
+	SourceIndex.Empty();
+	verify(Candidate->ResourceLease->Resize(RetainedBytes));
+	if (bHydrologyResetting.Load() || Generation != GetHydrologyGeneration())
+	{
+		OutError = TEXT("Canceled: environment input generation changed");
+		return false;
+	}
+	Candidate->ResourceLease->MarkPublished();
+	OutInputs = MoveTemp(Candidate);
+	OutError.Reset();
+	return true;
+}
+
 bool FVoxelGenerationPlanCache::FindHydrology(
 	const FVoxelHydrologyRegionKey& InKey,
 	FVoxelHydrologyPlanPtr& OutPlan) const
@@ -3954,6 +4212,9 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 	{
 		return;
 	}
+#if !UE_BUILD_SHIPPING
+	uint64 DiagnosticInputUsed = 0, DiagnosticInputLimit = 0;
+#endif
 	bool bNaturalCapacityPressure = false;
 	bool bHydrologyCapacityPressure = false;
 	uint64 NaturalHeadroom = 0;
@@ -3964,6 +4225,10 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 	if (Resources)
 	{
 		const auto State = Resources->Snapshot();
+#if !UE_BUILD_SHIPPING
+		DiagnosticInputUsed = State.Used[int32(EVoxelTerrainResourcePool::Input)];
+		DiagnosticInputLimit = State.Limits.InputBytes;
+#endif
 		const uint64 NativeLimit = State.Limits.ResidentBytes - State.Limits.OverlapBytes;
 		// 至少留出一轮自然列和常规驻留区的 1/16，不能只在剩余不足一个计划正文时才开始退休。
 		NaturalHeadroom = FMath::Min(NativeLimit / 4, FMath::Max(NativeLimit / 16,
@@ -4094,7 +4359,17 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 	bool bRetirementLimited = false;
 #if !UE_BUILD_SHIPPING
 	static double NextPressureDiagnostic = 0.0;
-	const bool bLogPressure = bNaturalCapacityPressure && FPlatformTime::Seconds() >= NextPressureDiagnostic;
+	const bool bLogPressure = (bNaturalCapacityPressure ||
+		(DiagnosticInputLimit && DiagnosticInputUsed >= DiagnosticInputLimit / 2)) &&
+		FPlatformTime::Seconds() >= NextPressureDiagnostic;
+	if (bLogPressure)
+	{
+		uint64 ControlBytes = 0;
+		int32 ControlLeases = 0;
+		GetRequiredInputCapacity(ControlBytes, ControlLeases);
+		UE_LOG(LogTemp, Display, TEXT("Voxel fact input ownership: used=%llu limit=%llu cacheControlBytes=%llu cacheControlLeases=%d"),
+			DiagnosticInputUsed, DiagnosticInputLimit, ControlBytes, ControlLeases);
+	}
 #endif
 
 	{

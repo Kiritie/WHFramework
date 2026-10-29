@@ -206,6 +206,9 @@ public:
 	FVoxelGenerationDependencyStatus EnsureEnvironmentGeometry(const FVoxelGenerationConsumerKey& InConsumer,
 		const FVoxelTerrainGeometry& InGeometry, EVoxelWorkClass InWorkClass,
 		int32 InSourcePriority, double InDistanceScore, double InForwardScore);
+	void VisitGenerationFactSources(const FVoxelGenerationConsumerKey& InConsumer, FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
+	TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe> GetEnvironmentGeometryInputs(
+		const FVoxelGenerationConsumerKey& InConsumer, const FVoxelTerrainGeometry& InGeometry) const;
 	FVoxelGenerationDependencyStatus EnsureEnvironmentBounds(const FVoxelGenerationBounds& InBounds,
 		EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	bool ResolveMapSurface(

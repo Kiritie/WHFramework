@@ -291,12 +291,14 @@ void FVoxelEcologyGenerator::BuildTrees(
 	TFunctionRef<bool(const FVoxelEcologyPlanWrite&)> InEmit,
 	const TAtomic<bool>* InCancel) const
 {
-	EnumerateTrees(InBounds, InSampleColumn, InSampleBaseSymbol,
-		[this, &InEmit, &InSampleColumn](const FIntVector& Anchor, const int32 Height,
-			const FVoxelStableId OwnerId)
+	EnumerateTrees(InBounds, InSampleColumn,
+		[&InSampleBaseSymbol](const FIntVector& Position, const FVoxelColumnSample&, uint32& Symbol)
 		{
-			FVoxelColumnSample Column;
-			if (!InSampleColumn(Anchor, Column)) return;
+			return InSampleBaseSymbol(Position, Symbol);
+		},
+		[this, &InEmit](const FIntVector& Anchor, const int32 Height,
+			const FVoxelStableId OwnerId, const FVoxelColumnSample& Column)
+		{
 			const FVoxelTreeSpecies Species = SelectTreeSpecies(Column, OwnerId);
 			const FInt64Vector WideAnchor(Anchor);
 			const int64 TrunkTop = static_cast<int64>(Anchor.Z) + Height;
@@ -366,8 +368,8 @@ void FVoxelEcologyGenerator::BuildTrees(
 void FVoxelEcologyGenerator::EnumerateTrees(
 	const FVoxelGenerationBounds& InBounds,
 	TFunctionRef<bool(const FIntVector&, FVoxelColumnSample&)> InSampleColumn,
-	TFunctionRef<bool(const FIntVector&, uint32&)> InSampleBaseSymbol,
-	TFunctionRef<void(const FIntVector&, int32, FVoxelStableId)> InVisit,
+	TFunctionRef<bool(const FIntVector&, const FVoxelColumnSample&, uint32&)> InSampleBaseSymbol,
+	TFunctionRef<void(const FIntVector&, int32, FVoxelStableId, const FVoxelColumnSample&)> InVisit,
 	int32& OutCandidates,
 	int32& OutAccepted,
 	const TAtomic<bool>* InCancel,
@@ -454,8 +456,8 @@ void FVoxelEcologyGenerator::EnumerateTrees(
 
 			uint32 AirValue = MAX_uint32;
 			uint32 FloorValue = MAX_uint32;
-			if (!InSampleBaseSymbol(Anchor, AirValue) ||
-				!InSampleBaseSymbol(FloorPosition, FloorValue) ||
+			if (!InSampleBaseSymbol(Anchor, Column, AirValue) ||
+				!InSampleBaseSymbol(FloorPosition, Column, FloorValue) ||
 				static_cast<uint16>(AirValue & 0xffffu) != Recipe->Palette.Air ||
 				static_cast<uint16>(FloorValue & 0xffffu) == Recipe->Palette.Air)
 			{
@@ -468,7 +470,7 @@ void FVoxelEcologyGenerator::EnumerateTrees(
 			++OutAccepted;
 			const int32 Height = VoxelGeneration::RandomRange(
 				VoxelGeneration::Mix(CandidateSeed ^ TreeHeightSalt), Settings.MinHeight, Settings.MaxHeight);
-			InVisit(Anchor, Height, OwnerId);
+			InVisit(Anchor, Height, OwnerId, Column);
 		}
 	}
 }

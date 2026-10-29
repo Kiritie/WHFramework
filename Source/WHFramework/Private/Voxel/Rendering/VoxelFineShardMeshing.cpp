@@ -3,13 +3,14 @@
 #include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Geometry/DWVoxelFaceVisibility.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
+#include "HAL/ThreadSafeCounter64.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 namespace
 {
 	struct FFineFaceKey
 	{
 		bool bVisible = false;
-		uint32 Packed = 0;
 		FVoxelRuntimeFaceRef Texture;
 		EVoxelRenderGroup Group = EVoxelRenderGroup::Opaque;
 		bool operator==(const FFineFaceKey& InOther) const = default;
@@ -93,39 +94,68 @@ namespace
 	}
 
 	bool PrimitiveBound(const FVoxelSectionSnapshot& InSource, const FIntVector& InOffset, const int32 InSide,
-		const FVoxelRegistrySnapshot& InRegistry, const FVoxelShapeRegistry& InShapes, int32& OutBound)
+		const FVoxelRegistrySnapshot& InRegistry, const FVoxelShapeRegistry& InShapes,
+		const TAtomic<bool>& InCancel, int32& OutBound, bool& OutKnownEmpty)
 	{
 		uint64 Count = 0;
+		bool bClosedCubes = true;
+		OutKnownEmpty = false;
 		for (int32 Z = 0; Z < InSide; ++Z)
 		{
+			if (InCancel.Load()) return false;
 			for (int32 Y = 0; Y < InSide; ++Y)
 			{
 				for (int32 X = 0; X < InSide; ++X)
 				{
 					FVoxelBlockState Block;
-					if (!InSource.TrySample(InOffset + FIntVector(X, Y, Z), Block))
-					{
-						return false;
-					}
+					if (!InSource.TrySample(InOffset + FIntVector(X, Y, Z), Block)) return false;
 					if (Block.IsAir())
 					{
+						bClosedCubes = false;
 						continue;
 					}
 					const auto* Definition = InRegistry.Find(Block.TypeId);
 					const auto* Shape = Definition ? Definition->FindShape(InShapes, Block.State) : nullptr;
-					if (!Shape)
-					{
-						return false;
-					}
+					if (!Shape) return false;
+					bClosedCubes &= Definition->Shape == EVoxelShapeKind::FullCube && Definition->bOccludes &&
+						(Shape->OcclusionMask & 0x3f) == 0x3f;
 					Count += Definition->Shape == EVoxelShapeKind::FullCube ? 6 : Shape->Quads.Num();
-					if (Count > MAX_int32)
-					{
-						return false;
-					}
+					if (Count > MAX_int32) return false;
 				}
 			}
 		}
 		OutBound = int32(Count);
+		if (Count == 0)
+		{
+			OutKnownEmpty = true;
+			return true;
+		}
+		if (!bClosedCubes) return true;
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineEmptyProof);
+		// 内部各面已由完整遮挡形状证明；外侧仍使用原可见性规则逐格验证。
+		for (uint8 Face = 0; Face < 6; ++Face)
+		{
+			if (InCancel.Load()) return false;
+			const int32 Axis = Face / 2;
+			const int32 U = (Axis + 1) % 3;
+			const int32 V = (Axis + 2) % 3;
+			for (int32 Y = 0; Y < InSide; ++Y)
+			{
+				for (int32 X = 0; X < InSide; ++X)
+				{
+					FIntVector Cell = InOffset;
+					Cell[Axis] += (Face & 1) ? 0 : InSide - 1;
+					Cell[U] += X;
+					Cell[V] += Y;
+					FVoxelBlockState Current;
+					FVoxelBlockState Neighbor;
+					if (!InSource.TrySample(Cell, Current) ||
+						!InSource.TrySample(Cell + VoxelCoord::Direction(Face), Neighbor)) return false;
+					if (VoxelFaceVisibility::ShouldRender(InRegistry, InShapes, Current, Neighbor, Face, nullptr)) return true;
+				}
+			}
+		}
+		OutKnownEmpty = true;
 		return true;
 	}
 
@@ -183,7 +213,6 @@ namespace
 						}
 						FFineFaceKey& Entry = InMask[X + InSide * Y];
 						Entry.bVisible = true;
-						Entry.Packed = Block.Pack();
 						Entry.Group = Definition->RenderGroup;
 						Entry.Texture = Definition->Face(Block.State,
 							FVoxelShapeRegistry::RotateFace(Face, uint8((4 - (Block.State & 3)) & 3)));
@@ -309,16 +338,14 @@ FVoxelFineShardMeshing::FVoxelFineShardMeshing(
 {
 }
 
-FVoxelFineMeshEstimate FVoxelFineShardMeshing::MinimumPieceMemory(const int32 InSideCells, const int32 InPrimitiveBound)
+FVoxelFineMeshEstimate FVoxelFineShardMeshing::MinimumPieceMemory(const int32 InSideCells, const int32 InBatchBound)
 {
-	check(InSideCells > 0 && InSideCells <= 64 && InPrimitiveBound >= 0);
+	check(InSideCells > 0 && InSideCells <= 64 && InBatchBound >= 0);
 	using namespace VoxelBoundedAllocation;
 	FVoxelFineMeshEstimate Estimate;
 	Estimate.MaskBytes = ArrayBytes<FFineFaceKey>(InSideCells * InSideCells);
-	Estimate.MetadataBytes = sizeof(FBuildPlan) + sizeof(FPrimitiveWorkspace) + ArrayBytes<FBatchPlan>(InPrimitiveBound);
-	Estimate.SliceBytes = sizeof(FVoxelSectionSnapshot) + ArrayBytes<uint32>(InSideCells * InSideCells * InSideCells) +
-		6 * ArrayBytes<uint32>(InSideCells * InSideCells);
-	Estimate.WorkingBytes = Estimate.SliceBytes + Estimate.MaskBytes;
+	Estimate.MetadataBytes = sizeof(FBuildPlan) + sizeof(FPrimitiveWorkspace) + ArrayBytes<FBatchPlan>(InBatchBound);
+	Estimate.WorkingBytes = Estimate.MaskBytes;
 	Estimate.AdditionalPeakBytes = Estimate.MetadataBytes + Estimate.WorkingBytes;
 	return Estimate;
 }
@@ -407,6 +434,19 @@ bool FVoxelFineShardMeshing::Initialize(const uint64 InMaximumPieceBytes,
 			}
 		}
 	}
+	uint32 MaximumGroup = 0;
+	uint32 MaximumBank = 0;
+	for (const FVoxelRuntimeDefinition& Definition : Registry->Definitions)
+	{
+		MaximumGroup = FMath::Max(MaximumGroup, uint32(Definition.RenderGroup));
+		for (int32 Face = 0; Face < 6; ++Face)
+		{
+			MaximumBank = FMath::Max(MaximumBank, uint32(Definition.Faces[Face].Bank));
+			MaximumBank = FMath::Max(MaximumBank, uint32(Definition.UpperFaces[Face].Bank));
+		}
+	}
+	// 批次键只含渲染组和 Bank；固定快照的二维键域给出无分配的保守上界。
+	MaximumBatchCount = Registry->Definitions.IsEmpty() ? 0 : int32((MaximumGroup + 1) * (MaximumBank + 1));
 	MaximumPieceBytes = InMaximumPieceBytes;
 	MaximumTotalGeometryBytes = InMaximumTotalGeometryBytes;
 	const int32 PieceSide = FMath::Min(Side, 16);
@@ -691,15 +731,28 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 	const FVoxelFineShardKey Key = Pending.Last();
 	const FIntVector Offset = Key.Min - Samples->Attempt.Input.Shard.Min;
 	int32 Bound = 0;
-	if (!PrimitiveBound(Samples->Snapshot, Offset, Key.SideCells, *Registry, *Shapes, Bound))
+	bool bKnownEmpty = false;
+	if (!PrimitiveBound(Samples->Snapshot, Offset, Key.SideCells, *Registry, *Shapes, InCancel, Bound, bKnownEmpty))
 	{
-		OutError = TEXT("Invalid Fine primitive input");
+		OutError = InCancel.Load() ? TEXT("Canceled") : TEXT("Invalid Fine primitive input");
 		Abort();
-		State = EVoxelFineBuildProgress::Failed;
+		State = InCancel.Load() ? EVoxelFineBuildProgress::Canceled : EVoxelFineBuildProgress::Failed;
 		return State;
 	}
+	const int32 PrimitiveCount = Bound;
+	// 每个定义最多提供六个普通面和六个上半面，批次只按渲染组与纹理 Bank 区分。
+	Bound = bKnownEmpty ? 0 : FMath::Min(MaximumBatchCount,
+		int32(FMath::Min<int64>(Bound, 12ll * Registry->Definitions.Num())));
 	using namespace VoxelBoundedAllocation;
-	const FVoxelFineMeshEstimate Minimum = MinimumPieceMemory(Key.SideCells, Bound);
+	FVoxelFineMeshEstimate Minimum = MinimumPieceMemory(Key.SideCells, Bound);
+	const int32 MaskCells = bKnownEmpty ? 0 : Key.SideCells * Key.SideCells;
+	if (bKnownEmpty)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineSkipEmptyPiece);
+		Minimum.MaskBytes = 0;
+		Minimum.WorkingBytes = 0;
+		Minimum.AdditionalPeakBytes = Minimum.MetadataBytes;
+	}
 	RequiredWorkingBytes = Minimum.MetadataBytes + Minimum.MaskBytes;
 	RequiredResultBytes = 0;
 	if (RequiredWorkingBytes > MaximumPieceBytes)
@@ -752,14 +805,14 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 	Plan.Estimate = Minimum;
 	TArray<FFineFaceKey> Mask;
 	if (!Reserve(Plan.Batches, Bound, ArrayBytes<FBatchPlan>(Bound)) ||
-		!Reserve(Mask, Key.SideCells * Key.SideCells, Minimum.MaskBytes))
+		!Reserve(Mask, MaskCells, Minimum.MaskBytes))
 	{
 		OutError = TEXT("EstimateMismatch: Fine count capacity");
 		Abort();
 		State = EVoxelFineBuildProgress::Failed;
 		return State;
 	}
-	Mask.SetNum(Key.SideCells * Key.SideCells, EAllowShrinking::No);
+	Mask.SetNum(MaskCells, EAllowShrinking::No);
 	const auto CountEmitter = [&](EVoxelRenderGroup Group, const FVoxelRuntimeFaceRef& Texture,
 		const FVector*, const FVector2D*, const FVector&, bool)
 	{
@@ -784,7 +837,7 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 		Plan.Estimate.MaximumIndices += 6;
 		return true;
 	};
-	if (!VisitFinePrimitives(Samples->Snapshot, Offset, Offset, Key.SideCells, Samples->Snapshot.GridSide,
+	if (!bKnownEmpty && !VisitFinePrimitives(Samples->Snapshot, Offset, Offset, Key.SideCells, Samples->Snapshot.GridSide,
 		TextureRepeatsPerCell, *Registry, *Shapes, Mask, InCancel, CountEmitter))
 	{
 		OutError = InCancel.Load() ? TEXT("Canceled") : TEXT("EstimateMismatch: Fine count traversal");
@@ -843,31 +896,19 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 			? EVoxelFineCapacityReason::ResultTokenUnavailable : EVoxelFineCapacityReason::CapacityUnachievable,
 			RequiredWorkingBytes, RequiredResultBytes);
 	}
-	FVoxelSectionSnapshot SliceSnapshot;
-	if (!Slice(*Samples, Key, SliceSnapshot, OutError) ||
-		!Reserve(Mask, Key.SideCells * Key.SideCells, Minimum.MaskBytes))
+	if (!Reserve(Mask, MaskCells, Minimum.MaskBytes))
 	{
+		OutError = TEXT("EstimateMismatch: Fine build mask capacity");
 		Abort();
 		State = EVoxelFineBuildProgress::Failed;
 		return State;
 	}
-	Mask.SetNum(Key.SideCells * Key.SideCells, EAllowShrinking::No);
-	const uint64 ActualSlice = sizeof(SliceSnapshot) + SliceSnapshot.Blocks.GetAllocatedSize() +
-		SliceSnapshot.Halo[0].GetAllocatedSize() + SliceSnapshot.Halo[1].GetAllocatedSize() +
-		SliceSnapshot.Halo[2].GetAllocatedSize() + SliceSnapshot.Halo[3].GetAllocatedSize() +
-		SliceSnapshot.Halo[4].GetAllocatedSize() + SliceSnapshot.Halo[5].GetAllocatedSize();
-	if (ActualSlice > Minimum.SliceBytes)
-	{
-		OutError = TEXT("EstimateMismatch: Fine Slice allocator capacity");
-		Abort();
-		State = EVoxelFineBuildProgress::Failed;
-		return State;
-	}
+	Mask.SetNum(MaskCells, EAllowShrinking::No);
 	auto Candidate = MakeWorkerShared<FVoxelSectionMeshResult>(ResultLease);
 	Candidate->Stamp.WorldEpoch = Samples->Attempt.Input.WorldEpoch;
 	Candidate->Stamp.Token = Samples->Attempt.Input.Incarnation;
 	Candidate->Stamp.Revision = Samples->Attempt.Input.MeshRevision;
-	Candidate->Stamp.Section = SliceSnapshot.Section;
+	Candidate->Stamp.Section = Samples->Snapshot.Section;
 	Candidate->ResourceLease = ResultLease;
 	if (!Reserve(Candidate->Batches, Plan.Batches.Num(), ArrayBytes<FVoxelRenderBatch>(Plan.Batches.Num())))
 	{
@@ -922,7 +963,7 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 		Mesh.Triangles.Append(Indices, UE_ARRAY_COUNT(Indices));
 		return true;
 	};
-	if (!VisitFinePrimitives(SliceSnapshot, FIntVector::ZeroValue, Offset, Key.SideCells, Samples->Snapshot.GridSide,
+	if (!bKnownEmpty && !VisitFinePrimitives(Samples->Snapshot, Offset, Offset, Key.SideCells, Samples->Snapshot.GridSide,
 		TextureRepeatsPerCell, *Registry, *Shapes, Mask, InCancel, BuildEmitter))
 	{
 		OutError = InCancel.Load() ? TEXT("Canceled") : TEXT("EstimateMismatch: Fine bounded build");
@@ -966,7 +1007,25 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 	Geometry->Pieces.Add({Key, Candidate});
 	Geometry->bKnownEmpty &= !bHasTriangles;
 	Geometry->PeakTemporaryBytes = FMath::Max(Geometry->PeakTemporaryBytes,
-		FMath::Max(CountPeak, ActualMetadata + ActualSlice + Mask.GetAllocatedSize()));
+		FMath::Max(CountPeak, ActualMetadata + Mask.GetAllocatedSize()));
+#if !UE_BUILD_SHIPPING
+	static FThreadSafeCounter64 CompletedPieces;
+	static FThreadSafeCounter64 EmptyAirPieces;
+	static FThreadSafeCounter64 EmptyClosedPieces;
+	if (bKnownEmpty)
+	{
+		if (PrimitiveCount == 0) EmptyAirPieces.Increment();
+		else EmptyClosedPieces.Increment();
+	}
+	const int64 PieceCount = CompletedPieces.Increment();
+	if (PieceCount <= 8 || PieceCount % 1024 == 0)
+	{
+		UE_LOG(LogTemp, Display, TEXT("Voxel Fine mesh working set: completed=%lld side=%d primitives=%d batchBound=%d batches=%d metadataBytes=%llu workingBytes=%llu resultBytes=%llu vertices=%llu indices=%llu provenEmpty=%d emptyAirTotal=%lld emptyClosedTotal=%lld"),
+			PieceCount, Key.SideCells, PrimitiveCount, Bound, Plan.Batches.Num(), ActualMetadata,
+			ActualMetadata + Mask.GetAllocatedSize(), ActualResult, Plan.Estimate.MaximumVertices, Plan.Estimate.MaximumIndices,
+			bKnownEmpty, EmptyAirPieces.GetValue(), EmptyClosedPieces.GetValue());
+	}
+#endif
 	++Geometry->BuildMicrosteps;
 	GeometryBytes = Geometry->GetAllocatedBytes();
 	CompletedVolume += uint64(Key.SideCells) * Key.SideCells * Key.SideCells;

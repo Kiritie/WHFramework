@@ -1411,6 +1411,8 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 		return {false, true, TEXT("生成事实需要完整Source优先级与Consumer身份")};
 	}
 
+	// 同一请求复用哈希，查找仍核对完整身份，不缓存事实就绪状态。
+	const uint32 ConsumerHash = GetTypeHash(InConsumer);
 	FString Error;
 	if (!PrepareStorage(Error)) return {false, !Error.StartsWith(TEXT("CapacityBlocked")), MoveTemp(Error)};
 	const auto CapturedStorage = Storage;
@@ -1442,7 +1444,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 				Desired.Add(Dependency);
 			}
 		}
-		FConsumerState* Consumer = Storage->Consumers.Find(InConsumer);
+		FConsumerState* Consumer = Storage->Consumers.FindByHash(ConsumerHash, InConsumer);
 		if (!Consumer)
 		{
 			if (!PrepareMap<FVoxelGenerationConsumerKey, FConsumerState>(Storage->Consumers, Storage->Consumers.Num() + 1,
@@ -1452,6 +1454,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			Consumer = &Storage->Consumers.Add(InConsumer);
 			Consumer->PriorityNode = Node;
 		}
+		bool bSameDependencies = false;
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureBinding);
 			bool bSame = Consumer->Dependencies.Num() == Desired.Count;
@@ -1461,13 +1464,14 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 				bSame = Consumer->Dependencies.Contains(Dependency);
 				Node = Storage->States.FindChecked(Dependency).NextDesired;
 			}
+			bSameDependencies = bSame;
 			if (!bSame)
 			{
 				int32 GrowthCount = 0;
 				for (FGuid Node = Desired.Head; Node.IsValid();)
 				{
 					const auto& State = Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Node));
-					if (!State.Donations.Contains(InConsumer) && State.Donations.Num() + 1 > State.DonationsCapacity) ++GrowthCount;
+					if (State.Donations.FindByHash(ConsumerHash, InConsumer) == nullptr && State.Donations.Num() + 1 > State.DonationsCapacity) ++GrowthCount;
 					Node = State.NextDesired;
 				}
 				FVoxelGenerationRequiredSourceScope PreviousDependenciesSource(&Resources.Get(), Consumer->DependenciesLease.Get());
@@ -1501,7 +1505,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 				{
 					const auto& State = Storage->States.FindChecked(Storage->PriorityFacts.FindChecked(Node));
 					DependencyNodes.Add(Node);
-					if (!State.Donations.Contains(InConsumer) && State.Donations.Num() + 1 > State.DonationsCapacity)
+					if (State.Donations.FindByHash(ConsumerHash, InConsumer) == nullptr && State.Donations.Num() + 1 > State.DonationsCapacity)
 					{
 						FDonationGrowth Plan;
 						Plan.Node = Node;
@@ -1563,41 +1567,68 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 		}
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsurePrune);
-			for (auto Edge = Consumer->Dependencies.CreateIterator(); Edge; ++Edge)
+			if (!bSameDependencies)
 			{
-				if (!Desired.Contains(Edge.Key()))
+				for (auto Edge = Consumer->Dependencies.CreateIterator(); Edge; ++Edge)
 				{
-					UnlinkSubscriptionWake(*Consumer, Edge.Value());
-					RemoveSubscription(Edge.Key(), InConsumer, Edge.Value().Id);
-					Edge.RemoveCurrent();
+					if (!Desired.Contains(Edge.Key()))
+					{
+						UnlinkSubscriptionWake(*Consumer, Edge.Value());
+						RemoveSubscription(Edge.Key(), InConsumer, Edge.Value().Id);
+						Edge.RemoveCurrent();
+					}
 				}
 			}
 		}
+		const bool bRefreshDonations = !bSameDependencies || Consumer->DonationWorkClass != InWorkClass ||
+			!Consumer->DonationPriority.IsSet() || Consumer->DonationPriority.GetValue() != Priority;
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureReadiness);
-			Status.bReady = true;
-			for (FGuid Node = Desired.Head; Node.IsValid();)
+#if CPUPROFILERTRACE_ENABLED
+			const int32 ProbeIndex = Desired.Count > 0 ? int32((ConsumerHash ^ uint32(GFrameCounter)) % uint32(Desired.Count)) : INDEX_NONE;
+			int32 ReadinessIndex = 0;
+#endif
+			const auto SelectProbe = [&]()
 			{
-				const auto Dependency = Storage->PriorityFacts.FindChecked(Node);
+#if CPUPROFILERTRACE_ENABLED
+				return ReadinessIndex++ == ProbeIndex;
+#else
+				return false;
+#endif
+			};
+			Status.bReady = true;
+			const auto VisitReadiness = [&](const FVoxelGenerationPlanDependency& Dependency, FSubscription* Subscription,
+				const bool bProbe, const bool* InCached)
+			{
 				auto& State = Storage->States.FindChecked(Dependency);
-				FSubscription* Subscription = Consumer->Dependencies.Find(Dependency);
 				if (!Subscription)
 				{
 					checkf(NextSubscriptionId != MAX_uint64, TEXT("Generation subscription serial exhausted"));
 					Subscription = &Consumer->Dependencies.Add(Dependency);
 					Subscription->Id = ++NextSubscriptionId;
 				}
-				const auto Previous = State.ServicePriority;
-				const FDonation* ExistingDonation = State.Donations.Find(InConsumer);
-				if (!ExistingDonation || ExistingDonation->WorkClass != InWorkClass ||
-					ExistingDonation->Priority != Priority || ExistingDonation->SubscriptionId != Subscription->Id)
+				if (bRefreshDonations)
 				{
-					TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureDonationChange);
-					State.Donations.Add(InConsumer, {InWorkClass, Priority, Subscription->Id});
-					ResolveDonations(State);
+					const auto Previous = State.ServicePriority;
+					const FDonation* ExistingDonation = State.Donations.FindByHash(ConsumerHash, InConsumer);
+					if (!ExistingDonation || ExistingDonation->WorkClass != InWorkClass ||
+						ExistingDonation->Priority != Priority || ExistingDonation->SubscriptionId != Subscription->Id)
+					{
+						TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureDonationChange);
+						State.Donations.Add(InConsumer, {InWorkClass, Priority, Subscription->Id});
+						ResolveDonations(State);
+					}
+					if (State.bInFlight && Previous != State.ServicePriority) Cache->RecordPlanDonation(Dependency.Kind);
 				}
-				if (State.bInFlight && Previous != State.ServicePriority) Cache->RecordPlanDonation(Dependency.Kind);
-				const bool bCached = IsCached(Dependency);
+				bool bCached;
+				if (InCached) bCached = *InCached;
+				else
+				{
+#if CPUPROFILERTRACE_ENABLED
+					TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_PlanReadinessCacheProbe, bProbe);
+#endif
+					bCached = IsCached(Dependency);
+				}
 				if (bCached)
 				{
 					if (State.PendingRequest.IsSet())
@@ -1616,8 +1647,81 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 					Status.Error = State.Error;
 				}
 				Status.bReady &= bCached;
-				Node = State.NextDesired;
+				if (Subscription->bWakePending)
+				{
+					TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureAcknowledgeWake);
+					// 本次已消费该事实的最新状态；后续变化仍可按原订阅重新唤醒。
+					UnlinkSubscriptionWake(*Consumer, *Subscription);
+				}
+				return State.NextDesired;
+			};
+			if (bSameDependencies)
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanReadinessExistingSubscriptions);
+				if (Consumer->Dependencies.Num() <= FVoxelGenerationPlanCache::ShardCount)
+				{
+					for (auto& Edge : Consumer->Dependencies)
+					{
+						const bool bProbe = SelectProbe();
+						TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_PlanReadinessEdgeProbe, bProbe);
+						VisitReadiness(Edge.Key, &Edge.Value, bProbe, nullptr);
+					}
+				}
+				else
+				{
+					constexpr int32 MaximumBatch = FVoxelGenerationPlanCache::MaximumAvailabilityBatch;
+					FVoxelGenerationPlanAvailabilityQuery Queries[MaximumBatch];
+					const FVoxelGenerationPlanDependency* Dependencies[MaximumBatch];
+					FSubscription* Subscriptions[MaximumBatch];
+					auto Edge = Consumer->Dependencies.CreateIterator();
+					while (Edge)
+					{
+						int32 Count = 0;
+						for (; Edge && Count < MaximumBatch; ++Edge)
+						{
+							Dependencies[Count] = &Edge.Key();
+							Subscriptions[Count] = &Edge.Value();
+							Queries[Count].Kind = Edge.Key().Kind;
+							Queries[Count].Coordinate = Edge.Key().Coordinate();
+							++Count;
+						}
+						Cache->HasPlans(MakeArrayView(Queries, Count));
+						for (int32 Index = 0; Index < Count; ++Index)
+						{
+							const bool bProbe = SelectProbe();
+							TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_PlanReadinessEdgeProbe, bProbe);
+							VisitReadiness(*Dependencies[Index], Subscriptions[Index], bProbe, &Queries[Index].bReady);
+						}
+					}
+				}
 			}
+			else
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanReadinessChangedSubscriptions);
+				for (FGuid Node = Desired.Head; Node.IsValid();)
+				{
+					const bool bProbe = SelectProbe();
+					TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_PlanReadinessEdgeProbe, bProbe);
+					const auto Dependency = Storage->PriorityFacts.FindChecked(Node);
+					Node = VisitReadiness(Dependency, Consumer->Dependencies.Find(Dependency), bProbe, nullptr);
+				}
+			}
+			check(Consumer->Dependencies.Num() == Desired.Count);
+			Consumer->DonationPriority = Priority;
+			Consumer->DonationWorkClass = InWorkClass;
+#if !UE_BUILD_SHIPPING
+			static uint64 ReadinessCalls = 0;
+			static uint64 ExistingEdges = 0;
+			static uint64 ChangedEdges = 0;
+			if (bSameDependencies) ExistingEdges += uint64(Desired.Count);
+			else ChangedEdges += uint64(Desired.Count);
+			++ReadinessCalls;
+			if (ReadinessCalls <= 4 || ReadinessCalls % 128 == 0)
+			{
+				UE_LOG(LogTemp, Display, TEXT("Voxel readiness traversal: calls=%llu desired=%d same=%d existingEdges=%llu changedEdges=%llu avoidedLookups=%llu"),
+					ReadinessCalls, Desired.Count, bSameDependencies, ExistingEdges, ChangedEdges, ExistingEdges * 3);
+			}
+#endif
 		}
 		AdvancePriorityDonations();
 		{
@@ -1632,7 +1736,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 					if (State.PendingRequest.IsSet()) LinkPendingAdmission(State);
 					else if (ArePrerequisitesReady(State)) Queue(Dependency, State);
 				}
-				if (Storage != Desired.CapturedStorage || !Storage || Storage->Owner != this || !Storage->Consumers.Contains(InConsumer))
+				if (Storage != Desired.CapturedStorage || !Storage || Storage->Owner != this || Storage->Consumers.FindByHash(ConsumerHash, InConsumer) == nullptr)
 				{
 					Status.bReady = false;
 					return Status;
@@ -1649,7 +1753,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 		}
 		RefreshQueuedPriorities();
 	}
-	if (Storage != CapturedStorage || !Storage || Storage->Owner != this || !Storage->Consumers.Contains(InConsumer))
+	if (Storage != CapturedStorage || !Storage || Storage->Owner != this || Storage->Consumers.FindByHash(ConsumerHash, InConsumer) == nullptr)
 	{
 		Status.bReady = false;
 	}
@@ -2122,7 +2226,26 @@ bool FVoxelGenerationPlanCoordinator::RegisterClosure(const FVoxelGenerationPlan
 bool FVoxelGenerationPlanCoordinator::ArePrerequisitesReady(const FState& InState) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanPrerequisiteScan);
-	for (const auto& Dependency : InState.Prerequisites) if (!IsCached(Dependency)) return false;
+	if (InState.Prerequisites.Num() <= FVoxelGenerationPlanCache::ShardCount)
+	{
+		for (const auto& Dependency : InState.Prerequisites) if (!IsCached(Dependency)) return false;
+		return true;
+	}
+	constexpr int32 MaximumBatch = FVoxelGenerationPlanCache::MaximumAvailabilityBatch;
+	FVoxelGenerationPlanAvailabilityQuery Queries[MaximumBatch];
+	for (int32 First = 0; First < InState.Prerequisites.Num();)
+	{
+		const int32 Count = FMath::Min(MaximumBatch, InState.Prerequisites.Num() - First);
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const auto& Dependency = InState.Prerequisites[First + Index];
+			Queries[Index].Kind = Dependency.Kind;
+			Queries[Index].Coordinate = Dependency.Coordinate();
+		}
+		Cache->HasPlans(MakeArrayView(Queries, Count));
+		for (int32 Index = 0; Index < Count; ++Index) if (!Queries[Index].bReady) return false;
+		First += Count;
+	}
 	return true;
 }
 

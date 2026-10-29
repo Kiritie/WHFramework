@@ -1053,9 +1053,13 @@ bool FVoxelProxyTreeSilhouetteTest::RunTest(const FString& InParameters)
 	FIntVector FirstAnchor = FIntVector::ZeroValue;
 	FVoxelStableId FirstTreeId;
 	Ecology.EnumerateTrees({FIntVector(0, 0, -64), FIntVector(32, 32, 128)},
-		SampleColumn, SampleBase,
+		SampleColumn,
+		[&SampleBase](const FIntVector& Position, const FVoxelColumnSample&, uint32& Symbol)
+		{
+			return SampleBase(Position, Symbol);
+		},
 		[&FirstAnchor, &FirstTreeId](const FIntVector& Anchor, const int32 Height,
-			const FVoxelStableId Id)
+			const FVoxelStableId Id, const FVoxelColumnSample&)
 		{
 			if (!FirstTreeId.IsValid())
 			{
@@ -1101,8 +1105,12 @@ bool FVoxelProxyTreeSilhouetteTest::RunTest(const FString& InParameters)
 	FVoxelOverlaySnapshotSet Removed;
 	Candidates = 0;
 	Accepted = 0;
-	Ecology.EnumerateTrees(TreeBounds, SampleColumn, SampleBase,
-		[&Removed](const FIntVector& Anchor, const int32 Height, const FVoxelStableId)
+	Ecology.EnumerateTrees(TreeBounds, SampleColumn,
+		[&SampleBase](const FIntVector& Position, const FVoxelColumnSample&, uint32& Symbol)
+		{
+			return SampleBase(Position, Symbol);
+		},
+		[&Removed](const FIntVector& Anchor, const int32 Height, const FVoxelStableId, const FVoxelColumnSample&)
 		{
 			const FIntVector Section(
 				VoxelGeneration::FloorDivide(Anchor.X, 16),
@@ -1125,8 +1133,8 @@ bool FVoxelProxyTreeSilhouetteTest::RunTest(const FString& InParameters)
 	int32 DestroyedTreeCells = 0;
 	for (int32 Index = 0; Index < Natural.Cells.Num(); ++Index)
 	{
-		NaturalTreeCells += Natural.Cells[Index].TypeId == 8 || Natural.Cells[Index].TypeId == 9;
-		DestroyedTreeCells += Destroyed.Cells[Index].TypeId == 8 || Destroyed.Cells[Index].TypeId == 9;
+		NaturalTreeCells += Natural.Cells.Get(Index).TypeId == 8 || Natural.Cells.Get(Index).TypeId == 9;
+		DestroyedTreeCells += Destroyed.Cells.Get(Index).TypeId == 8 || Destroyed.Cells.Get(Index).TypeId == 9;
 	}
 	TestTrue(TEXT("Distant proxy shows planned trees"), NaturalTreeCells > 0);
 	TestEqual(TEXT("Removed tree anchors hide distant tree silhouettes"),

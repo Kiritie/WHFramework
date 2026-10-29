@@ -227,6 +227,14 @@ const FVoxelViewPublisher::FUpdate* FVoxelViewPublisher::FindProjectedUpdate(
 	return Latest;
 }
 
+bool FVoxelViewPublisher::IsProjectedCoveragePrepared(const FPublication* InPublication, const FUpdate* InUpdate)
+{
+	if (!InPublication || InPublication->bCoveragePrepared) return true;
+	const int32 Index = InUpdate ? int32(InUpdate - InPublication->Updates.GetData()) : INDEX_NONE;
+	checkSlow(InPublication->Updates.IsValidIndex(Index));
+	return Index >= 0 && Index < InPublication->CoverageIndex;
+}
+
 bool FVoxelViewPublisher::CaptureCoverageSource(const FVoxelViewSourceId InSourceId,
 	const bool bInRetainPresented, FUpdate& OutSource) const
 {
@@ -879,6 +887,22 @@ void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 	if (!PendingPlan)
 	{
 		if (PendingGroups.IsEmpty()) return;
+		bool bHasAdmissibleGroup = false;
+		for (const auto& Pair : PendingGroups)
+		{
+			if (!Pair.Value.bCommitted) continue;
+			const auto* Generations = OwnerSerialQueues.Find(Pair.Value.Key);
+			if (!Generations || Generations->Num() < 2)
+			{
+				bHasAdmissibleGroup = true;
+				break;
+			}
+		}
+		if (!bHasAdmissibleGroup)
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherPendingAllBlocked);
+			return;
+		}
 		PendingPlan = MakeUnique<FPendingPlan>();
 		// Freeze this cohort by moving storage. New inputs can accumulate independently.
 		PendingPlan->Groups = MoveTemp(PendingGroups);
@@ -1892,12 +1916,18 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::PrepareCoverageSteps(FPublicat
 		{
 			const FPublication* Older = nullptr;
 			const FUpdate* Projected = FindProjectedUpdate(Update.SourceId, InPublication.Serial, &Older);
-			if (Older && !Older->bCoveragePrepared)
+			// CoverageIndex之前的来源已完整比较覆盖，不等待同批无关来源。
+			if (!IsProjectedCoveragePrepared(Older, Projected))
 			{
 				co_await FVoxelGameThreadContinuation::Yield();
 				continue;
 			}
-			if (Projected) { Previous = *Projected; bHasPrevious = true; }
+			if (Projected)
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_PublisherCoverageSourceReuse, Older && !Older->bCoveragePrepared);
+				Previous = *Projected;
+				bHasPrevious = true;
+			}
 			else if (const FEntry* Entry = Entries.Find(Update.SourceId); Entry && Entry->PresentedSource)
 			{
 				Previous.Source = Entry->PresentedSource;
@@ -1943,6 +1973,17 @@ bool FVoxelViewPublisher::AdmitCoveragePreparation(const FPublicationRef& InPubl
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherCoveragePreparation);
 	if (InPublication->bCoveragePrepared || InPublication->bCanceled || FPlatformTime::Seconds() >= InDeadline) return false;
+	const auto CanAdvanceSource = [this, &InPublication]
+	{
+		if (!InPublication->Updates.IsValidIndex(InPublication->CoverageIndex)) return true;
+		const FPublication* Older = nullptr;
+		const FUpdate* Previous = FindProjectedUpdate(InPublication->Updates[InPublication->CoverageIndex].SourceId,
+			InPublication->Serial, &Older);
+		return IsProjectedCoveragePrepared(Older, Previous);
+	};
+	// 真正等待前代时不重复恢复协程，把服务机会留给可推进的发布项。
+	if (!CanAdvanceSource()) return false;
+	int32 CheckedCoverageIndex = InPublication->CoverageIndex;
 	bool bAdvanced = false;
 	if (!InPublication->CoverageWork.IsValid())
 	{
@@ -1956,6 +1997,11 @@ bool FVoxelViewPublisher::AdmitCoveragePreparation(const FPublicationRef& InPubl
 	for (int32 Steps = 0; Steps < 64 && InPublication->CoverageIndex < End &&
 		FPlatformTime::Seconds() < InDeadline && !InPublication->CoverageWork.IsComplete(); ++Steps)
 	{
+		if (CheckedCoverageIndex != InPublication->CoverageIndex)
+		{
+			if (!CanAdvanceSource()) break;
+			CheckedCoverageIndex = InPublication->CoverageIndex;
+		}
 		InPublication->CoverageWork.Resume();
 		bAdvanced = true;
 	}

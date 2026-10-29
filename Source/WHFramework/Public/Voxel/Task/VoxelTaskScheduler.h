@@ -331,6 +331,7 @@ struct WHFRAMEWORK_API FVoxelTaskRequest
 
 private:
 	friend class FVoxelTaskScheduler;
+	void ReleaseExecutionBindings();
 #if WITH_DEV_AUTOMATION_TESTS
 	friend struct FVoxelSchedulerNativeBackingTestAccess;
 	friend class FVoxelTaskAdmissionFailureTest;

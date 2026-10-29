@@ -48,9 +48,6 @@ bool FVoxelMacroTerrainBuilder::Build(
 	const int32 Count =
 		Data.GetVertexCount();
 
-	Data.Height.SetNumUninitialized(Count);
-	Data.WaterHeight.SetNumUninitialized(Count);
-	Data.SurfaceStates.SetNumUninitialized(Count);
 	Data.ForestCoverage.SetNumUninitialized(Count);
 	Data.SnowCoverage.SetNumUninitialized(Count);
 
@@ -80,6 +77,10 @@ bool FVoxelMacroTerrainBuilder::Build(
 		return false;
 	}
 
+	Data.Height = MoveTemp(Surface.GroundZ);
+	Data.WaterHeight = MoveTemp(Surface.WaterZ);
+	Data.SurfaceStates = MoveTemp(Surface.SurfaceStates);
+
 	const FVoxelEcologyGenerator Ecology(Config->Recipe.ToSharedRef());
 	for (int32 Index = 0;
 		Index < Count;
@@ -87,12 +88,6 @@ bool FVoxelMacroTerrainBuilder::Build(
 	{
 		const FVoxelColumnSample& Column =
 			Columns[Index];
-
-		Data.Height[Index] = Surface.GroundZ[Index];
-
-		Data.WaterHeight[Index] = Surface.WaterZ[Index];
-
-		Data.SurfaceStates[Index] = Surface.SurfaceStates[Index];
 
 		const FVoxelEcologySample EcologySample = Ecology.Sample(Column);
 

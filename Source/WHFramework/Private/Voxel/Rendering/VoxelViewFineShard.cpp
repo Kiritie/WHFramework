@@ -63,6 +63,9 @@ struct FVoxelViewManager::FF0FineWorker
 				break;
 			}
 		}
+		// 仅已有进展且无资源等待时复用调度器的后台时间片。
+		Result.bContinueImmediately = Result.bSuccess && Result.bContinue && !Result.bCanceled &&
+			!InCancel.Load() && Result.Error.IsEmpty() && !bWaitingCapacity.Load();
 		return Result;
 	}
 
@@ -198,6 +201,9 @@ struct FVoxelViewManager::FFineShardWorker
 				break;
 			}
 		}
+		// 仅已有进展且无资源等待时复用调度器的后台时间片。
+		Result.bContinueImmediately = Result.bSuccess && Result.bContinue && !Result.bCanceled &&
+			!InCancel.Load() && Result.Error.IsEmpty() && !bWaitingFacts.Load() && !bWaitingCapacity.Load();
 		return Result;
 	}
 
@@ -658,6 +664,44 @@ void FVoxelViewManager::ProcessFineShardAdmissions(const double InDeadline)
 			UE_LOG(LogTemp, Display, TEXT("Voxel Fine admission sample: slots=%d sampledNew=%d submitted=%d meshReady=%d failed=%d capacityWaiting=%d dependencyWaiting=%d candidates=%d workerMicrosteps=%d workerSliceMilliseconds=%.3f"),
 				FineShardSlots.Num(), NewSlots, Submitted, MeshReady, Failed, CapacityWaiting, DependencyWaiting, Candidates.Num(),
 				CVarVoxelFineWorkerMicrosteps.GetValueOnGameThread(), CVarVoxelFineWorkerSliceMilliseconds.GetValueOnGameThread());
+			const auto CurrentInputs = GetViewInterest().PublicationInputs;
+			if (CurrentInputs)
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineAdmissionCensus);
+				int32 MissingSlots = 0;
+				int32 SubmittedSlots = 0;
+				int32 ReadySlots = 0;
+				int32 FailedSlots = 0;
+				int32 CapacitySlots = 0;
+				int32 RequestSlots = 0;
+				int32 RunnableSlots = 0;
+				int32 DependencySlots = 0;
+				int32 InflightSamplesReady = 0;
+				int32 PresentationComplete = 0;
+				for (const auto& Key : CurrentInputs->FineShards)
+				{
+					const auto* Slot = FineShardSlots.Find(Key);
+					if (!Slot) { ++MissingSlots; continue; }
+					if (Slot->bSubmitted)
+					{
+						++SubmittedSlots;
+						if (Slot->SamplesReady && Slot->SamplesReady->Load()) ++InflightSamplesReady;
+					}
+					else if (Slot->Build.IsMeshReady())
+					{
+						++ReadySlots;
+						if (Slot->bPresentationComplete) ++PresentationComplete;
+					}
+					else if (!Slot->Build.GetFailure().IsEmpty()) ++FailedSlots;
+					else if (Slot->bWaitingAdmissionCapacity) ++CapacitySlots;
+					else if (Slot->PendingRequest.IsSet()) ++RequestSlots;
+					else if (Slot->bDependencyWake) ++RunnableSlots;
+					else ++DependencySlots;
+				}
+				UE_LOG(LogTemp, Display, TEXT("Voxel Fine admission census: wanted=%d missingSlots=%d submitted=%d meshReady=%d failed=%d capacityFlag=%d pendingRequest=%d runnableFlag=%d dependencyWaiting=%d inflightSamplesReady=%d slotPresentationComplete=%d"),
+					CurrentInputs->FineShards.Num(), MissingSlots, SubmittedSlots, ReadySlots, FailedSlots, CapacitySlots,
+					RequestSlots, RunnableSlots, DependencySlots, InflightSamplesReady, PresentationComplete);
+			}
 		}
 	};
 	const TOptional<FVoxelFineShardKey> Continuation = FineShardAdmissionContinuation;

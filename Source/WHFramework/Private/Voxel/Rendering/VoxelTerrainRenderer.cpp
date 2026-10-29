@@ -1865,7 +1865,7 @@ namespace
 				const auto Submit = [&](const FVoxelTerrainRenderChunk* Chunk,
 					const int32 FirstTriangle, const int32 TriangleCount)
 				{
-					TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainSubmitDraw);
+					TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_TerrainSubmitDrawSample, (SubmittedDraws & 1023) == 0);
 					const bool bCanGroup = (Chunk->Relevance.bOpaque || Chunk->Relevance.bMasked) &&
 						!Chunk->Relevance.bNormalTranslucency && !Chunk->Relevance.bSeparateTranslucency &&
 						!Chunk->Relevance.bPostMotionBlurTranslucency;
@@ -1902,7 +1902,7 @@ namespace
 					auto& Uniform = Uniforms.FindOrAdd(Chunk);
 					if (!Uniform)
 					{
-						TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainCreatePrimitiveUniform);
+						TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_TerrainCreatePrimitiveUniformSample, (UniformBuffers & 1023) == 0);
 						if (!bCommonUniformReady)
 						{
 							TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TerrainBuildCommonPrimitiveUniform);

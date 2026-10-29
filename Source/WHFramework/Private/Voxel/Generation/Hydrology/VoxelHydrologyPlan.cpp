@@ -1489,22 +1489,25 @@ uint64 FVoxelHydrologyPlan::GetAllocatedBytes() const
 
 void FVoxelHydrologyPlan::VisitHydrologyLeases(TFunctionRef<void(const FVoxelTerrainResourceLease*)> InVisit) const
 {
-    if (ResourceLease)
+    VisitHydrologyLeaseOwners([InVisit](const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InLease)
     {
-        InVisit(ResourceLease.Get());
-    }
-    if (TopologyPlan) TopologyPlan->VisitHydrologyLeases(InVisit);
+        InVisit(InLease.Get());
+    });
+}
+
+void FVoxelHydrologyPlan::VisitHydrologyLeaseOwners(
+    TFunctionRef<void(const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>&)> InVisit) const
+{
+    if (ResourceLease) InVisit(ResourceLease);
+    if (TopologyPlan) TopologyPlan->VisitHydrologyLeaseOwners(InVisit);
     for (const auto& Topology : TopologyPlans)
-        if (Topology && Topology != TopologyPlan) Topology->VisitHydrologyLeases(InVisit);
-    for (const TSharedPtr<const FVoxelHydrologyRiverComponent, ESPMode::ThreadSafe>& Component : RiverComponents)
+        if (Topology && Topology != TopologyPlan) Topology->VisitHydrologyLeaseOwners(InVisit);
+    for (const auto& Component : RiverComponents)
     {
         if (Component)
         {
-            if (Component->ResourceLease)
-            {
-                InVisit(Component->ResourceLease.Get());
-            }
-            Component->Plan.VisitHydrologyLeases(InVisit);
+            if (Component->ResourceLease) InVisit(Component->ResourceLease);
+            Component->Plan.VisitHydrologyLeaseOwners(InVisit);
         }
     }
 }

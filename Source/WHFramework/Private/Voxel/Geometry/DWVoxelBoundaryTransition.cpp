@@ -1,4 +1,4 @@
-﻿#include "Voxel/Geometry/DWVoxelBoundaryTransition.h"
+#include "Voxel/Geometry/DWVoxelBoundaryTransition.h"
 
 #include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
@@ -14,8 +14,9 @@ namespace
 		return InFace ^ 1;
 	}
 
+	template<typename StorageType>
 	bool CaptureStates(const FVoxelViewKey& InKey, const uint8 InFace,
-		const TArray<FVoxelBlockState>& InBlocks, const uint64 InRevision, const int32 InStep,
+		const StorageType& InBlocks, const uint64 InRevision, const int32 InStep,
 		FVoxelBoundaryFaceSnapshot& OutSnapshot)
 	{
 		if (InStep <= 0 || !FMath::IsPowerOfTwo(InStep) || InKey.GetSide() % InStep != 0)
@@ -275,6 +276,17 @@ bool FVoxelBoundaryTransitionContext::Validate() const
 		{
 			return false;
 		}
+	}
+	for (const auto& Suppression : SuppressedFaces)
+	{
+		const uint8 Face = uint8(Suppression.Direction);
+		if (Face >= 6 || Suppression.Owner != Owner) return false;
+		const int32 Axis = Face / 2, U = (Axis + 1) % 3, V = (Axis + 2) % 3;
+		const int32 Plane = (Face & 1) ? OwnerBounds.Min[Axis] : OwnerBounds.Max[Axis];
+		if (Suppression.Min[Axis] != Plane || Suppression.Max[Axis] != Plane ||
+			Suppression.Min[U] < OwnerBounds.Min[U] || Suppression.Max[U] > OwnerBounds.Max[U] ||
+			Suppression.Min[V] < OwnerBounds.Min[V] || Suppression.Max[V] > OwnerBounds.Max[V] ||
+			Suppression.Min[U] >= Suppression.Max[U] || Suppression.Min[V] >= Suppression.Max[V]) return false;
 	}
 	for (int32 A = 0; A < Patches.Num(); ++A)
 	{

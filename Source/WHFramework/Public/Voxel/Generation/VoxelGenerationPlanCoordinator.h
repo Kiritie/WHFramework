@@ -190,6 +190,8 @@ private:
 	{
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> DependenciesLease;
 		TMap<FVoxelGenerationPlanDependency, FSubscription> Dependencies;
+		TOptional<FVoxelTerrainServicePriority> DonationPriority;
+		EVoxelWorkClass DonationWorkClass = EVoxelWorkClass::None;
 		FGuid PriorityNode;
 		FVoxelGenerationConsumerKey PreviousWake;
 		FVoxelGenerationConsumerKey NextWake;

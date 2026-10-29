@@ -210,6 +210,20 @@ FVoxelTaskResult& FVoxelTaskResult::operator=(FVoxelTaskResult&& InOther)
 	return *this;
 }
 
+void FVoxelTaskRequest::ReleaseExecutionBindings()
+{
+	Execute = nullptr;
+	GetBlockReason = nullptr;
+	ExecuteBindingLease.Reset();
+	BlockBindingLease.Reset();
+	ExecuteBindingBytes = 0;
+	BlockBindingBytes = 0;
+	ExecuteBindingCount = 0;
+	BlockBindingCount = 0;
+	bExecuteBound = false;
+	bBlockBound = false;
+}
+
 FVoxelTaskRequest& FVoxelTaskRequest::operator=(FVoxelTaskRequest&& InOther)
 {
 	if (this != &InOther)
@@ -320,13 +334,7 @@ void FVoxelTaskScheduler::FTaskBody::operator()() const
 	if (!bContinue)
 	{
 		// 最终结果持有自身正文；后台计算结束即释放仅供执行的捕获与工作区。
-		Request.Execute = nullptr;
-		Request.GetBlockReason = nullptr;
-		Request.ExecuteBindingLease.Reset();
-		Request.BlockBindingLease.Reset();
-		Request.ExecuteBindingBytes = Request.BlockBindingBytes = 0;
-		Request.ExecuteBindingCount = Request.BlockBindingCount = 0;
-		Request.bExecuteBound = Request.bBlockBound = false;
+		Request.ReleaseExecutionBindings();
 	}
 }
 
@@ -878,6 +886,11 @@ EVoxelTaskBlockReason FVoxelTaskScheduler::SelectPendingDisplacements(const FVox
 	DisplacedIndices.Reset();
 	uint64 RemainingInput = QueuedInputBytes + RunningContinuationInputBytes;
 	const double AdmissionNow = FPlatformTime::Seconds();
+	const FVoxelTerrainServicePriority IncomingPriority = ResolveServicePriority(InRequest);
+	const bool bUrgent = FVoxelTerrainWorkSelection::IsNear(IncomingPriority.Band) ||
+		InRequest.WorkClass == EVoxelWorkClass::Critical || InRequest.WorkClass == EVoxelWorkClass::Interactive ||
+		InRequest.WorkClass == EVoxelWorkClass::Warmup || InRequest.Kind == EVoxelTaskKind::BuildCollision ||
+		InRequest.Kind == EVoxelTaskKind::BuildNavigation;
 	const auto HasAgePriority = [AdmissionNow](const FVoxelTaskRequest& First, const FVoxelTaskRequest& Second)
 	{
 		return AdmissionNow - First.QueuedAt >= 0.5 && First.Sequence < Second.Sequence &&
@@ -895,6 +908,10 @@ EVoxelTaskBlockReason FVoxelTaskScheduler::SelectPendingDisplacements(const FVox
 			const int32 ExistingLane = TerrainLane(Existing);
 			const int32 Reserve = ExistingLane == static_cast<int32>(EVoxelTaskServiceLane::Other) ? 0 : ReservedPerLane;
 			if (ExistingLane != INDEX_NONE && ExistingLane != Lane && Counts[ExistingLane] <= Reserve)
+				continue;
+			if (!bUrgent && (IsRepresentationDataKind(Existing.Kind) ||
+				(Existing.bResumable && Existing.AccumulatedExecuteMilliseconds > 0.0)) &&
+				IncomingPriority.Band >= ResolveServicePriority(Existing).Band)
 				continue;
 			const bool bExistingBackground = IsBackgroundTerrainWork(Existing.Kind, Existing.WorkClass, Existing.TerrainStage);
 			const bool bMayReplace = (!bBackground && bExistingBackground) ||
@@ -2584,6 +2601,8 @@ void FVoxelTaskScheduler::QueueCanceled(
 		}
 	}
 
+	// 未开工的取消任务不再使用生成输入；保留结果和Apply通知即可。
+	InRequest.ReleaseExecutionBindings();
 	Completed.Request = MoveTemp(InRequest);
 
 	check(Canceled.Num() < Canceled.Max());

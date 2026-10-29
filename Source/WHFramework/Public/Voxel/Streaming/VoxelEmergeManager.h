@@ -63,6 +63,9 @@ public:
 	FVoxelGenerationDependencyStatus EnsureEnvironmentGeometry(const FVoxelGenerationConsumerKey& InConsumer,
 		const FVoxelTerrainGeometry& InGeometry, EVoxelWorkClass InWorkClass,
 		int32 InSourcePriority, double InDistanceScore, double InForwardScore);
+	void VisitGenerationFactSources(const FVoxelGenerationConsumerKey& InConsumer, FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
+	TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe> GetEnvironmentGeometryInputs(
+		const FVoxelGenerationConsumerKey& InConsumer, const FVoxelTerrainGeometry& InGeometry) const;
 	FVoxelGenerationDependencyStatus EnsureEnvironmentBounds(const FVoxelGenerationBounds& InBounds,
 		EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	FVoxelGenerationDependencyStatus EnsureEnvironmentSamples(const FVoxelGenerationConsumerKey& InConsumer,
@@ -229,6 +232,7 @@ private:
 		FVoxelGenerationBounds Bounds;
 		FVoxelGenerationPlanDependencyCapture Dependencies;
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
+		TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe> EnvironmentInputs;
 		TOptional<FVoxelTerrainServicePriority> ContinuationPriority;
 		uint64 WakeSerial = 0;
 		uint64 NaturalWakeSerial = 0;

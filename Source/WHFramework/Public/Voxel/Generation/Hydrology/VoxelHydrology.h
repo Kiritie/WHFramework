@@ -318,6 +318,7 @@ struct WHFRAMEWORK_API FVoxelHydrologyPlan
 	bool IndexSelectedRiverCells(FString& OutError);
 	bool HasSelectedRiverCell(const FIntPoint& InCell) const;
 	void VisitHydrologyLeases(TFunctionRef<void(const FVoxelTerrainResourceLease*)> InVisit) const;
+	void VisitHydrologyLeaseOwners(TFunctionRef<void(const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>&)> InVisit) const;
 	bool BuildGeometry(FString& OutError, const TAtomic<bool>* InCancel = nullptr);
 	bool BuildRiverGeometry(int32 InRiverIndex, FString& OutError, const TAtomic<bool>* InCancel = nullptr,
 		const FIntPoint* InCurveControl = nullptr);

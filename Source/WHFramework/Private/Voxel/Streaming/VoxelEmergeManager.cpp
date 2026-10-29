@@ -485,6 +485,8 @@ void FVoxelEmergeManager::VisitStorageSources(const FVoxelTerrainResources& InRe
 	}
 	for (const auto& Pair : ExternalFactConsumers)
 	{
+		if (Pair.Value.EnvironmentInputs && Pair.Value.EnvironmentInputs->IsOwnedBy(InResources))
+			Pair.Value.EnvironmentInputs->VisitRequiredSources(InVisit);
 		Visit(Pair.Value.Dependencies.Lease.Get());
 		Visit(Pair.Value.SampleRetentionStorageLease.Get());
 		for (const auto& Retention : Pair.Value.SampleRetentions)
@@ -1334,6 +1336,7 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentGeometry(
 	const EVoxelWorkClass InWorkClass, const int32 InSourcePriority,
 	const double InDistanceScore, const double InForwardScore)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_EnvironmentGeometryEnsure);
 	check(IsInGameThread());
 	FString Error;
 	if (bResetting || !InConsumer.IsValid() || InConsumer.WorldEpoch != Runtime.Epoch() ||
@@ -1368,13 +1371,23 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentGeometry(
 	const FIntPoint Origin = bProxy ? FIntPoint(PageMin.X - Step + Step / 2, PageMin.Y - Step + Step / 2) :
 		FIntPoint(PageMin.X, PageMin.Y);
 	const int32 Width = int32(Cells) + (bProxy ? 2 : 1);
-	const bool bTrees = Trees.bEnabled && (bProxy || FMath::Max<int64>(Trees.MaxHeight,
+	const bool bTrees = InGeometry.Key.Representation != EVoxelTerrainRepresentation::Macro &&
+		Trees.bEnabled && (bProxy || FMath::Max<int64>(Trees.MaxHeight,
 		int64(Trees.CrownRadius) * 2 + 1) >= Step);
 	FExternalFactConsumer* Consumer = ExternalFactConsumers.Find(InConsumer);
 	if (Consumer && (!Consumer->SamplingGeometry.IsSet() || Consumer->SamplingGeometry.GetValue() != InGeometry))
 		return {false, true, TEXT("InvalidRequest: same consumer changed its sampling geometry")};
+	const auto Cache = Generator->GetPlanCache();
+	if (Consumer && Consumer->EnvironmentInputs)
+	{
+		if (Consumer->EnvironmentInputs->IsCurrent(*Cache, InConsumer)) return {true, false, {}};
+		// Cache 换代后旧完成输入不能作为当前读端的就绪证明。
+		Consumer->EnvironmentInputs.Reset();
+		Consumer->bWaitingCapacity = false;
+	}
 	if (!Consumer)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_EnvironmentGeometryConsumerCreate);
 		if (ExternalFactConsumers.Num() == MAX_int32)
 			return {false, true, TEXT("Oversized: environment geometry consumer directory")};
 		if (!ReserveFactStorage(WaitingPlanSections.Num(), ExternalFactConsumers.Num() + 1, Error))
@@ -1386,27 +1399,107 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentGeometry(
 		FactStorageLease->MarkPublished();
 	}
 	const auto Resources = Scheduler.GetRuntimeResources();
+	struct FEnvironmentGeometrySources
+	{
+		const FVoxelEmergeManager* Manager;
+		FVoxelGenerationConsumerKey Consumer;
+	};
+	const FEnvironmentGeometrySources CapturedSources{this, InConsumer};
+	FVoxelGenerationRequiredSourceScope GeometrySources(&Resources.Get(), &CapturedSources,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			const auto& Sources = *static_cast<const FEnvironmentGeometrySources*>(InContext);
+			Sources.Manager->VisitGenerationFactSources(Sources.Consumer, InVisit);
+		});
 	const uint64 Version = Resources->ReleaseVersionExcludingOwner(InConsumer);
 	if (Consumer->bWaitingCapacity && Version <= Consumer->CapacityVersion)
 		return {false, false, TEXT("CapacityBlocked: environment geometry capture")};
 	Consumer->bWaitingCapacity = false;
-	if (!Consumer->Dependencies.Lease && !PlanCoordinator->GatherEnvironmentGeometry(
-		Bounds, Origin, Width, Width, Step, bTrees, InConsumer, Consumer->Dependencies, Error))
+	if (!Consumer->Dependencies.Lease)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_EnvironmentGeometryGather);
+		if (!PlanCoordinator->GatherEnvironmentGeometry(
+			Bounds, Origin, Width, Width, Step, bTrees, InConsumer, Consumer->Dependencies, Error))
+		{
+			Consumer->bWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
+			Consumer->CapacityVersion = Version;
+			return {false, !Consumer->bWaitingCapacity, MoveTemp(Error)};
+		}
+	}
+	const auto Status = PlanCoordinator->Ensure(Consumer->Dependencies.Values, InWorkClass,
+		InSourcePriority, InDistanceScore, InForwardScore, InConsumer);
+	Consumer = ExternalFactConsumers.Find(InConsumer);
+	if (bResetting || !Consumer || !Consumer->SamplingGeometry.IsSet() ||
+		Consumer->SamplingGeometry.GetValue() != InGeometry) return {};
+	if (Status.bFailed)
+	{
+		PlanCoordinator->ReleaseConsumer(InConsumer);
+		ExternalFactConsumers.Remove(InConsumer);
+		return Status;
+	}
+	if (!Status.bReady) return Status;
+	// 先保留实际 Hydro 键，再捕获原计划与授额；完整成功才解除已完成的调度图。
+	if (!Consumer->Retention && !PlanCoordinator->RetainDependencies(Consumer->Dependencies.Values,
+		FIntPoint(PageMin.X, PageMin.Y), InConsumer, Consumer->Retention, Error))
 	{
 		Consumer->bWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
 		Consumer->CapacityVersion = Version;
 		return {false, !Consumer->bWaitingCapacity, MoveTemp(Error)};
 	}
-
-
-	const auto Status = PlanCoordinator->Ensure(Consumer->Dependencies.Values, InWorkClass,
-		InSourcePriority, InDistanceScore, InForwardScore, InConsumer);
-	if (Status.bReady || Status.bFailed)
+	for (const auto& Dependency : Consumer->Dependencies.Values)
+		if (Dependency.Kind != EVoxelGenerationPlanKind::Hydrology)
+			return {false, true, TEXT("InvalidRequest: non-hydrology environment geometry input")};
+	TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe> Inputs;
+	if (!Cache->CaptureEnvironmentInputs(InConsumer, Consumer->Dependencies.Values.Num(),
+		[Consumer](const int32 Index) { return Consumer->Dependencies.Values[Index].HydrologyKey; },
+		Consumer->Retention, Inputs, Error))
 	{
-		PlanCoordinator->ReleaseConsumer(InConsumer);
-		ExternalFactConsumers.Remove(InConsumer);
+		Consumer->bWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
+		Consumer->CapacityVersion = Version;
+		const bool bWaiting = Consumer->bWaitingCapacity || Error.StartsWith(TEXT("DependencyNotReady"));
+		return {false, !bWaiting, MoveTemp(Error)};
 	}
-	return Status;
+	Consumer->EnvironmentInputs = Inputs;
+	PlanCoordinator->ReleaseConsumer(InConsumer);
+	Consumer = ExternalFactConsumers.Find(InConsumer);
+	if (bResetting || !Consumer || Consumer->EnvironmentInputs != Inputs ||
+		!Inputs->IsCurrent(*Cache, InConsumer)) return {};
+	Consumer->Dependencies = FVoxelGenerationPlanDependencyCapture{};
+	Consumer->Retention.Reset();
+	Consumer->bWaitingCapacity = false;
+	return {true, false, {}};
+}
+
+TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe> FVoxelEmergeManager::GetEnvironmentGeometryInputs(
+	const FVoxelGenerationConsumerKey& InConsumer, const FVoxelTerrainGeometry& InGeometry) const
+{
+	check(IsInGameThread());
+	if (bResetting || !InConsumer.IsValid() || InConsumer.WorldEpoch != Runtime.Epoch()) return nullptr;
+	const auto* Consumer = ExternalFactConsumers.Find(InConsumer);
+	if (!Consumer || !Consumer->SamplingGeometry.IsSet() || Consumer->SamplingGeometry.GetValue() != InGeometry ||
+		!Consumer->EnvironmentInputs || !Consumer->EnvironmentInputs->IsCurrent(*Generator->GetPlanCache(), InConsumer)) return nullptr;
+	return Consumer->EnvironmentInputs;
+}
+
+void FVoxelEmergeManager::VisitGenerationFactSources(const FVoxelGenerationConsumerKey& InConsumer, FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+{
+	check(IsInGameThread());
+	if (bResetting || !InConsumer.IsValid() || InConsumer.WorldEpoch != Runtime.Epoch()) return;
+	const auto Resources = Scheduler.GetRuntimeResources();
+	const auto Visit = [&Resources, InVisit](const FVoxelTerrainResourceLease* InLease)
+	{
+		if (InLease && InLease->IsOwnedBy(*Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(InLease, InVisit);
+	};
+	Visit(FactStorageLease.Get());
+	const auto* Consumer = ExternalFactConsumers.Find(InConsumer);
+	if (!Consumer) return;
+	if (Consumer->EnvironmentInputs && Consumer->EnvironmentInputs->IsOwnedBy(*Resources))
+		Consumer->EnvironmentInputs->VisitRequiredSources(InVisit);
+	Visit(Consumer->Dependencies.Lease.Get());
+	Visit(Consumer->SampleRetentionStorageLease.Get());
+	if (Consumer->Retention) Visit(&Consumer->Retention->GetResourceLease().Get());
+	for (const auto& Retention : Consumer->SampleRetentions)
+		if (Retention) Visit(&Retention->GetResourceLease().Get());
 }
 
 FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentBounds(

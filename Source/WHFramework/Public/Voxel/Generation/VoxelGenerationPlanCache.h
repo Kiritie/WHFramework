@@ -14,6 +14,7 @@
 #include "Voxel/Generation/VoxelStructurePlan.h"
 #include "Voxel/Generation/VoxelPlanDiagnostics.h"
 #include "Voxel/Generation/VoxelGenerationConsumer.h"
+#include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 struct FVoxelGenerationRuntimeConfig;
 struct FVoxelHydrologyRiverComponent;
@@ -116,6 +117,36 @@ private:
 	uint64 Id = 0;
 };
 
+// 已完成自然阶段持有真实 immutable 计划及原保留租约，不保留调度订阅。
+struct WHFRAMEWORK_API FVoxelGenerationEnvironmentInputs
+{
+public:
+	bool IsCurrent(const FVoxelGenerationPlanCache& InCache, const FVoxelGenerationConsumerKey& InConsumer) const;
+	int32 Num() const { return Plans.Num(); }
+	const TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>& GetRetention() const { return Retention; }
+	bool IsOwnedBy(const FVoxelTerrainResources& InResources) const { return ResourceLease && ResourceLease->IsOwnedBy(InResources); }
+	void VisitRequiredSources(FVoxelGenerationRequiredSourceScope::FVisit InVisit) const;
+
+private:
+	friend class FVoxelGenerationPlanCache;
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+	TSharedPtr<const FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
+	FVoxelGenerationConsumerKey Consumer;
+	uint64 CacheGeneration = 0;
+	TArray<FVoxelHydrologyPlanPtr> Plans;
+	// 原 lease 强引用的唯一目录；容量每次仍从原 lease 实时读取。
+	TArray<TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>> Sources;
+};
+
+// 一次同步查询的瞬时结果，不持有或替代事实保留租约。
+struct WHFRAMEWORK_API FVoxelGenerationPlanAvailabilityQuery
+{
+	EVoxelGenerationPlanKind Kind = EVoxelGenerationPlanKind::Hydrology;
+	FIntVector Coordinate = FIntVector::ZeroValue;
+	bool bReady = false;
+};
+
 struct WHFRAMEWORK_API FVoxelGenerationCacheStats
 {
 	int32 BaseColumns = 0;
@@ -139,6 +170,7 @@ class WHFRAMEWORK_API FVoxelGenerationPlanCache :
 {
 public:
 	static constexpr int32 ShardCount = 32;
+	static constexpr int32 MaximumAvailabilityBatch = 64;
 
 public:
 	/** 原 World 账本在分配前授予根对象、控制器与 shard；拒收保留 OutCache，绑定终生不替换。 */
@@ -189,6 +221,11 @@ public:
 	bool FindNaturalColumn(const FIntPoint& InPosition, FVoxelNaturalColumnEntryPtr& OutEntry) const;
 
 	bool HasPlan(EVoxelGenerationPlanKind InKind, const FIntVector& InCoordinate) const;
+	void HasPlans(TArrayView<FVoxelGenerationPlanAvailabilityQuery> InOutQueries) const;
+	bool CaptureEnvironmentInputs(const FVoxelGenerationConsumerKey& InConsumer, int32 InCount,
+		TFunctionRef<FVoxelHydrologyRegionKey(int32)> InKeyAt,
+		const TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>& InRetention,
+		TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe>& OutInputs, FString& OutError) const;
 
 	bool FindHydrology(
 		const FVoxelHydrologyRegionKey& InKey,

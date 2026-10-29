@@ -12,8 +12,8 @@
 namespace
 {
 	constexpr uint32 RepresentationMagic = 0x34505256;
-	constexpr uint16 RepresentationVersion = 7;
-	constexpr int32 MaxRepresentationRawBytes = 16 * 1024 * 1024;
+	constexpr uint16 RepresentationVersion = 8;
+	constexpr int32 MaxRepresentationRawBytes = 32 * 1024 * 1024;
 	constexpr int32 MaxCells = 1 << 20;
 	constexpr uint32 MaxDistantCells = 16384;
 
@@ -283,7 +283,7 @@ bool FVoxelRepresentationSync::EncodeVoxelProxy(
 		InData.Geometry.Key != FVoxelTerrainSpatialKey{EVoxelTerrainRepresentation::VoxelProxy, InData.Key.Coordinate, InData.Key.Level} ||
 		InData.Key.Level == 0 || InData.GridSide <= 0 || InData.GridSide > 128 || InData.LocalMinCells != FIntVector::ZeroValue || InData.GridSide !=
 			InData.Key.GetSide() / InData.Geometry.SampleStepCells ||
-		int64(InData.Cells.Num()) != int64(InData.GridSide) * InData.GridSide * InData.GridSide)
+		!InData.Cells.Validate(InData.GridSide))
 	{
 		OutError =
 			TEXT(
@@ -310,7 +310,7 @@ bool FVoxelRepresentationSync::EncodeVoxelProxy(
 		}
 	}
 
-	uint64 RawBytes = 105 + uint64(InData.Cells.Num()) * 4;
+	uint64 RawBytes = 117 + uint64(InData.Cells.GetColumns().Num()) * 16 + uint64(InData.Cells.GetOverrides().Num()) * 8;
 	for (int32 Face = 0; Face < 6; ++Face)
 	{
 		if (InData.Known[Face]) RawBytes += uint64(InData.Halo[Face].Num()) * 4;
@@ -347,11 +347,20 @@ bool FVoxelRepresentationSync::EncodeVoxelProxy(
 	Writer.U32(
 		InData.Cells.Num());
 
-	for (const FVoxelBlockState State :
-		InData.Cells)
+	Writer.U32(InData.Cells.GetInterior().Pack());
+	Writer.U32(InData.Cells.GetColumns().Num());
+	for (const auto& Column : InData.Cells.GetColumns())
 	{
-		Writer.U32(
-			State.Pack());
+		Writer.I32(Column.Ground);
+		Writer.I32(Column.Water);
+		Writer.U32(Column.Surface.Pack());
+		Writer.U32(Column.WaterState.Pack());
+	}
+	Writer.U32(InData.Cells.GetOverrides().Num());
+	for (const auto& Cell : InData.Cells.GetOverrides())
+	{
+		Writer.U32(Cell.Index);
+		Writer.U32(Cell.State.Pack());
 	}
 
 	for (int32 Face = 0;
@@ -447,26 +456,43 @@ bool FVoxelRepresentationSync::DecodeVoxelProxy(
 	if (!Reader.IsValid() || Data.Key.Level == 0 || Data.Key.Level > 20 ||
 		Data.GridSide <= 0 || Data.GridSide > 128 || Data.Geometry.SampleStepCells <= 0 ||
 		Data.GridSide != Data.Key.GetSide() / Data.Geometry.SampleStepCells ||
-		Count != (Data.GridSide * Data.GridSide * Data.GridSide) || uint64(Count) * 4 + 6 > uint64(Reader.Remaining()))
+		Count != uint32(Data.GridSide * Data.GridSide * Data.GridSide) || Reader.Remaining() < 18)
 	{
 		Reader.Reject();
 		OutError = TEXT("Invalid proxy sampling resolution");
 		return false;
 	}
 
-	Data.Cells.Reserve(
-		Count);
-
-	for (uint32 Index = 0;
-		Index < Count &&
-			Reader.IsValid();
-		++Index)
+	const FVoxelBlockState Interior = FVoxelBlockState::Unpack(Reader.U32());
+	const uint32 ColumnCount = Reader.U32();
+	if (!Reader.IsValid() || (ColumnCount != 0 && ColumnCount != uint32(Data.GridSide * Data.GridSide)) ||
+		uint64(ColumnCount) * 16 + 10 > uint64(Reader.Remaining()))
+	{ OutError = TEXT("Invalid proxy surface columns"); return false; }
+	TArray<FVoxelProxyColumn> Columns;
+	Columns.Reserve(ColumnCount);
+	for (uint32 Index = 0; Index < ColumnCount; ++Index)
 	{
-		Data.Cells.Add(
-			FVoxelBlockState::
-				Unpack(
-					Reader.U32()));
+		FVoxelProxyColumn Column;
+		Column.Ground = Reader.I32();
+		Column.Water = Reader.I32();
+		Column.Surface = FVoxelBlockState::Unpack(Reader.U32());
+		Column.WaterState = FVoxelBlockState::Unpack(Reader.U32());
+		Columns.Add(Column);
 	}
+	const uint32 OverrideCount = Reader.U32();
+	if (!Reader.IsValid() || OverrideCount > Count || uint64(OverrideCount) * 8 + 6 > uint64(Reader.Remaining()))
+	{ OutError = TEXT("Invalid proxy surface overrides"); return false; }
+	TArray<FVoxelProxyCell> Overrides;
+	Overrides.Reserve(OverrideCount);
+	for (uint32 Index = 0; Index < OverrideCount; ++Index)
+	{
+		FVoxelProxyCell Cell;
+		Cell.Index = int32(Reader.U32());
+		Cell.State = FVoxelBlockState::Unpack(Reader.U32());
+		Overrides.Add(Cell);
+	}
+	if (!Data.Cells.Import(Data.GridSide, Interior, MoveTemp(Columns), MoveTemp(Overrides)))
+	{ OutError = TEXT("Invalid proxy surface storage"); return false; }
 
 	for (int32 Face = 0;
 		Face < 6 &&

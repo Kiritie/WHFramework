@@ -83,19 +83,14 @@ namespace
 		FVoxelVoxelProxyData& InOutData)
 	{
 		const int32 Side = InOutData.GridSide;
-		for (int32 Z = 0; Z < Side; ++Z)
+		for (const auto& Pair : InEdits)
 		{
-			for (int32 Y = 0; Y < Side; ++Y)
-			{
-				for (int32 X = 0; X < Side; ++X)
-				{
-					if (const FCoarseOverlayCell* Edits = InEdits.Find(FIntVector(X, Y, Z)))
-					{
-						const FIntVector Local(X, Y, Z);
-						Edits->Apply(InStep, InArchitecture.Contains(Local), InConfig, InOutData.Cells[X + Y * Side + Z * (Side * Side)]);
-					}
-				}
-			}
+			const FIntVector Local = Pair.Key;
+			if (Local.X < 0 || Local.X >= Side || Local.Y < 0 || Local.Y >= Side || Local.Z < 0 || Local.Z >= Side) continue;
+			const int32 Index = Local.X + Side * (Local.Y + Side * Local.Z);
+			FVoxelBlockState State = InOutData.Cells[Index];
+			Pair.Value.Apply(InStep, InArchitecture.Contains(Local), InConfig, State);
+			InOutData.Cells[Index] = State;
 		}
 		for (int32 Face = 0; Face < 6; ++Face)
 		{
@@ -117,6 +112,17 @@ namespace
 			}
 		}
 	}
+}
+
+void FVoxelProxyColumnWorkspace::Reset()
+{
+	Valid.Empty();
+	Columns.Empty();
+	Lease.Reset();
+	Geometry = {};
+	Consumer = {};
+	SampledColumns = 0;
+	ReusedColumns = 0;
 }
 
 uint64 FVoxelVoxelProxyData::GetAllocatedBytes() const
@@ -150,10 +156,17 @@ FVoxelVoxelProxyBuilder::FVoxelVoxelProxyBuilder(
 
 bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOverlaySnapshotSet& InOverlays,
 	FVoxelVoxelProxyData& OutData, FString& OutError, const TAtomic<bool>* InCancel,
-	const FVoxelTerrainGeometry& InGeometry, const FVoxelTerrainBuildShard* InShard) const
+	const FVoxelTerrainGeometry& InGeometry, const FVoxelTerrainBuildShard* InShard,
+	FVoxelProxyColumnWorkspace* InColumns) const
 {
+	FVoxelGenerationRequiredSourceScope ColumnSources(Cache->GetResources().Get(), InColumns,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			if (InContext) FVoxelGenerationRequiredSourceScope::VisitLease(
+				static_cast<const FVoxelProxyColumnWorkspace*>(InContext)->Lease.Get(), InVisit);
+		});
 	FVoxelVoxelProxyData Data;
-	if (!BuildNatural(InKey, Data, OutError, InCancel, InGeometry, InShard)) return false;
+	if (!BuildNatural(InKey, Data, OutError, InCancel, InGeometry, InShard, InColumns)) return false;
 	if (!ApplyTreeSilhouettes(InKey, InOverlays, Data, OutError, InCancel)) return false;
 	const FIntVector Origin = Data.GetBuildBounds().Min;
 	const int32 Side = Data.GridSide;
@@ -233,11 +246,10 @@ bool FVoxelVoxelProxyBuilder::Build(const FVoxelViewKey& InKey, const FVoxelOver
 	ApplyCoarseEdits(CoarseEdits, CoarseNatural, Step, *Config, Data);
 	bool bHasAir = false;
 	bool bHasSolid = false;
-	for (const FVoxelBlockState State : Data.Cells)
-	{
-		bHasAir |= State.IsAir() || State == Config->Water || State == Config->Lava;
-		bHasSolid |= !State.IsAir() && State != Config->Water && State != Config->Lava;
-	}
+	bHasAir = Data.Cells.ContainsByPredicate([this](const FVoxelBlockState& State)
+	{ return State.IsAir() || State == Config->Water || State == Config->Lava; });
+	bHasSolid = Data.Cells.ContainsByPredicate([this](const FVoxelBlockState& State)
+	{ return !State.IsAir() && State != Config->Water && State != Config->Lava; });
 	Data.bHasVisibleSurfaceEvidence = bHasAir && bHasSolid;
 	OutData = MoveTemp(Data);
 	return true;
@@ -297,7 +309,8 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 			if (IsProxyTreeState(*Config, Cell.Pack())) Cell = FVoxelBlockState();
 		}
 	};
-	ClearTreeSamples(InOutData.Cells);
+	InOutData.Cells.Transform([this](FVoxelBlockState& Cell)
+	{ if (IsProxyTreeState(*Config, Cell.Pack())) Cell = FVoxelBlockState(); });
 	for (TArray<FVoxelBlockState>& Face : InOutData.Halo) ClearTreeSamples(Face);
 	FVoxelGenerationQuery Query;
 	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query,
@@ -334,11 +347,15 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 		}
 		return true;
 	};
-	auto SampleBase = [&SampleColumn, this](const FIntVector& Position,
-		uint32& OutSymbol)
+	auto SampleBase = [this, InCancel, &OutError, &bSampleFailed](const FIntVector& Position,
+		const FVoxelColumnSample& Column, uint32& OutSymbol)
 	{
-		FVoxelColumnSample Column;
-		if (!SampleColumn(Position, Column)) return false;
+		if (InCancel && InCancel->Load())
+		{
+			bSampleFailed = true;
+			OutError = TEXT("Canceled");
+			return false;
+		}
 		OutSymbol = Position.Z <= Column.SurfaceZ ?
 			Config->Recipe->Palette.Stone : Config->Recipe->Palette.Air;
 		return true;
@@ -355,9 +372,10 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 		if (Local.X >= 0 && Local.X < Side && Local.Y >= 0 && Local.Y < Side &&
 			Local.Z >= 0 && Local.Z < Side)
 		{
-			FVoxelBlockState& Cell = InOutData.Cells[Local.X + Local.Y * Side + Local.Z * Side * Side];
+			const int32 Index = Local.X + Local.Y * Side + Local.Z * Side * Side;
+			const FVoxelBlockState Cell = InOutData.Cells[Index];
 			if (Cell.IsAir() || Cell == Water || (State == Trunk && Cell == Leaves) ||
-				(bReplaceTrunk && Cell == Trunk)) Cell = State;
+				(bReplaceTrunk && Cell == Trunk)) InOutData.Cells[Index] = State;
 		}
 		for (int32 Face = 0; Face < 6; ++Face)
 		{
@@ -377,10 +395,8 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 	int32 Candidates = 0;
 	int32 Accepted = 0;
 	Ecology.EnumerateTrees(TreeBounds, SampleColumn, SampleBase,
-		[&](const FIntVector& Anchor, const int32 Height, const FVoxelStableId TreeId)
+		[&](const FIntVector& Anchor, const int32 Height, const FVoxelStableId TreeId, const FVoxelColumnSample& Column)
 		{
-			FVoxelColumnSample Column;
-			if (!SampleColumn(Anchor, Column)) return;
 			const FVoxelTreeSpecies Species = Ecology.SelectTreeSpecies(Column, TreeId);
 			if (!Config->ToRuntime(Species.Trunk, Trunk) || !Config->ToRuntime(Species.LeavesMid, Leaves))
 			{
@@ -431,7 +447,8 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 	FVoxelVoxelProxyData& OutData,
 	FString& OutError,
 	const TAtomic<bool>* InCancel,
-	const FVoxelTerrainGeometry& InGeometry, const FVoxelTerrainBuildShard* InShard) const
+	const FVoxelTerrainGeometry& InGeometry, const FVoxelTerrainBuildShard* InShard,
+	FVoxelProxyColumnWorkspace* InColumns) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(
 		Voxel_ProxyBuild);
@@ -474,6 +491,35 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 		}
 	}
 
+	const auto& FactResources = Cache->GetResources();
+	FVoxelGenerationConsumerKey Consumer;
+	if (FactResources && !Cache->ResolveConsumer(Consumer, OutError)) return false;
+	const int32 PageSide = int32(Geometry.Key.SideCells() / Step);
+	const int32 ColumnStride = InColumns ? PageSide + 2 : ColumnSampleSide;
+	const FIntPoint ColumnOffset = InColumns && InShard ?
+		FIntPoint(InShard->LocalMinCells.X / Step, InShard->LocalMinCells.Y / Step) : FIntPoint::ZeroValue;
+	if (InColumns && (PageSide <= 0 || PageSide > 256 ||
+		(!InColumns->Columns.IsEmpty() && (InColumns->Geometry != Geometry || InColumns->Consumer != Consumer ||
+			(FactResources && (!InColumns->Lease || !InColumns->Lease->IsOwnedBy(*FactResources))) ||
+			InColumns->Columns.Num() != ColumnStride * ColumnStride || InColumns->Valid.Num() != InColumns->Columns.Num()))))
+	{
+		OutError = TEXT("InvalidResource: proxy column workspace identity or capacity");
+		return false;
+	}
+	const auto ColumnIndex = [ColumnStride, ColumnOffset](const int32 InLocalX, const int32 InLocalY)
+	{
+		return ColumnOffset.X + InLocalX + 1 + (ColumnOffset.Y + InLocalY + 1) * ColumnStride;
+	};
+	bool bColumnsReady = InColumns && !InColumns->Columns.IsEmpty();
+	for (int32 Y = -1; Y <= GridSide && bColumnsReady; ++Y)
+		for (int32 X = -1; X <= GridSide && bColumnsReady; ++X)
+			bColumnsReady = InColumns->Valid[ColumnIndex(X, Y)] != 0;
+	FVoxelGenerationRequiredSourceScope ColumnSources(FactResources.Get(), InColumns,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			if (InContext) FVoxelGenerationRequiredSourceScope::VisitLease(
+				static_cast<const FVoxelProxyColumnWorkspace*>(InContext)->Lease.Get(), InVisit);
+		});
 	FVoxelGenerationQuery Query;
 	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query,
 		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
@@ -513,7 +559,7 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 				Settings.MaxZ)
 	};
 
-	if (!Query.PrepareColumns(
+	if (!bColumnsReady && !Query.PrepareColumns(
 			ColumnBounds,
 			OutError,
 			InCancel))
@@ -521,30 +567,27 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 		return false;
 	}
 
-	const auto& FactResources = Cache->GetResources();
-	FVoxelGenerationConsumerKey Consumer;
-	if (FactResources && !Cache->ResolveConsumer(Consumer, OutError)) return false;
 	FVoxelGenerationWorkspace ColumnsWorkspace(FactResources, Consumer,
 		Query.GetRequiredInputBytes(), Query.GetRequiredInputLeaseCount());
-	TArray<FVoxelColumnSample> Columns;
-
-	// 原查询根及其读者仍活着；先授予真实 sample backing，再 SetNum。
-	if (!ColumnsWorkspace.ReserveArray(Columns, ColumnSampleSide * ColumnSampleSide, OutError)) return false;
-
-	Columns.SetNumUninitialized(
-		ColumnSampleSide *
-		ColumnSampleSide);
-
-	auto ColumnIndex =
-		[ColumnSampleSide](
-			const int32 InLocalX,
-			const int32 InLocalY)
+	TArray<FVoxelColumnSample> LocalColumns;
+	TArray<uint8> LocalValid;
+	if (!InColumns || InColumns->Columns.IsEmpty())
+	{
+		const int32 Count = ColumnStride * ColumnStride;
+		if (!ColumnsWorkspace.ReserveArray(LocalColumns, Count, OutError) ||
+			(InColumns && !ColumnsWorkspace.ReserveArray(LocalValid, Count, OutError))) return false;
+		LocalColumns.SetNumUninitialized(Count);
+		if (InColumns)
 		{
-			return
-				(InLocalX + 1) +
-				(InLocalY + 1) *
-					ColumnSampleSide;
-		};
+			LocalValid.Init(0, Count);
+			InColumns->Columns = MoveTemp(LocalColumns);
+			InColumns->Valid = MoveTemp(LocalValid);
+			InColumns->Lease = ColumnsWorkspace.TakeLease();
+			InColumns->Geometry = Geometry;
+			InColumns->Consumer = Consumer;
+		}
+	}
+	TArrayView<FVoxelColumnSample> Columns = InColumns ? MakeArrayView(InColumns->Columns) : MakeArrayView(LocalColumns);
 
 	for (int32 LocalY = -1;
 		LocalY <= GridSide;
@@ -563,6 +606,12 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 			LocalX <= GridSide;
 			++LocalX)
 		{
+			const int32 Index = ColumnIndex(LocalX, LocalY);
+			if (InColumns && InColumns->Valid[Index])
+			{
+				++InColumns->ReusedColumns;
+				continue;
+			}
 			const int32 WorldX =
 				Bounds.Min.X +
 				LocalX *
@@ -577,16 +626,18 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 				Step /
 					2;
 
-			if (!Query.SampleColumn(
+			if (!Query.SampleEnvironmentColumn(
 					WorldX,
 					WorldY,
-					Columns[
-						ColumnIndex(
-							LocalX,
-							LocalY)],
-					OutError))
+					Columns[Index],
+					OutError, InCancel))
 			{
 				return false;
+			}
+			if (InColumns)
+			{
+				InColumns->Valid[Index] = 1;
+				++InColumns->SampledColumns;
 			}
 		}
 	}
@@ -692,65 +743,25 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 	Data.LocalMinCells = InShard ? InShard->LocalMinCells : FIntVector::ZeroValue;
 	Data.GridSide = GridSide;
 
-	Data.Cells.SetNumUninitialized(
-		GridSide *
-		GridSide *
-		GridSide);
-
-	bool bHasAir =
-		false;
-
-	bool bHasSolid =
-		false;
-
-	for (int32 Z = 0;
-		Z < GridSide;
-		++Z)
+	Data.Cells.InitializeColumns(GridSide, Config->Stone);
+	for (int32 Y = 0; Y < GridSide; ++Y)
 	{
-		for (int32 Y = 0;
-			Y < GridSide;
-			++Y)
+		if (InCancel && InCancel->Load()) { OutError = TEXT("Canceled"); return false; }
+		for (int32 X = 0; X < GridSide; ++X)
 		{
-			for (int32 X = 0;
-				X < GridSide;
-				++X)
-			{
-				FVoxelBlockState State;
-
-				if (!ResolveCell(
-						X,
-						Y,
-						Z,
-						State,
-						OutError))
-				{
-					return false;
-				}
-
-				const int32 Index =
-					X +
-					Y *
-						GridSide +
-					Z *
-						GridSide *
-						GridSide;
-
-				Data.Cells[
-					Index] =
-						State;
-
-				bHasAir |=
-					State.IsAir();
-
-				bHasSolid |=
-					!State.IsAir() &&
-					State !=
-						Config->Water &&
-					State !=
-						Config->Lava;
-			}
+			const auto& Sample = Columns[ColumnIndex(X, Y)];
+			FVoxelProxyColumn Column;
+			Column.Ground = int32(FMath::Clamp<int64>(VoxelStreamingGeometry::FloorDivide(int64(Sample.SurfaceZ) - Bounds.Min.Z, Step), MIN_int32, MAX_int32));
+			Column.Water = Sample.SurfaceWaterZ == MIN_int32 ? MIN_int32 : int32(FMath::Clamp<int64>(VoxelStreamingGeometry::FloorDivide(int64(Sample.SurfaceWaterZ) - Bounds.Min.Z, Step), MIN_int32, MAX_int32));
+			Column.WaterState = Config->Water;
+			if (!Config->ToRuntime(Sample.SurfaceMaterial, Column.Surface))
+			{ OutError = TEXT("VoxelProxy surface symbol is invalid"); return false; }
+			Data.Cells.SetColumn(X + Y * GridSide, Column);
 		}
 	}
+	const bool bHasAir = Data.Cells.ContainsByPredicate([](const FVoxelBlockState& State) { return State.IsAir(); });
+	const bool bHasSolid = Data.Cells.ContainsByPredicate([this](const FVoxelBlockState& State)
+	{ return !State.IsAir() && State != Config->Water && State != Config->Lava; });
 
 	/**
 	 * 六个 coarse halo face。

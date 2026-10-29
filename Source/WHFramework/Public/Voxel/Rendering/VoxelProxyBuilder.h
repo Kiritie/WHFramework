@@ -5,13 +5,28 @@
 #include "Voxel/Rendering/VoxelCoverage.h"
 
 #include "Voxel/Generation/VoxelGenerationBinding.h"
+#include "Voxel/Generation/VoxelGenerationTypes.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
 #include "Voxel/Rendering/VoxelViewTypes.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
 #include "Voxel/Runtime/VoxelOverlaySnapshot.h"
+#include "Voxel/Rendering/VoxelProxyCells.h"
 
 class FVoxelGenerationPipeline;
 class FVoxelTerrainResourceLease;
+
+struct WHFRAMEWORK_API FVoxelProxyColumnWorkspace
+{
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	FVoxelTerrainGeometry Geometry;
+	FVoxelGenerationConsumerKey Consumer;
+	TArray<FVoxelColumnSample> Columns;
+	TArray<uint8> Valid;
+	uint64 SampledColumns = 0;
+	uint64 ReusedColumns = 0;
+
+	void Reset();
+};
 
 struct WHFRAMEWORK_API FVoxelVoxelProxyData
 {
@@ -34,7 +49,7 @@ struct WHFRAMEWORK_API FVoxelVoxelProxyData
 	bool bHasVisibleSurfaceEvidence =
 		false;
 
-	TArray<FVoxelBlockState> Cells;
+	FVoxelProxyCells Cells;
 	TArray<FVoxelCoverageRect> TopSurfaceCoverage;
 	int32 CapturedSurfaceRows = 0;
 	bool AdvanceSurfaceCoverage(int32 InMaximumRows, bool& bOutComplete, FString& OutError,
@@ -82,7 +97,8 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel,
 		const FVoxelTerrainGeometry& InGeometry,
-		const FVoxelTerrainBuildShard* InShard = nullptr) const;
+		const FVoxelTerrainBuildShard* InShard = nullptr,
+		FVoxelProxyColumnWorkspace* InColumns = nullptr) const;
 
 	bool ApplyTreeSilhouettes(
 		const FVoxelViewKey& InKey,
@@ -93,7 +109,8 @@ public:
 	bool Build(const FVoxelViewKey& InKey, const FVoxelOverlaySnapshotSet& InOverlays,
 		FVoxelVoxelProxyData& OutData, FString& OutError, const TAtomic<bool>* InCancel,
 		const FVoxelTerrainGeometry& InGeometry,
-		const FVoxelTerrainBuildShard* InShard = nullptr) const;
+		const FVoxelTerrainBuildShard* InShard = nullptr,
+		FVoxelProxyColumnWorkspace* InColumns = nullptr) const;
 
 private:
 	TSharedRef<

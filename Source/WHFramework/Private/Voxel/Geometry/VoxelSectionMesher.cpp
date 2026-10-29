@@ -225,8 +225,8 @@ namespace
 {
 struct FFaceKey
 {
-    bool Visible=false;uint32 Packed=0;FVoxelRuntimeFaceRef Texture;EVoxelRenderGroup Group=EVoxelRenderGroup::Opaque;
-    bool operator==(const FFaceKey&B)const{return Visible==B.Visible&&Packed==B.Packed&&Texture==B.Texture&&Group==B.Group;}
+    bool Visible=false;FVoxelRuntimeFaceRef Texture;EVoxelRenderGroup Group=EVoxelRenderGroup::Opaque;
+    bool operator==(const FFaceKey&B)const{return Visible==B.Visible&&Texture==B.Texture&&Group==B.Group;}
 };
 FVector2D MakeFaceUV(
 uint8 Face,
@@ -427,7 +427,7 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
             FIntVector P(0,0,0);P[A]=Slice;P[U]=X;P[V]=Y;FVoxelBlockState B=FVoxelBlockState::Unpack(S.Blocks[P.X + Side * (P.Y + Side * P.Z)]);
             if(B.IsAir())continue;const auto*D=R.Find(B.TypeId);if(D->Shape!=EVoxelShapeKind::FullCube||
                 (InTransition && InTransition->CoversCell(F,P + InLocalCellOffset))||!Visible(S,R,H,P,B,F,nullptr))continue;
-            FFaceKey&K=Mask[X+Side*Y];K.Visible=true;K.Packed=B.Pack();K.Group=D->RenderGroup;
+            FFaceKey&K=Mask[X+Side*Y];K.Visible=true;K.Group=D->RenderGroup;
             uint8 MF=FVoxelShapeRegistry::RotateFace(F,uint8((4-(B.State&3))&3));K.Texture=D->Face(B.State,MF);
         }
         for(int32 Y=0;Y<Side;++Y)for(int32 X=0;X<Side;)
@@ -625,7 +625,7 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
                         double(InTextureGridSide > 0 ? InTextureGridSide : Side)) * InTextureRepeatsPerCell;
                 }
                 FFaceKey Material;
-                Material.Visible = true; Material.Packed = B.Pack(); Material.Group = D->RenderGroup; Material.Texture = Tex;
+                Material.Visible = true; Material.Group = D->RenderGroup; Material.Texture = Tex;
                 AppendVisibleQuad(Q.Face, Points, UV, Material);
             }
             else

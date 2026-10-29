@@ -494,7 +494,8 @@ EVoxelFineBuildProgress FVoxelFineShardSampler::Advance(const int32 InMaximumSec
 		const int64 SectionMinZ = int64(Key.Z) * 16;
 		if (SectionMinZ >= WorldMinZ && SectionMinZ + 16 <= WorldMaxZ)
 		{
-			if (!Generator->GenerateSectionWindow(Key, Window, MakeArrayView(Blocks), OutError, &InCancel))
+			// 本地栈候选仅成功后复制进快照，失败时允许直接丢弃。
+			if (!Generator->GenerateSectionWindow(Key, Window, MakeArrayView(Blocks), OutError, &InCancel, nullptr, true))
 			{
 				if (InCancel.Load())
 				{
@@ -539,8 +540,8 @@ EVoxelFineBuildProgress FVoxelFineShardSampler::Advance(const int32 InMaximumSec
 			if (int64(Section.Z) * 16 >= WorldMinZ && int64(Section.Z) * 16 + 16 <= WorldMaxZ) NaturalCells += Cells;
 		}
 		const FIntVector Min = Samples->Attempt.Input.Shard.Min;
-		UE_LOG(LogTemp, Display, TEXT("Fine section window sample: min=(%d,%d,%d) side=%d sections=%d outputCells=%llu naturalCells=%llu fullSectionCells=%llu"),
-			Min.X, Min.Y, Min.Z, Samples->Snapshot.GridSide, RequiredSections.Num(), OutputCells, NaturalCells, uint64(RequiredSections.Num()) * 4096);
+		UE_LOG(LogTemp, Display, TEXT("Fine section window sample: min=(%d,%d,%d) side=%d sections=%d outputCells=%llu naturalCells=%llu fullSectionCells=%llu directSpanBytes=%llu"),
+			Min.X, Min.Y, Min.Z, Samples->Snapshot.GridSide, RequiredSections.Num(), OutputCells, NaturalCells, uint64(RequiredSections.Num()) * 4096, NaturalCells * sizeof(FVoxelBlockState));
 #endif
 	}
 	OutError.Reset();

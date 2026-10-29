@@ -175,7 +175,7 @@ bool FVoxelSurfaceProxyBuilder::Build(
 	Columns.SetNumUninitialized(Count);
 	const double ColumnsStart = FPlatformTime::Seconds();
 
-	if (!Generator->SampleColumns(
+	if (!Generator->SampleEnvironmentColumns(
 		TileOrigin,
 		Data.Side,
 		Data.Side,
@@ -437,7 +437,8 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 			InOutData.DistantCells.Add({Min, Max, State, SourceTreeId});
 		}
 	};
-	if (Trees.bEnabled && FMath::Max(Trees.MaxHeight, Trees.CrownRadius * 2 + 1) >= Step)
+	if (InOutData.Geometry.Key.Representation != EVoxelTerrainRepresentation::Macro &&
+		Trees.bEnabled && FMath::Max(Trees.MaxHeight, Trees.CrownRadius * 2 + 1) >= Step)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SurfaceDistantTrees);
 		FVoxelBlockState Trunk;
@@ -448,19 +449,10 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 			OutError = TEXT("Distant tree materials are invalid");
 			return false;
 		}
-		FString TreeSampleError;
-		bool bTreeSampleFailed = false;
 		const bool bTreesEnumerated = Generator->EnumerateTrees(Bounds,
 			[&](const FIntVector& Anchor, const int32 Height,
-				const FVoxelStableId TreeId)
+				const FVoxelStableId TreeId, const FVoxelColumnSample& Column)
 			{
-				if (bTreeSampleFailed) return;
-				FVoxelColumnSample Column;
-				if (!Generator->SampleColumn(Anchor.X, Anchor.Y, Column, TreeSampleError, InCancel))
-				{
-					bTreeSampleFailed = true;
-					return;
-				}
 				const FVoxelEcologyGenerator Ecology(Config->Recipe.ToSharedRef());
 				const FVoxelTreeSpecies Species = Ecology.SelectTreeSpecies(Column, TreeId);
 				if (!Config->ToRuntime(Species.Trunk, Trunk) || !Config->ToRuntime(Species.LeavesMid, Leaves)) return;
@@ -512,11 +504,6 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 					}
 				}
 			}, OutError, InCancel);
-		if (bTreeSampleFailed)
-		{
-			OutError = MoveTemp(TreeSampleError);
-			return false;
-		}
 		if (!bTreesEnumerated) return false;
 	}
 

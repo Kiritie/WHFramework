@@ -91,7 +91,8 @@ bool FVoxelCoarseCompletedCapacityTest::RunTest(const FString& Parameters)
 		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSurfaceTileData>() +
 		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelWaterSurfaceTileData>() +
 		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelMacroTileData>();
-	MinimumRetained += RetainCoarseTestArray(Result.VoxelProxy->Cells);
+	Result.VoxelProxy->Cells.InitializeColumns(16, FVoxelBlockState());
+	MinimumRetained += Result.VoxelProxy->Cells.GetAllocatedSize();
 	MinimumRetained += RetainCoarseTestArray(Result.VoxelProxy->TopSurfaceCoverage);
 	for (auto& Halo : Result.VoxelProxy->Halo)
 	{

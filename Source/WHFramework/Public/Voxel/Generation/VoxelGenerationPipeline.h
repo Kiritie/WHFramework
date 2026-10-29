@@ -71,14 +71,16 @@ public:
 		const TAtomic<bool>* InCancel = nullptr,
 		const FVoxelTerrainResourceLease* InOutputLease = nullptr) const;
 
-	// 按实际消费窗口准备事实和采样；跨界依赖由生成器扩展，失败不改写调用者输出。
+	// 按实际消费窗口准备事实和采样；默认失败不改写输出。
+	// 仅调用者未发布且失败即丢弃的独占缓冲可允许部分输出；原租约须强持到返回。
 	bool GenerateSectionWindow(
 		const FIntVector& InSectionCoordinate,
 		const FVoxelSectionWindow& InWindow,
 		TArrayView<FVoxelBlockState> OutBaseBlocks,
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr,
-		const FVoxelTerrainResourceLease* InOutputLease = nullptr) const;
+		const FVoxelTerrainResourceLease* InOutputLease = nullptr,
+		bool bInAllowPartialOutput = false) const;
 
 #if WITH_DEV_AUTOMATION_TESTS
 	// 只兼容无账本夹具；绑定原账本时拒绝隐式分配 caller 数组。
@@ -91,7 +93,7 @@ public:
 
 	bool SampleColumn(int32 InX, int32 InY, FVoxelColumnSample& OutColumn, FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
 
-	bool EnumerateTrees(const FVoxelGenerationBounds& InBounds, TFunctionRef<void(const FIntVector&, int32, FVoxelStableId)> InVisit, FString& OutError,
+	bool EnumerateTrees(const FVoxelGenerationBounds& InBounds, TFunctionRef<void(const FIntVector&, int32, FVoxelStableId, const FVoxelColumnSample&)> InVisit, FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr) const;
 
 	bool SampleEnvironment(int32 InX, int32 InY, FVoxelEnvironmentSample& OutSample, FString& OutError, const TAtomic<bool>* InCancel = nullptr) const;
@@ -160,6 +162,13 @@ public:
 		bool bInUseColumnCache = true,
 		const FVoxelTerrainResourceLease* InOutputLease = nullptr) const;
 
+	// 构建任务的私有 scratch 直接写入；失败时允许部分输出，不计算地下水。
+	bool SampleEnvironmentColumns(
+		const FIntPoint& InOrigin, int32 InWidth, int32 InHeight, int32 InStep,
+		TArrayView<FVoxelColumnSample> OutColumns, FString& OutError,
+		const TAtomic<bool>* InCancel, bool bInUseColumnCache,
+		const FVoxelTerrainResourceLease* InOutputLease) const;
+
 	bool SampleColumns(
 		const FIntPoint& InOrigin,
 		int32 InWidth,
@@ -209,6 +218,12 @@ public:
 		const TAtomic<bool>* InCancel = nullptr) const;
 
 private:
+	bool SampleColumnGrid(
+		const FIntPoint& InOrigin, int32 InWidth, int32 InHeight, int32 InStep,
+		TArrayView<FVoxelColumnSample> OutColumns, FString& OutError,
+		const TAtomic<bool>* InCancel, bool bInUseColumnCache,
+		const FVoxelTerrainResourceLease* InOutputLease, bool bInEnvironmentOnly) const;
+
 	bool ResolveAllocation(
 		TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& OutResources,
 		FVoxelGenerationConsumerKey& OutConsumer,

@@ -326,7 +326,8 @@ private:
 
 		void AddAllocations(const FVoxelVoxelProxyData& InData)
 		{
-			AddArray(InData.Cells);
+			AddArray(InData.Cells.GetColumns());
+			AddArray(InData.Cells.GetOverrides());
 			AddArray(InData.TopSurfaceCoverage);
 			for (const auto& Halo : InData.Halo)
 			{

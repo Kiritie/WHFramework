@@ -42,11 +42,13 @@ namespace
 FVoxelGenerationRequiredSourceScope::FVoxelGenerationRequiredSourceScope(
 	const FVoxelTerrainResources* InResources,
 	const void* InContext,
-	FEnumerate InEnumerate)
+	FEnumerate InEnumerate,
+	const TAtomic<bool>* InCancel)
 	: Previous(ActiveScopeSlot())
 	, Resources(InContext && InEnumerate ? InResources : nullptr)
 	, Context(InContext)
 	, Enumerator(InEnumerate)
+	, Cancellation(InCancel)
 {
 	ActiveScopeSlot() = this;
 }
@@ -78,10 +80,19 @@ void FVoxelGenerationRequiredSourceScope::VisitLease(const FVoxelTerrainResource
 	}
 }
 
-void FVoxelGenerationRequiredSourceScope::Enumerate(const FVoxelTerrainResources& InResources, FVisit InVisit)
+const TAtomic<bool>* FVoxelGenerationRequiredSourceScope::ActiveCancellation()
 {
 	for (auto* Scope = ActiveScopeSlot(); Scope; Scope = Scope->Previous)
+		if (Scope->Cancellation) return Scope->Cancellation;
+	return nullptr;
+}
+
+void FVoxelGenerationRequiredSourceScope::Enumerate(const FVoxelTerrainResources& InResources, FVisit InVisit)
+{
+	const auto* Cancel = ActiveCancellation();
+	for (auto* Scope = ActiveScopeSlot(); Scope; Scope = Scope->Previous)
 	{
+		if (Cancel && Cancel->Load()) return;
 		if (Scope->Resources == &InResources && Scope->Enumerator)
 		{
 			Scope->Enumerator(Scope->Context, InVisit);
@@ -126,7 +137,13 @@ bool FVoxelGenerationRequiredSourceScope::MeasureSources(TFunctionRef<void(FVisi
 	const uint64 InExcludedSerial, FVoxelGenerationRequiredCapacity& OutCapacity, FString& OutError,
 	TArrayView<FVoxelGenerationSourceIdentity> InIdentities)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SourceCapacityMeasure);
+#if CPUPROFILERTRACE_ENABLED
+	static thread_local uint32 MeasureSampleIndex = 0;
+	TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_SourceCapacityMeasureSample, (++MeasureSampleIndex & 255) == 0);
+#endif
+	const auto* Cancel = ActiveCancellation();
+	if (Cancel && Cancel->Load()) { OutError = TEXT("Canceled: source capacity measurement"); return false; }
+	bool bCanceled = false;
 	FVoxelGenerationSourceIdentity StackIdentities[1024];
 	const auto Identities = InIdentities.IsEmpty() ? MakeArrayView(StackIdentities) : InIdentities;
 	const uint32 SlotCount = uint32(Identities.Num());
@@ -149,17 +166,23 @@ bool FVoxelGenerationRequiredSourceScope::MeasureSources(TFunctionRef<void(FVisi
 	uint32 Passes = 0;
 	const double Started = FPlatformTime::Seconds();
 	double NextDiagnostic = Started + 5.0;
-	while (PendingCount > 0 && bValid)
+	while (PendingCount > 0 && bValid && !bCanceled)
 	{
 		++Passes;
 		const FPartition Partition = Pending[--PendingCount];
-		FMemory::Memzero(Identities.GetData(), Identities.Num() * sizeof(FVoxelGenerationSourceIdentity));
+		// 本地表的成员已默认清零；外部缓冲和后续分区仍完整重置。
+		if (!InIdentities.IsEmpty() || Passes > 1)
+		{
+			FMemory::Memzero(Identities.GetData(), Identities.Num() * sizeof(FVoxelGenerationSourceIdentity));
+		}
 		uint32 Tracked = 0;
 		bool bOverflow = false;
 		FVoxelGenerationRequiredCapacity PartCapacity;
 		const uint64 Mask = Partition.Bits == 64 ? MAX_uint64 : (uint64(1) << Partition.Bits) - 1;
 		InEnumerate([&](const FVoxelGenerationRequiredSource& InSource)
 		{
+			if (bCanceled) return;
+			if (Cancel && (References & 63) == 0 && Cancel->Load()) { bCanceled = true; return; }
 			if ((++References & 65535) == 0)
 			{
 				const double Now = FPlatformTime::Seconds();
@@ -211,7 +234,7 @@ bool FVoxelGenerationRequiredSourceScope::MeasureSources(TFunctionRef<void(FVisi
 			Bytes += SourceBytes;
 			PartCapacity.LeaseCount += InSource.LeaseCount;
 		});
-		if (!bValid) break;
+		if (!bValid || bCanceled) break;
 		if (bOverflow)
 		{
 			if (!Partition.Kind)
@@ -240,6 +263,11 @@ bool FVoxelGenerationRequiredSourceScope::MeasureSources(TFunctionRef<void(FVisi
 			break;
 		}
 		Capacity.LeaseCount += PartCapacity.LeaseCount;
+	}
+	if (bCanceled || (Cancel && Cancel->Load()))
+	{
+		OutError = TEXT("Canceled: source capacity measurement");
+		return false;
 	}
 	if (!bValid)
 	{

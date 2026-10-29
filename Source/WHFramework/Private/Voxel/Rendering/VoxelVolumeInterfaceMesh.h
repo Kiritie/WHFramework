@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Voxel/Geometry/DWVoxelBoundaryTransition.h"
 #include "Voxel/Rendering/VoxelCoarseBuildStorage.h"
@@ -36,7 +36,12 @@ public:
 		}
 		const auto& Original = Inputs.Patches[PatchCursor];
 		const uint8 Face = uint8(Original.Face.Direction);
+		if (Face >= 6) { OutError = TEXT("Invalid volume interface direction"); return false; }
 		const int32 Axis = Face / 2, TangentU = Axis == 0 ? 1 : 0, TangentV = Axis == 2 ? 1 : 2;
+		// 每片最多四乘四个真实采样单元；不能按固定四个世界 cell 过度拆分粗接口。
+		const int32 Step = FMath::Min(Inputs.GetSampleStep(), Original.Neighbor.SampleStepCells);
+		if (Step <= 0 || Step > MAX_int32 / 4) { OutError = TEXT("Invalid volume interface sample step"); return false; }
+		TileSide = 4 * Step;
 		if (!bPatchStarted) { U = Original.Face.Min[TangentU]; V = Original.Face.Min[TangentV]; bPatchStarted = true; }
 		const int32 BatchBound = 12 * Registry.Definitions.Num();
 		const uint64 Scratch = 2 * VoxelBoundedAllocation::ArrayBytes<FVoxelRenderBatch>(BatchBound) +
@@ -50,8 +55,8 @@ public:
 		Local.RegistryRevision = Inputs.RegistryRevision; Local.ShapeRevision = Inputs.ShapeRevision; Local.InputSerial = Inputs.InputSerial;
 		Local.Patches.Reserve(1); Local.Patches.Add(Original);
 		auto& FaceRange = Local.Patches[0].Face;
-		FaceRange.Min[TangentU] = U; FaceRange.Max[TangentU] = FMath::Min(U + TileSide, Original.Face.Max[TangentU]);
-		FaceRange.Min[TangentV] = V; FaceRange.Max[TangentV] = FMath::Min(V + TileSide, Original.Face.Max[TangentV]);
+		FaceRange.Min[TangentU] = U; FaceRange.Max[TangentU] = int32(FMath::Min<int64>(int64(U) + TileSide, Original.Face.Max[TangentU]));
+		FaceRange.Min[TangentV] = V; FaceRange.Max[TangentV] = int32(FMath::Min<int64>(int64(V) + TileSide, Original.Face.Max[TangentV]));
 		FVoxelSectionSnapshot Snapshot; Snapshot.GridSide = Inputs.GetGridSide();
 		FVoxelSectionMeshResult Plan;
 		if (!FVoxelSectionMesher::Build(Snapshot, Registry, Shapes, Plan, &Cancel, 1.0, &Local, true, true, {}, 0, true))
@@ -123,12 +128,14 @@ struct FVoxelVolumeTransitionBuild
 		else if (Phase == 1)
 		{
 			FVoxelSectionMeshResult Counted;
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_VolumeBodyCount);
 			if (!BodyCount.Advance(*Data, Registry, Shapes, Inputs.Get(), TextureRepeats, Counted, bComplete, Result.Error, &Cancel)) return Result;
 			if (bComplete) { BodyBytes = BodyCount.GetEstimatedMeshBytes(); ++Phase; }
 		}
 		else if (Phase == 2)
 		{
 			FVoxelSectionMeshResult Counted;
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_VolumeBoundaryCount);
 			if (!BoundaryCount.Advance(*Inputs, Registry, Shapes, Counted, bComplete, Result.Error, Cancel)) return Result;
 			if (bComplete)
 			{
@@ -148,12 +155,14 @@ struct FVoxelVolumeTransitionBuild
 		}
 		else if (Phase == 4)
 		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_VolumeBodyBuild);
 			if (!BodyBuild.Advance(*Data, Registry, Shapes, Inputs.Get(), TextureRepeats, *Body, bComplete, Result.Error, &Cancel)) return Result;
 			if (bComplete) { Body->ResourceLease = Storage->GeometryLease; ++Phase; }
 		}
 		else
 		{
 			auto Boundary = Storage->MakeResult<FVoxelSectionMeshResult>();
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_VolumeBoundaryBuild);
 			if (!BoundaryBuild.Advance(*Inputs, Registry, Shapes, *Boundary, bComplete, Result.Error, Cancel)) return Result;
 			if (bComplete)
 			{

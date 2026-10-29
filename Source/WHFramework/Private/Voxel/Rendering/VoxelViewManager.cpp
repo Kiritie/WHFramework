@@ -1,4 +1,4 @@
-﻿#include "Voxel/Rendering/VoxelViewManager.h"
+#include "Voxel/Rendering/VoxelViewManager.h"
 
 #include "Voxel/Streaming/VoxelInterestRuntime.h"
 #include "Voxel/Chunks/VoxelSectionKey.h"
@@ -171,6 +171,7 @@ struct FRepresentationOverlayRead
 				}
 				OutTask.bSuccess = true;
 				OutTask.bContinue = true;
+				OutTask.bContinueImmediately = !bWaitingFacts.Load() && OutTask.Error.IsEmpty() && !InCancel.Load();
 				return false;
 			}
 			auto Taken = MetadataLease ? VoxelBoundedAllocation::MakeWorkerShared<FVoxelFineOverlayReadResult>(MetadataLease) :
@@ -1342,7 +1343,9 @@ void FVoxelViewManager::PrunePreparedData()
 		}
 	for (auto It = PreparedData.CreateIterator(); It; ++It)
 	{
-		if (!IsPreparedDataCurrent(It.Key()))
+		const EVoxelTaskKind MeshKind = It.Key().Kind == EVoxelTaskKind::GenerateVoxelProxy ? EVoxelTaskKind::BuildVoxelProxy :
+			It.Key().Kind == EVoxelTaskKind::GenerateSurface ? EVoxelTaskKind::BuildSurface : EVoxelTaskKind::BuildMacro;
+		if (!IsPreparedDataCurrent(It.Key()) || Scheduler.IsTerminal(It.Key()) || Scheduler.IsTerminal({MeshKind, It.Key().Stamp}))
 		{
 			PreparedDataBytes -= It.Value()->ResultBytes() + sizeof(FVoxelTaskResult) + sizeof(FVoxelTaskKey);
 			It.RemoveCurrent();
@@ -1353,6 +1356,32 @@ void FVoxelViewManager::PrunePreparedData()
 		return (Kind == EVoxelTaskKind::GenerateVoxelProxy || Kind == EVoxelTaskKind::GenerateSurface ||
 			Kind == EVoxelTaskKind::GenerateMacro) && !IsPreparedDataCurrent({ Kind, Stamp });
 	});
+}
+
+bool FVoxelViewManager::CheckCoarsePreflight(const FVoxelGenerationDependencyStatus& InStatus, const FVoxelTaskRequest& InRequest, const TCHAR* InStage)
+{
+	return CheckCoarsePreflight(InStatus.bReady, InStatus.bFailed, InStatus.Error, InRequest, InStage);
+}
+
+bool FVoxelViewManager::CheckCoarsePreflight(const FVoxelOverlayPreflightStatus& InStatus, const FVoxelTaskRequest& InRequest, const TCHAR* InStage)
+{
+	return CheckCoarsePreflight(InStatus.bReady, InStatus.bFailed, InStatus.Error, InRequest, InStage);
+}
+
+bool FVoxelViewManager::CheckCoarsePreflight(const bool bInReady, const bool bInFailed, const FString& InError,
+	const FVoxelTaskRequest& InRequest, const TCHAR* InStage)
+{
+	if (bInFailed)
+	{
+		Module.ReleaseGenerationFacts(InRequest.GenerationConsumer);
+		PreparedEnvironmentRetentions.Remove({InRequest.Kind, InRequest.Stamp});
+		Scheduler.ObserveDemand(InRequest.Kind, InRequest.Stamp, EVoxelTaskBlockReason::TerminalFailure,
+			InRequest.InputBytes, InRequest.ReservedBytes);
+		UE_LOG(LogTemp, Warning, TEXT("Voxel coarse preflight failed: stage=%s kind=%d error=%s"),
+			InStage, int32(InRequest.Kind), *InError);
+		return false;
+	}
+	return bInReady;
 }
 
 TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> FVoxelViewManager::RetainPreparedEnvironment(
@@ -1387,14 +1416,30 @@ bool FVoxelViewManager::EnqueuePreparedData(FVoxelTaskRequest&& InRequest, const
 	{
 		PendingDataBytes -= Reservation;
 		const FVoxelTaskKey Key { Result.Kind, Result.Stamp };
-		if (Result.bCanceled || Result.Error.StartsWith(TEXT("DependencyNotReady")) || !IsPreparedDataCurrent(Key)) return;
+		if (Result.bCanceled)
+		{
+			RecordDataAdmissionGate(Key.Stamp, Result.bAdmissionDisplaced ? TEXT("DataDisplaced") : TEXT("DataCanceled"));
+			return;
+		}
+		if (Result.Error.StartsWith(TEXT("DependencyNotReady")))
+		{
+			RecordDataAdmissionGate(Key.Stamp, TEXT("DataDependencyRetry"));
+			return;
+		}
+		if (!IsPreparedDataCurrent(Key))
+		{
+			RecordDataAdmissionGate(Key.Stamp, TEXT("DataStale"));
+			return;
+		}
 		if (Result.OverlayReadResult && !Module.IsOverlayReadCurrent(*Result.OverlayReadResult))
 		{
 			++TerrainWorkMetrics.Stale;
+			RecordDataAdmissionGate(Key.Stamp, TEXT("DataOverlayStale"));
 			return;
 		}
 		if (!Result.bSuccess)
 		{
+			RecordDataAdmissionGate(Key.Stamp, TEXT("DataFailed"));
 			Scheduler.ObserveDemand(Result.Kind, Result.Stamp, EVoxelTaskBlockReason::TerminalFailure);
 			UE_LOG(LogTemp, Warning, TEXT("Voxel data preparation failed: kind=%d error=%s"),
 				static_cast<int32>(Result.Kind), *Result.Error);
@@ -1405,7 +1450,11 @@ bool FVoxelViewManager::EnqueuePreparedData(FVoxelTaskRequest&& InRequest, const
 			Result.Surface ? Interest.FindGeometry(Result.Surface->Key) :
 			Result.Macro ? Interest.FindGeometry(Result.Macro->Key) : nullptr;
 		if (!Geometry || (Result.VoxelProxy && *Geometry != Result.VoxelProxy->Geometry) ||
-			(Result.Surface && *Geometry != Result.Surface->Geometry) || (Result.Macro && *Geometry != Result.Macro->Geometry)) return;
+			(Result.Surface && *Geometry != Result.Surface->Geometry) || (Result.Macro && *Geometry != Result.Macro->Geometry))
+		{
+			RecordDataAdmissionGate(Key.Stamp, TEXT("DataGeometryStale"));
+			return;
+		}
 		RemovePreparedData(Key);
 		Result.PreparedRevisionAdmission = Module.IsAuthority() ? EVoxelTerrainResourceAdmission::Granted : EVoxelTerrainResourceAdmission::None;
 		TSharedPtr<FVoxelTaskResult, ESPMode::ThreadSafe> Prepared;
@@ -1419,12 +1468,18 @@ bool FVoxelViewManager::EnqueuePreparedData(FVoxelTaskRequest&& InRequest, const
 #endif
 		if (!Prepared)
 		{
+			RecordDataAdmissionGate(Key.Stamp, TEXT("DataMetadataFailed"));
 			Scheduler.ObserveDemand(Key.Kind, Key.Stamp, EVoxelTaskBlockReason::TerminalFailure);
 			return;
 		}
 		PreparedDataBytes += Prepared->ResultBytes() + sizeof(FVoxelTaskResult) + sizeof(FVoxelTaskKey);
 		PreparedData.Add(Key, Prepared);
-		if (!TryAcceptPreparedRevision(Key, *Prepared)) return;
+		if (!TryAcceptPreparedRevision(Key, *Prepared))
+		{
+			RecordDataAdmissionGate(Key.Stamp, TEXT("DataRevisionWait"));
+			return;
+		}
+		RecordDataAdmissionGate(Key.Stamp, TEXT("DataAccepted"));
 		if (GetInputRoot().bInitialLayout && Prepared->VoxelProxy)
 		{
 			VoxelProxyData.Add(Prepared->VoxelProxy->Key, Prepared->VoxelProxy);
@@ -1461,10 +1516,16 @@ bool FVoxelViewManager::EnqueuePreparedData(FVoxelTaskRequest&& InRequest, const
 		}
 	}
 	const FVoxelTaskKey RetentionKey{InRequest.Kind, InRequest.Stamp};
+	const FVoxelGenerationConsumerKey FactConsumer = InRequest.GenerationConsumer;
 	RecordDataAdmissionGate(InRequest.Stamp, TEXT("SchedulerAdmission"));
 	if (!EnqueueViewTask(MoveTemp(InRequest)))
 		return false;
 	RecordDataAdmissionGate(RetentionKey.Stamp, TEXT("DataQueued"));
+	if (FactConsumer.IsValid())
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_CoarseFactsHandoff);
+		Module.ReleaseGenerationFacts(FactConsumer);
+	}
 	PreparedEnvironmentRetentions.Remove(RetentionKey);
 	PendingDataBytes += Reservation;
 	return true;
@@ -4157,49 +4218,6 @@ bool FVoxelViewManager::RequestFine(const FIntVector& InSection, const uint64 In
 {
 	return RequestF0Fine(InSection, InRevision);
 }
-bool FVoxelViewManager::BuildVoxelProxySnapshot(
-	const FVoxelVoxelProxyData& InData, const uint64 InRecipeHash, FVoxelSectionSnapshot& OutSnapshot, FString& OutError)
-{
-	if (!InData.Geometry.Validate(OutError) ||
-		InData.Geometry.Key != FVoxelTerrainSpatialKey{EVoxelTerrainRepresentation::VoxelProxy, InData.Key.Coordinate, InData.Key.Level} ||
-		InData.Key.Level == 0 || InData.GridSide <= 0 || InData.GridSide > 128 || InData.LocalMinCells != FIntVector::ZeroValue ||
-		InData.GridSide != InData.Key.GetSide() / InData.Geometry.SampleStepCells ||
-		int64(InData.Cells.Num()) != int64(InData.GridSide) * InData.GridSide * InData.GridSide)
-	{
-		OutError = TEXT("Voxel proxy snapshot has invalid cell data");
-		return false;
-	}
-
-	FVoxelSectionSnapshot Snapshot;
-	Snapshot.GridSide = InData.GridSide;
-	Snapshot.Section = InData.Key.Coordinate;
-	Snapshot.Stamp.RecipeHash = InRecipeHash;
-	Snapshot.Revision = InData.Revision;
-	Snapshot.Blocks.Reserve(InData.Cells.Num());
-	for (const FVoxelBlockState State : InData.Cells)
-		Snapshot.Blocks.Add(State.Pack());
-
-	for (int32 Face = 0; Face < 6; ++Face)
-	{
-		Snapshot.Known[Face] = InData.Known[Face];
-		if (!Snapshot.Known[Face])
-			continue;
-		const TArray<FVoxelBlockState>& Source = InData.Halo[Face];
-		if (Source.Num() != InData.GridSide * InData.GridSide)
-		{
-			OutError = TEXT("Voxel proxy snapshot has invalid halo data");
-			return false;
-		}
-		Snapshot.Halo[Face].Reserve(Source.Num());
-		for (const FVoxelBlockState State : Source)
-			Snapshot.Halo[Face].Add(State.Pack());
-	}
-
-	OutSnapshot = MoveTemp(Snapshot);
-	OutError.Reset();
-	return true;
-}
-
 bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int32 InPriority, const bool bDataOnly)
 {
 	const bool bInitialData = bDataOnly && GetInputRoot().bInitialLayout;
@@ -4279,6 +4297,34 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 	Request.GenerationConsumer = MakeCoarseGenerationConsumer(Geometry, Request.Stamp);
 	if (!Request.GenerationConsumer.IsValid()) return false;
 	FVoxelGenerationConsumerScope ConsumerScope(Request.GenerationConsumer);
+	struct FAdmissionFactSources
+	{
+		const FVoxelViewManager* Manager;
+		FVoxelGenerationConsumerKey Consumer;
+		FVoxelTaskKey RetentionKey;
+	};
+	const FAdmissionFactSources FactSourceContext{this, Request.GenerationConsumer, {EVoxelTaskKind::GenerateVoxelProxy, Request.Stamp}};
+	const auto GenerationFactResources = Scheduler.GetRuntimeResources();
+	FVoxelGenerationRequiredSourceScope FactSources(&GenerationFactResources.Get(), &FactSourceContext,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			const auto& Sources = *static_cast<const FAdmissionFactSources*>(InContext);
+			Sources.Manager->Module.VisitGenerationFactSources(Sources.Consumer, InVisit);
+			if (const auto* Retention = Sources.Manager->PreparedEnvironmentRetentions.Find(Sources.RetentionKey); Retention && *Retention)
+			{
+				const auto& Lease = (*Retention)->GetResourceLease();
+				if (Lease->IsOwnedBy(*Sources.Manager->Scheduler.GetRuntimeResources()))
+					FVoxelGenerationRequiredSourceScope::VisitLease(&Lease.Get(), InVisit);
+			}
+		});
+	ON_SCOPE_EXIT
+	{
+		if (bDataOnly && Scheduler.IsTerminal(FactSourceContext.RetentionKey))
+		{
+			Module.ReleaseGenerationFacts(FactSourceContext.Consumer);
+			PreparedEnvironmentRetentions.Remove(FactSourceContext.RetentionKey);
+		}
+	};
 
 	Request.ReservedBytes = 1;
 	const FVoxelGenerationBounds ProxyBounds = InKey.GetBounds();
@@ -4354,14 +4400,20 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewProxyEnvironment);
 		RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
-		if (!(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)).bReady)
+		if (!CheckCoarsePreflight(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore), Request, TEXT("Natural")))
 			return false;
+	}
+	const auto EnvironmentInputs = bDataOnly ? Module.GetEnvironmentGeometryInputs(Request.GenerationConsumer, Geometry) : nullptr;
+	if (bDataOnly)
+	{
+		if (!EnvironmentInputs) return false;
+		PreparedEnvironmentRetentions.FindChecked(DataKey) = EnvironmentInputs->GetRetention();
 	}
 	if (bDataOnly)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewProxyOverlayPreflight);
 		RecordDataAdmissionGate(Request.Stamp, TEXT("ProjectOverlayPreflight"));
-		if (!Generator->EnsureCoarseOverlayBoundsReady(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
+		if (!CheckCoarsePreflight(Generator->EnsureCoarseOverlayBoundsReady(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore), Request, TEXT("ProjectOverlay")))
 			return false;
 	}
 	if (bDataOnly)
@@ -4449,10 +4501,15 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 	{
 		FString CallbackBindingError;
 		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
-			[BuildStorage, bDataOnly, bInitialData, GeometryLimit, PageBuild, MeshEstimate, PageMesh, Prepared, Config, Cache, Generator, EnvironmentRetention, Registry, Shapes, RecipeHash,
+			[BuildStorage, bDataOnly, bInitialData, GeometryLimit, PageBuild, MeshEstimate, PageMesh, Prepared, Config, Cache, Generator, EnvironmentInputs, Registry, Shapes, RecipeHash,
 						  OverlayRead, InKey, Geometry, TextureStretch = Module.GetViewSettings().MaximumTextureStretchCells,
 						  Lod = Module.GetViewSettings().Lod](const TAtomic<bool>& InCancel)
 	{
+		FVoxelGenerationRequiredSourceScope EnvironmentSources(Generator->GetPlanCache()->GetResources().Get(), EnvironmentInputs.Get(),
+			[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+			{
+				if (InContext) static_cast<const FVoxelGenerationEnvironmentInputs*>(InContext)->VisitRequiredSources(InVisit);
+			}, &InCancel);
 		FVoxelTaskResult Result;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkingLease;
 		if (bDataOnly) OverlayRead->Begin();
@@ -4536,6 +4593,7 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 			{
 				Result.VoxelProxy.Reset();
 				Result.bContinue = true;
+				Result.bContinueImmediately = true;
 				return Result;
 			}
 
@@ -4544,6 +4602,7 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 				MeshEstimate->Data = Result.VoxelProxy;
 				Result.VoxelProxy.Reset();
 				Result.bContinue = true;
+				Result.bContinueImmediately = true;
 			}
 			return Result;
 		}
@@ -4589,7 +4648,7 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 		return EnqueuePreparedData(MoveTemp(Request), BuildStorage->GeometryCapacityBytes);
 	if (!EnqueueViewTask(MoveTemp(Request)))
 		return false;
-	RemovePreparedData(DataKey);
+	// 保留原数据直到网格成功接纳，避免取消后重建数据。
 	return true;
 }
 
@@ -4680,6 +4739,34 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	MeshAdmissionStage = TEXT("Consumer");
 	if (!Request.GenerationConsumer.IsValid()) return false;
 	FVoxelGenerationConsumerScope ConsumerScope(Request.GenerationConsumer);
+	struct FAdmissionFactSources
+	{
+		const FVoxelViewManager* Manager;
+		FVoxelGenerationConsumerKey Consumer;
+		FVoxelTaskKey RetentionKey;
+	};
+	const FAdmissionFactSources FactSourceContext{this, Request.GenerationConsumer, {EVoxelTaskKind::GenerateSurface, Request.Stamp}};
+	const auto GenerationFactResources = Scheduler.GetRuntimeResources();
+	FVoxelGenerationRequiredSourceScope FactSources(&GenerationFactResources.Get(), &FactSourceContext,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			const auto& Sources = *static_cast<const FAdmissionFactSources*>(InContext);
+			Sources.Manager->Module.VisitGenerationFactSources(Sources.Consumer, InVisit);
+			if (const auto* Retention = Sources.Manager->PreparedEnvironmentRetentions.Find(Sources.RetentionKey); Retention && *Retention)
+			{
+				const auto& Lease = (*Retention)->GetResourceLease();
+				if (Lease->IsOwnedBy(*Sources.Manager->Scheduler.GetRuntimeResources()))
+					FVoxelGenerationRequiredSourceScope::VisitLease(&Lease.Get(), InVisit);
+			}
+		});
+	ON_SCOPE_EXIT
+	{
+		if (bDataOnly && Scheduler.IsTerminal(FactSourceContext.RetentionKey))
+		{
+			Module.ReleaseGenerationFacts(FactSourceContext.Consumer);
+			PreparedEnvironmentRetentions.Remove(FactSourceContext.RetentionKey);
+		}
+	};
 
 	Request.ReservedBytes = 1;
 	Request.DistanceScore = MinimumObserverDistanceCells(SurfaceWorldCenter(InKey));
@@ -4733,10 +4820,16 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	const auto EnvironmentRetention = bDataOnly ? RetainPreparedEnvironment(DataKey, *Generator, OverlayBounds) : nullptr;
 	if (bDataOnly && !EnvironmentRetention) return false;
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
-	if (bDataOnly && !(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)).bReady)
+	if (bDataOnly && !CheckCoarsePreflight(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore), Request, TEXT("Natural")))
 		return false;
+	const auto EnvironmentInputs = bDataOnly ? Module.GetEnvironmentGeometryInputs(Request.GenerationConsumer, Geometry) : nullptr;
+	if (bDataOnly)
+	{
+		if (!EnvironmentInputs) return false;
+		PreparedEnvironmentRetentions.FindChecked(DataKey) = EnvironmentInputs->GetRetention();
+	}
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("ProjectOverlayPreflight"));
-	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
+	if (bDataOnly && !CheckCoarsePreflight(Generator->EnsureCoarseOverlayBoundsReady(OverlayBounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore), Request, TEXT("ProjectOverlay")))
 		return false;
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("OverlayCapture"));
 	if (bDataOnly && !Module.CaptureFineOverlays(OverlayBounds, OverlayCapture, OverlayError, &Request.GenerationConsumer))
@@ -4826,10 +4919,15 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	{
 		FString CallbackBindingError;
 		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
-			[BuildStorage, bDataOnly, bInitialData, GeometryLimit, PageBuild, MeshEstimate, PageMesh, Prepared, OverlayRead, Generator, EnvironmentRetention, Config, Registry,
+			[BuildStorage, bDataOnly, bInitialData, GeometryLimit, PageBuild, MeshEstimate, PageMesh, Prepared, OverlayRead, Generator, EnvironmentInputs, Config, Registry,
 						  Settings, InKey, Geometry, TextureStretch = Module.GetViewSettings().MaximumTextureStretchCells,
 						  Lod = Module.GetViewSettings().Lod](const TAtomic<bool>& InCancel)
 	{
+		FVoxelGenerationRequiredSourceScope EnvironmentSources(Generator->GetPlanCache()->GetResources().Get(), EnvironmentInputs.Get(),
+			[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+			{
+				if (InContext) static_cast<const FVoxelGenerationEnvironmentInputs*>(InContext)->VisitRequiredSources(InVisit);
+			}, &InCancel);
 		FVoxelTaskResult Result;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkingLease;
 		if (bDataOnly) OverlayRead->Begin();
@@ -4917,6 +5015,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 			{
 				Result.Surface.Reset();
 				Result.bContinue = true;
+				Result.bContinueImmediately = true;
 				return Result;
 			}
 
@@ -4936,6 +5035,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 			Result.Surface.Reset();
 			Result.Water.Reset();
 			Result.bContinue = true;
+			Result.bContinueImmediately = true;
 			return Result;
 		}
 		Result.SurfaceMesh = BuildStorage->MakeResult<FVoxelSectionMeshResult>();
@@ -4975,7 +5075,7 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 	MeshAdmissionStage = TEXT("Enqueue");
 	if (!EnqueueViewTask(MoveTemp(Request)))
 		return false;
-	RemovePreparedData(DataKey);
+	// 保留原数据直到网格成功接纳，避免取消后重建数据。
 	MeshAdmissionStage = TEXT("Submitted");
 	return true;
 }
@@ -5054,6 +5154,34 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 	Request.GenerationConsumer = MakeCoarseGenerationConsumer(Geometry, Request.Stamp);
 	if (!Request.GenerationConsumer.IsValid()) return false;
 	FVoxelGenerationConsumerScope ConsumerScope(Request.GenerationConsumer);
+	struct FAdmissionFactSources
+	{
+		const FVoxelViewManager* Manager;
+		FVoxelGenerationConsumerKey Consumer;
+		FVoxelTaskKey RetentionKey;
+	};
+	const FAdmissionFactSources FactSourceContext{this, Request.GenerationConsumer, {EVoxelTaskKind::GenerateMacro, Request.Stamp}};
+	const auto GenerationFactResources = Scheduler.GetRuntimeResources();
+	FVoxelGenerationRequiredSourceScope FactSources(&GenerationFactResources.Get(), &FactSourceContext,
+		[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			const auto& Sources = *static_cast<const FAdmissionFactSources*>(InContext);
+			Sources.Manager->Module.VisitGenerationFactSources(Sources.Consumer, InVisit);
+			if (const auto* Retention = Sources.Manager->PreparedEnvironmentRetentions.Find(Sources.RetentionKey); Retention && *Retention)
+			{
+				const auto& Lease = (*Retention)->GetResourceLease();
+				if (Lease->IsOwnedBy(*Sources.Manager->Scheduler.GetRuntimeResources()))
+					FVoxelGenerationRequiredSourceScope::VisitLease(&Lease.Get(), InVisit);
+			}
+		});
+	ON_SCOPE_EXIT
+	{
+		if (bDataOnly && Scheduler.IsTerminal(FactSourceContext.RetentionKey))
+		{
+			Module.ReleaseGenerationFacts(FactSourceContext.Consumer);
+			PreparedEnvironmentRetentions.Remove(FactSourceContext.RetentionKey);
+		}
+	};
 
 	Request.ReservedBytes = 1;
 	Request.DistanceScore = MinimumObserverDistanceCells(MacroWorldCenter(InKey));
@@ -5101,10 +5229,16 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 	const auto EnvironmentRetention = bDataOnly ? RetainPreparedEnvironment(DataKey, *Generator, Bounds) : nullptr;
 	if (bDataOnly && !EnvironmentRetention) return false;
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
-	if (bDataOnly && !(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore)).bReady)
+	if (bDataOnly && !CheckCoarsePreflight(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore), Request, TEXT("Natural")))
 		return false;
+	const auto EnvironmentInputs = bDataOnly ? Module.GetEnvironmentGeometryInputs(Request.GenerationConsumer, Geometry) : nullptr;
+	if (bDataOnly)
+	{
+		if (!EnvironmentInputs) return false;
+		PreparedEnvironmentRetentions.FindChecked(DataKey) = EnvironmentInputs->GetRetention();
+	}
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("ProjectOverlayPreflight"));
-	if (bDataOnly && !Generator->EnsureCoarseOverlayBoundsReady(Bounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore).bReady)
+	if (bDataOnly && !CheckCoarsePreflight(Generator->EnsureCoarseOverlayBoundsReady(Bounds, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore), Request, TEXT("ProjectOverlay")))
 		return false;
 	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("OverlayCapture"));
 	if (bDataOnly && !Module.CaptureFineOverlays(Bounds, OverlayCapture, OverlayError, &Request.GenerationConsumer))
@@ -5187,10 +5321,15 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 	{
 		FString CallbackBindingError;
 		if (!Request.BindExecute(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
-			[BuildStorage, bDataOnly, bInitialData, GeometryLimit, PageBuild, MeshEstimate, PageMesh, Prepared, OverlayRead, Settings, Generator, EnvironmentRetention, Config,
+			[BuildStorage, bDataOnly, bInitialData, GeometryLimit, PageBuild, MeshEstimate, PageMesh, Prepared, OverlayRead, Settings, Generator, EnvironmentInputs, Config,
 						  Registry, InKey, Geometry, TextureStretch = Module.GetViewSettings().MaximumTextureStretchCells,
 						  Lod = Module.GetViewSettings().Lod](const TAtomic<bool>& InCancel)
 	{
+		FVoxelGenerationRequiredSourceScope EnvironmentSources(Generator->GetPlanCache()->GetResources().Get(), EnvironmentInputs.Get(),
+			[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+			{
+				if (InContext) static_cast<const FVoxelGenerationEnvironmentInputs*>(InContext)->VisitRequiredSources(InVisit);
+			}, &InCancel);
 		FVoxelTaskResult Result;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkingLease;
 		if (bDataOnly) OverlayRead->Begin();
@@ -5276,6 +5415,7 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 			{
 				Result.Macro.Reset();
 				Result.bContinue = true;
+				Result.bContinueImmediately = true;
 				return Result;
 			}
 
@@ -5284,6 +5424,7 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 			MeshEstimate->Macro = Result.Macro;
 			Result.Macro.Reset();
 			Result.bContinue = true;
+			Result.bContinueImmediately = true;
 			return Result;
 		}
 		Result.MacroMesh = BuildStorage->MakeResult<FVoxelSectionMeshResult>();
@@ -5319,7 +5460,7 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 		return EnqueuePreparedData(MoveTemp(Request), BuildStorage->GeometryCapacityBytes);
 	if (!EnqueueViewTask(MoveTemp(Request)))
 		return false;
-	RemovePreparedData(DataKey);
+	// 保留原数据直到网格成功接纳，避免取消后重建数据。
 	return true;
 }
 
@@ -5412,6 +5553,7 @@ bool FVoxelViewManager::PublishVoxelProxy(const FVoxelTaskResult& InResult)
 	}
 	VoxelProxySources.Add(Key, SourceId);
 	RecordTerrainMesh({EVoxelTerrainRepresentation::VoxelProxy, Key.Coordinate, Key.Level}, *Mesh, InResult.ExecuteMilliseconds);
+	RemovePreparedData({EVoxelTaskKind::GenerateVoxelProxy, InResult.Stamp});
 	return true;
 }
 
@@ -5448,6 +5590,7 @@ bool FVoxelViewManager::PublishSurface(const FVoxelTaskResult& InResult)
 	IndexCoverage(Key);
 	RecordTerrainMesh(
 		{EVoxelTerrainRepresentation::Surface, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0), Key.Level}, *Mesh, InResult.ExecuteMilliseconds);
+	RemovePreparedData({EVoxelTaskKind::GenerateSurface, InResult.Stamp});
 	return true;
 }
 
@@ -5509,6 +5652,7 @@ bool FVoxelViewManager::PublishMacro(const FVoxelTaskResult& InResult)
 		IndexCoverage(Key);
 		RecordTerrainMesh(
 			{EVoxelTerrainRepresentation::Macro, FIntVector(Key.Coordinate.X, Key.Coordinate.Y, 0), Key.Level}, *Mesh, InResult.ExecuteMilliseconds);
+		RemovePreparedData({EVoxelTaskKind::GenerateMacro, InResult.Stamp});
 		return true;
 	}
 

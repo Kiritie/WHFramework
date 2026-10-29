@@ -46,6 +46,38 @@ bool SameFineInput(const FAtomPtr& A, const FAtomPtr& B)
 		A->Evidence.Content == B->Evidence.Content && A->FineGeometry == B->FineGeometry);
 }
 
+// 原始 Fine 网格已按其冻结 halo 剔面。双向逐样本相同才能保留原面，不能只比较版本或层级。
+const FVoxelFineAtomBoundary* FindNativeAtomBoundary(const FAtomPtr& Atom)
+{
+	if (!Atom || !Atom->FineGeometry || !Atom->FineGeometry->Boundary) return nullptr;
+	const auto& Boundary = *Atom->FineGeometry->Boundary;
+	const int32 Side = Boundary.Input.Shard.SideCells / 16;
+	const FIntVector Offset = Atom->Section - Boundary.Input.Shard.Min / 16;
+	if (Side <= 0 || Offset.GetMin() < 0 || Offset.GetMax() >= Side) return nullptr;
+	const int32 Index = Offset.X + Side * (Offset.Y + Side * Offset.Z);
+	return Boundary.Atoms.IsValidIndex(Index) && Boundary.Atoms[Index].Section == Atom->Section ? &Boundary.Atoms[Index] : nullptr;
+}
+
+bool NativeFineHalosAgree(const FAtomPtr& A, const FAtomPtr& B, const uint8 Face)
+{
+#if CPUPROFILERTRACE_ENABLED
+	static thread_local uint32 AgreementSample = 0;
+	TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_NativeFineHaloAgreementSample, (++AgreementSample & 255) == 0);
+#endif
+	if (!A || !B || Face >= 6 || B->Section != A->Section + VoxelCoord::Direction(Face)) return false;
+	const auto& Left = A->Evidence.Content;
+	const auto& Right = B->Evidence.Content;
+	if (Left.WorldEpoch != Right.WorldEpoch || Left.GeneratorIdentity != Right.GeneratorIdentity ||
+		Left.RegistryRevision != Right.RegistryRevision || Left.ShapeRevision != Right.ShapeRevision) return false;
+	const auto* SourceA = FindNativeAtomBoundary(A);
+	const auto* SourceB = FindNativeAtomBoundary(B);
+	if (!SourceA || !SourceB) return false;
+	const uint8 Opposite = Face ^ 1;
+	return SourceA->Owned[Face].Num() == 256 && SourceA->Halo[Face].Num() == 256 &&
+		SourceB->Owned[Opposite].Num() == 256 && SourceB->Halo[Opposite].Num() == 256 &&
+		SourceA->Halo[Face] == SourceB->Owned[Opposite] && SourceB->Halo[Opposite] == SourceA->Owned[Face];
+}
+
 struct FNativeInterfacePiece
 {
 	TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe> Mesh;
@@ -75,7 +107,7 @@ struct FPreparedFine
 			{ OutError = TEXT("DependencyNotReady:NativeNeighborBoundary"); return false; }
 			if (!NeighborFine[Face]) NeighborCoarse[Face] = FindCoarseOwner(CoarseRoot, Section);
 			const auto Source = NeighborCoarse[Face] ? NeighborCoarse[Face]->Geometry->Source : nullptr;
-			if (NeighborFine[Face] || (Source &&
+			if ((NeighborFine[Face] && !NativeFineHalosAgree(Base, NeighborFine[Face], Face)) || (Source &&
 				(Source->FrozenVoxelProxy || Source->FrozenSurface || Source->FrozenMacro)))
 				SuppressedFaceMask |= uint8(1u << Face);
 		}
@@ -103,7 +135,8 @@ struct FPreparedFine
 
 	bool CanReuseNativeInterfaces(const FSnapshotPtr& Previous) const
 	{
-		if (!Previous || !Base->bUseDrawRanges || FindFineAtom(Previous->Root, Base->Section) != Base)
+		if (!Previous || !Base->bUseDrawRanges || Base->SuppressedFaceMask != SuppressedFaceMask ||
+			FindFineAtom(Previous->Root, Base->Section) != Base)
 			return false;
 		for (uint8 Face = 0; Face < 6; ++Face)
 		{
