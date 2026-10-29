@@ -224,6 +224,7 @@ private:
 		uint64 SubscriptionCancellations = 0;
 		uint64 ForgottenInFlight = 0;
 		uint64 CanceledResults = 0;
+		bool bQueuedPrioritiesDirty = false;
 	};
 	struct FDonationGrowth
 	{

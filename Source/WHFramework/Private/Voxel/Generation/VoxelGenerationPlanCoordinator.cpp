@@ -705,11 +705,13 @@ bool FVoxelGenerationPlanCoordinator::IsCached(const FVoxelGenerationPlanDepende
 void FVoxelGenerationPlanCoordinator::RefreshQueuedPriorities()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanRefreshQueuedPriorities);
-	if (!Storage) return;
-	Scheduler.UpdateServicePriorities([this](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
+	if (!Storage || !Storage->bQueuedPrioritiesDirty) return;
+	const auto CapturedStorage = Storage;
+	Storage->bQueuedPrioritiesDirty = false;
+	Scheduler.UpdateServicePriorities([this, CapturedStorage](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp,
 		EVoxelWorkClass& WorkClass, FVoxelTerrainServicePriority& Priority)
 	{
-		if (Kind != EVoxelTaskKind::BuildGenerationPlan || Stamp.WorldEpoch != WorldEpoch) return;
+		if (Storage != CapturedStorage || Kind != EVoxelTaskKind::BuildGenerationPlan || Stamp.WorldEpoch != WorldEpoch) return;
 		const uint64 KindValue = Stamp.Revision;
 		if (KindValue > static_cast<uint64>(EVoxelGenerationPlanKind::Ecology)) return;
 		const FVoxelGenerationPlanDependency Dependency = MakeDependency(
@@ -1739,9 +1741,12 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 				if (Storage != Desired.CapturedStorage || !Storage || Storage->Owner != this || Storage->Consumers.FindByHash(ConsumerHash, InConsumer) == nullptr)
 				{
 					Status.bReady = false;
+					Status.bNeedsAdvance = true;
 					return Status;
 				}
 				const auto* Current = Storage->States.Find(Dependency);
+				if (!Current || (Current->State != EVoxelPlanDependencyState::Ready &&
+					!Current->bInFlight && !Current->bAdmissionLinked)) Status.bNeedsAdvance = true;
 				if (Current && Current->State == EVoxelPlanDependencyState::Failed)
 				{
 					Status.bReady = false;
@@ -1756,6 +1761,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 	if (Storage != CapturedStorage || !Storage || Storage->Owner != this || Storage->Consumers.FindByHash(ConsumerHash, InConsumer) == nullptr)
 	{
 		Status.bReady = false;
+		Status.bNeedsAdvance = true;
 	}
 	return Status;
 }
@@ -1896,6 +1902,8 @@ void FVoxelGenerationPlanCoordinator::SetConsumerWakeCallback(TFunction<void(con
 void FVoxelGenerationPlanCoordinator::ResolveDonations(FState& InOutState)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanResolveDonations);
+	const EVoxelWorkClass PreviousWorkClass = InOutState.WorkClass;
+	const FVoxelTerrainServicePriority PreviousPriority = InOutState.ServicePriority;
 	InOutState.WorkClass = EVoxelWorkClass::Background;
 	FVoxelTerrainServicePriority OwnPriority;
 	const FDonation* Best = nullptr;
@@ -1919,6 +1927,8 @@ void FVoxelGenerationPlanCoordinator::ResolveDonations(FState& InOutState)
 	InOutState.SourcePriority = InOutState.ServicePriority.SourcePriority;
 	InOutState.DistanceScore = InOutState.ServicePriority.DistanceCells;
 	InOutState.ForwardScore = InOutState.ServicePriority.ForwardScore;
+	Storage->bQueuedPrioritiesDirty |= InOutState.bInFlight &&
+		(PreviousWorkClass != InOutState.WorkClass || PreviousPriority != InOutState.ServicePriority);
 }
 
 void FVoxelGenerationPlanCoordinator::LinkConsumerWake(const FVoxelGenerationConsumerKey& InConsumer, FConsumerState& InState)
@@ -2257,7 +2267,11 @@ void FVoxelGenerationPlanCoordinator::AdvancePriorityDonations()
 		const auto* Fact = Storage->PriorityFacts.Find(Node);
 		auto* State = Fact ? Storage->States.Find(*Fact) : nullptr;
 		if (!State) return;
-		if (State->bInFlight && State->ServicePriority != Priority) Cache->RecordPlanDonation(Fact->Kind);
+		if (State->bInFlight && State->ServicePriority != Priority)
+		{
+			Storage->bQueuedPrioritiesDirty = true;
+			Cache->RecordPlanDonation(Fact->Kind);
+		}
 		State->ServicePriority = Priority;
 		State->SourcePriority = Priority.SourcePriority;
 		State->DistanceScore = Priority.DistanceCells;

@@ -707,31 +707,46 @@ void FVoxelTaskScheduler::FlushSectionIdleNotifications()
 
 void FVoxelTaskScheduler::RefreshBlockReasons()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TaskRefreshBlockReasons);
 	const uint64 LastInitialSequence = NextSequence;
 	BlockRefreshSequence = LastInitialSequence;
 	uint64 VisitedSequence = 0;
-	while (true)
+	const auto SortPending = [this]
 	{
-		FVoxelTaskRequest* Next = nullptr;
-		for (FVoxelTaskRequest& Request : Pending)
+		Pending.Sort([](const FVoxelTaskRequest& Left, const FVoxelTaskRequest& Right)
 		{
-			if (Request.Sequence > VisitedSequence && Request.Sequence <= LastInitialSequence &&
-				(!Next || Request.Sequence < Next->Sequence)) Next = &Request;
-		}
-		if (!Next) break;
-		const FVoxelTaskKey Key{Next->Kind, Next->Stamp};
-		VisitedSequence = Next->Sequence;
-		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CallbackLease = Next->BlockBindingLease;
-		TFunction<EVoxelTaskBlockReason()> Callback = MoveTemp(Next->GetBlockReason);
-		Next = nullptr;
+			return Left.Sequence < Right.Sequence;
+		});
+	};
+	SortPending();
+	int32 Index = 0;
+	while (Index < Pending.Num())
+	{
+		if (Pending[Index].Sequence > LastInitialSequence) break;
+		const FVoxelTaskKey Key{Pending[Index].Kind, Pending[Index].Stamp};
+		VisitedSequence = Pending[Index].Sequence;
+		const uint64 QueueVersion = QueueAdmissionVersion;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CallbackLease = Pending[Index].BlockBindingLease;
+		TFunction<EVoxelTaskBlockReason()> Callback = MoveTemp(Pending[Index].GetBlockReason);
 		const EVoxelTaskBlockReason Reason = Callback ? Callback() : EVoxelTaskBlockReason::None;
 		if (bStopped) return;
+		if (QueueAdmissionVersion == QueueVersion)
+		{
+			Pending[Index].GetBlockReason = MoveTemp(Callback);
+			Pending[Index].Blocked = Reason;
+			++Index;
+			continue;
+		}
 		if (FVoxelTaskRequest* Original = Pending.FindByPredicate([&Key, VisitedSequence](const FVoxelTaskRequest& Request)
 			{ return Request.Sequence == VisitedSequence && Request.Kind == Key.Kind && Request.Stamp == Key.Stamp; }))
 		{
 			Original->GetBlockReason = MoveTemp(Callback);
 			Original->Blocked = Reason;
 		}
+		// 回调可取消、替换或重入接纳；只重排剩余身份，本次新任务仍留给下一轮。
+		SortPending();
+		Index = 0;
+		while (Index < Pending.Num() && Pending[Index].Sequence <= VisitedSequence) ++Index;
 	}
 }
 
@@ -1159,16 +1174,39 @@ TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> FVoxelTaskScheduler::Get
 
 void FVoxelTaskScheduler::VisitPriorityStates(TFunctionRef<void(FVoxelTaskRequest&)> InUpdate)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_TaskVisitPriorityStates);
 	const uint64 LastInitialSequence = NextSequence;
 	uint64 VisitedSequence = 0;
+	int32 Cursors[3] = {};
+	const auto SortQueues = [this, &Cursors, &VisitedSequence]
+	{
+		const auto BySequence = [](const auto& Left, const auto& Right) { return Left.Sequence < Right.Sequence; };
+		Pending.Sort(BySequence);
+		Running.Sort(BySequence);
+		AwaitingApply.Sort(BySequence);
+		const auto Seek = [&VisitedSequence](const auto& Queue)
+		{
+			int32 Index = 0;
+			while (Index < Queue.Num() && Queue[Index].Sequence <= VisitedSequence) ++Index;
+			return Index;
+		};
+		Cursors[0] = Seek(Pending);
+		Cursors[1] = Seek(Running);
+		Cursors[2] = Seek(AwaitingApply);
+	};
+	SortQueues();
 	while (true)
 	{
 		FVoxelTaskRequest Identity;
 		uint64 Next = MAX_uint64;
-		const auto Capture = [&Identity, &Next, VisitedSequence, LastInitialSequence](const auto& Request)
+		int32 SelectedQueue = INDEX_NONE;
+		const auto Capture = [&Identity, &Next, &SelectedQueue, &Cursors, LastInitialSequence](const auto& Queue, const int32 QueueIndex)
 		{
-			if (Request.Sequence <= VisitedSequence || Request.Sequence > LastInitialSequence || Request.Sequence >= Next) return;
+			if (Cursors[QueueIndex] >= Queue.Num()) return;
+			const auto& Request = Queue[Cursors[QueueIndex]];
+			if (Request.Sequence > LastInitialSequence || Request.Sequence >= Next) return;
 			Next = Request.Sequence;
+			SelectedQueue = QueueIndex;
 			Identity.Stamp = Request.Stamp;
 			Identity.Kind = Request.Kind;
 			Identity.WorkClass = Request.WorkClass;
@@ -1179,12 +1217,16 @@ void FVoxelTaskScheduler::VisitPriorityStates(TFunctionRef<void(FVoxelTaskReques
 			Identity.ServiceBand = Request.ServiceBand;
 			Identity.TerrainStage = Request.TerrainStage;
 		};
-		for (const FVoxelTaskRequest& Request : Pending) Capture(Request);
-		for (const FRunning& Request : Running) Capture(Request);
-		for (const FRunning& Request : AwaitingApply) Capture(Request);
+		Capture(Pending, 0);
+		Capture(Running, 1);
+		Capture(AwaitingApply, 2);
 		if (Next == MAX_uint64) break;
 		VisitedSequence = Next;
+		const int32 SelectedIndex = Cursors[SelectedQueue]++;
+		const uint64 QueueVersion = QueueAdmissionVersion;
 		InUpdate(Identity);
+		if (bStopped) return;
+		const bool bQueueChanged = QueueVersion != QueueAdmissionVersion;
 		const auto Restore = [this, &Identity, Next](auto& Request)
 		{
 			if (Request.Sequence != Next || Request.Kind != Identity.Kind || !(Request.Stamp == Identity.Stamp)) return false;
@@ -1202,21 +1244,41 @@ void FVoxelTaskScheduler::VisitPriorityStates(TFunctionRef<void(FVoxelTaskReques
 			Request.TerrainStage = Identity.TerrainStage;
 			return true;
 		};
-		for (FVoxelTaskRequest& Request : Pending) if (Restore(Request)) break;
-		for (auto* Queue : {&Running, &AwaitingApply})
+		const auto RestoreRunning = [&Restore](FRunning& Request)
 		{
-			for (FRunning& Request : *Queue)
+			if (!Restore(Request)) return false;
+			Request.Slot->Request.WorkClass = Request.WorkClass;
+			Request.Slot->Request.SourcePriority = Request.SourcePriority;
+			Request.Slot->Request.DistanceScore = Request.DistanceScore;
+			Request.Slot->Request.ForwardScore = Request.ForwardScore;
+			Request.Slot->Request.SourceStableKey = Request.SourceStableKey;
+			Request.Slot->Request.ServiceBand = Request.ServiceBand;
+			Request.Slot->Request.TerrainStage = Request.TerrainStage;
+			return true;
+		};
+		if (!bQueueChanged)
+		{
+			if (SelectedQueue == 0)
 			{
-				if (!Restore(Request)) continue;
-				Request.Slot->Request.WorkClass = Request.WorkClass;
-				Request.Slot->Request.SourcePriority = Request.SourcePriority;
-				Request.Slot->Request.DistanceScore = Request.DistanceScore;
-				Request.Slot->Request.ForwardScore = Request.ForwardScore;
-				Request.Slot->Request.SourceStableKey = Request.SourceStableKey;
-				Request.Slot->Request.ServiceBand = Request.ServiceBand;
-				Request.Slot->Request.TerrainStage = Request.TerrainStage;
-				break;
+				verify(Restore(Pending[SelectedIndex]));
 			}
+			else if (SelectedQueue == 1)
+			{
+				verify(RestoreRunning(Running[SelectedIndex]));
+			}
+			else
+			{
+				verify(RestoreRunning(AwaitingApply[SelectedIndex]));
+			}
+		}
+		else
+		{
+			for (FVoxelTaskRequest& Request : Pending) if (Restore(Request)) break;
+			for (auto* Queue : {&Running, &AwaitingApply})
+			{
+				for (FRunning& Request : *Queue) if (RestoreRunning(Request)) break;
+			}
+			SortQueues();
 		}
 	}
 }
@@ -1385,6 +1447,7 @@ void FVoxelTaskScheduler::Tick(
 				MoveTemp(AwaitingApply[Index]);
 
 			AwaitingApply.RemoveAt(Index, 1, EAllowShrinking::No);
+			ChangedQueueAdmission();
 			check(!Completed.Task.IsValid() && Completed.bServiceSettled);
 
 			ReservedBytes -=
@@ -1394,7 +1457,6 @@ void FVoxelTaskScheduler::Tick(
 			if (OriginalRequest.bResumable)
 			{
 				RunningContinuationInputBytes -= OriginalRequest.InputBytes;
-				ChangedQueueAdmission();
 			}
 			// 最后一次原生执行实际退休后才结算；续跑保留同一完整授额。
 			if (Completed.NativeLease)
@@ -2246,6 +2308,7 @@ void FVoxelTaskScheduler::RetireCompletedTasks()
 		if (!Running[Index].Task.CanRetire()) continue;
 		FRunning Completed = MoveTemp(Running[Index]);
 		Running.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+		ChangedQueueAdmission();
 		Completed.Task.Retire();
 		check(!Completed.bServiceSettled);
 		verify(WorkerSelection.Settle(Completed.ServiceChargeSerial, Completed.Slot->ExecuteMicroseconds));

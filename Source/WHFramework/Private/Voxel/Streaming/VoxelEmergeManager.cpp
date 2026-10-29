@@ -1383,6 +1383,7 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentGeometry(
 		if (Consumer->EnvironmentInputs->IsCurrent(*Cache, InConsumer)) return {true, false, {}};
 		// Cache 换代后旧完成输入不能作为当前读端的就绪证明。
 		Consumer->EnvironmentInputs.Reset();
+		Consumer->EnvironmentWait.Reset();
 		Consumer->bWaitingCapacity = false;
 	}
 	if (!Consumer)
@@ -1426,6 +1427,18 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentGeometry(
 			return {false, !Consumer->bWaitingCapacity, MoveTemp(Error)};
 		}
 	}
+	if (Consumer->EnvironmentWait.IsSet())
+	{
+		const auto& Waiting = Consumer->EnvironmentWait.GetValue();
+		if (Waiting.WakeSerial == Consumer->WakeSerial && Waiting.WorkClass == InWorkClass &&
+			Waiting.SourcePriority == InSourcePriority && Waiting.DistanceScore == InDistanceScore && Waiting.ForwardScore == InForwardScore)
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_EnvironmentGeometryUnchangedWait);
+			return {false, false, {}};
+		}
+	}
+	Consumer->EnvironmentWait.Reset();
+	const uint64 BeforeEnsureWake = Consumer->WakeSerial;
 	const auto Status = PlanCoordinator->Ensure(Consumer->Dependencies.Values, InWorkClass,
 		InSourcePriority, InDistanceScore, InForwardScore, InConsumer);
 	Consumer = ExternalFactConsumers.Find(InConsumer);
@@ -1437,7 +1450,12 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentGeometry(
 		ExternalFactConsumers.Remove(InConsumer);
 		return Status;
 	}
-	if (!Status.bReady) return Status;
+	if (!Status.bReady)
+	{
+		if (!Status.bNeedsAdvance && Status.Error.IsEmpty())
+			Consumer->EnvironmentWait = FEnvironmentWait{BeforeEnsureWake, InWorkClass, InSourcePriority, InDistanceScore, InForwardScore};
+		return Status;
+	}
 	// 先保留实际 Hydro 键，再捕获原计划与授额；完整成功才解除已完成的调度图。
 	if (!Consumer->Retention && !PlanCoordinator->RetainDependencies(Consumer->Dependencies.Values,
 		FIntPoint(PageMin.X, PageMin.Y), InConsumer, Consumer->Retention, Error))

@@ -227,12 +227,21 @@ private:
 	int32 WaitingFactCapacity = 0;
 	int32 ExternalFactCapacity = 0;
 	TMap<FIntVector, FWaitingPlanSection> WaitingPlanSections;
+	struct FEnvironmentWait
+	{
+		uint64 WakeSerial = 0;
+		EVoxelWorkClass WorkClass = EVoxelWorkClass::None;
+		int32 SourcePriority = 0;
+		double DistanceScore = 0.0;
+		double ForwardScore = 0.0;
+	};
 	struct FExternalFactConsumer
 	{
 		FVoxelGenerationBounds Bounds;
 		FVoxelGenerationPlanDependencyCapture Dependencies;
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
 		TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe> EnvironmentInputs;
+		TOptional<FEnvironmentWait> EnvironmentWait;
 		TOptional<FVoxelTerrainServicePriority> ContinuationPriority;
 		uint64 WakeSerial = 0;
 		uint64 NaturalWakeSerial = 0;
