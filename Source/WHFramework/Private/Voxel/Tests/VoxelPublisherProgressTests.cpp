@@ -29,8 +29,6 @@ bool FVoxelPublisherProgressAndNearOrderTest::RunTest(const FString& Parameters)
 	Publication->Serial = 2;
 	Publication->bCoveragePrepared = true;
 	Publication->bGroupsPrepared = true;
-	Publication->bBuildOrderInitialized = true;
-	Publication->bBuildOrderDirty = false;
 	Publisher.Publications.Add(Publication);
 	Publisher.bPrioritiesDirty = false;
 	const auto AddReady = [&](const double Distance, const EVoxelTerrainServiceBand Band)

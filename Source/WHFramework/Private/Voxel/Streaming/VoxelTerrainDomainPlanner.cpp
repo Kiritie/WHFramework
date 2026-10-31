@@ -35,7 +35,7 @@ bool FVoxelTerrainDomainPlanner::ApplySourceDelta(const EVoxelTerrainRepresentat
 			Left.Source.ViewportHeightPixels == Right.Source.ViewportHeightPixels &&
 			Left.Source.GetSchedulingPriority() == Right.Source.GetSchedulingPriority() &&
 			Left.OuterRadiusCells == Right.OuterRadiusCells && Left.InnerRadiusCells == Right.InnerRadiusCells &&
-			Left.VerticalHalfExtentCells == Right.VerticalHalfExtentCells;
+			Left.VerticalHalfExtentCells == Right.VerticalHalfExtentCells && Left.MinimumSamplingDistanceCells == Right.MinimumSamplingDistanceCells;
 	};
 	bool bSameSources = Sources[Stage] && Sources[Stage]->Values.Num() == InSources.Num();
 	for (int32 Index = 0; bSameSources && Index < InSources.Num(); ++Index)
@@ -553,8 +553,14 @@ bool FVoxelTerrainDomainPlanner::Build(TConstArrayView<FVoxelStreamingSource> In
 				continue;
 			}
 
+			int32 SamplingFloor = 0;
+			if (Representation == EVoxelTerrainRepresentation::Surface)
+				SamplingFloor = Source.View.VoxelProxyRadiusCells > 0 ? Ranges.Proxy :
+					Source.Has(EVoxelStreamingCapability::FineVisual) ? Ranges.Fine : 0;
+			else if (Representation == EVoxelTerrainRepresentation::Macro) SamplingFloor = PreviousOuter;
 			Sources.Add({Source, Outer,
-				Representation == EVoxelTerrainRepresentation::VoxelProxy ? Source.View.VoxelProxyVerticalHalfExtentCells : (MAX_int32 / 2), Inner});
+				Representation == EVoxelTerrainRepresentation::VoxelProxy ? Source.View.VoxelProxyVerticalHalfExtentCells : (MAX_int32 / 2),
+				Inner, FMath::Min(Outer, SamplingFloor)});
 		}
 
 		const uint8 Maximum = Representation == EVoxelTerrainRepresentation::VoxelProxy ? InSettings.Lod.MaximumVoxelProxyLevel

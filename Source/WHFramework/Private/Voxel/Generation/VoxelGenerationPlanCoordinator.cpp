@@ -1413,6 +1413,9 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 		return {false, true, TEXT("生成事实需要完整Source优先级与Consumer身份")};
 	}
 
+	if (Storage)
+		if (const auto* Existing = Storage->Consumers.Find(InConsumer); Existing && Existing->bRetiring)
+			return {false, false, {}, true};
 	// 同一请求复用哈希，查找仍核对完整身份，不缓存事实就绪状态。
 	const uint32 ConsumerHash = GetTypeHash(InConsumer);
 	FString Error;
@@ -1456,6 +1459,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			Consumer = &Storage->Consumers.Add(InConsumer);
 			Consumer->PriorityNode = Node;
 		}
+		Consumer->bHydrologyReadinessTracked = false;
 		bool bSameDependencies = false;
 		{
 			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureBinding);
@@ -1599,6 +1603,9 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 #endif
 			};
 			Status.bReady = true;
+			const uint64 HydrologyRevision = Cache->GetHydrologyRetirementRevision();
+			bool bOnlyLeafHydrology = Desired.Count > 0;
+			Consumer->MissingHydrology = 0;
 			const auto VisitReadiness = [&](const FVoxelGenerationPlanDependency& Dependency, FSubscription* Subscription,
 				const bool bProbe, const bool* InCached)
 			{
@@ -1649,6 +1656,9 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 					Status.Error = State.Error;
 				}
 				Status.bReady &= bCached;
+				bOnlyLeafHydrology &= Dependency.Kind == EVoxelGenerationPlanKind::Hydrology && State.Prerequisites.IsEmpty();
+				Subscription->bHydrologyReady = bCached;
+				if (!bCached) ++Consumer->MissingHydrology;
 				if (Subscription->bWakePending)
 				{
 					TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnsureAcknowledgeWake);
@@ -1711,6 +1721,9 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			check(Consumer->Dependencies.Num() == Desired.Count);
 			Consumer->DonationPriority = Priority;
 			Consumer->DonationWorkClass = InWorkClass;
+			Consumer->HydrologyRetirementRevision = HydrologyRevision;
+			Consumer->bHydrologyReadinessTracked = bOnlyLeafHydrology && !Status.bFailed &&
+				HydrologyRevision == Cache->GetHydrologyRetirementRevision();
 #if !UE_BUILD_SHIPPING
 			static uint64 ReadinessCalls = 0;
 			static uint64 ExistingEdges = 0;
@@ -1733,10 +1746,12 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 				const auto Dependency = Storage->PriorityFacts.FindChecked(Node);
 				auto& State = Storage->States.FindChecked(Dependency);
 				const FGuid Next = State.NextDesired;
+				bool bWaitingPrerequisites = false;
 				if (State.State == EVoxelPlanDependencyState::Missing && !State.bInFlight)
 				{
 					if (State.PendingRequest.IsSet()) LinkPendingAdmission(State);
 					else if (ArePrerequisitesReady(State)) Queue(Dependency, State);
+					else bWaitingPrerequisites = true;
 				}
 				if (Storage != Desired.CapturedStorage || !Storage || Storage->Owner != this || Storage->Consumers.FindByHash(ConsumerHash, InConsumer) == nullptr)
 				{
@@ -1746,7 +1761,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 				}
 				const auto* Current = Storage->States.Find(Dependency);
 				if (!Current || (Current->State != EVoxelPlanDependencyState::Ready &&
-					!Current->bInFlight && !Current->bAdmissionLinked)) Status.bNeedsAdvance = true;
+					!Current->bInFlight && !Current->bAdmissionLinked && !bWaitingPrerequisites)) Status.bNeedsAdvance = true;
 				if (Current && Current->State == EVoxelPlanDependencyState::Failed)
 				{
 					Status.bReady = false;
@@ -1763,7 +1778,30 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 		Status.bReady = false;
 		Status.bNeedsAdvance = true;
 	}
+	if (Storage == CapturedStorage && Storage && Storage->Owner == this)
+	{
+		if (auto* Consumer = Storage->Consumers.Find(InConsumer); Consumer &&
+			(Status.bFailed || Status.bNeedsAdvance || !Status.Error.IsEmpty()))
+			Consumer->bHydrologyReadinessTracked = false;
+	}
 	return Status;
+}
+
+bool FVoxelGenerationPlanCoordinator::TryGetEnvironmentGeometryReadiness(
+	const FVoxelGenerationConsumerKey& InConsumer, const EVoxelWorkClass InWorkClass,
+	const FVoxelTerrainServicePriority& InPriority, FVoxelGenerationDependencyStatus& OutStatus) const
+{
+	check(IsInGameThread());
+	const auto* Consumer = Storage && Storage->Owner == this && InConsumer.WorldEpoch == WorldEpoch ?
+		Storage->Consumers.Find(InConsumer) : nullptr;
+	if (!ConsumerWakeCallback || !Consumer || Consumer->bRetiring || !Consumer->bHydrologyReadinessTracked ||
+		Consumer->DonationWorkClass != InWorkClass || !Consumer->DonationPriority.IsSet() ||
+		Consumer->DonationPriority.GetValue() != InPriority ||
+		Consumer->HydrologyRetirementRevision != Cache->GetHydrologyRetirementRevision()) return false;
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_EnvironmentGeometryIncrementalReadiness);
+	OutStatus = {};
+	OutStatus.bReady = Consumer->MissingHydrology == 0;
+	return true;
 }
 
 void FVoxelGenerationPlanCoordinator::Reset()
@@ -1797,19 +1835,91 @@ void FVoxelGenerationPlanCoordinator::Reset()
 	});
 }
 
+void FVoxelGenerationPlanCoordinator::RetireEnvironmentConsumer(const FVoxelGenerationConsumerKey& InConsumer)
+{
+	check(IsInGameThread());
+	if (!Storage) return;
+	if (auto* Consumer = Storage->Consumers.Find(InConsumer); Consumer && !Consumer->bRetiring)
+	{
+		UnlinkConsumerWake(*Consumer);
+		Consumer->WakeHead.Invalidate();
+		Consumer->WakeTail.Invalidate();
+		Consumer->PreviousRetiring = Storage->RetiringTail;
+		if (Storage->RetiringTail.IsValid()) Storage->Consumers.FindChecked(Storage->RetiringTail).NextRetiring = InConsumer;
+		else Storage->RetiringHead = InConsumer;
+		Storage->RetiringTail = InConsumer;
+		Consumer->bRetiring = true;
+	}
+	if (InConsumer.Kind == EVoxelGenerationConsumerKind::Environment)
+	{
+		auto Space = InConsumer;
+		Space.RequestSerial = 1;
+		if (const auto* Current = Storage->EnvironmentAttempts.Find(Space); Current && *Current == InConsumer)
+			Storage->EnvironmentAttempts.Remove(Space);
+	}
+}
+
+void FVoxelGenerationPlanCoordinator::UnlinkRetiringConsumer(FConsumerState& InState)
+{
+	if (!InState.bRetiring) return;
+	if (InState.PreviousRetiring.IsValid()) Storage->Consumers.FindChecked(InState.PreviousRetiring).NextRetiring = InState.NextRetiring;
+	else Storage->RetiringHead = InState.NextRetiring;
+	if (InState.NextRetiring.IsValid()) Storage->Consumers.FindChecked(InState.NextRetiring).PreviousRetiring = InState.PreviousRetiring;
+	else Storage->RetiringTail = InState.PreviousRetiring;
+	InState.PreviousRetiring = {};
+	InState.NextRetiring = {};
+	InState.bRetiring = false;
+}
+
+int32 FVoxelGenerationPlanCoordinator::AdvanceRetiringConsumers(const double InDeadline, const int32 InMaximumEdges)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanEnvironmentRetirement);
+	const auto CapturedStorage = Storage;
+	int32 Processed = 0;
+	while (Storage && Storage == CapturedStorage && Storage->Owner == this && Storage->RetiringHead.IsValid() &&
+		Processed < InMaximumEdges && FPlatformTime::Seconds() < InDeadline)
+	{
+		const auto Key = Storage->RetiringHead;
+		auto& Consumer = Storage->Consumers.FindChecked(Key);
+		++Processed;
+		if (Consumer.RetirementCursor >= Consumer.Dependencies.GetMaxIndex())
+		{
+			const FGuid Node = Consumer.PriorityNode;
+			UnlinkRetiringConsumer(Consumer);
+			Storage->Consumers.Remove(Key);
+			PriorityGraph.Remove(Node);
+			continue;
+		}
+		const auto Index = FSetElementId::FromInteger(Consumer.RetirementCursor++);
+		if (!Consumer.Dependencies.IsValidId(Index)) continue;
+		const auto Dependency = Consumer.Dependencies.Get(Index).Key;
+		const uint64 Id = Consumer.Dependencies.Get(Index).Value.Id;
+		check(Dependency.Kind == EVoxelGenerationPlanKind::Hydrology);
+		if (const auto* State = Storage->States.Find(Dependency))
+		{
+			check(State->Prerequisites.IsEmpty());
+			PriorityGraph.RemoveDependency(Consumer.PriorityNode, State->PriorityNode);
+		}
+		Consumer.Dependencies.Remove(Dependency);
+		RemoveSubscription(Dependency, Key, Id);
+	}
+	return Processed;
+}
+
 void FVoxelGenerationPlanCoordinator::ReleaseConsumer(const FVoxelGenerationConsumerKey& InConsumer)
 {
 	check(IsInGameThread());
 	if (!Storage) return;
+	if (const auto* Consumer = Storage->Consumers.Find(InConsumer); Consumer && Consumer->bRetiring) return;
 	const auto CapturedStorage = Storage;
 	if (auto* Consumer = Storage->Consumers.Find(InConsumer))
 	{
 		const FGuid Node = Consumer->PriorityNode;
-		for (auto& Edge : Consumer->Dependencies)
-		{
-			UnlinkSubscriptionWake(*Consumer, Edge.Value);
-		}
+		if (!Consumer->bRetiring)
+			for (auto& Edge : Consumer->Dependencies)
+				UnlinkSubscriptionWake(*Consumer, Edge.Value);
 		UnlinkConsumerWake(*Consumer);
+		UnlinkRetiringConsumer(*Consumer);
 		// 先脱离可重入查找表，再逐个撤销；旧依赖正文与授额在局部一起持有。
 		FConsumerState Releasing = MoveTemp(*Consumer);
 		Storage->Consumers.Remove(InConsumer);
@@ -1880,6 +1990,7 @@ uint64 FVoxelGenerationPlanCoordinator::GetWaitingConsumers(const EVoxelGenerati
 	uint64 Count = 0;
 	for (const auto& Consumer : Storage->Consumers)
 	{
+		if (Consumer.Value.bRetiring) continue;
 		for (const auto& Edge : Consumer.Value.Dependencies)
 		{
 			const auto* State = Storage->States.Find(Edge.Key);
@@ -1976,8 +2087,21 @@ void FVoxelGenerationPlanCoordinator::WakeConsumers(const FVoxelGenerationPlanDe
 	for (const auto& Donation : State->Donations)
 	{
 		auto* Consumer = Storage->Consumers.Find(Donation.Key);
-		auto* Edge = Consumer ? Consumer->Dependencies.Find(InDependency) : nullptr;
-		if (!Edge || Edge->Id != Donation.Value.SubscriptionId || Donation.Key.WorldEpoch != WorldEpoch || Edge->bWakePending) continue;
+		auto* Edge = Consumer && !Consumer->bRetiring ? Consumer->Dependencies.Find(InDependency) : nullptr;
+		if (!Edge || Edge->Id != Donation.Value.SubscriptionId || Donation.Key.WorldEpoch != WorldEpoch) continue;
+		if (Consumer->bHydrologyReadinessTracked)
+		{
+			if (InDependency.Kind != EVoxelGenerationPlanKind::Hydrology ||
+				State->State != EVoxelPlanDependencyState::Ready || !State->Prerequisites.IsEmpty())
+				Consumer->bHydrologyReadinessTracked = false;
+			else if (!Edge->bHydrologyReady)
+			{
+				check(Consumer->MissingHydrology > 0);
+				--Consumer->MissingHydrology;
+				Edge->bHydrologyReady = true;
+			}
+		}
+		if (Edge->bWakePending) continue;
 		Edge->bWakePending = true;
 		Edge->PreviousWake = Consumer->WakeTail;
 		Edge->NextWake.Invalidate();
@@ -1993,10 +2117,16 @@ int32 FVoxelGenerationPlanCoordinator::AdvanceConsumerWakes(const double InDeadl
 {
 	check(IsInGameThread());
 	const int32 Maximum = FMath::Max(0, InMaximumEdges);
-	const int32 AdmissionBudget = Storage && Storage->WakeHead.IsValid() ? Maximum / 2 : Maximum;
+	const double Started = FPlatformTime::Seconds();
+	const double RetirementDeadline = FMath::Min(InDeadline, Started + FMath::Max(0.0, InDeadline - Started) * 0.5);
+	const int32 RetirementSteps = AdvanceRetiringConsumers(RetirementDeadline, Maximum / 2);
+	const int32 Remaining = Maximum - RetirementSteps;
+	if (Storage && PriorityGraph.IsPending() && FPlatformTime::Seconds() < InDeadline) AdvancePriorityDonations();
+	if (Storage && FPlatformTime::Seconds() < InDeadline) RefreshQueuedPriorities();
+	const int32 AdmissionBudget = Storage && Storage->WakeHead.IsValid() ? Remaining / 2 : Remaining;
 	const int32 AdmissionSteps = AdvancePendingAdmissions(InDeadline, AdmissionBudget);
 	int32 Processed = 0;
-	while (Storage && Storage->WakeHead.IsValid() && Processed < Maximum - AdmissionSteps && FPlatformTime::Seconds() <= InDeadline)
+	while (Storage && Storage->WakeHead.IsValid() && Processed < Remaining - AdmissionSteps && FPlatformTime::Seconds() <= InDeadline)
 	{
 		const auto ConsumerKey = Storage->WakeHead;
 		auto& Consumer = Storage->Consumers.FindChecked(ConsumerKey);
@@ -2015,7 +2145,7 @@ int32 FVoxelGenerationPlanCoordinator::AdvanceConsumerWakes(const double InDeadl
 		if (Donation && Donation->SubscriptionId == Id && ConsumerKey.WorldEpoch == WorldEpoch && ConsumerWakeCallback)
 			ConsumerWakeCallback(ConsumerKey);
 	}
-	return Processed;
+	return Processed + RetirementSteps;
 }
 
 FVoxelGenerationConsumerKey FVoxelGenerationPlanCoordinator::EnvironmentConsumer(

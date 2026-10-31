@@ -191,7 +191,6 @@ bool FVoxelNetworkRepresentationDataCodecTest::RunTest(const FString& InParamete
 	Macro.WaterKind = {uint8(EVoxelWaterKind::River), uint8(EVoxelWaterKind::Lake),
 		uint8(EVoxelWaterKind::Ocean), uint8(EVoxelWaterKind::None)};
 	Macro.SurfaceStates = { FVoxelBlockState(1, 0), FVoxelBlockState(2, 0), FVoxelBlockState(3, 0), FVoxelBlockState(4, 0) }; Macro.ForestCoverage = { 5, 6, 7, 8 };
-	Macro.SnowCoverage = { 8, 7, 6, 5 };
 	Macro.LargeStructures.Add({ FIntPoint(4, 5), 6, 7, 8 });
 	Macro.DistantCells.Add({FIntVector(-128, 512, 12), FIntVector(-80, 560, 58),
 		FVoxelBlockState(3, 9), {31, 37}});

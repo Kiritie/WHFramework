@@ -666,9 +666,9 @@ void UVoxelModule::OnRefresh(
 
 		if (GenerationCache)
 		{
-			const FVoxelGenerationCacheStats CacheStats = GenerationCache->GetStats();
+			const FVoxelGenerationCacheStats CacheStats = GenerationCache->GetStats(false);
 			UE_LOG(LogTemp, Display,
-				TEXT("Voxel cache: base=%d natural=%d hydro=%d cave=%d ecology=%d feature=%d structure=%d memory=%.2fMiB waits=%llu waitMs=%.2f"),
+				TEXT("Voxel cache: base=%d natural=%d hydro=%d cave=%d ecology=%d feature=%d structure=%d waits=%llu waitMs=%.2f"),
 				CacheStats.BaseColumns,
 				CacheStats.NaturalColumns,
 				CacheStats.Hydrology,
@@ -676,7 +676,6 @@ void UVoxelModule::OnRefresh(
 				CacheStats.Ecology,
 				CacheStats.Features,
 				CacheStats.Structures,
-				static_cast<double>(CacheStats.AllocatedBytes) / (1024.0 * 1024.0),
 				CacheStats.GateWaitCount,
 				static_cast<double>(CacheStats.GateWaitMicroseconds) / 1000.0);
 		}

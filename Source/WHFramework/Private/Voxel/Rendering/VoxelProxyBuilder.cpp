@@ -404,33 +404,56 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 				bSampleFailed = true;
 				return;
 			}
-			for (int32 Z = 0; Z < Height; ++Z)
-			{
-				FVoxelBlockState EditedTrunk = Trunk;
-				InOverlays.ApplyAt(Anchor + FIntVector(0, 0, Z), EditedTrunk);
-				if (EditedTrunk != Trunk) return;
-			}
-			const int32 RootZ = VoxelGeneration::FloorDivide(Anchor.Z - Origin.Z, Step);
-			const int32 CrownZ = FMath::Max(RootZ + 1,
-				VoxelGeneration::FloorDivide(Anchor.Z + Height - 1 - Origin.Z, Step));
-			for (int32 Z = RootZ; Z <= CrownZ; ++Z)
-			{
-				Draw(FIntVector(Anchor.X, Anchor.Y, Origin.Z + Z * Step), Trunk, false);
-			}
-			const int32 Radius = FMath::Max(1, (Trees.CrownRadius - 1) / Step);
-			for (int32 Z = -Radius; Z <= Radius; ++Z)
-			{
-				for (int32 Y = -Radius; Y <= Radius; ++Y)
+			if (InOverlays.Num())
+				for (int32 Z = 0; Z < Height; ++Z)
 				{
-					for (int32 X = -Radius; X <= Radius; ++X)
-					{
-						if (!FVoxelEcologyGenerator::ContainsCrown(FIntVector(X, Y, Z), Radius, TreeId, Species.Form)) continue;
-						Config->ToRuntime(FVoxelEcologyGenerator::SelectLeaf(Species, Z, Radius), Leaves);
-						Draw(FIntVector(Anchor.X + X * Step, Anchor.Y + Y * Step,
-							Origin.Z + (CrownZ + Z) * Step), Leaves, true);
-					}
+					const FIntRect Section = FVoxelEcologyGenerator::TrunkSection(Height, Z, Trees.CrownRadius, TreeId, Species.Form);
+					for (int32 Y = Section.Min.Y; Y < Section.Max.Y; ++Y)
+						for (int32 X = Section.Min.X; X < Section.Max.X; ++X)
+						{
+							FVoxelBlockState EditedTrunk = Trunk;
+							InOverlays.ApplyAt(Anchor + FIntVector(X, Y, Z), EditedTrunk);
+							if (EditedTrunk != Trunk) return;
+						}
 				}
+			const int32 RootZ = VoxelGeneration::FloorDivide(Anchor.Z - Origin.Z, Step);
+			const int32 LastTrunkZ = VoxelGeneration::FloorDivide(Anchor.Z + Height - 1 - Origin.Z, Step);
+			for (int32 Z = RootZ; Z <= LastTrunkZ; ++Z)
+			{
+				const int32 FirstLayer = FMath::Max(0, Origin.Z + Z * Step - Anchor.Z);
+				const int32 LastLayer = FMath::Min(Height, Origin.Z + (Z + 1) * Step - Anchor.Z);
+				if (FirstLayer >= LastLayer) continue;
+				const FIntRect Section = FVoxelEcologyGenerator::TrunkBounds(Height, FirstLayer, LastLayer, Trees.CrownRadius, TreeId, Species.Form);
+				const int32 MinX = VoxelGeneration::FloorDivide(Anchor.X + Section.Min.X - Origin.X, Step);
+				const int32 MinY = VoxelGeneration::FloorDivide(Anchor.Y + Section.Min.Y - Origin.Y, Step);
+				const int32 MaxX = VoxelGeneration::FloorDivide(Anchor.X + Section.Max.X - 1 - Origin.X, Step);
+				const int32 MaxY = VoxelGeneration::FloorDivide(Anchor.Y + Section.Max.Y - 1 - Origin.Y, Step);
+				for (int32 Y = MinY; Y <= MaxY; ++Y)
+					for (int32 X = MinX; X <= MaxX; ++X)
+						Draw(Origin + FIntVector(X, Y, Z) * Step, Trunk, false);
 			}
+			const int32 Radius = Trees.CrownRadius;
+			const FIntVector CrownCenter = Anchor + FIntVector(0, 0, Height - 1);
+			FIntVector ShapeMin;
+			FIntVector ShapeMax;
+			FVoxelEcologyGenerator::CrownBounds(Radius, Species.Form, ShapeMin, ShapeMax);
+			FIntVector CrownMin;
+			FIntVector CrownMax;
+			for (int32 Axis = 0; Axis < 3; ++Axis)
+			{
+				CrownMin[Axis] = VoxelGeneration::FloorDivide(CrownCenter[Axis] + ShapeMin[Axis] - Origin[Axis], Step);
+				CrownMax[Axis] = VoxelGeneration::FloorDivide(CrownCenter[Axis] + ShapeMax[Axis] - 1 - Origin[Axis], Step);
+			}
+			for (int32 Z = CrownMin.Z; Z <= CrownMax.Z; ++Z)
+				for (int32 Y = CrownMin.Y; Y <= CrownMax.Y; ++Y)
+					for (int32 X = CrownMin.X; X <= CrownMax.X; ++X)
+					{
+						const FIntVector Min = Origin + FIntVector(X, Y, Z) * Step;
+						if (!FVoxelEcologyGenerator::CrownIntersects(Min - CrownCenter, Min + FIntVector(Step) - CrownCenter, Radius, TreeId, Species.Form)) continue;
+						const int32 LeafZ = FMath::Clamp(Min.Z + Step / 2 - CrownCenter.Z, -Radius, Radius);
+						Config->ToRuntime(FVoxelEcologyGenerator::SelectLeaf(Species, LeafZ, Radius), Leaves);
+						Draw(Min, Leaves, true);
+					}
 		}, Candidates, Accepted, InCancel);
 	if (bSampleFailed) return false;
 	if (InCancel && InCancel->Load())

@@ -5,7 +5,6 @@
 #include "Voxel/Rendering/VoxelViewTypes.h"
 #include "Voxel/Rendering/VoxelFinePage.h"
 #include "Voxel/Rendering/VoxelStreamingGeometry.h"
-#include "Voxel/Rendering/VoxelTerrainViewPlan.h"
 #include "Voxel/Streaming/VoxelStreamingSource.h"
 #include "Voxel/Generation/VoxelGenerationTypes.h"
 #include "Voxel/Task/VoxelTerrainWorkSelection.h"
@@ -82,7 +81,6 @@ struct WHFRAMEWORK_API FVoxelTerrainPublicationInputs
 {
 	int32 MaximumFeedbackSections = 0;
 	TArray<FVoxelTerrainGeometry> Geometry;
-	TArray<FVoxelViewKey> Roots;
 	TArray<FIntVector> Fine;
 	TArray<FIntVector> RuntimeSections;
 	TArray<FVoxelViewKey> Proxy;
@@ -97,7 +95,7 @@ struct WHFRAMEWORK_API FVoxelTerrainPublicationInputs
 	uint64 GetAllocatedBytes() const
 	{
 		return AdmissionLanes[0].GetAllocatedSize() + AdmissionLanes[1].GetAllocatedSize() + AdmissionLanes[2].GetAllocatedSize() +
-			   AdmissionLanes[3].GetAllocatedSize() + Geometry.GetAllocatedSize() + Roots.GetAllocatedSize() + Fine.GetAllocatedSize() +
+			   AdmissionLanes[3].GetAllocatedSize() + Geometry.GetAllocatedSize() + Fine.GetAllocatedSize() +
 			   Proxy.GetAllocatedSize() + Surface.GetAllocatedSize() + Macro.GetAllocatedSize() + FinePages.GetAllocatedSize() + FineOwners.GetAllocatedSize() +
 			   Admissions.GetAllocatedSize() + AdmissionPriorities.GetAllocatedSize() + FineShards.GetAllocatedSize() + RuntimeSections.GetAllocatedSize();
 	}
@@ -126,7 +124,6 @@ struct WHFRAMEWORK_API FVoxelInterestSet
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FinalizationLease;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CoarseCompositionLease;
 	TMap<FGuid, FVoxelSourceInterest> Sources;
-	FVoxelTerrainViewPlan TerrainPlan;
 	TSharedPtr<const FVoxelFinePagePlan, ESPMode::ThreadSafe> FinePagePlan;
 	TSharedPtr<const FVoxelTerrainPublicationInputs, ESPMode::ThreadSafe> PublicationInputs;
 	TMap<FVoxelTerrainSpatialKey, FVoxelTerrainGeometry> Geometry;

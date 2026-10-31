@@ -4418,6 +4418,7 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 		FWriteScopeLock Scope(
 			Shard.Lock);
 
+		const int32 PreviousHydrologyCount = Shard.Hydrology.Num();
 		bRetirementLimited |= !TrimMapBudgeted(
 			Shard.Hydrology,
 			Shard.HydrologyKeys,
@@ -4433,6 +4434,11 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 					RegionCenter,
 					&FVoxelGenerationCacheRetentionPoint::HydrologyRadiusCells);
 			});
+		if (Shard.Hydrology.Num() != PreviousHydrologyCount)
+		{
+			check(HydrologyRetirementRevision.Load() != MAX_uint64);
+			++HydrologyRetirementRevision;
+		}
 
         bRetirementLimited |= !TrimMapBudgeted(
             Shard.HydrologyTopology, Shard.HydrologyTopologyKeys, Shard.HydrologyTopologyCursor,
@@ -4716,6 +4722,8 @@ void FVoxelGenerationPlanCache::TickMaintenance(
 void FVoxelGenerationPlanCache::Reset()
 {
 	bHydrologyResetting.Store(true);
+	check(HydrologyRetirementRevision.Load() != MAX_uint64);
+	++HydrologyRetirementRevision;
 	check(HydrologyGeneration.Load() != MAX_uint64);
 	++HydrologyGeneration;
 	ON_SCOPE_EXIT
@@ -4929,7 +4937,7 @@ void FVoxelGenerationPlanCache::Reset()
 }
 
 FVoxelGenerationCacheStats
-FVoxelGenerationPlanCache::GetStats() const
+FVoxelGenerationPlanCache::GetStats(const bool bInIncludeAllocatedBytes) const
 {
 	FVoxelGenerationCacheStats Stats;
 
@@ -4984,8 +4992,10 @@ FVoxelGenerationPlanCache::GetStats() const
 	Stats.GateWaitMicroseconds =
 		GateWaitMicroseconds.Load();
 
-	Stats.AllocatedBytes =
-		GetAllocatedBytes();
+	if (bInIncludeAllocatedBytes)
+	{
+		Stats.AllocatedBytes = GetAllocatedBytes();
+	}
 
 	return Stats;
 }

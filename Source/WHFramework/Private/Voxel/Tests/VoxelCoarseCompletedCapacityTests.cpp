@@ -113,7 +113,6 @@ bool FVoxelCoarseCompletedCapacityTest::RunTest(const FString& Parameters)
 	MinimumRetained += RetainCoarseTestArray(Result.Macro->WaterKind);
 	MinimumRetained += RetainCoarseTestArray(Result.Macro->SurfaceStates);
 	MinimumRetained += RetainCoarseTestArray(Result.Macro->ForestCoverage);
-	MinimumRetained += RetainCoarseTestArray(Result.Macro->SnowCoverage);
 	MinimumRetained += RetainCoarseTestArray(Result.Macro->LargeStructures);
 	MinimumRetained += RetainCoarseTestArray(Result.Macro->DistantCells);
 	Result.VoxelProxyMesh = Storage.MakeResult<FVoxelSectionMeshResult>();

@@ -100,6 +100,10 @@ public:
 
 	FVoxelEcologySample Sample(const FVoxelColumnSample& InColumn) const;
 
+	static FIntRect TrunkSection(int32 InHeight, int32 InZ, int32 InCrownRadius, const FVoxelStableId& InTreeId, EVoxelTreeForm InForm);
+	static FIntRect TrunkBounds(int32 InHeight, int32 InFirstZ, int32 InLastZ, int32 InCrownRadius, const FVoxelStableId& InTreeId, EVoxelTreeForm InForm);
+	static void CrownBounds(int32 InRadius, EVoxelTreeForm InForm, FIntVector& OutMin, FIntVector& OutMax);
+	static bool CrownIntersects(const FIntVector& InMin, const FIntVector& InMax, int32 InRadius, const FVoxelStableId& InTreeId, EVoxelTreeForm InForm);
 	static bool ContainsCrown(const FIntVector& InOffset, int32 InRadius, const FVoxelStableId& InTreeId, EVoxelTreeForm InForm = EVoxelTreeForm::Broadleaf);
 	FVoxelTreeSpecies SelectTreeSpecies(const FVoxelColumnSample& InColumn, const FVoxelStableId& InTreeId) const;
 	static uint16 SelectLeaf(const FVoxelTreeSpecies& InSpecies, int32 InZ, int32 InRadius);
@@ -124,6 +128,8 @@ public:
 		FVoxelTreeRejectDiagnostics* OutRejects = nullptr) const;
 
 private:
+	static void CrownLobe(int32 InIndex, EVoxelTreeForm InForm, const FVoxelStableId& InTreeId, FVector& OutCenter, FVector& OutRadii);
+
 	static bool AppendWorldWrite(
 		TFunctionRef<bool(const FVoxelEcologyPlanWrite&)> InEmit,
 		const FInt64Vector& InPosition,

@@ -45,8 +45,7 @@ uint64 FVoxelInterestSet::GetAllocatedBytes() const
 		AllocatedBytes(Admissions) + AllocatedBytes(AdmissionLanes[0]) + AllocatedBytes(AdmissionLanes[1]) +
 		AllocatedBytes(AdmissionLanes[2]) + AllocatedBytes(AdmissionLanes[3]) + AllocatedBytes(Exact) + AllocatedBytes(VoxelProxy) +
 		AllocatedBytes(Surface) + AllocatedBytes(Macro) + AllocatedBytes(VoxelProxyPriorities) + AllocatedBytes(SurfacePriorities) +
-		AllocatedBytes(MacroPriorities) + AllocatedBytes(TerrainPlan.Roots) + AllocatedBytes(TerrainPlan.Leaves) +
-		AllocatedBytes(TerrainPlan.Required) + AllocatedBytes(TerrainPlan.FineDependencies);
+		AllocatedBytes(MacroPriorities);
 }
 
 uint64 FVoxelInterestSet::GetOwnedAllocatedBytes() const
@@ -224,7 +223,6 @@ bool FVoxelInterestManager::BuildPublicationInputs(FVoxelInterestSet& Interest, 
 	{ OutError = TEXT("Oversized: Fine feedback section index"); return false; }
 	const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainPublicationInputs>() +
 		VoxelBoundedAllocation::ArrayBytes<FVoxelTerrainGeometry>(Interest.Geometry.Num()) +
-		VoxelBoundedAllocation::ArrayBytes<FVoxelViewKey>(Interest.TerrainPlan.Roots.Num()) +
 		VoxelBoundedAllocation::ArrayBytes<FIntVector>(Interest.FineSections->Num()) +
 		VoxelBoundedAllocation::ArrayBytes<FIntVector>(Interest.Exact.Num()) +
 		VoxelBoundedAllocation::ArrayBytes<FVoxelViewKey>(Interest.VoxelProxy.Num()) +
@@ -249,8 +247,6 @@ bool FVoxelInterestManager::BuildPublicationInputs(FVoxelInterestSet& Interest, 
 	Inputs->MaximumFeedbackSections = int32(FeedbackRows);
 	Inputs->Geometry.Reserve(Interest.Geometry.Num());
 	for (const auto& Pair : Interest.Geometry) Inputs->Geometry.Add(Pair.Value);
-	Inputs->Roots.Reserve(Interest.TerrainPlan.Roots.Num());
-	for (const auto& Key : Interest.TerrainPlan.Roots) Inputs->Roots.Add(Key);
 	Inputs->Fine.Reserve(Interest.FineSections->Num());
 	for (const auto& Key : *Interest.FineSections) Inputs->Fine.Add(Key);
 	Inputs->RuntimeSections.Reserve(Interest.Exact.Num());

@@ -161,18 +161,6 @@ bool FVoxelTerrainStageCache::AccumulateRetainedInput(const FVoxelTerrainResourc
 		for (int32 I = 0; I < 4; ++I) Nodes[I] = Indexes[I] ? Indexes[I]->Slots[Slot].Get() : nullptr;
 		if (!VisitSpatial(VisitSpatial, Nodes, 27, Active && StageSpatialRootSlot(Active->Key) == Slot)) return false;
 	}
-	// 旧完整 Build 只为兼容非增量调用保留；生产 Domain 仅使用 Slots。
-	for (int32 I = 0; I < 4; ++I)
-	{
-		if (!Indexes[I] || Indexes[I]->bIncremental) continue;
-		bool Seen = false; for (int32 J = 0; J < I; ++J) Seen |= Indexes[I] == Indexes[J];
-		if (Seen) continue;
-		for (const auto& Pair : Indexes[I]->Roots)
-		{
-			const FVoxelTerrainStageCacheNode* Values[9] = {Pair.Value.Get()};
-			if (!VisitCache(VisitCache, Values)) return false;
-		}
-	}
 	return !bInIncludeCoverage || FVoxelCoverageIndex::AccumulateRetainedInputs(InResources, MakeArrayView(Coverage),
 		MakeArrayView(Serials, SerialCount), InOutBytes, InOutLeaseCount);
 }
@@ -269,6 +257,62 @@ bool ResolveLocalPredecessorPreference(
 	OutPreference = Preferred;
 	return true;
 }
+
+bool ValidateStagePolicy(const EVoxelTerrainRepresentation Representation, const uint8 MaximumLevel,
+	const int32 MaximumSamples, const int32 MinZ, const int32 MaxZ, const double Pixels,
+	const FVoxelTerrainPageCostLimits& Limits, FString& Error)
+{
+	if ((Representation != EVoxelTerrainRepresentation::VoxelProxy && Representation != EVoxelTerrainRepresentation::Surface &&
+		Representation != EVoxelTerrainRepresentation::Macro) || MaximumLevel > VoxelStreamingGeometry::MaximumSpatialLevel ||
+		MinZ >= MaxZ || !FMath::IsFinite(Pixels) || Pixels <= 0.0 || !FMath::IsPowerOfTwo(MaximumSamples) ||
+		MaximumSamples < (Representation == EVoxelTerrainRepresentation::VoxelProxy ? 32 : 16) ||
+		MaximumSamples > (Representation == EVoxelTerrainRepresentation::VoxelProxy ? 128 : 256) ||
+		(Representation == EVoxelTerrainRepresentation::VoxelProxy && MaximumLevel < 1) || Limits.Triangles == 0 || Limits.MeshBytes == 0 ||
+		!FMath::IsFinite(Limits.BuildMilliseconds) || Limits.BuildMilliseconds <= 0.0)
+	{
+		Error = TEXT("Invalid coarse stage policy");
+		return false;
+	}
+	return true;
+}
+
+bool ValidateStageSources(TConstArrayView<FVoxelTerrainStageSource> Sources, const bool bColumn, const uint8 MaximumLevel,
+	const int32 MinZ, const int32 MaxZ, FString& Error)
+{
+	constexpr int64 MaximumRoots = 1 << 20;
+	int64 TotalRoots = 0;
+	for (const auto& Source : Sources)
+	{
+		if (Source.OuterRadiusCells < 0 || Source.VerticalHalfExtentCells < 0 || Source.MinimumSamplingDistanceCells < 0 ||
+			Source.MinimumSamplingDistanceCells > Source.OuterRadiusCells || !FMath::IsFinite(Source.Source.VerticalFovDegrees) ||
+			Source.Source.VerticalFovDegrees <= 0.0 || Source.Source.VerticalFovDegrees >= 180.0 || Source.Source.ViewportHeightPixels <= 0)
+		{
+			Error = TEXT("Invalid coarse stage source");
+			return false;
+		}
+		FVoxelTerrainStageRootRange Range;
+		if (!StageSourceRootRange(Source, bColumn, MaximumLevel, MinZ, MaxZ, Range)) continue;
+		int64 Count = 1;
+		for (int32 Axis = 0; Axis < 3; ++Axis)
+		{
+			const int64 Width = int64(Range.Max[Axis]) - Range.Min[Axis] + 1;
+			if (Width <= 0 || Width > MaximumRoots || Count > MaximumRoots / Width)
+			{
+				Error = TEXT("CapacityUnachievable: coarse root enumeration");
+				return false;
+			}
+			Count *= Width;
+		}
+		if (TotalRoots > MaximumRoots - Count)
+		{
+			Error = TEXT("CapacityUnachievable: coarse root enumeration");
+			return false;
+		}
+		TotalRoots += Count;
+	}
+	return true;
+}
+
 }
 
 bool FVoxelTerrainStagePlanner::Build(const EVoxelTerrainRepresentation InRepresentation, TConstArrayView<FVoxelTerrainStageSource> InSources,
@@ -276,330 +320,78 @@ bool FVoxelTerrainStagePlanner::Build(const EVoxelTerrainRepresentation InRepres
 	const uint64 InGeneratorIdentity, const uint64 InMaterialRevision, FVoxelTerrainStagePlan& OutPlan, FString& OutError,
 	const FVoxelCoverageIndex* InPredecessorCoverage, const FVoxelTerrainPageCostLimits& InCostLimits, FVoxelTerrainStageCache* InCache)
 {
+	if (!ValidateStagePolicy(InRepresentation, InMaximumLevel, InMaximumSamplesPerAxis, InWorldMinZ, InWorldMaxZ,
+		InTargetPixels, InCostLimits, OutError) ||
+		!ValidateStageSources(InSources, InRepresentation != EVoxelTerrainRepresentation::VoxelProxy,
+			InMaximumLevel, InWorldMinZ, InWorldMaxZ, OutError))
+	{
+		return false;
+	}
+	FVoxelTerrainStageCache LocalCache;
+	FVoxelTerrainStageCache& Cache = InCache ? *InCache : LocalCache;
 	bool bCompletedBuild = false;
-	const uint64 BeforeBuild = InCache && InCache->Resources ? InCache->Resources->ReleaseVersionExcludingOwner(InCache->Consumer) : 0;
+	const uint64 BeforeBuild = Cache.Resources ? Cache.Resources->ReleaseVersionExcludingOwner(Cache.Consumer) : 0;
 	ON_SCOPE_EXIT
 	{
-		if (!bCompletedBuild && InCache && InCache->Resources)
+		if (!bCompletedBuild)
 		{
-			InCache->bCapacityBlocked = OutError.StartsWith(TEXT("CapacityBlocked"));
-			InCache->RetryCapacityVersion = BeforeBuild;
+			Cache.bCapacityBlocked = OutError.StartsWith(TEXT("CapacityBlocked"));
+			Cache.RetryCapacityVersion = BeforeBuild;
 		}
 	};
-	if (InRepresentation != EVoxelTerrainRepresentation::VoxelProxy && InRepresentation != EVoxelTerrainRepresentation::Surface &&
-		InRepresentation != EVoxelTerrainRepresentation::Macro)
+	bool bSameSources = Cache.SourceInputs && Cache.SourceInputs->Values.Num() == InSources.Num();
+	for (int32 Index = 0; bSameSources && Index < InSources.Num(); ++Index)
 	{
-		OutError = TEXT("Stage planner only builds coarse representations; Fine uses complete real Section families");
-		return false;
+		bSameSources = SameStageInfluence(Cache.SourceInputs->Values[Index], InSources[Index]);
 	}
-
-	if (InMaximumLevel > VoxelStreamingGeometry::MaximumSpatialLevel ||
-		InMaximumSamplesPerAxis < (InRepresentation == EVoxelTerrainRepresentation::VoxelProxy ? 32 : 16) ||
-		InMaximumSamplesPerAxis > (InRepresentation == EVoxelTerrainRepresentation::VoxelProxy ? 128 : 256) || !FMath::IsPowerOfTwo(InMaximumSamplesPerAxis) ||
-		(InRepresentation == EVoxelTerrainRepresentation::VoxelProxy && InMaximumLevel < 1) || InCostLimits.Triangles == 0 || InCostLimits.MeshBytes == 0 ||
-		!FMath::IsFinite(InCostLimits.BuildMilliseconds) || InCostLimits.BuildMilliseconds <= 0.0 || InWorldMinZ >= InWorldMaxZ ||
-		!FMath::IsFinite(InTargetPixels) || InTargetPixels <= 0.0)
-	{
-		OutError = TEXT("Invalid stage policy");
-		return false;
-	}
-
-	if (InCache && InCache->Resources)
-	{
-		bool SameSources = InCache->SourceInputs && InCache->SourceInputs->Values.Num() == InSources.Num();
-		for (int32 I = 0; SameSources && I < InSources.Num(); ++I) SameSources = SameStageInfluence(InCache->SourceInputs->Values[I], InSources[I]);
-		if (!SameSources)
-		{
-			TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-			uint64 Input = OutPlan.RetainedInputBytes; int32 Count = OutPlan.RetainedLeaseCount;
-			if (!InCache->AccumulateRetainedInput(*InCache->Resources, nullptr, {}, Input, Count))
-			{ OutError = TEXT("CapacityUnachievable: coarse compatibility frozen roots"); return false; }
-			if (OutPlan.ResourceLease && OutPlan.ResourceLease->IsOwnedBy(*InCache->Resources))
-			{ Input += OutPlan.ResourceLease->GetPool() == EVoxelTerrainResourcePool::Input ? OutPlan.ResourceLease->Bytes() : 0; ++Count; }
-			const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainDomainSourceBatch>() +
-				VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelTerrainStageSource, FDefaultAllocator>(InSources.Num());
-			const auto Admission = InCache->Resources->TryAcquire(InCache->Consumer, EVoxelTerrainResourcePool::Input, Bytes, Lease, 0, Input, Count);
-			if (Admission != EVoxelTerrainResourceAdmission::Granted)
-			{ OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: coarse frozen compatibility source") : TEXT("CapacityUnachievable: coarse frozen compatibility source"); return false; }
-			auto Batch = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainDomainSourceBatch>(Lease);
-			Batch->Lease = MoveTemp(Lease); Batch->Values.Reserve(InSources.Num()); Batch->Values.Append(InSources);
-			InCache->SourceInputs = MoveTemp(Batch);
-		}
-		// 同步兼容入口完成全部游标；生产 Domain 每次只调用一次有界 Advance。
-		for (;;)
-		{
-			if (AdvanceDirtyRoots(InRepresentation, InMaximumLevel, InMaximumSamplesPerAxis, InWorldMinZ, InWorldMaxZ,
-				InTargetPixels, InGeneratorIdentity, InMaterialRevision, OutPlan, OutError, InPredecessorCoverage, InCostLimits, *InCache))
-			{ bCompletedBuild = true; return true; }
-			if (!OutError.StartsWith(TEXT("PlanningPending"))) return false;
-		}
-	}
-	const bool bColumn = InRepresentation != EVoxelTerrainRepresentation::VoxelProxy;
-	const int64 Side = int64(16) << InMaximumLevel;
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RootsLease;
-	TSet<FVoxelTerrainSpatialKey> Roots;
-	int64 RootCapacity = 0;
-	for (const auto& Entry : InSources)
-	{
-		if (Entry.OuterRadiusCells < 0 || Entry.VerticalHalfExtentCells < 0)
-		{ OutError = TEXT("Invalid coarse source bounds"); return false; }
-		if (Entry.OuterRadiusCells == 0 || (!bColumn && Entry.VerticalHalfExtentCells == 0)) continue;
-		const int64 X = VoxelStreamingGeometry::FloorDivide(int64(Entry.Source.Center.X) + Entry.OuterRadiusCells, Side) -
-			VoxelStreamingGeometry::FloorDivide(int64(Entry.Source.Center.X) - Entry.OuterRadiusCells, Side) + 1;
-		const int64 Y = VoxelStreamingGeometry::FloorDivide(int64(Entry.Source.Center.Y) + Entry.OuterRadiusCells, Side) -
-			VoxelStreamingGeometry::FloorDivide(int64(Entry.Source.Center.Y) - Entry.OuterRadiusCells, Side) + 1;
-		const int64 Low = FMath::Max<int64>(InWorldMinZ, int64(Entry.Source.Center.Z) - Entry.VerticalHalfExtentCells);
-		const int64 High = FMath::Min<int64>(int64(InWorldMaxZ) - 1, int64(Entry.Source.Center.Z) + Entry.VerticalHalfExtentCells);
-		const int64 Z = bColumn ? 1 : FMath::Max<int64>(0, VoxelStreamingGeometry::FloorDivide(High, Side) - VoxelStreamingGeometry::FloorDivide(Low, Side) + 1);
-		constexpr int64 MaximumRoots = 1 << 20;
-		if (X > MaximumRoots || Y > MaximumRoots || Z > MaximumRoots || X * Y > MaximumRoots ||
-			(Z && X * Y > MaximumRoots / Z) || RootCapacity > MaximumRoots - X * Y * Z)
-		{ OutError = TEXT("CapacityUnachievable: coarse root enumeration"); return false; }
-		RootCapacity += X * Y * Z;
-	}
-	if (InCache && InCache->Resources && RootCapacity)
-	{
-		const uint64 Bytes = VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelTerrainSpatialKey>(Roots, int32(RootCapacity));
-		FStageRetainedFloor Floor;
-		Floor.Add(OutPlan.ResourceLease, InCache->Resources.Get());
-		Floor.Add(InCache->Root ? InCache->Root->Lease : nullptr, InCache->Resources.Get());
-		const uint64 Limit = InCache->Resources->Snapshot().Limits.WorkingBytes;
-		if (Bytes > Limit || Floor.Working > Limit - Bytes)
-		{ OutError = TEXT("CapacityUnachievable: coarse roots retained Working peak"); return false; }
-		const auto Admission = InCache->Resources->TryAcquire(InCache->Consumer, EVoxelTerrainResourcePool::Working, Bytes, RootsLease,
-			0, Floor.Input, Floor.Count);
-		if (Admission != EVoxelTerrainResourceAdmission::Granted)
-		{
-			OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: coarse root enumeration") :
-				TEXT("CapacityUnachievable: coarse root enumeration");
-			return false;
-		}
-	}
-	Roots.Reserve(int32(RootCapacity));
-
-	for (const FVoxelTerrainStageSource& Entry : InSources)
-	{
-		if (Entry.OuterRadiusCells < 0 || Entry.VerticalHalfExtentCells < 0 || !FMath::IsFinite(Entry.Source.VerticalFovDegrees) ||
-			Entry.Source.VerticalFovDegrees <= 0.0 || Entry.Source.VerticalFovDegrees >= 180.0 || Entry.Source.ViewportHeightPixels <= 0)
-		{
-			OutError = TEXT("Invalid source stage range or projection");
-			return false;
-		}
-
-		if (Entry.OuterRadiusCells == 0 || (!bColumn && Entry.VerticalHalfExtentCells == 0))
-		{
-			continue;
-		}
-
-		const FIntVector Center = Entry.Source.Center;
-		const int64 MinX = VoxelStreamingGeometry::FloorDivide(int64(Center.X) - Entry.OuterRadiusCells, Side);
-		const int64 MaxX = VoxelStreamingGeometry::FloorDivide(int64(Center.X) + Entry.OuterRadiusCells, Side);
-		const int64 MinY = VoxelStreamingGeometry::FloorDivide(int64(Center.Y) - Entry.OuterRadiusCells, Side);
-		const int64 MaxY = VoxelStreamingGeometry::FloorDivide(int64(Center.Y) + Entry.OuterRadiusCells, Side);
-		const int64 MinZ =
-			bColumn ? 0 : VoxelStreamingGeometry::FloorDivide(FMath::Max<int64>(InWorldMinZ, int64(Center.Z) - Entry.VerticalHalfExtentCells), Side);
-		const int64 MaxZ =
-			bColumn ? 0 : VoxelStreamingGeometry::FloorDivide(FMath::Min<int64>(int64(InWorldMaxZ) - 1, int64(Center.Z) + Entry.VerticalHalfExtentCells), Side);
-
-		const int64 Width = MaxX - MinX + 1;
-		const int64 Height = MaxY - MinY + 1;
-		const int64 Depth = MaxZ >= MinZ ? MaxZ - MinZ + 1 : 0;
-		constexpr int64 EmergencyNodes = 1 << 20;
-		if (Width > EmergencyNodes || Height > EmergencyNodes || Depth > EmergencyNodes || Width * Height > EmergencyNodes ||
-			(Depth > 0 && Width * Height > EmergencyNodes / Depth))
-		{
-			OutError = TEXT("Stage root enumeration exceeds the emergency guard; no reduced-quality plan is substituted");
-			return false;
-		}
-
-		for (int64 Z = MinZ; Z <= MaxZ; ++Z)
-		{
-			for (int64 Y = MinY; Y <= MaxY; ++Y)
-			{
-				for (int64 X = MinX; X <= MaxX; ++X)
-				{
-					Roots.Add({InRepresentation, FIntVector(static_cast<int32>(X), static_cast<int32>(Y), static_cast<int32>(Z)), InMaximumLevel});
-
-					if (Roots.Num() > (1 << 20))
-					{
-						OutError = TEXT("Combined stage roots exceed the emergency node guard");
-						return false;
-					}
-				}
-			}
-		}
-	}
-
-	FVoxelTerrainStagePlan Candidate;
-	if (InCache) { Candidate.Resources = InCache->Resources; Candidate.Consumer = InCache->Consumer; }
-	TSharedPtr<FVoxelTerrainStageCacheIndex, ESPMode::ThreadSafe> CandidateCache;
-	if (InCache)
+	if (!bSameSources)
 	{
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-		const TMap<FVoxelTerrainSpatialKey, FStageCacheNodePtr> EmptyRootIndex;
-		const TSet<FVoxelTerrainSpatialKey> EmptyFailedRoots;
-		const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainStageCacheIndex>() +
-			VoxelGenerationAllocation::Private::SetReserveBytes<TPair<FVoxelTerrainSpatialKey, FStageCacheNodePtr>>(EmptyRootIndex, Roots.Num()) +
-			VoxelGenerationAllocation::Private::SetReserveBytes<FVoxelTerrainSpatialKey>(EmptyFailedRoots, Roots.Num());
-		if (InCache->Resources)
+		if (Cache.Resources)
 		{
-			FStageRetainedFloor Floor;
-			Floor.Add(OutPlan.ResourceLease, InCache->Resources.Get());
-			Floor.Add(RootsLease, InCache->Resources.Get());
-			Floor.Add(InCache->Root ? InCache->Root->Lease : nullptr, InCache->Resources.Get());
-			const auto Admission = InCache->Resources->TryAcquire(InCache->Consumer, EVoxelTerrainResourcePool::Input, Bytes, Lease,
-				0, Floor.Input, Floor.Count);
-			if (Admission != EVoxelTerrainResourceAdmission::Granted)
+			uint64 Input = OutPlan.RetainedInputBytes;
+			int32 Count = OutPlan.RetainedLeaseCount;
+			if (!Cache.AccumulateRetainedInput(*Cache.Resources, nullptr, {}, Input, Count))
 			{
-				OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ? TEXT("CapacityBlocked: coarse root index") :
-					TEXT("CapacityUnachievable: coarse root index");
+				OutError = TEXT("CapacityUnachievable: coarse frozen roots");
 				return false;
 			}
-			CandidateCache = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainStageCacheIndex>(Lease);
-		}
-		else CandidateCache = MakeShared<FVoxelTerrainStageCacheIndex, ESPMode::ThreadSafe>();
-		CandidateCache->Lease = MoveTemp(Lease); CandidateCache->Roots.Reserve(Roots.Num()); CandidateCache->FailedRoots.Reserve(Roots.Num());
-		CandidateCache->MaximumLevel = InMaximumLevel; CandidateCache->MaximumSamples = InMaximumSamplesPerAxis;
-		CandidateCache->MinZ = InWorldMinZ; CandidateCache->MaxZ = InWorldMaxZ; CandidateCache->TargetPixels = InTargetPixels;
-		CandidateCache->Generator = InGeneratorIdentity; CandidateCache->Material = InMaterialRevision; CandidateCache->Limits = InCostLimits;
-		InCache->RebuiltNodes = InCache->ReusedNodes = 0;
-		InCache->FailedRoots = 0; InCache->bCapacityBlocked = false;
-	}
-	FStageRetainedFloor BuildFloor;
-	BuildFloor.Add(OutPlan.ResourceLease, Candidate.Resources.Get());
-	BuildFloor.Add(RootsLease, Candidate.Resources.Get());
-	BuildFloor.Add(InCache && InCache->Root ? InCache->Root->Lease : nullptr, Candidate.Resources.Get());
-	BuildFloor.Add(CandidateCache ? CandidateCache->Lease : nullptr, Candidate.Resources.Get());
-	BuildFloor.Bind(Candidate);
-	int32 Visited = 0;
-	for (const FVoxelTerrainSpatialKey& Root : Roots)
-	{
-		FStageCacheNodePtr Previous, Updated, Fallback;
-		const bool bSamePolicy = InCache && InCache->Root && InCache->Root->SamePolicy(InMaximumLevel, InMaximumSamplesPerAxis,
-			InWorldMinZ, InWorldMaxZ, InTargetPixels, InGeneratorIdentity, InMaterialRevision, InCostLimits);
-		if (bSamePolicy)
-		{
-			Fallback = InCache->Root->Roots.FindRef(Root);
-			if (!InCache->Root->FailedRoots.Contains(Root)) Previous = Fallback;
-		}
-		FVoxelTerrainStagePlan RootPlan;
-		RootPlan.Resources = Candidate.Resources; RootPlan.Consumer = Candidate.Consumer;
-		FStageRetainedFloor RootFloor = BuildFloor;
-		RootFloor.Add(Candidate.ResourceLease, Candidate.Resources.Get());
-		RootFloor.Bind(RootPlan);
-		if (!Visit(Root, InSources, InMaximumLevel, InMaximumSamplesPerAxis, InWorldMinZ, InWorldMaxZ, InTargetPixels, InGeneratorIdentity, InMaterialRevision,
-				RootPlan, Visited, OutError, InPredecessorCoverage, InCostLimits, InCache, Previous, &Updated))
-		{
-			if (!InCache || !Fallback) return false;
-			const bool bCapacityFailure = OutError.StartsWith(TEXT("CapacityBlocked"));
-			RootPlan = {};
-			RootPlan.Resources = Candidate.Resources; RootPlan.Consumer = Candidate.Consumer;
-			RootFloor.Bind(RootPlan);
-			if (!ReplayStageCache(Fallback, RootPlan, OutError)) return false;
-			Updated = Fallback;
-			CandidateCache->FailedRoots.Add(Root); ++Candidate.FailedRootCount; ++InCache->FailedRoots;
-			InCache->bCapacityBlocked |= bCapacityFailure;
-			OutError.Reset();
-		}
-		FStageRetainedFloor AppendFloor = BuildFloor;
-		AppendFloor.Add(RootPlan.ResourceLease, Candidate.Resources.Get());
-		AppendFloor.Bind(Candidate);
-		if (!ReserveStagePlan(Candidate, Candidate.Pages.Num() + RootPlan.Pages.Num(), OutError)) return false;
-		BuildFloor.Bind(Candidate);
-		Candidate.Pages.Append(MoveTemp(RootPlan.Pages)); Candidate.Costs.Append(MoveTemp(RootPlan.Costs));
-		Candidate.Priorities.Append(MoveTemp(RootPlan.Priorities)); Candidate.ResolutionFloorPages.Append(RootPlan.ResolutionFloorPages);
-		if (CandidateCache) CandidateCache->Roots.Add(Root, MoveTemp(Updated));
-	}
-
-	// 保留原有同 Representation 邻居物理平衡，但递归 Visit 新增样本上限参数。
-	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BalanceLease;
-	TArray<FVoxelTerrainSpatialKey> BalanceQueue;
-	if (!ReserveStageScratch(BalanceQueue, Candidate.Pages.Num(), 0, 1 << 22, Candidate, BalanceLease, OutError)) return false;
-	Candidate.Pages.GenerateKeyArray(BalanceQueue);
-	for (int32 Next = 0; Next < BalanceQueue.Num(); ++Next)
-	{
-		const FVoxelTerrainSpatialKey Key = BalanceQueue[Next];
-		if (!Candidate.Pages.Contains(Key))
-		{
-			continue;
-		}
-
-		FIntVector Min;
-		FIntVector Max;
-		if (!Key.TryBounds(InWorldMinZ, InWorldMaxZ, Min, Max))
-		{
-			return false;
-		}
-
-		for (int32 Axis = 0; Axis < (bColumn ? 2 : 3); ++Axis)
-		{
-			for (const int32 Sign : {-1, 1})
+			if (OutPlan.ResourceLease && OutPlan.ResourceLease->IsOwnedBy(*Cache.Resources))
 			{
-				FIntVector Point = Min + (Max - Min) / 2;
-				if (Sign < 0 && Min[Axis] == MIN_int32) continue;
-				Point[Axis] = Sign < 0 ? Min[Axis] - 1 : Max[Axis];
-
-				for (uint8 Level = Key.Level + 2; Level <= InMaximumLevel; ++Level)
-				{
-					const int64 NeighborSide = int64(16) << Level;
-					const FVoxelTerrainSpatialKey Neighbor{InRepresentation,
-						FIntVector(int32(VoxelStreamingGeometry::FloorDivide(Point.X, NeighborSide)),
-							int32(VoxelStreamingGeometry::FloorDivide(Point.Y, NeighborSide)),
-							bColumn ? 0 : int32(VoxelStreamingGeometry::FloorDivide(Point.Z, NeighborSide))),
-						Level};
-
-					if (!Candidate.Pages.Contains(Neighbor))
-					{
-						continue;
-					}
-
-					Candidate.Pages.Remove(Neighbor);
-					Candidate.Costs.Remove(Neighbor);
-					Candidate.Priorities.Remove(Neighbor);
-					Candidate.ResolutionFloorPages.Remove(Neighbor);
-
-					for (int32 Child = 0; Child < (bColumn ? 4 : 8); ++Child)
-					{
-						FVoxelTerrainSpatialKey ChildKey = Neighbor;
-						ChildKey.Level = Level - 1;
-						ChildKey.Coordinate = Neighbor.Coordinate * 2 + FIntVector(Child & 1, (Child >> 1) & 1, bColumn ? 0 : ((Child >> 2) & 1));
-
-						FStageRetainedFloor BalanceFloor = BuildFloor;
-						BalanceFloor.Add(BalanceLease, Candidate.Resources.Get());
-						BalanceFloor.Bind(Candidate);
-						const bool bVisited = Visit(ChildKey, InSources, InMaximumLevel, InMaximumSamplesPerAxis, InWorldMinZ, InWorldMaxZ, InTargetPixels,
-							InGeneratorIdentity, InMaterialRevision, Candidate, Visited, OutError, InPredecessorCoverage, InCostLimits);
-						BuildFloor.Bind(Candidate);
-						if (!bVisited) return false;
-						if (!ReserveStageScratch(BalanceQueue, BalanceQueue.Num() + 1, 0, 1 << 22, Candidate, BalanceLease, OutError)) return false;
-						BalanceQueue.Add(ChildKey);
-					}
-
-					if (!ReserveStageScratch(BalanceQueue, BalanceQueue.Num() + 1, 0, 1 << 22, Candidate, BalanceLease, OutError)) return false;
-					BalanceQueue.Add(Key);
-					break;
-				}
+				Input += OutPlan.ResourceLease->GetPool() == EVoxelTerrainResourcePool::Input ? OutPlan.ResourceLease->Bytes() : 0;
+				++Count;
+			}
+			const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainDomainSourceBatch>() +
+				VoxelGenerationAllocation::Private::ArrayReserveBytes<FVoxelTerrainStageSource, FDefaultAllocator>(InSources.Num());
+			const auto Admission = Cache.Resources->TryAcquire(Cache.Consumer, EVoxelTerrainResourcePool::Input, Bytes, Lease, 0, Input, Count);
+			if (Admission != EVoxelTerrainResourceAdmission::Granted)
+			{
+				OutError = Admission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
+					TEXT("CapacityBlocked: coarse frozen source") : TEXT("CapacityUnachievable: coarse frozen source");
+				return false;
 			}
 		}
-
-		if (BalanceQueue.Num() > (1 << 22))
+		auto Batch = Lease ? VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainDomainSourceBatch>(Lease) :
+			MakeShared<FVoxelTerrainDomainSourceBatch, ESPMode::ThreadSafe>();
+		Batch->Lease = MoveTemp(Lease);
+		Batch->Values.Reserve(InSources.Num());
+		Batch->Values.Append(InSources);
+		Cache.SourceInputs = MoveTemp(Batch);
+	}
+	// 同步入口耗尽同一个增量游标；生产 Domain 仍按原预算分帧推进。
+	for (;;)
+	{
+		if (AdvanceDirtyRoots(InRepresentation, InMaximumLevel, InMaximumSamplesPerAxis, InWorldMinZ, InWorldMaxZ,
+			InTargetPixels, InGeneratorIdentity, InMaterialRevision, OutPlan, OutError, InPredecessorCoverage, InCostLimits, Cache))
 		{
-			OutError = TEXT("Physical balance exceeds the bounded traversal guard");
+			bCompletedBuild = true;
+			return true;
+		}
+		if (!OutError.StartsWith(TEXT("PlanningPending")))
+		{
 			return false;
 		}
 	}
-
-	Candidate.RetainedInputBytes = Candidate.RetainedWorkingBytes = 0;
-	Candidate.RetainedLeaseCount = 0;
-	OutPlan = MoveTemp(Candidate);
-	if (InCache)
-	{
-		InCache->Root = MoveTemp(CandidateCache);
-		if (InCache->Resources) InCache->RetryCapacityVersion = BeforeBuild;
-	}
-	OutError.Reset();
-	bCompletedBuild = true;
-	return true;
 }
 
 bool FVoxelTerrainStagePlanner::AdvanceDirtyRoots(const EVoxelTerrainRepresentation Representation, const uint8 MaximumLevel,
@@ -607,14 +399,17 @@ bool FVoxelTerrainStagePlanner::AdvanceDirtyRoots(const EVoxelTerrainRepresentat
 	const uint64 Material, FVoxelTerrainStagePlan& OutPlan, FString& Error, const FVoxelCoverageIndex* Predecessor,
 	const FVoxelTerrainPageCostLimits& Limits, FVoxelTerrainStageCache& Cache, const int32 RootBudget, const bool bExportUnchangedOutput)
 {
-	if ((Representation != EVoxelTerrainRepresentation::VoxelProxy && Representation != EVoxelTerrainRepresentation::Surface &&
-		Representation != EVoxelTerrainRepresentation::Macro) || !Cache.SourceInputs || MaximumLevel > VoxelStreamingGeometry::MaximumSpatialLevel ||
-		RootBudget <= 0 || MinZ >= MaxZ || !FMath::IsFinite(Pixels) || Pixels <= 0.0 || !FMath::IsPowerOfTwo(MaximumSamples) ||
-		MaximumSamples < (Representation == EVoxelTerrainRepresentation::VoxelProxy ? 32 : 16) ||
-		MaximumSamples > (Representation == EVoxelTerrainRepresentation::VoxelProxy ? 128 : 256) ||
-		(Representation == EVoxelTerrainRepresentation::VoxelProxy && MaximumLevel < 1) || Limits.Triangles == 0 || Limits.MeshBytes == 0 ||
-		!FMath::IsFinite(Limits.BuildMilliseconds) || Limits.BuildMilliseconds <= 0.0)
-	{ Error = TEXT("Invalid incremental coarse policy"); return false; }
+	if (!Cache.SourceInputs || RootBudget <= 0)
+	{
+		Error = TEXT("Invalid coarse planning input or root budget");
+		return false;
+	}
+	if (!ValidateStagePolicy(Representation, MaximumLevel, MaximumSamples, MinZ, MaxZ, Pixels, Limits, Error) ||
+		!ValidateStageSources(Cache.SourceInputs->Values, Representation != EVoxelTerrainRepresentation::VoxelProxy,
+			MaximumLevel, MinZ, MaxZ, Error))
+	{
+		return false;
+	}
 	const FVoxelTerrainStageCache Previous = Cache;
 	Cache.CapacityPrevious = &Previous;
 	ON_SCOPE_EXIT { Cache.CapacityPrevious = nullptr; };
@@ -657,7 +452,7 @@ bool FVoxelTerrainStagePlanner::AdvanceDirtyRoots(const EVoxelTerrainRepresentat
 	}
 	const auto SameInputs = [&](const FVoxelTerrainStageCacheIndex* Index)
 	{
-		return Index && Index->bIncremental && Index->WorldEpoch == Cache.Consumer.WorldEpoch && Index->Sources == Cache.SourceInputs &&
+		return Index && Index->WorldEpoch == Cache.Consumer.WorldEpoch && Index->Sources == Cache.SourceInputs &&
 			Index->SamePolicy(MaximumLevel, MaximumSamples, MinZ, MaxZ, Pixels, Generator, Material, Limits) && SameCoverage(Index->Predecessor);
 	};
 	const bool RetryFailedRoots = SameInputs(Cache.Root.Get()) && Cache.bCapacityBlocked && Cache.IsRetryReady();
@@ -697,14 +492,14 @@ bool FVoxelTerrainStagePlanner::AdvanceDirtyRoots(const EVoxelTerrainRepresentat
 		Work->Lease = MoveTemp(WorkLease); Work->bRetryOnly = RetryFailedRoots; Work->bOutputChanged = !RetryFailedRoots;
 		Work->Candidate = IndexLease ? VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainStageCacheIndex>(IndexLease) : MakeShared<FVoxelTerrainStageCacheIndex, ESPMode::ThreadSafe>();
 		const auto* Base = Previous.Work ? Previous.Work->Candidate.Get() : Previous.Root.Get();
-		const bool Compatible = Base && Base->bIncremental && Base->WorldEpoch == Cache.Consumer.WorldEpoch && Base->MaximumLevel == MaximumLevel;
+		const bool Compatible = Base && Base->WorldEpoch == Cache.Consumer.WorldEpoch && Base->MaximumLevel == MaximumLevel;
 		if (Compatible) for (int32 Slot = 0; Slot < 12; ++Slot) Work->Candidate->Slots[Slot] = Base->Slots[Slot];
-		Work->Candidate->Lease = MoveTemp(IndexLease); Work->Candidate->bIncremental = true; Work->Candidate->WorldEpoch = Cache.Consumer.WorldEpoch;
+		Work->Candidate->Lease = MoveTemp(IndexLease); Work->Candidate->WorldEpoch = Cache.Consumer.WorldEpoch;
 		Work->Candidate->Sources = Cache.SourceInputs; Work->Candidate->Predecessor = InputCoverage;
 		Work->Candidate->MaximumLevel = MaximumLevel; Work->Candidate->MaximumSamples = MaximumSamples;
 		Work->Candidate->MinZ = MinZ; Work->Candidate->MaxZ = MaxZ; Work->Candidate->TargetPixels = Pixels;
 		Work->Candidate->Generator = Generator; Work->Candidate->Material = Material; Work->Candidate->Limits = Limits;
-		const bool PolicyChanged = !Previous.Root || !Previous.Root->bIncremental || Previous.Root->WorldEpoch != Cache.Consumer.WorldEpoch ||
+		const bool PolicyChanged = !Previous.Root || Previous.Root->WorldEpoch != Cache.Consumer.WorldEpoch ||
 			!Previous.Root->SamePolicy(MaximumLevel, MaximumSamples, MinZ, MaxZ, Pixels, Generator, Material, Limits);
 		const FVoxelTerrainDomainSourceBatch* Batches[] = {Previous.Root ? Previous.Root->Sources.Get() : nullptr,
 			Previous.Work ? Previous.Work->Candidate->Sources.Get() : nullptr, Cache.SourceInputs.Get()};
@@ -734,7 +529,7 @@ bool FVoxelTerrainStagePlanner::AdvanceDirtyRoots(const EVoxelTerrainRepresentat
 			if (Duplicate) continue;
 			for (const auto& Source : Batches[I]->Values)
 			{
-				if (Source.OuterRadiusCells < 0 || Source.VerticalHalfExtentCells < 0 || !FMath::IsFinite(Source.Source.VerticalFovDegrees) ||
+				if (Source.OuterRadiusCells < 0 || Source.VerticalHalfExtentCells < 0 || Source.MinimumSamplingDistanceCells < 0 || Source.MinimumSamplingDistanceCells > Source.OuterRadiusCells || !FMath::IsFinite(Source.Source.VerticalFovDegrees) ||
 					Source.Source.VerticalFovDegrees <= 0.0 || Source.Source.VerticalFovDegrees >= 180.0 || Source.Source.ViewportHeightPixels <= 0)
 				{ Error = TEXT("Invalid incremental coarse source"); return false; }
 				const auto* Old = FindSource(Batches[0], Source.Source.Id), *Pending = FindSource(Batches[1], Source.Source.Id), *Now = FindSource(Batches[2], Source.Source.Id);
@@ -1084,7 +879,7 @@ bool FVoxelTerrainStagePlanner::Visit(const FVoxelTerrainSpatialKey& InKey, TCon
 
 		int32 Step = 1;
 		bool bFloor = false;
-		if (!VoxelStreamingGeometry::ResolveSampleStep(Distance, Source.VerticalFovDegrees, Source.ViewportHeightPixels, InTargetPixels,
+		if (!VoxelStreamingGeometry::ResolveSampleStep(FMath::Max(Distance, double(Entry.MinimumSamplingDistanceCells)), Source.VerticalFovDegrees, Source.ViewportHeightPixels, InTargetPixels,
 				static_cast<int32>(InKey.SideCells()), Step, bFloor, OutError,
 				InKey.Representation == EVoxelTerrainRepresentation::VoxelProxy ? 2 : 1))
 		{

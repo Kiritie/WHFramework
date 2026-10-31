@@ -525,7 +525,11 @@ bool FVoxelCoverageIndex::AccumulateRetainedInputs(const FVoxelTerrainResources&
 		return true;
 	};
 	for (const auto* Index : InIndexes)
-		if (Index && (!AddLease(Index->StorageLease) || !AddLease(Index->Root ? Index->Root->Lease : nullptr))) return false;
+		if (Index && !AddLease(Index->StorageLease)) return false;
+	// 绑定资源后的节点与记录使用独立租约；外部 StorageLease 仍可跨树层级共享。
+	const int32 SharedStorageSerialCount = AncestorCount;
+	for (const auto* Index : InIndexes)
+		if (Index && !AddLease(Index->Root ? Index->Root->Lease : nullptr)) return false;
 	const auto Visit = [&](auto&& Self, const FNode* const* Nodes) -> bool
 	{
 		const FNode* Shared = nullptr;
@@ -562,7 +566,7 @@ bool FVoxelCoverageIndex::AccumulateRetainedInputs(const FVoxelTerrainResources&
 				if (bRepeated) continue;
 				for (const uint64 Serial : InExcludedSerials)
 					if (Serial >= Node->MinimumSerial && Serial <= Node->MaximumSerial) bDisjoint = false;
-				for (int32 Ancestor = 0; Ancestor < AncestorCount; ++Ancestor)
+				for (int32 Ancestor = 0; Ancestor < SharedStorageSerialCount; ++Ancestor)
 					if (Ancestors[Ancestor] >= Node->MinimumSerial && Ancestors[Ancestor] <= Node->MaximumSerial) bDisjoint = false;
 				Independent[IndependentCount++] = Node;
 			}
@@ -585,7 +589,7 @@ bool FVoxelCoverageIndex::AccumulateRetainedInputs(const FVoxelTerrainResources&
 			bool bExcludedRange = false;
 			for (const uint64 Serial : InExcludedSerials)
 				bExcludedRange |= Serial >= Shared->MinimumSerial && Serial <= Shared->MaximumSerial;
-			for (int32 Index = 0; Index < AncestorCount; ++Index)
+			for (int32 Index = 0; Index < SharedStorageSerialCount; ++Index)
 				bExcludedRange |= Ancestors[Index] >= Shared->MinimumSerial && Ancestors[Index] <= Shared->MaximumSerial;
 			if (!bExcludedRange)
 			{

@@ -25,6 +25,7 @@ namespace
 		const FVoxelPublishFootprint& A,
 		const FVoxelPublishFootprint& B)
 	{
+		if (A.bIndependentInitial && B.bIndependentInitial) return false;
 		if (!A.Bounds.IsValid || !B.Bounds.IsValid)
 		{
 			return false;
@@ -343,10 +344,10 @@ void FVoxelPublishGroupPlanner::Build(
 	}
 }
 
-void FVoxelPublishBoundsIndex::Add(const int32 InOrdinal, const FBox& InBounds)
+void FVoxelPublishBoundsIndex::Add(const int32 InOrdinal, const FBox& InBounds, const uint64 InSerial)
 {
 	if (!InBounds.IsValid) return;
-	Bounds.Add(InOrdinal, InBounds);
+	Records.Add(InOrdinal, {InBounds, InSerial});
 	uint8 Level = 0;
 	double Side = 800.0;
 	const double Extent = FMath::Max(InBounds.Max.X - InBounds.Min.X, InBounds.Max.Y - InBounds.Min.Y);
@@ -367,22 +368,26 @@ void FVoxelPublishBoundsIndex::Add(const int32 InOrdinal, const FBox& InBounds)
 		for (int32 X = Min.X; X <= Max.X; ++X)
 		{
 			FKey Key{FIntPoint(X, Y), Level};
-			Nodes.FindOrAdd(Key).Own.Add(InOrdinal);
+			FNode& Node = Nodes.FindOrAdd(Key);
+			Node.Own.Add(InOrdinal);
+			Node.MinimumSerial = FMath::Min(Node.MinimumSerial, InSerial);
 			while (Key.Level < 31)
 			{
 				Key.Coordinate = FIntPoint(static_cast<int32>(VoxelStreamingGeometry::FloorDivide(Key.Coordinate.X, 2)),
 					static_cast<int32>(VoxelStreamingGeometry::FloorDivide(Key.Coordinate.Y, 2)));
 				++Key.Level;
-				Nodes.FindOrAdd(Key);
+				FNode& Ancestor = Nodes.FindOrAdd(Key);
+				Ancestor.MinimumSerial = FMath::Min(Ancestor.MinimumSerial, InSerial);
 			}
 		}
 }
 
-void FVoxelPublishBoundsIndex::BeginQuery(const FBox& InBounds, FQuery& OutQuery) const
+void FVoxelPublishBoundsIndex::BeginQuery(const FBox& InBounds, FQuery& OutQuery, const uint64 InMaximumSerial) const
 {
 	OutQuery = {};
 	OutQuery.Bounds = InBounds;
-	if (!InBounds.IsValid || Bounds.IsEmpty()) return;
+	OutQuery.MaximumSerial = InMaximumSerial;
+	if (!InBounds.IsValid || Records.IsEmpty()) return;
 	for (int32 Y : {-1, 0}) for (int32 X : {-1, 0}) OutQuery.Stack.Add({FIntPoint(X, Y), RootLevel});
 }
 
@@ -397,9 +402,10 @@ bool FVoxelPublishBoundsIndex::AdvanceQuery(FQuery& InOutQuery, int32& OutOrdina
 			const auto Id = FSetElementId::FromInteger(InOutQuery.OwnCursor++);
 			if (!Own.IsValidId(Id)) return false;
 			const int32 Candidate = Own[Id];
-			if (InOutQuery.Seen.Contains(Candidate)) return false;
+			const FRecord& Record = Records.FindChecked(Candidate);
+			if (Record.Serial > InOutQuery.MaximumSerial || InOutQuery.Seen.Contains(Candidate)) return false;
 			InOutQuery.Seen.Add(Candidate);
-			const FBox& Box = Bounds.FindChecked(Candidate);
+			const FBox& Box = Record.Bounds;
 			if (Box.Min.X <= InOutQuery.Bounds.Max.X && Box.Max.X >= InOutQuery.Bounds.Min.X &&
 				Box.Min.Y <= InOutQuery.Bounds.Max.Y && Box.Max.Y >= InOutQuery.Bounds.Min.Y) OutOrdinal = Candidate;
 			return false;
@@ -409,7 +415,7 @@ bool FVoxelPublishBoundsIndex::AdvanceQuery(FQuery& InOutQuery, int32& OutOrdina
 	if (InOutQuery.Stack.IsEmpty()) return true;
 	const FKey Key = InOutQuery.Stack.Pop(EAllowShrinking::No);
 	const FNode* Node = Nodes.Find(Key);
-	if (!Node) return false;
+	if (!Node || Node->MinimumSerial > InOutQuery.MaximumSerial) return false;
 	const double Side = 800.0 * static_cast<double>(1ull << Key.Level);
 	const double MinX = Key.Coordinate.X * Side, MinY = Key.Coordinate.Y * Side;
 	if (MinX > InOutQuery.Bounds.Max.X || MinX + Side < InOutQuery.Bounds.Min.X ||

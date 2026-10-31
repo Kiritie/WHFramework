@@ -1401,7 +1401,7 @@ bool FVoxelBlockyFlatTest::RunTest(const FString& InParameters)
 			TestTrue(TEXT("Flat top normal points upward"), Normal.Z > 0.99);
 		}
 	}
-	TestEqual(TEXT("Flat terrain has tops and no internal sides"), Vertices, 16);
+	TestEqual(TEXT("平坦地表合并为一个矩形且没有内部侧面"), Vertices, 4);
 	return true;
 }
 
@@ -1437,7 +1437,7 @@ bool FVoxelBlockyStepTest::RunTest(const FString& InParameters)
 			}
 		}
 	}
-	TestEqual(TEXT("Each stepped cell boundary produces one side quad"), VerticalQuads, 2);
+	TestEqual(TEXT("连续同平面台阶侧面合并为一个矩形"), VerticalQuads, 1);
 	return true;
 }
 

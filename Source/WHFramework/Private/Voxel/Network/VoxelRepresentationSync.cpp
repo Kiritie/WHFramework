@@ -12,7 +12,7 @@
 namespace
 {
 	constexpr uint32 RepresentationMagic = 0x34505256;
-	constexpr uint16 RepresentationVersion = 8;
+	constexpr uint16 RepresentationVersion = 9;
 	constexpr int32 MaxRepresentationRawBytes = 32 * 1024 * 1024;
 	constexpr int32 MaxCells = 1 << 20;
 	constexpr uint32 MaxDistantCells = 16384;
@@ -652,12 +652,12 @@ bool FVoxelRepresentationSync::EncodeMacro(
 	const int32 Count = InData.Side * InData.Side;
 	if (Count <= 0 || Count > MaxCells || InData.Height.Num() != Count || InData.WaterHeight.Num() != Count ||
 		InData.WaterKind.Num() != Count ||
-		InData.SurfaceStates.Num() != Count || InData.ForestCoverage.Num() != Count || InData.SnowCoverage.Num() != Count ||
+		InData.SurfaceStates.Num() != Count || InData.ForestCoverage.Num() != Count ||
 		InData.LargeStructures.Num() > 4096 || InData.DistantCells.Num() > MaxDistantCells)
 	{
 		OutError = TEXT("Voxel macro representation is invalid"); return false;
 	}
-	const uint64 RawBytes = 104 + uint64(Count) * 15 + uint64(InData.LargeStructures.Num()) * 16 +
+	const uint64 RawBytes = 104 + uint64(Count) * 14 + uint64(InData.LargeStructures.Num()) * 16 +
 		uint64(InData.DistantCells.Num()) * 44;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RawLease;
 	FVoxelByteWriter Writer{int32(RawBytes)};
@@ -674,7 +674,7 @@ bool FVoxelRepresentationSync::EncodeMacro(
 			OutError = TEXT("Voxel macro water kind is invalid"); return false;
 		}
 		Writer.I32(InData.Height[Index]); Writer.I32(InData.WaterHeight[Index]); Writer.U32(InData.SurfaceStates[Index].Pack());
-		Writer.U8(InData.WaterKind[Index]); Writer.U8(InData.ForestCoverage[Index]); Writer.U8(InData.SnowCoverage[Index]);
+		Writer.U8(InData.WaterKind[Index]); Writer.U8(InData.ForestCoverage[Index]);
 	}
 	Writer.U16(InData.LargeStructures.Num());
 	for (const FVoxelMacroStructureProxy& Structure : InData.LargeStructures)
@@ -711,16 +711,16 @@ bool FVoxelRepresentationSync::DecodeMacro(
 	{ OutError = TEXT("Representation payload key disagrees with geometry header"); return false; }
 	Data.Side = Reader.U16(); Data.Step = Reader.I32();
 	const uint32 Count = Reader.U32();
-	if (Data.Step != Data.Geometry.SampleStepCells || Data.Side <= 1 || Data.Side > 257 || int64(Data.Side - 1) * Data.Step != Data.Geometry.Key.SideCells() || Count != static_cast<uint32>(Data.Side * Data.Side) || Count > MaxCells || !Reader.IsValid() || uint64(Count) * 15 > uint64(Reader.Remaining()))
+	if (Data.Step != Data.Geometry.SampleStepCells || Data.Side <= 1 || Data.Side > 257 || int64(Data.Side - 1) * Data.Step != Data.Geometry.Key.SideCells() || Count != static_cast<uint32>(Data.Side * Data.Side) || Count > MaxCells || !Reader.IsValid() || uint64(Count) * 14 > uint64(Reader.Remaining()))
 	{ OutError = TEXT("Invalid macro sampling resolution"); return false; }
 	Data.Height.Reserve(Count); Data.WaterHeight.Reserve(Count); Data.WaterKind.Reserve(Count); Data.SurfaceStates.Reserve(Count);
-	Data.ForestCoverage.Reserve(Count); Data.SnowCoverage.Reserve(Count);
+	Data.ForestCoverage.Reserve(Count);
 	for (uint32 Index = 0; Index < Count && Reader.IsValid(); ++Index)
 	{
 		Data.Height.Add(Reader.I32()); Data.WaterHeight.Add(Reader.I32()); Data.SurfaceStates.Add(FVoxelBlockState::Unpack(Reader.U32()));
 		const uint8 Kind = Reader.U8();
 		if (Kind > static_cast<uint8>(EVoxelWaterKind::Edited)) Reader.Reject();
-		Data.WaterKind.Add(Kind); Data.ForestCoverage.Add(Reader.U8()); Data.SnowCoverage.Add(Reader.U8());
+		Data.WaterKind.Add(Kind); Data.ForestCoverage.Add(Reader.U8());
 	}
 	const uint16 StructureCount = Reader.U16();
 	if (StructureCount > 4096 || !Reader.IsValid() || uint64(StructureCount) * 16 > uint64(Reader.Remaining())) { OutError = TEXT("Invalid macro structure count"); return false; }

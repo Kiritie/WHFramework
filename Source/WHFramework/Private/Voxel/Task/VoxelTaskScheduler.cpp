@@ -371,7 +371,7 @@ uint64 FVoxelTaskResult::ResultBytes() const
 	{
 		Bytes += sizeof(FVoxelMacroTileData) + Macro->Height.GetAllocatedSize() + Macro->WaterHeight.GetAllocatedSize() +
 			Macro->WaterKind.GetAllocatedSize() +
-			Macro->SurfaceStates.GetAllocatedSize() + Macro->ForestCoverage.GetAllocatedSize() + Macro->SnowCoverage.GetAllocatedSize() +
+			Macro->SurfaceStates.GetAllocatedSize() + Macro->ForestCoverage.GetAllocatedSize() +
 			Macro->LargeStructures.GetAllocatedSize() + Macro->DistantCells.GetAllocatedSize();
 	}
 

@@ -800,14 +800,10 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 	auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
 	const FVoxelViewKey NearRoot{FIntVector::ZeroValue, 1};
 	const FVoxelViewKey FarRoot{FIntVector(100, 0, 0), 1};
-	Interest.TerrainPlan.Roots = {NearRoot, FarRoot};
-	Interest.TerrainPlan.Required = Interest.TerrainPlan.Roots;
 	TArray<FVoxelViewKey> NearChildren;
 	NearRoot.GetChildren(NearChildren);
 	for (const auto& Child : NearChildren)
 	{
-		Interest.TerrainPlan.Leaves.Add(Child);
-		Interest.TerrainPlan.Required.Add(Child);
 		ScopedManager.FineReady.Add(Child.Coordinate);
 		ScopedManager.GetInputRoot().FineWanted.Add(Child.Coordinate);
 		const FVoxelFinePageKey Page{Child.Coordinate, 0};
@@ -815,18 +811,13 @@ bool FVoxelManagerLocalCoverageTest::RunTest(const FString& InParameters)
 		ScopedManager.GetInputRoot().FinePagePlan.SectionOwners.Add(Child.Coordinate, Page);
 		ScopedManager.IndexCoverage(Child);
 	}
-	Interest.TerrainPlan.Leaves.Add(FarRoot);
-	ScopedManager.GetInputRoot().MaximumTerrainRootLevel = 1;
-	for (const auto& Root : Interest.TerrainPlan.Roots)
+	for (const FVoxelViewKey& Root : {NearRoot, FarRoot})
 	{
 		auto Record = MakeShared<FVoxelCoverageRecord, ESPMode::ThreadSafe>();
 		Record->Geometry = {{EVoxelTerrainRepresentation::VoxelProxy, Root.Coordinate, Root.Level}, 2,
 			Module->Manifest.Settings.MinZ, Module->Manifest.Settings.MaxZ, Module->Manifest.BaseSampleHash, Module->GetRegistry()->Hash};
 		Interest.Geometry.Add(Record->Geometry.Key, Record->Geometry);
 		const auto Bounds = Root.GetBounds(); Record->Min = Bounds.Min; Record->Max = Bounds.Max;
-		FString IndexError;
-		TestTrue(TEXT("Fixture registers each terrain root"), ScopedManager.GetInputRoot().TerrainRootIndex.Upsert(Record, IndexError));
-		ScopedManager.GetInputRoot().IndexedTerrainRoots.Add(Root);
 	}
 	ScopedManager.CommitTerrainOwnership({1, FIntPoint(NearRoot.Coordinate.X, NearRoot.Coordinate.Y), NearRoot.Level}, MakeArrayView(&NearRoot, 1));
 	ScopedManager.CommitTerrainOwnership({1, FIntPoint(FarRoot.Coordinate.X, FarRoot.Coordinate.Y), FarRoot.Level}, MakeArrayView(&FarRoot, 1));

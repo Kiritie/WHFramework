@@ -429,6 +429,60 @@ struct FVoxelEnvironmentColumnWork
 	}
 };
 
+struct FVoxelEnvironmentGeometryCapture
+{
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> MetadataLease;
+	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> FactResources;
+	TSharedPtr<FVoxelGenerationPlanCache, ESPMode::ThreadSafe> Cache;
+	FVoxelGenerationConsumerKey Consumer;
+	FVoxelTaskStamp Stamp;
+	FVoxelGenerationPlanDependencyCapture Dependencies;
+	TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
+	TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe> Inputs;
+	TAtomic<bool> bWaitingCapacity{false};
+	TAtomic<uint64> CapacityVersion{0};
+
+	void VisitSources(const FVoxelTerrainResources& InResources, FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
+	{
+		for (const auto* Lease : {MetadataLease.Get(), Dependencies.Lease.Get(), Retention ? &Retention->GetResourceLease().Get() : nullptr})
+			if (Lease && Lease->IsOwnedBy(InResources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, InVisit);
+	}
+	EVoxelTaskBlockReason GetBlockReason() const
+	{
+		if (!bWaitingCapacity.Load()) return EVoxelTaskBlockReason::None;
+		uint64 Version = 0;
+		return FactResources->TryGetReleaseVersionExcludingOwner(Consumer, Version) && Version > CapacityVersion.Load()
+			? EVoxelTaskBlockReason::None : EVoxelTaskBlockReason::Memory;
+	}
+	FVoxelTaskResult Advance(const TAtomic<bool>& InCancel)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_EnvironmentInputsCaptureWorker);
+		FVoxelTaskResult Result;
+		if (InCancel.Load()) { Result.bCanceled = true; return Result; }
+		const uint64 BeforeCapture = FactResources->ReleaseVersionExcludingOwner(Consumer);
+		FVoxelGenerationConsumerScope ConsumerScope(Consumer);
+		FVoxelGenerationRequiredSourceScope Sources(FactResources.Get(), this,
+			[](const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+			{
+				const auto& Work = *static_cast<const FVoxelEnvironmentGeometryCapture*>(InContext);
+				Work.VisitSources(*Work.FactResources, InVisit);
+			});
+		bWaitingCapacity.Store(false);
+		Result.bSuccess = Cache->CaptureEnvironmentInputs(Consumer, Dependencies.Values.Num(),
+			[this](const int32 Index) { return Dependencies.Values[Index].HydrologyKey; }, Retention, Inputs, Result.Error);
+		Result.bCanceled = InCancel.Load() || (!Result.bSuccess && Result.Error.StartsWith(TEXT("Canceled")));
+		if (Result.bCanceled) { Inputs.Reset(); Result.bSuccess = false; }
+		else if (!Result.bSuccess && Result.Error.StartsWith(TEXT("CapacityBlocked")))
+		{
+			CapacityVersion.Store(BeforeCapture);
+			bWaitingCapacity.Store(true);
+			Result.bSuccess = Result.bContinue = true;
+			Result.Error.Reset();
+		}
+		return Result;
+	}
+};
+
 void FVoxelEmergeManager::VisitStorageSources(const FVoxelTerrainResources& InResources,
 	FVoxelGenerationRequiredSourceScope::FVisit InVisit) const
 {
@@ -485,6 +539,8 @@ void FVoxelEmergeManager::VisitStorageSources(const FVoxelTerrainResources& InRe
 	}
 	for (const auto& Pair : ExternalFactConsumers)
 	{
+		if (Pair.Value.GeometryCapture) Pair.Value.GeometryCapture->VisitSources(InResources, InVisit);
+		VisitRequest(Pair.Value.PendingGeometryCapture);
 		if (Pair.Value.EnvironmentInputs && Pair.Value.EnvironmentInputs->IsOwnedBy(InResources))
 			Pair.Value.EnvironmentInputs->VisitRequiredSources(InVisit);
 		Visit(Pair.Value.Dependencies.Lease.Get());
@@ -1340,6 +1396,7 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentGeometry(
 	check(IsInGameThread());
 	FString Error;
 	if (bResetting || !InConsumer.IsValid() || InConsumer.WorldEpoch != Runtime.Epoch() ||
+		!FMath::IsFinite(InDistanceScore) || InDistanceScore < 0.0 || !FMath::IsFinite(InForwardScore) ||
 		!InGeometry.Validate(Error))
 		return {false, true, TEXT("InvalidRequest: environment geometry or consumer")};
 	const bool bProxy = InGeometry.Key.Representation == EVoxelTerrainRepresentation::VoxelProxy;
@@ -1386,6 +1443,9 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentGeometry(
 		Consumer->EnvironmentWait.Reset();
 		Consumer->bWaitingCapacity = false;
 	}
+	if (Consumer && !Consumer->GeometryCaptureError.IsEmpty()) return {false, true, Consumer->GeometryCaptureError};
+	if (Consumer && (Consumer->GeometryCapture || Consumer->bGeometryCaptureAdmissionWaiting))
+		return AdvanceEnvironmentGeometryCapture(InConsumer, InWorkClass, InSourcePriority, InDistanceScore, InForwardScore);
 	if (!Consumer)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_EnvironmentGeometryConsumerCreate);
@@ -1439,8 +1499,17 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentGeometry(
 	}
 	Consumer->EnvironmentWait.Reset();
 	const uint64 BeforeEnsureWake = Consumer->WakeSerial;
-	const auto Status = PlanCoordinator->Ensure(Consumer->Dependencies.Values, InWorkClass,
-		InSourcePriority, InDistanceScore, InForwardScore, InConsumer);
+	FVoxelTaskRequest PriorityRequest;
+	PriorityRequest.Kind = EVoxelTaskKind::GenerateExactBase;
+	PriorityRequest.WorkClass = InWorkClass;
+	PriorityRequest.SourcePriority = InSourcePriority;
+	PriorityRequest.DistanceScore = InDistanceScore;
+	PriorityRequest.ForwardScore = InForwardScore;
+	PriorityRequest.SourceStableKey = InConsumer.OwnerId;
+	const auto Priority = FVoxelTaskScheduler::ResolveServicePriority(PriorityRequest);
+	FVoxelGenerationDependencyStatus Status;
+	if (!PlanCoordinator->TryGetEnvironmentGeometryReadiness(InConsumer, InWorkClass, Priority, Status))
+		Status = PlanCoordinator->Ensure(Consumer->Dependencies.Values, InWorkClass, Priority, InConsumer);
 	Consumer = ExternalFactConsumers.Find(InConsumer);
 	if (bResetting || !Consumer || !Consumer->SamplingGeometry.IsSet() ||
 		Consumer->SamplingGeometry.GetValue() != InGeometry) return {};
@@ -1452,6 +1521,12 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentGeometry(
 	}
 	if (!Status.bReady)
 	{
+		if (Status.Error.StartsWith(TEXT("CapacityBlocked")))
+		{
+			// Ensure may release its failed scratch allocation; wait from the current version, not its own earlier release.
+			Consumer->bWaitingCapacity = true;
+			Consumer->CapacityVersion = Resources->ReleaseVersionExcludingOwner(InConsumer);
+		}
 		if (!Status.bNeedsAdvance && Status.Error.IsEmpty())
 			Consumer->EnvironmentWait = FEnvironmentWait{BeforeEnsureWake, InWorkClass, InSourcePriority, InDistanceScore, InForwardScore};
 		return Status;
@@ -1467,25 +1542,129 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentGeometry(
 	for (const auto& Dependency : Consumer->Dependencies.Values)
 		if (Dependency.Kind != EVoxelGenerationPlanKind::Hydrology)
 			return {false, true, TEXT("InvalidRequest: non-hydrology environment geometry input")};
-	TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe> Inputs;
-	if (!Cache->CaptureEnvironmentInputs(InConsumer, Consumer->Dependencies.Values.Num(),
-		[Consumer](const int32 Index) { return Consumer->Dependencies.Values[Index].HydrologyKey; },
-		Consumer->Retention, Inputs, Error))
+	return AdvanceEnvironmentGeometryCapture(InConsumer, InWorkClass, InSourcePriority, InDistanceScore, InForwardScore);
+}
+
+FVoxelGenerationDependencyStatus FVoxelEmergeManager::AdvanceEnvironmentGeometryCapture(const FVoxelGenerationConsumerKey& InConsumer,
+	const EVoxelWorkClass InWorkClass, const int32 InSourcePriority, const double InDistanceScore, const double InForwardScore)
+{
+	check(IsInGameThread());
+	auto* Consumer = ExternalFactConsumers.Find(InConsumer);
+	if (bResetting || !Consumer || !Consumer->SamplingGeometry.IsSet()) return {};
+	if (Consumer->bGeometryCaptureSubmitted) return {};
+	const auto Resources = Scheduler.GetTerrainResources();
+	const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(InConsumer);
+	if (Consumer->bGeometryCaptureAdmissionWaiting && BeforeAdmission <= Consumer->GeometryCaptureAdmissionVersion) return {};
+	Consumer->bGeometryCaptureAdmissionWaiting = false;
+	const auto AdmissionFailure = [Consumer, BeforeAdmission](FString InError) -> FVoxelGenerationDependencyStatus
 	{
-		Consumer->bWaitingCapacity = Error.StartsWith(TEXT("CapacityBlocked"));
-		Consumer->CapacityVersion = Version;
-		const bool bWaiting = Consumer->bWaitingCapacity || Error.StartsWith(TEXT("DependencyNotReady"));
-		return {false, !bWaiting, MoveTemp(Error)};
+		Consumer->bGeometryCaptureAdmissionWaiting = InError.StartsWith(TEXT("CapacityBlocked"));
+		Consumer->GeometryCaptureAdmissionVersion = BeforeAdmission;
+		return {false, !Consumer->bGeometryCaptureAdmissionWaiting, MoveTemp(InError)};
+	};
+	FString Error;
+	if (!Consumer->GeometryCapture)
+	{
+		if (!Consumer->Dependencies.Lease || Consumer->Dependencies.Values.IsEmpty() || !Consumer->Retention)
+			return {false, true, TEXT("InvalidRequest: environment capture inputs")};
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+		const auto Admission = Resources->TryAcquire(InConsumer, EVoxelTerrainResourcePool::Input,
+			VoxelBoundedAllocation::WorkerSharedBytes<FVoxelEnvironmentGeometryCapture>(), Lease);
+		if (Admission != EVoxelTerrainResourceAdmission::Granted)
+			return AdmissionFailure(Admission == EVoxelTerrainResourceAdmission::CapacityBlocked
+				? TEXT("CapacityBlocked: environment capture metadata") : TEXT("CapacityUnachievable: environment capture metadata"));
+		if (NextEnvironmentTaskSerial == MAX_uint64) return {false, true, TEXT("Oversized: environment capture serial")};
+		const auto Work = VoxelBoundedAllocation::MakeWorkerShared<FVoxelEnvironmentGeometryCapture>(Lease);
+		Work->MetadataLease = MoveTemp(Lease);
+		Work->FactResources = Scheduler.GetRuntimeResources();
+		Work->Cache = Generator->GetPlanCache();
+		Work->Consumer = InConsumer;
+		Work->Stamp.WorldEpoch = InConsumer.WorldEpoch;
+		Work->Stamp.OwnerId = InConsumer.OwnerId;
+		Work->Stamp.OwnerIncarnation = InConsumer.OwnerIncarnation;
+		Work->Stamp.Token = ++NextEnvironmentTaskSerial;
+		Work->Stamp.Section = FIntVector(MIN_int32, 8, 0);
+		Work->Stamp.bHasGeometryIdentity = true;
+		Work->Stamp.GeometryIdentity = Consumer->SamplingGeometry.GetValue();
+		Work->Stamp.Revision = GetTypeHash(Work->Stamp.GeometryIdentity);
+		Work->Dependencies = MoveTemp(Consumer->Dependencies);
+		Work->Retention = MoveTemp(Consumer->Retention);
+		Consumer->GeometryCapture = Work;
+		if (Consumer->GeometryCaptureQueuedAt == 0.0) Consumer->GeometryCaptureQueuedAt = FPlatformTime::Seconds();
 	}
-	Consumer->EnvironmentInputs = Inputs;
-	PlanCoordinator->ReleaseConsumer(InConsumer);
+	const auto Work = Consumer->GeometryCapture;
+	FVoxelGenerationRequiredSourceScope Source(&Resources.Get(), Work->MetadataLease.Get());
+	if (!Consumer->PendingGeometryCapture)
+	{
+		Consumer->PendingGeometryCapture.Emplace();
+		auto& Request = Consumer->PendingGeometryCapture.GetValue();
+		Request.Kind = EVoxelTaskKind::ProjectBackground;
+		Request.Stamp = Work->Stamp;
+		Request.GenerationConsumer = InConsumer;
+		Request.bTerrainDataOnly = true;
+		Request.bResumable = true;
+		Request.ReservedBytes = 1;
+		Request.QueuedAt = Consumer->GeometryCaptureQueuedAt;
+	}
+	auto& Request = Consumer->PendingGeometryCapture.GetValue();
+	Request.WorkClass = InWorkClass;
+	Request.SourcePriority = InSourcePriority;
+	Request.DistanceScore = InDistanceScore;
+	Request.ForwardScore = InForwardScore;
+	Request.SourceStableKey = InConsumer.OwnerId;
+	Request.ServiceBand = InWorkClass == EVoxelWorkClass::Critical ? EVoxelTerrainServiceBand::P0 :
+		Work->Stamp.GeometryIdentity.Key.Representation == EVoxelTerrainRepresentation::VoxelProxy ? EVoxelTerrainServiceBand::P3 :
+		Work->Stamp.GeometryIdentity.Key.Representation == EVoxelTerrainRepresentation::Surface ? EVoxelTerrainServiceBand::P4 : EVoxelTerrainServiceBand::P5;
+	if (!Request.bBlockBound && !Request.BindGetBlockReason(Resources, InConsumer, [Work] { return Work->GetBlockReason(); }, Error))
+		return AdmissionFailure(MoveTemp(Error));
+	if (!Request.bExecuteBound && !Request.BindExecute(Resources, InConsumer, [Work](const TAtomic<bool>& InCancel) { return Work->Advance(InCancel); }, Error))
+		return AdmissionFailure(MoveTemp(Error));
+	if (!Request.bApplyBound && !Request.BindApply(Resources, InConsumer,
+		[this, Lifetime = TWeakPtr<bool>(EnvironmentCaptureLifetime), InConsumer, Stamp = Work->Stamp](FVoxelTaskResult&& Result)
+		{
+			const auto Alive = Lifetime.Pin();
+			if (!Alive || !*Alive) return;
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_EnvironmentInputsCaptureApply);
+			auto* Current = ExternalFactConsumers.Find(InConsumer);
+			if (bResetting || !Current || !Current->GeometryCapture || Current->GeometryCapture->Stamp != Stamp ||
+				Result.Stamp != Stamp || Stamp.WorldEpoch != Runtime.Epoch() || !Current->SamplingGeometry.IsSet() ||
+				Current->SamplingGeometry.GetValue() != Stamp.GeometryIdentity) return;
+			const auto Completed = Current->GeometryCapture;
+			Current->bGeometryCaptureSubmitted = false;
+			Current->PendingGeometryCapture.Reset();
+			if (Result.bSuccess && !Result.bCanceled && Completed->Inputs && Completed->Inputs->IsCurrent(*Completed->Cache, InConsumer))
+			{
+				Current->EnvironmentInputs = MoveTemp(Completed->Inputs);
+				Current->GeometryCapture.Reset();
+				Current->EnvironmentWait.Reset();
+				Current->bWaitingCapacity = false;
+				Result.MarkWorkUsed();
+				TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_EnvironmentInputsReleaseConsumer);
+				PlanCoordinator->RetireEnvironmentConsumer(InConsumer);
+			}
+			else
+			{
+				Current->Dependencies = MoveTemp(Completed->Dependencies);
+				Current->GeometryCapture.Reset();
+				Current->EnvironmentWait.Reset();
+				Current->bWaitingCapacity = false;
+				if (!Result.bSuccess && !Result.bCanceled && !Result.Error.StartsWith(TEXT("DependencyNotReady")) && !Result.Error.StartsWith(TEXT("Canceled")))
+				{
+					Current->GeometryCaptureError = Result.Error.IsEmpty() ? TEXT("InvalidRequest: environment capture failed") : MoveTemp(Result.Error);
+					PlanCoordinator->ReleaseConsumer(InConsumer);
+				}
+			}
+			if (!*Alive || bResetting || !ExternalFactConsumers.Contains(InConsumer)) return;
+			if (ExternalConsumerWakeCallback) ExternalConsumerWakeCallback(InConsumer);
+		}, Error))
+		return AdmissionFailure(MoveTemp(Error));
+	FVoxelTaskRequest Submitted = MoveTemp(Request);
+	Consumer->PendingGeometryCapture.Reset();
+	Consumer->bGeometryCaptureSubmitted = true;
+	const bool bEnqueued = Scheduler.Enqueue(MoveTemp(Submitted));
 	Consumer = ExternalFactConsumers.Find(InConsumer);
-	if (bResetting || !Consumer || Consumer->EnvironmentInputs != Inputs ||
-		!Inputs->IsCurrent(*Cache, InConsumer)) return {};
-	Consumer->Dependencies = FVoxelGenerationPlanDependencyCapture{};
-	Consumer->Retention.Reset();
-	Consumer->bWaitingCapacity = false;
-	return {true, false, {}};
+	if (Consumer && Consumer->GeometryCapture == Work && !bEnqueued) Consumer->bGeometryCaptureSubmitted = false;
+	return {};
 }
 
 TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe> FVoxelEmergeManager::GetEnvironmentGeometryInputs(
@@ -1514,6 +1693,7 @@ void FVoxelEmergeManager::VisitGenerationFactSources(const FVoxelGenerationConsu
 	if (Consumer->EnvironmentInputs && Consumer->EnvironmentInputs->IsOwnedBy(*Resources))
 		Consumer->EnvironmentInputs->VisitRequiredSources(InVisit);
 	Visit(Consumer->Dependencies.Lease.Get());
+	if (Consumer->GeometryCapture) Consumer->GeometryCapture->VisitSources(*Resources, InVisit);
 	Visit(Consumer->SampleRetentionStorageLease.Get());
 	if (Consumer->Retention) Visit(&Consumer->Retention->GetResourceLease().Get());
 	for (const auto& Retention : Consumer->SampleRetentions)
@@ -1706,6 +1886,14 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentSamples(
 void FVoxelEmergeManager::Reset()
 {
 	TGuardValue<bool> ResetGuard(bResetting, true);
+	if (EnvironmentCaptureLifetime) *EnvironmentCaptureLifetime = false;
+	EnvironmentCaptureLifetime.Reset();
+	for (const auto& Pair : ExternalFactConsumers)
+		if (Pair.Value.GeometryCapture && Pair.Value.bGeometryCaptureSubmitted)
+			Scheduler.CancelMatching([Stamp = Pair.Value.GeometryCapture->Stamp](const EVoxelTaskKind Kind, const FVoxelTaskStamp& InStamp)
+			{
+				return Kind == EVoxelTaskKind::ProjectBackground && InStamp == Stamp;
+			});
 	Scheduler.CancelMatching([Owner = GenerationOwnerId, Epoch = Runtime.Epoch()](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
 	{
 		return (Kind == EVoxelTaskKind::GenerateExactBase || Kind == EVoxelTaskKind::DecodeOverlay) &&
@@ -1720,6 +1908,7 @@ void FVoxelEmergeManager::Reset()
 	for (const auto& Pair : ExternalFactConsumers) Generator->ReleaseOverlayConsumer(Pair.Key);
 	for (const auto& Pair : WaitingPlanSections) Generator->ReleaseOverlayConsumer(Pair.Value.Consumer);
 	ExternalFactConsumers.Reset();
+	EnvironmentCaptureLifetime = MakeShared<bool>(true);
 	verify(AdmissionSelection.Reset());
 	AdmissionAges.Empty();
 	AdmissionAgeStorageLease.Reset();
@@ -1846,6 +2035,7 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureGenerationFacts(
 	if (bInAllowContinuation && Consumer->ContinuationPriority.IsSet())
 	{
 		const bool bNaturalReady = Consumer->bNaturalReady;
+		const bool bNaturalNeedsAdvance = Consumer->bNaturalNeedsAdvance;
 		const bool bPriorityChanged = Consumer->ContinuationPriority.GetValue() != InPriority;
 		const uint64 NaturalWakeSerial = Consumer->NaturalWakeSerial;
 		const auto Overlay = Generator->EnsureOverlayConsumerReady(InConsumer, InBounds, WorkClass, InPriority);
@@ -1854,13 +2044,28 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureGenerationFacts(
 		Consumer->ContinuationPriority.Reset();
 		if (Overlay.bFailed) return {false, true, Overlay.Error};
 		const bool bReady = bNaturalReady && Overlay.bReady;
-		return {bReady, false, {}, !bReady && (bPriorityChanged || Consumer->WakeSerial != NaturalWakeSerial)};
+		return {bReady, false, {}, !bReady && (bNaturalNeedsAdvance || bPriorityChanged || Consumer->WakeSerial != NaturalWakeSerial)};
 	}
 	const uint64 NaturalWakeSerial = Consumer->WakeSerial;
-	const auto Natural = PlanCoordinator->Ensure(Consumer->Dependencies.Values, WorkClass, InPriority, InConsumer);
-	if (Natural.bFailed) return Natural;
-	Consumer = ExternalFactConsumers.Find(InConsumer);
-	if (!Consumer) return {};
+	FVoxelGenerationDependencyStatus Natural;
+	if (Consumer->NaturalWaitPriority.IsSet() && Consumer->NaturalWaitPriority.GetValue() == InPriority &&
+		Consumer->NaturalWaitWakeSerial == NaturalWakeSerial)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_GenerationFactsUnchangedWait);
+	}
+	else
+	{
+		Consumer->NaturalWaitPriority.Reset();
+		Natural = PlanCoordinator->Ensure(Consumer->Dependencies.Values, WorkClass, InPriority, InConsumer);
+		if (Natural.bFailed) return Natural;
+		Consumer = ExternalFactConsumers.Find(InConsumer);
+		if (!Consumer) return {};
+		if (!Natural.bReady && !Natural.bNeedsAdvance && Natural.Error.IsEmpty())
+		{
+			Consumer->NaturalWaitPriority = InPriority;
+			Consumer->NaturalWaitWakeSerial = NaturalWakeSerial;
+		}
+	}
 	if (bInAllowContinuation)
 	{
 		if (!Natural.Error.IsEmpty()) return Natural;
@@ -1868,6 +2073,7 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureGenerationFacts(
 		Consumer->ContinuationPriority = InPriority;
 		Consumer->NaturalWakeSerial = NaturalWakeSerial;
 		Consumer->bNaturalReady = Natural.bReady;
+		Consumer->bNaturalNeedsAdvance = Natural.bNeedsAdvance;
 		return {false, false, {}, true};
 	}
 	const auto Overlay = Generator->EnsureOverlayConsumerReady(InConsumer, InBounds, WorkClass, InPriority);
@@ -1878,9 +2084,17 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureGenerationFacts(
 void FVoxelEmergeManager::ReleaseGenerationFacts(const FVoxelGenerationConsumerKey& InConsumer)
 {
 	check(IsInGameThread());
+	TOptional<FVoxelTaskStamp> CaptureStamp;
+	if (const auto* Consumer = ExternalFactConsumers.Find(InConsumer); Consumer && Consumer->GeometryCapture && Consumer->bGeometryCaptureSubmitted)
+		CaptureStamp = Consumer->GeometryCapture->Stamp;
 	PlanCoordinator->ReleaseConsumer(InConsumer);
 	Generator->ReleaseOverlayConsumer(InConsumer);
 	ExternalFactConsumers.Remove(InConsumer);
+	if (CaptureStamp)
+		Scheduler.CancelMatching([Stamp = CaptureStamp.GetValue()](const EVoxelTaskKind Kind, const FVoxelTaskStamp& InStamp)
+		{
+			return Kind == EVoxelTaskKind::ProjectBackground && InStamp == Stamp;
+		});
 }
 
 bool FVoxelEmergeManager::HasGenerationFactConsumer(const FVoxelGenerationConsumerKey& InConsumer) const

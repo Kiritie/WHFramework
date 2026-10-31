@@ -1,5 +1,6 @@
 ﻿#include "Voxel/Rendering/VoxelHeightfieldMesher.h"
 #include "Voxel/Rendering/VoxelViewLod.h"
+#include "Voxel/Geometry/VoxelFaceMerger.h"
 #include "Voxel/Rendering/VoxelHeightfieldWaterTriangles.h"
 
 #include "Voxel/Generation/VoxelGenerationBinding.h"
@@ -384,98 +385,150 @@ bool FVoxelHeightfieldMesher::BuildBlockyTerrain(
 			return true;
 		};
 
-	for (int32 Y = Window.Min.Y; Y < Window.Max.Y; ++Y)
+	// 固定栈上列游标覆盖矩形，不分配逐格 mask；大窗口按列带接续同一发射路径。
+	constexpr int32 MaximumTopStripeWidth = 256;
+	for (int32 StripeMinX = Window.Min.X; StripeMinX < Window.Max.X;)
 	{
-		if (InCancel && InCancel->Load())
+		const int32 StripeMaxX = StripeMinX + FMath::Min(MaximumTopStripeWidth, Window.Max.X - StripeMinX);
+		int32 TopCoveredUntilY[MaximumTopStripeWidth] = {};
+		int32 XSideCoveredUntilY[MaximumTopStripeWidth] = {};
+		for (int32 Y = Window.Min.Y; Y < Window.Max.Y; ++Y)
 		{
-			OutError = TEXT("Canceled");
-			return false;
+			if (InCancel && InCancel->Load())
+			{
+				OutError = TEXT("Canceled");
+				return false;
+			}
+
+			int32 YSideRunEndX = StripeMinX;
+			for (int32 X = StripeMinX; X < StripeMaxX; ++X)
+			{
+				const double X0 = static_cast<double>(X * InStep);
+				const double X1 = static_cast<double>((X + 1) * InStep);
+				const double Y0 = static_cast<double>(Y * InStep);
+				const double Y1 = static_cast<double>((Y + 1) * InStep);
+				const double CurrentTop = TopZ(X, Y);
+				const FLinearColor Color = CoverageColor(X, Y);
+
+				if (TopCoveredUntilY[X - StripeMinX] <= Y)
+				{
+					const int32 CurrentIndex = CellIndex(X, Y);
+					const FLinearColor Tint = TopTint(X, Y);
+					const auto MatchesTop = [&](const int32 CandidateX, const int32 CandidateY)
+					{
+						const int32 Index = CellIndex(CandidateX, CandidateY);
+						return TopCoveredUntilY[CandidateX - StripeMinX] <= Y &&
+							InHeights[Index] == InHeights[CurrentIndex] && InMaterials[Index] == InMaterials[CurrentIndex] &&
+							CoverageColor(CandidateX, CandidateY) == Color && TopTint(CandidateX, CandidateY) == Tint;
+					};
+					FIntRect Rectangle;
+					if (!FVoxelFaceMerger::Grow(FIntPoint(X, Y), FIntPoint(StripeMaxX, Window.Max.Y), MatchesTop, Rectangle, InCancel))
+					{
+						OutError = TEXT("Canceled");
+						return false;
+					}
+					const int32 RunEndX = Rectangle.Max.X;
+					const int32 RunEndY = Rectangle.Max.Y;
+					for (int32 CoveredX = X; CoveredX < RunEndX; ++CoveredX)
+						TopCoveredUntilY[CoveredX - StripeMinX] = RunEndY;
+					const double RunX1 = static_cast<double>(RunEndX * InStep);
+					const double RunY1 = static_cast<double>(RunEndY * InStep);
+					if (!AppendMaterialQuad(X, Y, FacePositiveZ,
+						FVector(X0, Y0, CurrentTop), FVector(RunX1, Y0, CurrentTop),
+						FVector(RunX1, RunY1, CurrentTop), FVector(X0, RunY1, CurrentTop), Color))
+					{
+						return false;
+					}
+				}
+
+				if (X + 1 < CellSide && XSideCoveredUntilY[X - StripeMinX] <= Y &&
+					InHeights[CellIndex(X, Y)] != MIN_int32 && InHeights[CellIndex(X + 1, Y)] != MIN_int32 &&
+					InHeights[CellIndex(X, Y)] != InHeights[CellIndex(X + 1, Y)])
+				{
+					const double NeighborTop = TopZ(X + 1, Y);
+					const int32 MaterialX = CurrentTop > NeighborTop ? X : X + 1;
+					const FLinearColor WallColor = CoverageColor(MaterialX, Y);
+					FIntRect Rectangle;
+					if (!FVoxelFaceMerger::Grow(FIntPoint(Y, 0), FIntPoint(Window.Max.Y, 1),
+						[&](const int32 CandidateY, const int32)
+						{
+							return InHeights[CellIndex(X, CandidateY)] == InHeights[CellIndex(X, Y)] &&
+								InHeights[CellIndex(X + 1, CandidateY)] == InHeights[CellIndex(X + 1, Y)] &&
+								InMaterials[CellIndex(MaterialX, CandidateY)] == InMaterials[CellIndex(MaterialX, Y)] &&
+								CoverageColor(MaterialX, CandidateY) == WallColor;
+						}, Rectangle, InCancel))
+					{
+						OutError = TEXT("Canceled");
+						return false;
+					}
+					const int32 RunEndY = Rectangle.Max.X;
+					XSideCoveredUntilY[X - StripeMinX] = RunEndY;
+					const double WallY1 = static_cast<double>(RunEndY * InStep);
+
+					if (CurrentTop > NeighborTop &&
+						!AppendMaterialQuad(
+							X, Y, FacePositiveX,
+							FVector(X1, WallY1, CurrentTop), FVector(X1, Y0, CurrentTop),
+							FVector(X1, Y0, NeighborTop), FVector(X1, WallY1, NeighborTop), WallColor))
+					{
+						return false;
+					}
+
+					if (NeighborTop > CurrentTop &&
+						!AppendMaterialQuad(
+							X + 1, Y, FaceNegativeX,
+							FVector(X1, Y0, NeighborTop), FVector(X1, WallY1, NeighborTop),
+							FVector(X1, WallY1, CurrentTop), FVector(X1, Y0, CurrentTop), WallColor))
+					{
+						return false;
+					}
+				}
+
+				if (Y + 1 < CellSide && X >= YSideRunEndX && InHeights[CellIndex(X, Y)] != MIN_int32 &&
+					InHeights[CellIndex(X, Y + 1)] != MIN_int32 &&
+					InHeights[CellIndex(X, Y)] != InHeights[CellIndex(X, Y + 1)])
+				{
+					const double NeighborTop = TopZ(X, Y + 1);
+					const int32 MaterialY = CurrentTop > NeighborTop ? Y : Y + 1;
+					const FLinearColor WallColor = CoverageColor(X, MaterialY);
+					FIntRect Rectangle;
+					if (!FVoxelFaceMerger::Grow(FIntPoint(X, 0), FIntPoint(StripeMaxX, 1),
+						[&](const int32 CandidateX, const int32)
+						{
+							return InHeights[CellIndex(CandidateX, Y)] == InHeights[CellIndex(X, Y)] &&
+								InHeights[CellIndex(CandidateX, Y + 1)] == InHeights[CellIndex(X, Y + 1)] &&
+								InMaterials[CellIndex(CandidateX, MaterialY)] == InMaterials[CellIndex(X, MaterialY)] &&
+								CoverageColor(CandidateX, MaterialY) == WallColor;
+						}, Rectangle, InCancel))
+					{
+						OutError = TEXT("Canceled");
+						return false;
+					}
+					const int32 RunEndX = Rectangle.Max.X;
+					YSideRunEndX = RunEndX;
+					const double WallX1 = static_cast<double>(RunEndX * InStep);
+
+					if (CurrentTop > NeighborTop &&
+						!AppendMaterialQuad(
+							X, Y, FacePositiveY,
+							FVector(X0, Y1, CurrentTop), FVector(WallX1, Y1, CurrentTop),
+							FVector(WallX1, Y1, NeighborTop), FVector(X0, Y1, NeighborTop), WallColor))
+					{
+						return false;
+					}
+
+					if (NeighborTop > CurrentTop &&
+						!AppendMaterialQuad(
+							X, Y + 1, FaceNegativeY,
+							FVector(WallX1, Y1, NeighborTop), FVector(X0, Y1, NeighborTop),
+							FVector(X0, Y1, CurrentTop), FVector(WallX1, Y1, CurrentTop), WallColor))
+					{
+						return false;
+					}
+				}
+			}
 		}
-
-		int32 TopRunEnd = Window.Min.X;
-		for (int32 X = Window.Min.X; X < Window.Max.X; ++X)
-		{
-			const double X0 = static_cast<double>(X * InStep);
-			const double X1 = static_cast<double>((X + 1) * InStep);
-			const double Y0 = static_cast<double>(Y * InStep);
-			const double Y1 = static_cast<double>((Y + 1) * InStep);
-			const double CurrentTop = TopZ(X, Y);
-			const FLinearColor Color = CoverageColor(X, Y);
-
-			if (X >= TopRunEnd)
-			{
-				// 只合并原采样高度、材质、覆盖色和顶面着色完全相同的行内平面。
-				// UV 来自原世界坐标，侧面仍逐单元生成；Count/Build 使用同一条规则。
-				TopRunEnd = X + 1;
-				const int32 CurrentIndex = CellIndex(X, Y);
-				const FLinearColor Tint = TopTint(X, Y);
-				while (TopRunEnd < Window.Max.X)
-				{
-					const int32 NextIndex = CellIndex(TopRunEnd, Y);
-					if (InHeights[NextIndex] != InHeights[CurrentIndex] ||
-						InMaterials[NextIndex] != InMaterials[CurrentIndex] ||
-						CoverageColor(TopRunEnd, Y) != Color || TopTint(TopRunEnd, Y) != Tint) break;
-					++TopRunEnd;
-				}
-				const double RunX1 = static_cast<double>(TopRunEnd * InStep);
-				if (!AppendMaterialQuad(X, Y, FacePositiveZ,
-					FVector(X0, Y0, CurrentTop), FVector(RunX1, Y0, CurrentTop),
-					FVector(RunX1, Y1, CurrentTop), FVector(X0, Y1, CurrentTop), Color))
-				{
-					return false;
-				}
-			}
-
-			if (X + 1 < CellSide && InHeights[CellIndex(X, Y)] != MIN_int32 &&
-				InHeights[CellIndex(X + 1, Y)] != MIN_int32)
-			{
-				const double NeighborTop = TopZ(X + 1, Y);
-
-				if (CurrentTop > NeighborTop &&
-					!AppendMaterialQuad(
-						X, Y, FacePositiveX,
-						FVector(X1, Y1, CurrentTop), FVector(X1, Y0, CurrentTop),
-						FVector(X1, Y0, NeighborTop), FVector(X1, Y1, NeighborTop), Color))
-				{
-					return false;
-				}
-
-				if (NeighborTop > CurrentTop &&
-					!AppendMaterialQuad(
-						X + 1, Y, FaceNegativeX,
-						FVector(X1, Y0, NeighborTop), FVector(X1, Y1, NeighborTop),
-						FVector(X1, Y1, CurrentTop), FVector(X1, Y0, CurrentTop),
-						CoverageColor(X + 1, Y)))
-				{
-					return false;
-				}
-			}
-
-			if (Y + 1 < CellSide && InHeights[CellIndex(X, Y)] != MIN_int32 &&
-				InHeights[CellIndex(X, Y + 1)] != MIN_int32)
-			{
-				const double NeighborTop = TopZ(X, Y + 1);
-
-				if (CurrentTop > NeighborTop &&
-					!AppendMaterialQuad(
-						X, Y, FacePositiveY,
-						FVector(X0, Y1, CurrentTop), FVector(X1, Y1, CurrentTop),
-						FVector(X1, Y1, NeighborTop), FVector(X0, Y1, NeighborTop), Color))
-				{
-					return false;
-				}
-
-				if (NeighborTop > CurrentTop &&
-					!AppendMaterialQuad(
-						X, Y + 1, FaceNegativeY,
-						FVector(X1, Y1, NeighborTop), FVector(X0, Y1, NeighborTop),
-						FVector(X0, Y1, CurrentTop), FVector(X1, Y1, CurrentTop),
-						CoverageColor(X, Y + 1)))
-				{
-					return false;
-				}
-			}
-		}
+		StripeMinX = StripeMaxX;
 	}
 
 	for (const FVoxelRenderBatch& Batch : Mesh.Batches)
@@ -513,6 +566,35 @@ bool FVoxelHeightfieldMesher::AppendDistantCells(
 	const double InMaximumTextureStretchCells, const FIntRect& InWindow)
 {
 	const double TexturePeriod = VoxelViewLod::TexturePeriodCells(InStep, InMaximumTextureStretchCells);
+	struct FDistantFaceKey
+	{
+		FVoxelRuntimeFaceRef Material;
+		EVoxelRenderGroup Group = EVoxelRenderGroup::Opaque;
+		bool operator==(const FDistantFaceKey& InOther) const { return Material == InOther.Material && Group == InOther.Group; }
+	};
+	TVoxelPlanarFaceMerger<FDistantFaceKey> Merger;
+	const auto EmitFace = [&](const uint8 FaceIndex, const double Plane, const FBox2D& Rect, const FDistantFaceKey& Key)
+	{
+		if (InCancel && InCancel->Load()) { OutError = TEXT("Canceled"); return false; }
+		const int32 Axis = FaceIndex / 2;
+		const int32 U = (Axis + 1) % 3;
+		const int32 V = (Axis + 2) % 3;
+		const int32 Corners[6][4] = {{2, 3, 0, 1}, {3, 2, 1, 0}, {1, 2, 3, 0}, {2, 1, 0, 3}, {0, 1, 2, 3}, {3, 2, 1, 0}};
+		const double CoordinatesU[] = {Rect.Min.X, Rect.Max.X, Rect.Max.X, Rect.Min.X};
+		const double CoordinatesV[] = {Rect.Min.Y, Rect.Min.Y, Rect.Max.Y, Rect.Max.Y};
+		FVector Vertices[4];
+		for (int32 Index = 0; Index < 4; ++Index)
+		{
+			Vertices[Index][Axis] = Plane;
+			Vertices[Index][U] = CoordinatesU[Corners[FaceIndex][Index]];
+			Vertices[Index][V] = CoordinatesV[Corners[FaceIndex][Index]];
+		}
+		FVoxelRenderBatch& Batch = FindOrAddBatch(InOutMesh, Key.Group, Key.Material.Bank);
+		const int32 FirstUV = Batch.Mesh.UV0.Num();
+		AppendQuad(Batch.Mesh, Vertices[0], Vertices[1], Vertices[2], Vertices[3], Key.Material);
+		for (int32 Index = FirstUV; Index < Batch.Mesh.UV0.Num(); ++Index) Batch.Mesh.UV0[Index] /= TexturePeriod;
+		return true;
+	};
 	for (const FVoxelDistantCell& Cell : InCells)
 	{
 		const FIntPoint CellPosition((Cell.Min.X - InTileOrigin.X) / InStep, (Cell.Min.Y - InTileOrigin.Y) / InStep);
@@ -534,32 +616,20 @@ bool FVoxelHeightfieldMesher::AppendDistantCells(
 			OutError = TEXT("Distant voxel cell is missing from registry");
 			return false;
 		}
-		const double X0 = Cell.Min.X - InTileOrigin.X;
-		const double X1 = Cell.Max.X - InTileOrigin.X;
-		const double Y0 = Cell.Min.Y - InTileOrigin.Y;
-		const double Y1 = Cell.Max.Y - InTileOrigin.Y;
-		const double Z0 = Cell.Min.Z;
-		const double Z1 = Cell.Max.Z;
-		auto Face = [&](const uint8 FaceIndex, const FVector& A,
-			const FVector& B, const FVector& C, const FVector& D)
+		const FVector Min(Cell.Min.X - InTileOrigin.X, Cell.Min.Y - InTileOrigin.Y, Cell.Min.Z);
+		const FVector Max(Cell.Max.X - InTileOrigin.X, Cell.Max.Y - InTileOrigin.Y, Cell.Max.Z);
+		const bool bOccludes = Definition->bOccludes && Definition->RenderGroup == EVoxelRenderGroup::Opaque;
+		for (uint8 FaceIndex = 0; FaceIndex < 6; ++FaceIndex)
 		{
-			const FVoxelRuntimeFaceRef& Material = Definition->Face(Cell.State.State, FaceIndex);
-			FVoxelRenderBatch& Batch = FindOrAddBatch(InOutMesh,
-				Definition->RenderGroup, Material.Bank);
-			const int32 FirstUV = Batch.Mesh.UV0.Num();
-			AppendQuad(Batch.Mesh, A, B, C, D, Material);
-			for (int32 Index = FirstUV; Index < Batch.Mesh.UV0.Num(); ++Index)
-			{
-				Batch.Mesh.UV0[Index] /= TexturePeriod;
-			}
-		};
-		Face(FacePositiveX, {X1, Y1, Z1}, {X1, Y0, Z1}, {X1, Y0, Z0}, {X1, Y1, Z0});
-		Face(FaceNegativeX, {X0, Y0, Z1}, {X0, Y1, Z1}, {X0, Y1, Z0}, {X0, Y0, Z0});
-		Face(FacePositiveY, {X0, Y1, Z1}, {X1, Y1, Z1}, {X1, Y1, Z0}, {X0, Y1, Z0});
-		Face(FaceNegativeY, {X1, Y0, Z1}, {X0, Y0, Z1}, {X0, Y0, Z0}, {X1, Y0, Z0});
-		Face(FacePositiveZ, {X0, Y0, Z1}, {X1, Y0, Z1}, {X1, Y1, Z1}, {X0, Y1, Z1});
-		Face(FaceNegativeZ, {X0, Y1, Z0}, {X1, Y1, Z0}, {X1, Y0, Z0}, {X0, Y0, Z0});
+			const int32 Axis = FaceIndex / 2;
+			const int32 U = (Axis + 1) % 3;
+			const int32 V = (Axis + 2) % 3;
+			const FDistantFaceKey Key{Definition->Face(Cell.State.State, FaceIndex), Definition->RenderGroup};
+			if (!Merger.Add(FaceIndex, (FaceIndex & 1) ? Min[Axis] : Max[Axis],
+				FBox2D(FVector2D(Min[U], Min[V]), FVector2D(Max[U], Max[V])), Key, bOccludes, EmitFace)) return false;
+		}
 	}
+	if (!Merger.Flush(EmitFace)) return false;
 	OutError.Reset();
 	return true;
 }
@@ -712,30 +782,60 @@ bool FVoxelHeightfieldMesher::BuildWaterGrid(const int32 InSide, const int32 InS
 
 
 
-	for (int32 Y = Window.Min.Y;
-		Y < Window.Max.Y;
-		++Y)
+	constexpr int32 StripeWidth = 256;
+	for (int32 StripeMinX = Window.Min.X; StripeMinX < Window.Max.X; StripeMinX += StripeWidth)
 	{
-		if (InCancel &&
-			InCancel->Load())
+		const int32 StripeMaxX = FMath::Min(Window.Max.X, StripeMinX + StripeWidth);
+		int32 CoveredUntilY[StripeWidth];
+		for (int32& CoveredY : CoveredUntilY) CoveredY = Window.Min.Y;
+		for (int32 Y = Window.Min.Y; Y < Window.Max.Y; ++Y)
 		{
-			OutError =
-				TEXT("Canceled");
-
-			return false;
-		}
-
-		for (int32 X = Window.Min.X;
-			X < Window.Max.X;
-			++X)
-		{
-			VoxelHeightfieldWater::VisitCellPolygons(InSide, InStep, InGroundZ, InWaterZ, InWaterKind, X, Y,
-				[&Mesh, &Face](TConstArrayView<FVector> Polygon, const uint8 Variant, const bool bFullCell)
+			if (InCancel && InCancel->Load())
+			{
+				OutError = TEXT("Canceled");
+				return false;
+			}
+			for (int32 X = StripeMinX; X < StripeMaxX; ++X)
+			{
+				if (CoveredUntilY[X - StripeMinX] > Y) continue;
+				const int32 First = X + Y * InSide;
+				const int32 Height = InWaterZ[First];
+				const uint8 Kind = InWaterKind[First];
+				const auto MatchesFlatCell = [&](const int32 CandidateX, const int32 CandidateY)
 				{
-					auto& Batch = FindOrAddBatch(Mesh, EVoxelRenderGroup::Water, Face.Bank, Variant);
-					if (bFullCell) AppendQuad(Batch.Mesh, Polygon[0], Polygon[1], Polygon[2], Polygon[3], Face);
-					else AppendWaterPolygon(Batch.Mesh, Polygon, Face);
-				});
+					if (!Kind || Height == MIN_int32 || CoveredUntilY[CandidateX - StripeMinX] > Y) return false;
+					const int32 Index = CandidateX + CandidateY * InSide;
+					for (const int32 Corner : {Index, Index + 1, Index + InSide, Index + InSide + 1})
+						if (InWaterKind[Corner] != Kind || InWaterZ[Corner] != Height || Height < InGroundZ[Corner]) return false;
+					return true;
+				};
+				if (MatchesFlatCell(X, Y))
+				{
+					FIntRect Rectangle;
+					if (!FVoxelFaceMerger::Grow(FIntPoint(X, Y), FIntPoint(StripeMaxX, Window.Max.Y), MatchesFlatCell, Rectangle, InCancel))
+					{
+						OutError = TEXT("Canceled");
+						return false;
+					}
+					const int32 EndX = Rectangle.Max.X;
+					const int32 EndY = Rectangle.Max.Y;
+					for (int32 CoveredX = X; CoveredX < EndX; ++CoveredX) CoveredUntilY[CoveredX - StripeMinX] = EndY;
+					auto& Batch = FindOrAddBatch(Mesh, EVoxelRenderGroup::Water, Face.Bank, Kind);
+					const double Top = double(Height) + 1.0;
+					AppendQuad(Batch.Mesh, FVector(X * InStep, Y * InStep, Top), FVector(EndX * InStep, Y * InStep, Top),
+						FVector(EndX * InStep, EndY * InStep, Top), FVector(X * InStep, EndY * InStep, Top), Face);
+				}
+				else
+				{
+					VoxelHeightfieldWater::VisitCellPolygons(InSide, InStep, InGroundZ, InWaterZ, InWaterKind, X, Y,
+						[&Mesh, &Face](TConstArrayView<FVector> Polygon, const uint8 Variant, const bool bFullCell)
+						{
+							auto& Batch = FindOrAddBatch(Mesh, EVoxelRenderGroup::Water, Face.Bank, Variant);
+							if (bFullCell) AppendQuad(Batch.Mesh, Polygon[0], Polygon[1], Polygon[2], Polygon[3], Face);
+							else AppendWaterPolygon(Batch.Mesh, Polygon, Face);
+						});
+				}
+			}
 		}
 	}
 

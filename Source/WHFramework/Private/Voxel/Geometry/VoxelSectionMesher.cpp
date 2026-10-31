@@ -1,5 +1,6 @@
 #include "Voxel/Geometry/VoxelSectionMesher.h"
 #include "Voxel/Geometry/DWVoxelFaceVisibility.h"
+#include "Voxel/Geometry/VoxelFaceMerger.h"
 #include "Voxel/Geometry/DWVoxelBoundaryTransition.h"
 #include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Rendering/VoxelBoundaryRaster.h"
@@ -418,10 +419,13 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
         }
     };
 
+    TArray<FFaceKey> Mask;
+    if (!bBoundaryOnly) { Mask.Reserve(Side * Side); Mask.SetNum(Side * Side); }
     if (!bBoundaryOnly) for(uint8 F=0;F<6;++F)for(int32 Slice=0;Slice<Side;++Slice)
     {
         if(Cancel&&Cancel->Load())return false;
-        TArray<FFaceKey> Mask; Mask.Reserve(Side * Side); Mask.SetNum(Side * Side);int32 A=F/2,U=(A+1)%3,V=(A+2)%3;
+        for (FFaceKey& Key : Mask) Key.Visible = false;
+        const int32 A=F/2,U=(A+1)%3,V=(A+2)%3;
         for(int32 Y=0;Y<Side;++Y)for(int32 X=0;X<Side;++X)
         {
             FIntVector P(0,0,0);P[A]=Slice;P[U]=X;P[V]=Y;FVoxelBlockState B=FVoxelBlockState::Unpack(S.Blocks[P.X + Side * (P.Y + Side * P.Z)]);
@@ -432,9 +436,12 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
         }
         for(int32 Y=0;Y<Side;++Y)for(int32 X=0;X<Side;)
         {
-            const auto K=Mask[X+Side*Y];if(!K.Visible){++X;continue;}int32 W=1,Ht=1;
-            while(X+W<Side&&Mask[X+W+Side*Y]==K)++W;
-            bool Stop=false;while(Y+Ht<Side&&!Stop){for(int32 DX=0;DX<W;++DX)if(!(Mask[X+DX+Side*(Y+Ht)]==K)){Stop=true;break;}if(!Stop)++Ht;}
+            const auto K=Mask[X+Side*Y];if(!K.Visible){++X;continue;}
+            FIntRect Rectangle;
+            if (!FVoxelFaceMerger::Grow(FIntPoint(X, Y), FIntPoint(Side),
+                [&](const int32 CandidateX, const int32 CandidateY) { return Mask[CandidateX + Side * CandidateY] == K; }, Rectangle, Cancel)) return false;
+            const int32 W = Rectangle.Width();
+            const int32 Ht = Rectangle.Height();
         	FVector P[4];
         	FVector2D UV[4];
             const int32 XX[4]={X,X+W,X+W,X},YY[4]={Y,Y,Y+Ht,Y+Ht};
@@ -453,6 +460,7 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
             for(int32 DY=0;DY<Ht;++DY)for(int32 DX=0;DX<W;++DX)Mask[X+DX+Side*(Y+DY)].Visible=false;X+=W;
         }
     }
+    Mask.Empty();
     if (InTransition && bIncludeBoundary)
     {
         const auto OwnerBounds = InTransition->Owner.GetBounds();
@@ -585,15 +593,11 @@ bool FVoxelSectionMesher::Build(const FVoxelSectionSnapshot&S,const FVoxelRegist
                             for (int32 X = 0; X < 16;)
                             {
                                 if (!Mask[X + Y * 16]) { ++X; continue; }
-                                int32 Width = 1, Height = 1;
-                                while (X + Width < 16 && Mask[X + Width + Y * 16]) ++Width;
-                                bool bStop = false;
-                                while (Y + Height < 16 && !bStop)
-                                {
-                                    for (int32 Delta = 0; Delta < Width; ++Delta)
-                                        if (!Mask[X + Delta + (Y + Height) * 16]) { bStop = true; break; }
-                                    if (!bStop) ++Height;
-                                }
+                                FIntRect Rectangle;
+                                if (!FVoxelFaceMerger::Grow(FIntPoint(X, Y), FIntPoint(16),
+                                    [&](const int32 CandidateX, const int32 CandidateY) { return Mask[CandidateX + CandidateY * 16]; }, Rectangle, Cancel)) return false;
+                                const int32 Width = Rectangle.Width();
+                                const int32 Height = Rectangle.Height();
                                 if (!EmitRectangle(X, Y, Width, Height)) return false;
                                 for (int32 DY = 0; DY < Height; ++DY)
                                     for (int32 DX = 0; DX < Width; ++DX) Mask[X + DX + (Y + DY) * 16] = false;

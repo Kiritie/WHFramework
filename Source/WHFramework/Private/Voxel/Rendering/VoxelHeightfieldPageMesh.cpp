@@ -164,7 +164,7 @@ bool FVoxelHeightfieldPageMesh::Advance(const FVoxelMacroTileData& InData,
 		InData.Step != Geometry.SampleStepCells || int64(InData.Side - 1) * InData.Step != Geometry.Key.SideCells() ||
 		InData.Height.Num() != InData.Side * InData.Side || InData.WaterHeight.Num() != InData.Height.Num() ||
 		InData.WaterKind.Num() != InData.Height.Num() || InData.SurfaceStates.Num() != InData.Height.Num() ||
-		InData.ForestCoverage.Num() != InData.Height.Num() || InData.SnowCoverage.Num() != InData.Height.Num() ||
+		InData.ForestCoverage.Num() != InData.Height.Num() ||
 		!FMath::IsFinite(InTextureStretch) || InTextureStretch <= 0.0)
 	{
 		OutError = TEXT("Macro mesh input does not match its actual geometry");

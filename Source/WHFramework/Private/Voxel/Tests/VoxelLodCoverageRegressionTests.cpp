@@ -164,7 +164,6 @@ bool FVoxelPublisherStageAndIndexTest::RunTest(const FString& InParameters)
 	const auto Publication = MakeShared<FVoxelViewPublisher::FPublication>();
 	Publication->Serial = 1;
 	Publication->Updates.SetNum(2);
-	Publication->PreparedMeshes.SetNum(2);
 	for (int32 Index = 0; Index < 2; ++Index)
 	{
 		FVoxelViewSourceId SourceId = FVoxelViewSourceId::NewId();
@@ -188,17 +187,9 @@ bool FVoxelPublisherStageAndIndexTest::RunTest(const FString& InParameters)
 	Publisher.BuildGroups(Publication, true);
 	Publisher.SortGroups(Publication);
 	Publication->bGroupsPrepared = true;
-	for (int32 Step = 0; Step < 16 && !Publication->bBuildOrderInitialized; ++Step)
-	{
-		auto& Frame = Module->GetTerrainFrameContext();
-		Frame.Begin(1, Frame.GetFrameCounter() + 1, FPlatformTime::Seconds(), {});
-		Publisher.AdmitBuilds(Publication);
-		Frame.End(FPlatformTime::Seconds());
-	}
-	TestTrue(TEXT("Build admission initialization completes within bounded work"), Publication->bBuildOrderInitialized);
-	for (int32 Index = 0; Index < Publication->Updates.Num(); ++Index)
-		TestTrue(TEXT("Every prepared direct mesh still belongs to its final update"),
-			Publication->PreparedMeshes[Index] == Publication->Updates[Index].Source);
+	for (const auto& Update : Publication->Updates)
+		TestTrue(TEXT("覆盖重排后的直接网格仍属于原Source身份"),
+			Update.Source == Publisher.Entries.FindChecked(Update.SourceId).Source);
 	Scheduler.SetObservedTerrainStage(0);
 	for (const auto& Update : Publication->Updates)
 	{
@@ -301,9 +292,6 @@ bool FVoxelEmptyTransitionConvergenceTest::RunTest(const FString& InParameters)
 	const FVoxelViewKey Node{FIntVector::ZeroValue, 1};
 	const FVoxelPublishGroupKey Owner{1, FIntPoint::ZeroValue, 1};
 	auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
-	Interest.TerrainPlan.Roots = {Node};
-	Interest.TerrainPlan.Leaves = {Node};
-	Interest.TerrainPlan.Required = {Node};
 	Manager.GetInputRoot().ProxyWanted.Add(Node);
 	Manager.VoxelProxyReady.Add(Node);
 	auto Data = MakeShared<FVoxelVoxelProxyData, ESPMode::ThreadSafe>();
@@ -344,7 +332,6 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVoxelFineProxyDependenciesTest,
 
 bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 {
-	FString BuildError;
 	(void)InParameters;
 	UVoxelModule* Module = NewObject<UVoxelModule>();
 	FVoxelTaskScheduler Scheduler(true);
@@ -354,29 +341,8 @@ bool FVoxelFineProxyDependenciesTest::RunTest(const FString& InParameters)
 	FVoxelViewManager Manager(*Module, Scheduler, 11);
 	const FVoxelViewKey Dependency{FIntVector::ZeroValue, 1};
 	const FVoxelViewKey Distant{FIntVector(10, 0, 0), 1};
-	const FVoxelViewKey Root{FIntVector::ZeroValue, 5};
 	auto& Interest = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest());
-	Interest.TerrainPlan.Roots = {Root};
-	Interest.TerrainPlan.Leaves = Interest.TerrainPlan.Required = Interest.TerrainPlan.Roots;
-	for (uint8 Level = Root.Level; Level > 0; --Level)
-	{
-		const FVoxelViewKey Parent{FIntVector::ZeroValue, Level};
-		Interest.TerrainPlan.Leaves.Remove(Parent);
-		Interest.TerrainPlan.FineDependencies.Add(Parent);
-		TArray<FVoxelViewKey> Children;
-		Parent.GetChildren(Children);
-		for (const FVoxelViewKey& Child : Children)
-		{
-			Interest.TerrainPlan.Leaves.Add(Child);
-			Interest.TerrainPlan.Required.Add(Child);
-			Interest.TerrainPlan.FineDependencies.Add(Child);
-		}
-	}
-	TestTrue(TEXT("Dependency fixture has a complete spatial partition"), Interest.TerrainPlan.Validate(BuildError));
-	TestTrue(TEXT("Spatial dependency fixture retains the Fine ancestor"),
-		Interest.TerrainPlan.FineDependencies.Contains(Dependency));
-	TestTrue(TEXT("Spatial dependency fixture includes the handoff sibling"),
-		Interest.TerrainPlan.FineDependencies.Contains({FIntVector(1, 0, 0), 1}));
+	Interest.CriticalDependencies.Add({EVoxelTerrainRepresentation::VoxelProxy, Dependency.Coordinate, Dependency.Level});
 	FVoxelViewAdmission Admission;
 	Admission.Kind = EVoxelViewAdmissionKind::VoxelProxy;
 	Admission.ProxyKey = Dependency;

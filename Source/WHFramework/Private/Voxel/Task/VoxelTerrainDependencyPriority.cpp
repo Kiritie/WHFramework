@@ -248,6 +248,14 @@ void FVoxelTerrainDependencyPriority::SetPriority(const FGuid& InNode,
 	}
 }
 
+void FVoxelTerrainDependencyPriority::RemoveDependency(const FGuid& InNode, const FGuid& InDependency)
+{
+	FNode* Node = Storage ? Storage->Nodes.Find(InNode) : nullptr;
+	if (!Node || !Node->Dependencies.Remove(InDependency)) return;
+	Storage->Nodes.FindChecked(InDependency).Consumers.Remove(InNode);
+	Dirty(InDependency);
+}
+
 void FVoxelTerrainDependencyPriority::Remove(const FGuid& InNode)
 {
 	FNode* Node = Storage ? Storage->Nodes.Find(InNode) : nullptr;

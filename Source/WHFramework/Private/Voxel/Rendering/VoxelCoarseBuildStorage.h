@@ -359,7 +359,6 @@ private:
 			AddArray(InData.WaterKind);
 			AddArray(InData.SurfaceStates);
 			AddArray(InData.ForestCoverage);
-			AddArray(InData.SnowCoverage);
 			AddArray(InData.LargeStructures);
 			AddArray(InData.DistantCells);
 		}

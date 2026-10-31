@@ -98,6 +98,11 @@ public:
 		const FIntPoint& InCenter, const FVoxelGenerationConsumerKey& InConsumer,
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe>& OutRetention, FString& OutError) const;
 
+	// Only for the same immutable environment geometry dependency capture already bound by Ensure.
+	bool TryGetEnvironmentGeometryReadiness(const FVoxelGenerationConsumerKey& InConsumer,
+		EVoxelWorkClass InWorkClass, const FVoxelTerrainServicePriority& InPriority,
+		FVoxelGenerationDependencyStatus& OutStatus) const;
+
 	FVoxelGenerationDependencyStatus Ensure(
 		TConstArrayView<FVoxelGenerationPlanDependency> InDependencies,
 		EVoxelWorkClass InWorkClass, const FVoxelTerrainServicePriority& InPriority,
@@ -114,6 +119,7 @@ public:
 	FVoxelGenerationDependencyStatus EnsureEnvironmentBounds(const FVoxelGenerationBounds& InBounds,
 		EVoxelWorkClass InWorkClass, int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	void ReleaseConsumer(const FVoxelGenerationConsumerKey& InConsumer);
+	void RetireEnvironmentConsumer(const FVoxelGenerationConsumerKey& InConsumer);
 	void ReleaseEnvironment(const FIntPoint& InCell);
 	uint64 GetWaitingConsumers(EVoxelGenerationPlanKind InKind) const;
 
@@ -185,6 +191,7 @@ private:
 		FGuid PreviousWake;
 		FGuid NextWake;
 		bool bWakePending = false;
+		bool bHydrologyReady = false;
 	};
 	struct FConsumerState
 	{
@@ -198,7 +205,14 @@ private:
 		FGuid WakeHead;
 		FGuid WakeTail;
 		int32 Capacity = 0;
+		int32 MissingHydrology = 0;
+		uint64 HydrologyRetirementRevision = 0;
+		bool bHydrologyReadinessTracked = false;
 		bool bWakeQueued = false;
+		FVoxelGenerationConsumerKey PreviousRetiring;
+		FVoxelGenerationConsumerKey NextRetiring;
+		int32 RetirementCursor = 0;
+		bool bRetiring = false;
 	};
 	struct FStorage
 	{
@@ -214,6 +228,8 @@ private:
 		TMap<FVoxelGenerationConsumerKey, FVoxelGenerationConsumerKey> EnvironmentAttempts;
 		FVoxelGenerationConsumerKey WakeHead;
 		FVoxelGenerationConsumerKey WakeTail;
+		FVoxelGenerationConsumerKey RetiringHead;
+		FVoxelGenerationConsumerKey RetiringTail;
 		FGuid AdmissionHead;
 		FGuid AdmissionTail;
 		int32 AdmissionCount = 0;
@@ -264,6 +280,8 @@ private:
 	bool SetFactDependencies(const FVoxelGenerationPlanDependency& InDependency, FString& OutError);
 	void LinkConsumerWake(const FVoxelGenerationConsumerKey& InConsumer, FConsumerState& InState);
 	void UnlinkConsumerWake(FConsumerState& InState);
+	void UnlinkRetiringConsumer(FConsumerState& InState);
+	int32 AdvanceRetiringConsumers(double InDeadline, int32 InMaximumEdges);
 	void UnlinkSubscriptionWake(FConsumerState& InConsumer, FSubscription& InSubscription);
 
 	void ResolveDonations(FState& InOutState);

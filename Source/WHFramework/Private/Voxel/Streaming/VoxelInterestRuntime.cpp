@@ -751,10 +751,7 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 			return false;
 		}
 	}
-	OutDelta.bVisualPartitionChanged |= !SameFinePagePlan(PreviousInterest.FinePagePlan, Next.FinePagePlan) ||
-										!SameRuntimeSet(PreviousInterest.TerrainPlan.Roots, Next.TerrainPlan.Roots) ||
-										!SameRuntimeSet(PreviousInterest.TerrainPlan.Leaves, Next.TerrainPlan.Leaves) ||
-										!SameRuntimeSet(PreviousInterest.TerrainPlan.FineDependencies, Next.TerrainPlan.FineDependencies);
+	OutDelta.bVisualPartitionChanged |= !SameFinePagePlan(PreviousInterest.FinePagePlan, Next.FinePagePlan);
 	bool bChanged = !OutDelta.AddedExact.IsEmpty() || !OutDelta.RemovedExact.IsEmpty() ||
 		OutDelta.bVisualPartitionChanged || Next.Warmup.Num() != PreviousInterest.Warmup.Num() ||
 		Next.Sources.Num() != PreviousInterest.Sources.Num() ||

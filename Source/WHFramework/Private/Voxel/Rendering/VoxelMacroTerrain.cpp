@@ -49,7 +49,6 @@ bool FVoxelMacroTerrainBuilder::Build(
 		Data.GetVertexCount();
 
 	Data.ForestCoverage.SetNumUninitialized(Count);
-	Data.SnowCoverage.SetNumUninitialized(Count);
 
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ColumnsLease;
 	TArray<FVoxelColumnSample> Columns;
@@ -91,24 +90,8 @@ bool FVoxelMacroTerrainBuilder::Build(
 
 		const FVoxelEcologySample EcologySample = Ecology.Sample(Column);
 
-		const int32 Temperature =
-			FMath::Clamp(
-				Column.Climate.
-					TemperatureQ15,
-				-32768,
-				32767);
-
 		Data.ForestCoverage[Index] = static_cast<uint8>(
 			EcologySample.bTreeAllowed ? EcologySample.TreeDensity * 255 / 1000 : 0);
-
-		Data.SnowCoverage[Index] =
-			static_cast<uint8>(
-				FMath::Clamp(
-					(-Temperature) *
-						255 /
-						32768,
-					0,
-					255));
 	}
 	Data.DistantCells = MoveTemp(Surface.DistantCells);
 

@@ -77,8 +77,7 @@ bool FVoxelViewManager::BeginInterestWorkspace(TSharedPtr<const FVoxelInterestSe
 		Current.SurfaceWanted.Num() + Current.MacroWanted.Num() + Current.FinePagePlan.Pages.Num();
 	const int64 ShardsCount64 = int64(FineShardSlots.Num()) + Current.FineWanted.Num() +
 		(AppliedInterestSnapshot ? AppliedInterestSnapshot->FineShardDemands.Num() : 0);
-	if (AddedCount64 > MAX_int32 || RemovedCount64 > MAX_int32 || ShardsCount64 > MAX_int32 ||
-		Inputs.Roots.Num() > MAX_int32 / (VoxelStreamingGeometry::MaximumSpatialLevel + 1)) return false;
+	if (AddedCount64 > MAX_int32 || RemovedCount64 > MAX_int32 || ShardsCount64 > MAX_int32) return false;
 	const int32 AddedCount = int32(AddedCount64), RemovedCount = int32(RemovedCount64), ShardsCount = int32(ShardsCount64);
 	// 每个潜在实际 Atom/旧事实及新 Wanted 都有失败键槽；容量不足时保留旧 Current，不能先接管后丢事件。
 	const int64 RetryCount = AddedCount64 + CoverageIndex.NumRecords() + FineReady.Num() + VoxelProxyReady.Num() +
@@ -90,12 +89,10 @@ bool FVoxelViewManager::BeginInterestWorkspace(TSharedPtr<const FVoxelInterestSe
 		VoxelBoundedAllocation::TaskBytes<TVoxelInterestReclaimTask<FInterestInputRoot>>() +
 		VoxelBoundedAllocation::SetBytes<FIntVector>(Inputs.Fine.Num()) +
 		VoxelBoundedAllocation::SetBytes<FVoxelViewKey>(Inputs.Proxy.Num()) +
-		VoxelBoundedAllocation::SetBytes<FVoxelViewKey>(Inputs.Roots.Num()) +
 		VoxelBoundedAllocation::SetBytes<FVoxelSurfaceTileKey>(Inputs.Surface.Num()) +
 		VoxelBoundedAllocation::SetBytes<FVoxelMacroTileKey>(Inputs.Macro.Num()) +
 		VoxelBoundedAllocation::SetBytes<FVoxelFinePageKey>(Inputs.FinePages.Num()) +
 		VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelFinePageKey>(Inputs.FineOwners.Num()) +
-		FVoxelCoverageIndex::MaximumStorageBytes(Inputs.Roots.Num()) +
 		VoxelBoundedAllocation::ArrayBytes<FVoxelPublishGroupKey>(AddedCount) +
 		VoxelBoundedAllocation::ArrayBytes<FVoxelPublishGroupKey>(RemovedCount) +
 		VoxelBoundedAllocation::ArrayBytes<FVoxelFinePageKey>(Inputs.FinePages.Num()) +
@@ -111,13 +108,10 @@ bool FVoxelViewManager::BeginInterestWorkspace(TSharedPtr<const FVoxelInterestSe
 	Root.bInitialLayout = !AppliedInputRoot || Current.bInitialLayout;
 	Root.FineWanted.Reserve(Inputs.Fine.Num());
 	Root.ProxyWanted.Reserve(Inputs.Proxy.Num());
-	Root.IndexedTerrainRoots.Reserve(Inputs.Roots.Num());
 	Root.SurfaceWanted.Reserve(Inputs.Surface.Num());
 	Root.MacroWanted.Reserve(Inputs.Macro.Num());
 	Root.FinePagePlan.Pages.Reserve(Inputs.FinePages.Num());
 	Root.FinePagePlan.SectionOwners.Reserve(Inputs.FineOwners.Num());
-	Root.TerrainRootIndex.ReserveForRecords(Inputs.Roots.Num());
-	Root.TerrainRootIndex.BindStorageLease(Root.ResourceLease);
 	InterestWorkspace->ChangedCoverage.Reserve(AddedCount);
 	InterestWorkspace->Retirements.Reserve(RemovedCount);
 	InterestWorkspace->LayoutChanges.Reserve(Inputs.FinePages.Num());
@@ -159,7 +153,7 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 		const auto Id = FSetElementId::FromInteger(Workspace.Cursor++);
 		if (Set.IsValidId(Id)) Operation(Set[Id]);
 	};
-	for (int32 Work = 0; Work < 8192 && Workspace.Phase < 14 && FPlatformTime::Seconds() < InDeadline; ++Work)
+	for (int32 Work = 0; Work < 8192 && Workspace.Phase < 13 && FPlatformTime::Seconds() < InDeadline; ++Work)
 	{
 		const double Start = FPlatformTime::Seconds();
 		if (!TerrainFrameBudget.TryStart(EVoxelPublishPhase::Plan, Start, BoundInterestOperationEstimate(Module, InterestMicrostepEstimateMilliseconds))) return;
@@ -167,28 +161,13 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 		switch (Workspace.Phase)
 		{
 		case 0:
-			AddOne(Inputs.Roots, [&Workspace](const FVoxelViewKey& Key)
-			{
-				Workspace.Root->IndexedTerrainRoots.Add(Key);
-				Workspace.Root->MaximumTerrainRootLevel = FMath::Max(Workspace.Root->MaximumTerrainRootLevel, Key.Level);
-				auto Record = MakeShared<FVoxelCoverageRecord, ESPMode::ThreadSafe>();
-				Record->Geometry.Key = {EVoxelTerrainRepresentation::VoxelProxy, Key.Coordinate, Key.Level};
-				Record->Geometry.SampleStepCells = 2;
-				const auto Bounds = Key.GetBounds();
-				Record->Min = Bounds.Min;
-				Record->Max = Bounds.Max;
-				FString Error;
-				verify(Workspace.Root->TerrainRootIndex.Upsert(Record, Error));
-			});
-			break;
-		case 1:
 			AddOne(Inputs.Fine, [this, &Workspace](const FIntVector& Key)
 			{
 				Workspace.Root->FineWanted.Add(Key);
 				if (!GetInputRoot().FineWanted.Contains(Key)) Workspace.ChangedCoverage.Add({4, Key, 0});
 			});
 			break;
-		case 2:
+		case 1:
 			AddOne(Inputs.Proxy, [this, &Workspace](const FVoxelViewKey& Key)
 			{
 				Workspace.Root->ProxyWanted.Add(Key);
@@ -196,64 +175,64 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 				if (!GetInputRoot().ProxyWanted.Contains(Key)) Workspace.ChangedCoverage.Add({1, Key.Coordinate, Key.Level});
 			});
 			break;
-		case 3:
+		case 2:
 			AddOne(Inputs.Surface, [this, &Workspace](const FVoxelSurfaceTileKey& Key)
 			{
 				Workspace.Root->SurfaceWanted.Add(Key);
 				if (!GetInputRoot().SurfaceWanted.Contains(Key)) Workspace.ChangedCoverage.Add({2, Key.Coordinate, Key.Level});
 			});
 			break;
-		case 4:
+		case 3:
 			AddOne(Inputs.Macro, [this, &Workspace](const FVoxelMacroTileKey& Key)
 			{
 				Workspace.Root->MacroWanted.Add(Key);
 				if (!GetInputRoot().MacroWanted.Contains(Key)) Workspace.ChangedCoverage.Add({3, Key.Coordinate, Key.Level});
 			});
 			break;
-		case 5:
+		case 4:
 			AddOne(Inputs.FinePages, [this, &Workspace](const FVoxelFinePageKey& Page)
 			{
 				Workspace.Root->FinePagePlan.Pages.Add(Page);
 				if (!GetInputRoot().FinePagePlan.Pages.Contains(Page)) Workspace.LayoutChanges.Add(Page);
 			});
 			break;
-		case 6:
+		case 5:
 			AddOne(Inputs.FineOwners, [&Workspace](const auto& Pair)
 			{
 				Workspace.Root->FinePagePlan.SectionOwners.Add(Pair.Key, Pair.Value);
 			});
 			break;
-		case 7:
+		case 6:
 			VisitOne(GetInputRoot().FineWanted, [&Workspace](const FIntVector& Key)
 			{
 				if (!Workspace.Root->FineWanted.Contains(Key)) Workspace.Retirements.Add({4, Key, 0});
 			});
 			break;
-		case 8:
+		case 7:
 			VisitOne(GetInputRoot().ProxyWanted, [&Workspace](const FVoxelViewKey& Key)
 			{
 				if (!Workspace.Root->ProxyWanted.Contains(Key)) Workspace.Retirements.Add({1, Key.Coordinate, Key.Level});
 			});
 			break;
-		case 9:
+		case 8:
 			VisitOne(GetInputRoot().SurfaceWanted, [&Workspace](const FVoxelSurfaceTileKey& Key)
 			{
 				if (!Workspace.Root->SurfaceWanted.Contains(Key)) Workspace.Retirements.Add({2, Key.Coordinate, Key.Level});
 			});
 			break;
-		case 10:
+		case 9:
 			VisitOne(GetInputRoot().MacroWanted, [&Workspace](const FVoxelMacroTileKey& Key)
 			{
 				if (!Workspace.Root->MacroWanted.Contains(Key)) Workspace.Retirements.Add({3, Key.Coordinate, Key.Level});
 			});
 			break;
-		case 11:
+		case 10:
 			VisitOne(GetInputRoot().FinePagePlan.Pages, [&Workspace](const FVoxelFinePageKey& Page)
 			{
 				if (!Workspace.Root->FinePagePlan.Pages.Contains(Page)) Workspace.Retirements.Add({0, Page.Coordinate, Page.Level});
 			});
 			break;
-		case 12:
+		case 11:
 			if (Workspace.Cursor >= FineShardSlotOrder.GetMaxIndex()) { NextPhase(); break; }
 			{
 				const int32 Index = Workspace.Cursor++;
@@ -268,7 +247,7 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 					Workspace.ChangedShardOwners.Add(Key);
 			}
 			break;
-		case 13:
+		case 12:
 			if (!Inputs.Geometry.IsValidIndex(Workspace.Cursor)) { NextPhase(); break; }
 			{
 				const auto& Geometry = Inputs.Geometry[Workspace.Cursor];
@@ -321,7 +300,7 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 
 bool FVoxelViewManager::TryCommitInterestRoot()
 {
-	if (!InterestWorkspace || InterestWorkspace->Phase != 14 || CommittedWorkspaceEvents) return false;
+	if (!InterestWorkspace || InterestWorkspace->Phase != 13 || CommittedWorkspaceEvents) return false;
 	const auto Latest = InterestWorkspace->Snapshot;
 	if (!Latest || !Module.CanCommitTerrainInterest(*Latest))
 	{

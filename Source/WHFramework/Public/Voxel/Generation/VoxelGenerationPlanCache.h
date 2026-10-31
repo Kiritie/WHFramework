@@ -248,6 +248,7 @@ public:
 
 	bool BindHydrologyRecipe(uint64 InRecipeHash, uint32 InAlgorithmVersion, FString& OutError, uint64 InExpectedGeneration = 0);
 	uint64 GetHydrologyGeneration() const { return HydrologyGeneration.Load(); }
+	uint64 GetHydrologyRetirementRevision() const { return HydrologyRetirementRevision.Load(); }
 
 	// 单次只推进一个有界批次；未 Ready 保持原 owner 和容量，不发布 Region。
 	bool AdvanceHydrologyPlan(const FVoxelHydrologyRegionKey& InKey,
@@ -408,7 +409,7 @@ public:
 	/** 终结当时在途的原 gate；外部 immutable 引用保持有效，不等待 worker。gate 诊断保留前1023 TCHAR。 */
 	void Reset();
 
-	FVoxelGenerationCacheStats GetStats() const;
+	FVoxelGenerationCacheStats GetStats(bool bInIncludeAllocatedBytes = true) const;
 	FVoxelPlanDiagnostics GetPlanDiagnostics(EVoxelGenerationPlanKind InKind) const;
 	void RecordPlanDonation(EVoxelGenerationPlanKind InKind);
 	uint64 GetAllocatedBytes() const;
@@ -583,6 +584,7 @@ private:
 	FVoxelPlanDiagnostics PlanBuildDiagnostics[5];
 
 	TAtomic<uint64> HydrologyGeneration{1};
+	TAtomic<uint64> HydrologyRetirementRevision{1};
 	TAtomic<bool> bHydrologyResetting{false};
 	uint64 HydrologyRecipeHash = 0;
 	uint32 HydrologyAlgorithmVersion = 0;

@@ -11,7 +11,6 @@ void FVoxelViewManager::BindCoverageIndexResources()
 	const auto Resources = Scheduler.GetTerrainResources();
 	CoverageIndex.BindResources(Resources, Consumer);
 	HeightfieldCoverageIndex.BindResources(Resources, Consumer);
-	EmptyInputRoot.TerrainRootIndex.BindResources(Resources, Consumer);
 }
 
 bool FVoxelViewManager::ReserveCoverageIndexRetries(const int32 InCount)

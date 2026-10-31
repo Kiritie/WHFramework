@@ -73,6 +73,13 @@ struct WHFRAMEWORK_API FVoxelTerrainTargetReadiness
 {
 	FVoxelTerrainGeometry Geometry;
 	FName DataAdmissionGate;
+	FName PresentationGate;
+	FVoxelTerrainSpatialKey PresentationDependency;
+	FName PresentationDependencyGate;
+	uint64 MeshVertices = 0;
+	uint64 MeshTriangles = 0;
+	uint64 MeshBytes = 0;
+	bool bMeshMetricsAvailable = false;
 	bool bDataReady = false;
 	bool bMeshReady = false;
 	bool bPresented = false;
@@ -81,6 +88,7 @@ struct WHFRAMEWORK_API FVoxelTerrainTargetReadiness
 	bool bFailed = false;
 	bool bDirty = false;
 	bool bPublishing = false;
+	bool bPresentationHidden = false;
 	int32 RequiredSections = 0;
 	int32 ReadySections = 0;
 	int32 PresentedSections = 0;
@@ -92,6 +100,7 @@ struct WHFRAMEWORK_API FVoxelTerrainReadinessSnapshot
 	uint64 PublicationRevision = 0;
 	uint64 FineLayoutRevision = 0;
 	bool bAdoptingInputs = false;
+	bool bInitialLayout = false;
 	TMap<FGuid, FVoxelStreamingSource> Sources;
 	TArray<FVoxelTerrainTargetReadiness> Targets;
 };
@@ -279,9 +288,6 @@ private:
 		uint8 MaximumProxyLevel = 0;
 		TSet<FVoxelSurfaceTileKey> SurfaceWanted;
 		TSet<FVoxelMacroTileKey> MacroWanted;
-		FVoxelCoverageIndex TerrainRootIndex;
-		TSet<FVoxelViewKey> IndexedTerrainRoots;
-		uint8 MaximumTerrainRootLevel = 0;
 		FVoxelFinePagePlan FinePagePlan;
 	};
 	struct FInterestWorkspace
@@ -565,6 +571,7 @@ private:
 	void InvalidateRepresentationKey(const FVoxelTerrainSpatialKey& InKey);
 	void ResolveTransitionVisibility();
 	FVoxelGameThreadContinuation ResolveTransitionVisibilitySteps();
+	FVoxelGameThreadContinuation RetirePublishedHeightfieldSteps(uint64 InIncarnation, TSet<FVoxelHeightfieldNodeKey> InOwners, TArray<FVoxelCoverageRect> InRecheck);
 	FVoxelGameThreadContinuation CaptureCoverageCandidateSteps(
 		TSet<FIntVector>& OutFine, TSet<FVoxelViewKey>& OutProxy, TSet<FVoxelSurfaceTileKey>& OutSurface, TSet<FVoxelMacroTileKey>& OutMacro,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, bool& OutComplete) const;
@@ -580,6 +587,7 @@ private:
 		FVoxelTaskResult&& InResult);
 	void PumpHeightfieldTransitions(double InDeadline = MAX_dbl);
 	void RebuildVolumeTransitions(const TSet<FVoxelViewKey>& InTargetNodes);
+	bool IsHeightfieldTransitionPresented(const FVoxelHeightfieldNodeKey& InKey) const;
 	bool VolumeHandoffAffectsHeightfield(const FVoxelHeightfieldNodeKey& InKey) const;
 	void PumpVolumeTransitions(double InDeadline = MAX_dbl);
 	TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> FindFineBoundaryGeometry(const FIntVector& InSection) const;
@@ -751,6 +759,7 @@ private:
 		FVoxelCoverageRect Bounds;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 		TFunction<void()> Apply;
+		FVoxelGameThreadContinuation Work;
 
 		FDeferredCoverageCallback() = default;
 		FDeferredCoverageCallback(const FVoxelCoverageRect& InBounds, TFunction<void()> InApply,
@@ -758,18 +767,24 @@ private:
 			: Bounds(InBounds), ResourceLease(MoveTemp(InResourceLease)), Apply(MoveTemp(InApply))
 		{
 		}
+		FDeferredCoverageCallback(const FVoxelCoverageRect& InBounds, FVoxelGameThreadContinuation InWork)
+			: Bounds(InBounds), Work(MoveTemp(InWork))
+		{
+		}
 		FDeferredCoverageCallback(FDeferredCoverageCallback&& InOther)
-			: Bounds(InOther.Bounds), ResourceLease(MoveTemp(InOther.ResourceLease)), Apply(MoveTemp(InOther.Apply))
+			: Bounds(InOther.Bounds), ResourceLease(MoveTemp(InOther.ResourceLease)), Apply(MoveTemp(InOther.Apply)), Work(MoveTemp(InOther.Work))
 		{
 		}
 		FDeferredCoverageCallback& operator=(FDeferredCoverageCallback&& InOther)
 		{
 			if (this != &InOther)
 			{
+				Work.Reset();
 				Apply = nullptr;
 				ResourceLease = MoveTemp(InOther.ResourceLease);
 				Bounds = InOther.Bounds;
 				Apply = MoveTemp(InOther.Apply);
+				Work = MoveTemp(InOther.Work);
 			}
 			return *this;
 		}

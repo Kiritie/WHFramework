@@ -35,6 +35,7 @@ struct WHFRAMEWORK_API FVoxelPublishFootprint
 	FVoxelPublishGroupKey Key;
 	FBox Bounds = FBox(ForceInit);
 	bool bTransition = false;
+	bool bIndependentInitial = false;
 };
 
 // Pure planning state. Capture one footprint at a time, then advance bounded
@@ -111,25 +112,35 @@ private:
 			return HashCombineFast(GetTypeHash(Key.Coordinate), GetTypeHash(Key.Level));
 		}
 	};
-	struct FNode { TSet<int32> Own; };
+	struct FNode
+	{
+		TSet<int32> Own;
+		uint64 MinimumSerial = MAX_uint64;
+	};
+	struct FRecord
+	{
+		FBox Bounds = FBox(ForceInit);
+		uint64 Serial = 0;
+	};
 
 public:
 	struct FQuery
 	{
 		FBox Bounds = FBox(ForceInit);
+		uint64 MaximumSerial = MAX_uint64;
 		TArray<FKey> Stack;
 		TSet<int32> Seen;
 		FKey Current;
 		int32 OwnCursor = 0;
 		bool bHasCurrent = false;
 	};
-	void Add(int32 InOrdinal, const FBox& InBounds);
-	void BeginQuery(const FBox& InBounds, FQuery& OutQuery) const;
+	void Add(int32 InOrdinal, const FBox& InBounds, uint64 InSerial = 0);
+	void BeginQuery(const FBox& InBounds, FQuery& OutQuery, uint64 InMaximumSerial = MAX_uint64) const;
 	// true means completed; otherwise OutOrdinal may contain one local candidate.
 	bool AdvanceQuery(FQuery& InOutQuery, int32& OutOrdinal) const;
 
 private:
 	TMap<FKey, FNode> Nodes;
-	TMap<int32, FBox> Bounds;
+	TMap<int32, FRecord> Records;
 	uint8 RootLevel = 0;
 };

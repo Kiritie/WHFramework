@@ -49,7 +49,7 @@ struct FVoxelRemotePageBuild
 		return VoxelBoundedAllocation::WorkerSharedBytes<FVoxelMacroTileData>() +
 			2 * VoxelBoundedAllocation::ArrayBytes<int32>(Count) +
 			VoxelBoundedAllocation::ArrayBytes<uint16>(Count) +
-			3 * VoxelBoundedAllocation::ArrayBytes<uint8>(Count) + Distant +
+			2 * VoxelBoundedAllocation::ArrayBytes<uint8>(Count) + Distant +
 			VoxelBoundedAllocation::ArrayBytes<FVoxelMacroStructureProxy>(4096);
 	}
 

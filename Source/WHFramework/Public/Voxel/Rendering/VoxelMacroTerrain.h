@@ -39,7 +39,6 @@ struct WHFRAMEWORK_API FVoxelMacroTileData
 	TArray<uint8> WaterKind;
 	TArray<FVoxelBlockState> SurfaceStates;
 	TArray<uint8> ForestCoverage;
-	TArray<uint8> SnowCoverage;
 	TArray<FVoxelMacroStructureProxy> LargeStructures;
 	TArray<FVoxelDistantCell> DistantCells;
 

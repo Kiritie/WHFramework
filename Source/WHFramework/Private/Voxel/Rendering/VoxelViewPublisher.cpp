@@ -534,11 +534,12 @@ bool FVoxelViewPublisher::CommitGroup(const FGuid& InGroup)
 	return true;
 }
 
-bool FVoxelViewPublisher::SetOwnershipChanged(const FGuid& InGroup, const bool bInChanged)
+bool FVoxelViewPublisher::SetOwnershipChanged(const FGuid& InGroup, const bool bInChanged, const bool bInInitialLayout)
 {
 	FPendingGroup* Group = FindPendingGroup(InGroup);
 	if (!Group || Group->bCommitted) return false;
 	Group->bOwnershipChanged = bInChanged;
+	Group->bInitialLayout = bInInitialLayout;
 	return true;
 }
 
@@ -554,9 +555,7 @@ void FVoxelViewPublisher::InvalidatePriorities()
 	InvalidateCommitReadiness();
 	++PriorityRevision;
 	bPrioritiesDirty = true;
-	if (!PriorityPlan)
-		for (const auto& Publication : Publications)
-			for (FGroup& Group : Publication->Groups) Group.bPriorityReady = false;
+
 }
 
 double FVoxelViewPublisher::BoundsDistance(const TConstArrayView<FBox> InBounds) const
@@ -777,6 +776,7 @@ void FVoxelViewPublisher::StartCommittedGroups()
 	{
 		FVoxelPublishFootprint& Footprint = Footprints.AddDefaulted_GetRef();
 		Footprint.Key = Pair.Value.Key;
+		Footprint.bIndependentInitial = IsIndependentInitial(Footprint.Key, Pair.Value.bInitialLayout);
 		Footprint.bTransition = Footprint.Key.Representation == 4 || Footprint.Key.Representation == 5;
 		if (!Footprint.bTransition)
 		{
@@ -819,6 +819,7 @@ void FVoxelViewPublisher::StartCommittedGroups()
 	{
 		const FVoxelPublishGroupKey Key = It.Value().Key;
 		if (BlockedComponents.Contains(GroupIndices[KeyIndices.FindChecked(Key)])) continue;
+		Publication->bInitialLayout = ReadyKeys.IsEmpty() ? It.Value().bInitialLayout : Publication->bInitialLayout && It.Value().bInitialLayout;
 		ReadyKeys.Add(Key);
 		Publication->Callbacks.Add(Key, It.Value().Callback);
 		Publication->Validations.Add(Key, It.Value().Validation);
@@ -868,7 +869,6 @@ void FVoxelViewPublisher::StartCommittedGroups()
 	}
 #endif
 	Publication->Serial = ++BatchSerial;
-	Publication->PreparedMeshes.SetNum(Publication->Updates.Num());
 	Publication->bCoveragePrepared = Publication->Updates.IsEmpty();
 	Publication->bGroupsPrepared = false;
 	Publications.Add(Publication);
@@ -924,6 +924,7 @@ void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 		const auto& Pair = Plan.Groups.Get(Id);
 		FVoxelPublishFootprint Footprint;
 		Footprint.Key = Pair.Value.Key;
+		Footprint.bIndependentInitial = IsIndependentInitial(Footprint.Key, Pair.Value.bInitialLayout);
 		Footprint.bTransition = Footprint.Key.Representation == 4 || Footprint.Key.Representation == 5;
 		if (!Footprint.bTransition)
 			Footprint.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Footprint.Key, Module.BlockSize(), Module.GetViewSettings().Lod);
@@ -998,12 +999,14 @@ void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 			Plan.Publication->GroupOrder.Add(GroupIndex);
 		}
 		FGroup& Target = Plan.Publication->Groups[*Selected];
+		Target.bIndependentInitial = Target.Keys.IsEmpty() ? Plan.Footprints[Index].bIndependentInitial : Target.bIndependentInitial && Plan.Footprints[Index].bIndependentInitial;
 		Target.Keys.Add(Group.Key);
 		Target.Bounds += Plan.Footprints[Index].Bounds;
 		if (Plan.Footprints[Index].Bounds.IsValid) Target.ChangedBounds.Add(Plan.Footprints[Index].Bounds);
 		Target.bTransition |= Plan.Footprints[Index].bTransition;
 		Target.TerrainStage = FMath::Min(Target.TerrainStage, Group.TerrainStage);
 		Plan.SelectedKeys.Add(Group.Key, *Selected);
+		Plan.Publication->bInitialLayout = Plan.Publication->Callbacks.IsEmpty() ? Group.bInitialLayout : Plan.Publication->bInitialLayout && Group.bInitialLayout;
 		Plan.Publication->Callbacks.Add(Group.Key, Group.Callback);
 		Plan.Publication->Validations.Add(Group.Key, Group.Validation);
 		Plan.Publication->TerrainStages.Add(Group.Key, Group.TerrainStage);
@@ -1023,7 +1026,6 @@ void FVoxelViewPublisher::AdvancePendingPlan(const double InDeadlineSeconds)
 		{
 			Update.GroupIndex = *GroupIndex;
 			const int32 Index = Plan.Publication->Updates.Add(MoveTemp(Update));
-			Plan.Publication->PreparedMeshes.Add(nullptr);
 			IndexPublicationUpdate(Plan.Publication, Index);
 			Plan.Publication->Groups[*GroupIndex].UpdateIndices.Add(Index);
 		}
@@ -1100,6 +1102,7 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 		if (Entry)
 		{
 			Footprint.Key = Entry->GroupKey;
+			Footprint.bIndependentInitial = IsIndependentInitial(Footprint.Key, Publication->bInitialLayout);
 			const FUpdate* const* Update = Updates.Find(SourceId);
 			const bool* Hidden = Publication->Visibility.Find(SourceId);
 			bool PreviousHidden = Entry->bHidden;
@@ -1167,6 +1170,7 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 		if (Plan.SourceKeys.Contains(Key)) return;
 		auto& Footprint = Footprints.AddDefaulted_GetRef();
 		Footprint.Key = Key;
+		Footprint.bIndependentInitial = IsIndependentInitial(Key, Publication->bInitialLayout);
 		const bool bLogicalChange = Publication->OwnershipChanges.Contains(Key);
 		Footprint.bTransition = bLogicalChange && (Key.Representation == 4 || Key.Representation == 5);
 		if (bLogicalChange && !Footprint.bTransition)
@@ -1194,6 +1198,7 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 		if (GroupIndex == Plan.Groups.Num()) Plan.Groups.AddDefaulted();
 		FGroup& Group = Plan.Groups[GroupIndex];
 		const auto& Footprint = Footprints[Index];
+		Group.bIndependentInitial = Group.Keys.IsEmpty() ? Footprint.bIndependentInitial : Group.bIndependentInitial && Footprint.bIndependentInitial;
 		if (!Plan.GroupKeys.Contains(Footprint.Key))
 		{
 			Plan.GroupKeys.Add(Footprint.Key);
@@ -1244,8 +1249,6 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 		if (!Publication->Groups.IsValidIndex(Plan.Cursor))
 		{
 			Publication->bGroupsPrepared = true;
-			Publication->bBuildOrderInitialized = Publication->Updates.IsEmpty();
-			Publication->bBuildOrderDirty = false;
 			Next();
 			return;
 		}
@@ -1256,6 +1259,9 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 	{
 		if (Publication->Groups.IsValidIndex(Plan.Cursor)) { QueueReadyGroup(Publication, Plan.Cursor++); return; }
 		Publication->Plan.Reset();
+		check(PrepareReadinessRevision < MAX_uint64);
+		++PrepareReadinessRevision;
+		ReadySelectionCursors[0] = 0;
 		++PriorityRevision;
 		bPrioritiesDirty = true;
 	}
@@ -1278,6 +1284,7 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 		if (Entry)
 		{
 			Footprint.Key = Entry->GroupKey;
+			Footprint.bIndependentInitial = IsIndependentInitial(Footprint.Key, Publication->bInitialLayout);
 			const FUpdate* const* Update = Updates.Find(SourceId);
 			const bool* Hidden = Publication->Visibility.Find(SourceId);
 			bool PreviousHidden = Entry->bHidden;
@@ -1332,6 +1339,7 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 		if (SourceKeys.Contains(Pair.Key)) continue;
 		auto& Footprint = Footprints.AddDefaulted_GetRef();
 		Footprint.Key = Pair.Key;
+		Footprint.bIndependentInitial = IsIndependentInitial(Pair.Key, Publication->bInitialLayout);
 		const bool bLogicalChange = !bInPreparedCoverage || Publication->OwnershipChanges.Contains(Pair.Key);
 		Footprint.bTransition = bLogicalChange && (Pair.Key.Representation == 4 || Pair.Key.Representation == 5);
 		if (bLogicalChange && !Footprint.bTransition)
@@ -1353,6 +1361,7 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 	for (int32 Index = 0; Index < Footprints.Num(); ++Index)
 	{
 		FGroup& Group = Publication->Groups[GroupIndices[Index]];
+		Group.bIndependentInitial = Group.Keys.IsEmpty() ? Footprints[Index].bIndependentInitial : Group.bIndependentInitial && Footprints[Index].bIndependentInitial;
 		if (!GroupKeys.Contains(Footprints[Index].Key))
 		{
 			GroupKeys.Add(Footprints[Index].Key);
@@ -1513,13 +1522,46 @@ void FVoxelViewPublisher::DeferSaturatedGroups(const FPublicationRef& Publicatio
 	for (FGroup& Group : Publication->Groups) Group.UpdateIndices.Reset();
 	for (int32 Index = 0; Index < Publication->Updates.Num(); ++Index)
 		Publication->Groups[Publication->Updates[Index].GroupIndex].UpdateIndices.Add(Index);
-	Publication->PreparedMeshes.Reset();
-	Publication->PreparedMeshes.SetNum(Publication->Updates.Num());
 	Publication->CoverageIndex = Publication->Updates.Num();
-	Publication->BuildOrder.Reset();
-	Publication->bBuildOrderInitialized = false;
 	Publication->bFinished = Publication->Groups.IsEmpty();
 	bActiveBusyKeysDirty = true;
+}
+
+void FVoxelViewPublisher::PublishResolvedPriority(const FPriorityGroup& InResolved, const uint64 InRevision)
+{
+	if (!InResolved.IsCurrent()) return;
+	FGroup& Group = InResolved.Key->Groups[InResolved.Value];
+	if (Group.bCommitted) return;
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherResolvedPriority);
+	const bool bChanged = !Group.bPriorityReady || Group.Priority.Service != InResolved.Priority.Service ||
+		Group.Priority.WorkClass != InResolved.Priority.WorkClass;
+	Group.Priority = InResolved.Priority;
+	Group.bPriorityReady = true;
+	if (!bChanged) return;
+	{
+		TGuardValue<bool> UpdatingOrder(bCommitOrderDirty, true);
+		const auto Matches = [&InResolved](const FReadyGroup& InReady)
+		{
+			return InReady.Publication == InResolved.Key && InReady.GroupIndex == InResolved.Value;
+		};
+		const int32 PrepareIndex = ReadyPrepareGroups.IndexOfByPredicate(Matches);
+		if (PrepareIndex != INDEX_NONE)
+		{
+			ReadyPrepareGroups.RemoveAt(PrepareIndex, 1, EAllowShrinking::No);
+			ReadySelectionCursors[0] = FMath::Min(ReadySelectionCursors[0], PrepareIndex);
+		}
+		const int32 CommitIndex = ReadyCommitGroups.IndexOfByPredicate(Matches);
+		if (CommitIndex != INDEX_NONE)
+		{
+			ReadyCommitGroups.RemoveAt(CommitIndex, 1, EAllowShrinking::No);
+			ReadySelectionCursors[1] = FMath::Min(ReadySelectionCursors[1], CommitIndex);
+			bCommitSelectionComplete = false;
+		}
+		Group.bPrepareQueued = false;
+		Group.bCommitQueued = false;
+		QueueReadyGroup(InResolved.Key, InResolved.Value, InRevision);
+	}
+	if (Group.bNativeAdmitted) RefreshTaskPriorities();
 }
 
 void FVoxelViewPublisher::AdvancePriorities()
@@ -1590,10 +1632,9 @@ void FVoxelViewPublisher::AdvancePriorities()
 		const int32 Index = Plan.InnerCursor++;
 		FGroup& Group = Publication->Groups[Index];
 		if (Group.bCommitted) return;
-		Group.Priority = GroupPriority(Group);
-		Plan.SpatialIndex.Add(Plan.Groups.Num(), Group.Bounds);
-		Group.bPriorityReady = false;
-		Plan.Groups.Add({Publication, Index, Publication->GroupRevision});
+		const FGroupPriority Priority = GroupPriority(Group);
+		Plan.SpatialIndex.Add(Plan.Groups.Num(), Group.Bounds, Publication->Serial);
+		Plan.Groups.Add({Publication, Index, Publication->GroupRevision, Priority});
 		return;
 	}
 	if (Plan.Phase == 4)
@@ -1606,7 +1647,9 @@ void FVoxelViewPublisher::AdvancePriorities()
 			Plan.SpatialDemand.ChangedBounds = Deferred->Bounds;
 			Plan.SpatialDemand.bTransition = Deferred->bTransition;
 			for (const FBox& Bounds : Deferred->Bounds) if (Bounds.IsValid) Plan.SpatialDemand.Bounds += Bounds;
-			Plan.SpatialIndex.BeginQuery(Plan.SpatialDemand.Bounds, Plan.SpatialQuery);
+			Plan.SpatialPriority = BoundsPriority(Deferred->Bounds, Deferred->TerrainStage);
+			check(Deferred->Serial > 0);
+			Plan.SpatialIndex.BeginQuery(Plan.SpatialDemand.Bounds, Plan.SpatialQuery, Deferred->Serial - 1);
 			Plan.bSpatialQueryActive = true;
 			return;
 		}
@@ -1614,11 +1657,11 @@ void FVoxelViewPublisher::AdvancePriorities()
 		if (Plan.SpatialIndex.AdvanceQuery(Plan.SpatialQuery, Candidate))
 		{ ++Plan.Cursor; Plan.bSpatialQueryActive = false; return; }
 		if (Candidate == INDEX_NONE) return;
-		const auto& Target = Plan.Groups[Candidate];
-		if (!Target.IsCurrent()) return;
+		auto& Target = Plan.Groups[Candidate];
+		if (!Target.IsCurrent() || Target.Key->Groups[Target.Value].bCommitted) return;
 		if (Target.Key->Serial >= Deferred->Serial) return;
 		FGroup& Group = Target.Key->Groups[Target.Value];
-		if (GroupsInteract(Plan.SpatialDemand, Group)) MergePriority(Group.Priority, BoundsPriority(Deferred->Bounds, Deferred->TerrainStage));
+		if (GroupsInteract(Plan.SpatialDemand, Group)) MergePriority(Target.Priority, Plan.SpatialPriority);
 		return;
 	}
 
@@ -1626,45 +1669,52 @@ void FVoxelViewPublisher::AdvancePriorities()
 	{
 		if (!Plan.Groups.IsValidIndex(Plan.Cursor))
 		{
-			bCommitOrderDirty = true;
-			Plan.Phase = 8;
+			Plan.Phase = 11;
 			Plan.Cursor = 0;
 			return;
 		}
-		const auto& Source = Plan.Groups[Plan.Cursor];
-		if (!Source.IsCurrent()) { ++Plan.Cursor; Plan.InnerCursor = 0; Plan.Phase = 5; Plan.bSpatialQueryActive = false; return; }
+		auto& Source = Plan.Groups[Plan.Cursor];
+		if (!Source.IsCurrent() || Source.Key->Groups[Source.Value].bCommitted) { ++Plan.Cursor; Plan.InnerCursor = 0; Plan.Phase = 5; Plan.bSpatialQueryActive = false; return; }
 		FGroup& Group = Source.Key->Groups[Source.Value];
 		if (!Group.Keys.IsValidIndex(Plan.InnerCursor)) { Plan.Phase = 6; Plan.InnerCursor = 0; return; }
 		const auto& Key = Group.Keys[Plan.InnerCursor++];
-		if (const auto* Priority = Plan.Priorities.Find(Key)) MergePriority(Group.Priority, *Priority);
+		if (const auto* Priority = Plan.Priorities.Find(Key)) MergePriority(Source.Priority, *Priority);
 		return;
 	}
 	if (Plan.Phase == 6)
 	{
-		const auto& Source = Plan.Groups[Plan.Cursor];
-		if (!Source.IsCurrent()) { ++Plan.Cursor; Plan.InnerCursor = 0; Plan.Phase = 5; Plan.bSpatialQueryActive = false; return; }
+		auto& Source = Plan.Groups[Plan.Cursor];
+		if (!Source.IsCurrent() || Source.Key->Groups[Source.Value].bCommitted) { ++Plan.Cursor; Plan.InnerCursor = 0; Plan.Phase = 5; Plan.bSpatialQueryActive = false; return; }
 		FGroup& Group = Source.Key->Groups[Source.Value];
 		if (!Group.Keys.IsValidIndex(Plan.InnerCursor)) { Plan.Phase = 7; Plan.InnerCursor = 0; return; }
-		if (Source.Key->bGroupsPrepared) MergePriority(Plan.Priorities.FindOrAdd(Group.Keys[Plan.InnerCursor]), Group.Priority);
+		if (Source.Key->bGroupsPrepared) MergePriority(Plan.Priorities.FindOrAdd(Group.Keys[Plan.InnerCursor]), Source.Priority);
 		++Plan.InnerCursor;
 		return;
 	}
 	if (Plan.Phase == 7)
 	{
-		const auto& Source = Plan.Groups[Plan.Cursor];
-		if (!Source.IsCurrent()) { ++Plan.Cursor; Plan.InnerCursor = 0; Plan.Phase = 5; Plan.bSpatialQueryActive = false; return; }
+		auto& Source = Plan.Groups[Plan.Cursor];
+		if (!Source.IsCurrent() || Source.Key->Groups[Source.Value].bCommitted) { ++Plan.Cursor; Plan.InnerCursor = 0; Plan.Phase = 5; Plan.bSpatialQueryActive = false; return; }
 		FGroup& Group = Source.Key->Groups[Source.Value];
 		if (!Source.Key->bGroupsPrepared || Plan.Publications.Last()->Serial >= Source.Key->Serial)
-		{ ++Plan.Cursor; Plan.InnerCursor = 0; Plan.Phase = 5; return; }
+		{
+			PublishResolvedPriority(Source, Plan.Revision);
+			++Plan.Cursor;
+			Plan.InnerCursor = 0;
+			Plan.Phase = 5;
+			return;
+		}
 		if (!Plan.bSpatialQueryActive)
 		{
-			Plan.SpatialIndex.BeginQuery(Group.Bounds, Plan.SpatialQuery);
+			check(Source.Key->Serial > 0);
+			Plan.SpatialIndex.BeginQuery(Group.Bounds, Plan.SpatialQuery, Source.Key->Serial - 1);
 			Plan.bSpatialQueryActive = true;
 			return;
 		}
 		int32 Candidate = INDEX_NONE;
 		if (Plan.SpatialIndex.AdvanceQuery(Plan.SpatialQuery, Candidate))
 		{
+			PublishResolvedPriority(Source, Plan.Revision);
 			++Plan.Cursor;
 			Plan.InnerCursor = 0;
 			Plan.Phase = 5;
@@ -1672,73 +1722,13 @@ void FVoxelViewPublisher::AdvancePriorities()
 			return;
 		}
 		if (Candidate == INDEX_NONE || !Source.Key->bGroupsPrepared) return;
-		const auto& Target = Plan.Groups[Candidate];
-		if (!Target.IsCurrent()) return;
+		auto& Target = Plan.Groups[Candidate];
+		if (!Target.IsCurrent() || Target.Key->Groups[Target.Value].bCommitted) return;
 		if (Target.Key->Serial >= Source.Key->Serial) return;
 		FGroup& Older = Target.Key->Groups[Target.Value];
-		if (GroupsInteract(Group, Older)) MergePriority(Older.Priority, Group.Priority);
+		if (GroupsInteract(Group, Older)) MergePriority(Target.Priority, Source.Priority);
 	}
 
-	if (Plan.Phase == 8)
-	{
-		if (Plan.Publications.IsValidIndex(Plan.Cursor))
-		{
-			const auto& Publication = Plan.Publications[Plan.Cursor++];
-			Publication->bBuildOrderDirty = true;
-			Publication->BuildHeapifyIndex = INDEX_NONE;
-			return;
-		}
-		Next();
-		return;
-	}
-	if (Plan.Phase == 9)
-	{
-		if (ReadyCommitGroups.IsValidIndex(Plan.Cursor))
-		{
-			const FReadyGroup& Existing = ReadyCommitGroups[Plan.Cursor];
-			if (Existing.PriorityRevision == Plan.Revision)
-			{
-				++Plan.Cursor;
-				return;
-			}
-			FReadyGroup Ready = Existing;
-			ReadyCommitGroups.RemoveAt(Plan.Cursor, 1, EAllowShrinking::No);
-			if (Ready.Publication->bCanceled || !Ready.Publication->Groups.IsValidIndex(Ready.GroupIndex))
-			{
-				return;
-			}
-			Ready.Priority = Ready.Publication->Groups[Ready.GroupIndex].Priority.Service;
-			Ready.PriorityRevision = Plan.Revision;
-			InsertReadyCommit(MoveTemp(Ready));
-			return;
-		}
-		bCommitOrderDirty = false;
-		InvalidateCommitReadiness();
-		Next();
-		return;
-	}
-	if (Plan.Phase == 10)
-	{
-		if (ReadyPrepareGroups.IsValidIndex(Plan.Cursor))
-		{
-			FReadyGroup Ready = ReadyPrepareGroups[Plan.Cursor];
-			if (Ready.PriorityRevision == Plan.Revision) { ++Plan.Cursor; return; }
-			ReadyPrepareGroups.RemoveAt(Plan.Cursor, 1, EAllowShrinking::No);
-			if (Ready.Publication->bCanceled || !Ready.Publication->Groups.IsValidIndex(Ready.GroupIndex)) return;
-			Ready.Priority = Ready.Publication->Groups[Ready.GroupIndex].Priority.Service;
-			Ready.PriorityRevision = Plan.Revision;
-			InsertReadyPrepare(MoveTemp(Ready));
-			return;
-		}
-		for (const auto& Resolved : Plan.Groups)
-			if (Resolved.IsCurrent()) Resolved.Key->Groups[Resolved.Value].bPriorityReady = true;
-		check(PrepareReadinessRevision < MAX_uint64);
-		++PrepareReadinessRevision;
-		ReadySelectionCursors[0] = 0;
-		InvalidateCommitReadiness();
-		Next();
-		return;
-	}
 	if (Plan.Phase == 11)
 	{
 		// Scheduler has a fixed admission cap; preserve admitted tasks and their age.
@@ -1846,8 +1836,24 @@ void FVoxelViewPublisher::UpdateGroupPriorities(TMap<FVoxelPublishGroupKey, FGro
 	});
 }
 
+bool FVoxelViewPublisher::IsIndependentInitial(const FVoxelPublishGroupKey& InKey, const bool bInInitialLayout) const
+{
+	if (!bInInitialLayout) return false;
+	if (const auto* Sources = OwnerSources.Find(InKey))
+		for (const auto SourceId : *Sources)
+			if (const auto* Entry = Entries.Find(SourceId); Entry &&
+				(Entry->bPresented || Entry->PresentedSource || Entry->NativeMesh || Entry->PresentedWorldBounds.IsValid)) return false;
+	return true;
+}
+
 bool FVoxelViewPublisher::GroupsInteract(const FGroup& InFirst, const FGroup& InSecond)
 {
+	if (InFirst.bIndependentInitial && InSecond.bIndependentInitial && !InFirst.bTransition && !InSecond.bTransition)
+	{
+		for (const auto& Key : InFirst.Keys)
+			if (InSecond.Keys.Contains(Key)) return true;
+		return false;
+	}
 	if (!InFirst.Bounds.IsValid || !InSecond.Bounds.IsValid) return false;
 	const bool bTransition = InFirst.bTransition || InSecond.bTransition;
 	const auto Interacts = [bTransition](const FBox& A, const FBox& B)
@@ -2015,70 +2021,6 @@ bool FVoxelViewPublisher::AdmitCoveragePreparation(const FPublicationRef& InPubl
 	return bAdvanced;
 }
 
-bool FVoxelViewPublisher::HigherBuildPriority(const FPublication& Publication, const int32 First, const int32 Second) const
-{
-	const int32 FirstGroup = Publication.Updates[First].GroupIndex;
-	const int32 SecondGroup = Publication.Updates[Second].GroupIndex;
-	const auto& FirstPriority = Publication.Groups[FirstGroup].Priority;
-	const auto& SecondPriority = Publication.Groups[SecondGroup].Priority;
-	if (HigherGroupPriority(FirstPriority, SecondPriority)) return true;
-	if (HigherGroupPriority(SecondPriority, FirstPriority)) return false;
-	return FirstGroup == SecondGroup ? First < Second : FirstGroup < SecondGroup;
-}
-
-bool FVoxelViewPublisher::AdmitBuilds(const FPublicationRef& InPublication, const double InDeadline)
-{
-	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherBuildAdmission);
-	if (!InPublication->bCoveragePrepared || !InPublication->bGroupsPrepared ||
-		FPlatformTime::Seconds() >= InDeadline) return false;
-	bool bAdvanced = false;
-	const auto Before = [this, &InPublication](const int32 InA, const int32 InB)
-	{
-		return HigherBuildPriority(*InPublication, InA, InB);
-	};
-	if (!InPublication->bBuildOrderInitialized)
-	{
-		if (InPublication->Updates.IsValidIndex(InPublication->BuildInitializationIndex))
-		{
-			InPublication->BuildOrder.HeapPush(InPublication->BuildInitializationIndex++, Before);
-			return true;
-		}
-		InPublication->bBuildOrderInitialized = true;
-		bAdvanced = true;
-		InPublication->bBuildOrderDirty = false;
-	}
-	if (InPublication->bBuildOrderDirty)
-	{
-		if (InPublication->BuildHeapifyIndex == INDEX_NONE) InPublication->BuildHeapifyIndex = InPublication->BuildOrder.Num() / 2;
-		if (InPublication->BuildHeapifyIndex >= 0)
-		{
-			int32 Parent = InPublication->BuildHeapifyIndex--;
-			while (2 * Parent + 1 < InPublication->BuildOrder.Num())
-			{
-				int32 Child = 2 * Parent + 1;
-				if (Child + 1 < InPublication->BuildOrder.Num() && Before(InPublication->BuildOrder[Child + 1], InPublication->BuildOrder[Child])) ++Child;
-				if (!Before(InPublication->BuildOrder[Child], InPublication->BuildOrder[Parent])) break;
-				InPublication->BuildOrder.Swap(Child, Parent);
-				Parent = Child;
-			}
-		}
-		if (InPublication->BuildHeapifyIndex < 0) InPublication->bBuildOrderDirty = false;
-		return true;
-	}
-	const double Deadline = FMath::Min(InDeadline, Module.GetTerrainFrameContext().Deadline());
-	for (int32 Count = 0; Count < 8 && !InPublication->BuildOrder.IsEmpty() && FPlatformTime::Seconds() < Deadline; ++Count)
-	{
-		int32 Index = INDEX_NONE;
-		InPublication->BuildOrder.HeapPop(Index, Before, EAllowShrinking::No);
-		bAdvanced = true;
-		const auto& Update = InPublication->Updates[Index];
-		if (InPublication->Groups[Update.GroupIndex].bCommitted) continue;
-		// 所有权由原生 Atom 根裁定，粗网格不再按 Fine/Page 可见性重复重裁整块网格。
-		InPublication->PreparedMeshes[Index] = Update.Source;
-		QueueReadyGroup(InPublication, Update.GroupIndex);
-	}
-	return bAdvanced;
-}
 void FVoxelViewPublisher::Tick()
 {
 	Tick(Module.GetTerrainFrameContext().GetPublishBudget());
@@ -2126,8 +2068,9 @@ bool FVoxelViewPublisher::CommitReadyGroups(const FPublicationRef& Publication, 
 			return Entry && Hidden && Entry->bHidden != *Hidden;
 		});
 		if (bHasChanges && CommittedThisFrame >= Limit) continue;
+		const bool bWasPresentationCommitted = Group.bPresentationCommitted;
 		bAdvanced |= CommitReadyGroup(Publication, Group);
-		if (Group.bCommitted) CommittedThisFrame += bHasChanges ? 1 : 0;
+		if (!bWasPresentationCommitted && Group.bPresentationCommitted) CommittedThisFrame += bHasChanges ? 1 : 0;
 		if (FPlatformTime::Seconds() >= Deadline) break;
 	}
 	if (InGroupIndex != INDEX_NONE && Publication->Groups[InGroupIndex].bCommitted) Publication->GroupOrder.Remove(InGroupIndex);
@@ -2153,7 +2096,6 @@ void FVoxelViewPublisher::DiscardReadyGroup(const FPublicationRef& InPublication
 		Update.Components.Reset();
 		Update.Source.Reset();
 		Update.NativeMesh.Reset();
-		if (InPublication->PreparedMeshes.IsValidIndex(Index)) InPublication->PreparedMeshes[Index].Reset();
 	}
 	for (const auto SourceId : InGroup.VisibilitySources) ReleaseSourceGeneration(SourceId, InPublication->Serial);
 	InGroup.bCommitted = true;
@@ -2172,74 +2114,77 @@ bool FVoxelViewPublisher::CommitReadyGroup(const FPublicationRef& Publication, F
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewCommit);
 	bool bAdvanced = false;
-	if (!AdvanceNativeGroup(Publication, InGroup, bAdvanced)) return bAdvanced;
 	const double CommitStart = FPlatformTime::Seconds();
-	for (const int32 Index : InGroup.UpdateIndices)
+	if (!InGroup.bPresentationCommitted)
 	{
-		FUpdate& Update = Publication->Updates[Index];
-		ReleaseSourceGeneration(Update.SourceId, Publication->Serial);
-		FEntry* Entry = Entries.Find(Update.SourceId);
-		if (!Entry) continue;
-		Entry->LocalWorldBoxes = MoveTemp(Update.LocalWorldBoxes);
-		Update.CommonBoxes.Reset();
-		const bool bRetainedGeometry = !Update.bSourceDirty && Entry->NativeMesh &&
-			Entry->PresentedSource == Update.Source && Entry->PresentedNativeStamp == Update.NativeStamp &&
-			Entry->NativeMesh->WorldCellOrigin == Update.Location / Module.BlockSize() &&
-			Entry->NativeMesh->CellScale == Update.Scale / Module.BlockSize();
-		if (GetNativeUpdateWork(Publication.Get(), Update) != ENativeUpdateWork::Upload || bRetainedGeometry)
+		if (!AdvanceNativeGroup(Publication, InGroup, bAdvanced)) return bAdvanced;
+		for (const int32 Index : InGroup.UpdateIndices)
 		{
-			Entry->Exclusions = MoveTemp(Update.Exclusions);
-			Entry->bDirty = !Entry->NativeMesh || Entry->Source != Entry->PresentedSource ||
-				Entry->NativeStamp != Entry->PresentedNativeStamp ||
-				Entry->NativeMesh->WorldCellOrigin != Entry->Location / Module.BlockSize() ||
-				Entry->NativeMesh->CellScale != Entry->Scale / Module.BlockSize();
-			continue;
-		}
-		Entry->NativeMesh = MoveTemp(Update.NativeMesh);
-		Entry->PresentedNativeStamp = Update.NativeStamp;
-		Entry->Exclusions = MoveTemp(Update.Exclusions);
-		Entry->PresentedSource = Update.Source;
-		Entry->PresentedVertices = Entry->PresentedTriangles = Entry->PresentedBytes = 0;
-		if (const FMeshPtr Mesh = Publication->PreparedMeshes.IsValidIndex(Index) ? Publication->PreparedMeshes[Index] : FMeshPtr())
-		{
-			Entry->PresentedBytes = Mesh->Bytes();
-			for (const auto& Batch : Mesh->Batches)
+			FUpdate& Update = Publication->Updates[Index];
+			ReleaseSourceGeneration(Update.SourceId, Publication->Serial);
+			FEntry* Entry = Entries.Find(Update.SourceId);
+			if (!Entry) continue;
+			Entry->LocalWorldBoxes = MoveTemp(Update.LocalWorldBoxes);
+			Update.CommonBoxes.Reset();
+			const bool bRetainedGeometry = !Update.bSourceDirty && Entry->NativeMesh &&
+				Entry->PresentedSource == Update.Source && Entry->PresentedNativeStamp == Update.NativeStamp &&
+				Entry->NativeMesh->WorldCellOrigin == Update.Location / Module.BlockSize() &&
+				Entry->NativeMesh->CellScale == Update.Scale / Module.BlockSize();
+			if (GetNativeUpdateWork(Publication.Get(), Update) != ENativeUpdateWork::Upload || bRetainedGeometry)
 			{
-				Entry->PresentedVertices += Batch.Mesh.Vertices.Num();
-				Entry->PresentedTriangles += Batch.Mesh.Triangles.Num() / 3;
+				Entry->Exclusions = MoveTemp(Update.Exclusions);
+				Entry->bDirty = !Entry->NativeMesh || Entry->Source != Entry->PresentedSource ||
+					Entry->NativeStamp != Entry->PresentedNativeStamp ||
+					Entry->NativeMesh->WorldCellOrigin != Entry->Location / Module.BlockSize() ||
+					Entry->NativeMesh->CellScale != Entry->Scale / Module.BlockSize();
+				continue;
 			}
+			Entry->NativeMesh = MoveTemp(Update.NativeMesh);
+			Entry->PresentedNativeStamp = Update.NativeStamp;
+			Entry->Exclusions = MoveTemp(Update.Exclusions);
+			Entry->PresentedSource = Update.Source;
+			Entry->PresentedVertices = Entry->PresentedTriangles = Entry->PresentedBytes = 0;
+			if (const FMeshPtr& Mesh = Update.Source)
+			{
+				Entry->PresentedBytes = Mesh->Bytes();
+				for (const auto& Batch : Mesh->Batches)
+				{
+					Entry->PresentedVertices += Batch.Mesh.Vertices.Num();
+					Entry->PresentedTriangles += Batch.Mesh.Triangles.Num() / 3;
+				}
+			}
+			Entry->bDirty = Entry->Source != Update.Source || Entry->Location != Update.Location || Entry->Scale != Update.Scale;
+			Entry->bPresented = true;
+			Entry->PresentedWorldBounds = Update.Bounds.IsValid
+				? FBox(Update.Location + Update.Bounds.Min * Update.Scale,
+					Update.Location + Update.Bounds.Max * Update.Scale)
+				: FBox(ForceInit);
 		}
-		Entry->bDirty = Entry->Source != Update.Source || Entry->Location != Update.Location || Entry->Scale != Update.Scale;
-		Entry->bPresented = true;
-		Entry->PresentedWorldBounds = Update.Bounds.IsValid
-			? FBox(Update.Location + Update.Bounds.Min * Update.Scale,
-				Update.Location + Update.Bounds.Max * Update.Scale)
-			: FBox(ForceInit);
-	}
-	for (const FVoxelViewSourceId SourceKey : InGroup.VisibilitySources)
-	{
-		ReleaseSourceGeneration(SourceKey, Publication->Serial);
-		const bool* bHidden = Publication->Visibility.Find(SourceKey);
-		if (FEntry* Entry = Entries.Find(SourceKey); Entry && bHidden)
+		for (const FVoxelViewSourceId SourceKey : InGroup.VisibilitySources)
 		{
-			Entry->bHidden = *bHidden;
+			ReleaseSourceGeneration(SourceKey, Publication->Serial);
+			const bool* bHidden = Publication->Visibility.Find(SourceKey);
+			if (FEntry* Entry = Entries.Find(SourceKey); Entry && bHidden)
+			{
+				Entry->bHidden = *bHidden;
+			}
+			Publication->Visibility.Remove(SourceKey);
 		}
-		Publication->Visibility.Remove(SourceKey);
+		InGroup.bPresentationCommitted = true;
+		bAdvanced = true;
+		ReleaseNativeGroup(InGroup);
+		for (const int32 Index : InGroup.UpdateIndices)
+		{
+			Publication->Updates[Index].Source.Reset();
+			Publication->Updates[Index].NativeMesh.Reset();
+		}
 	}
+	if (InGroup.bIndependentInitial && CommitGate && InGroup.Keys.ContainsByPredicate(
+		[this](const auto& Key) { return !CommitGate(Key); })) return bAdvanced;
 	InGroup.bCommitted = true;
-	ReleaseNativeGroup(InGroup);
 	for (const auto& Key : InGroup.Keys) SetOwnerActive(Key, Publication->Serial, false);
 	bFirstOwnersDirty = true;
 	bActiveBusyKeysDirty = true;
-	for (const int32 Index : InGroup.UpdateIndices)
-	{
-		if (Publication->PreparedMeshes.IsValidIndex(Index))
-		{
-			Publication->PreparedMeshes[Index].Reset();
-		}
-		Publication->Updates[Index].Source.Reset();
-		Publication->Updates[Index].NativeMesh.Reset();
-	}
 	TMap<FGroupCallback*, TArray<FVoxelPublishGroupKey>> CallbackKeys;
 	for (const auto& Key : InGroup.Keys)
 	{
@@ -2272,7 +2217,13 @@ void FVoxelViewPublisher::FinishGroups()
 void FVoxelViewPublisher::DiscardGroups()
 {
 	for (const auto& Publication : Publications) DiscardPublication(Publication);
-	check(ActiveNativeGroups == 0);
+	check(ActiveNativeGroups == 0 && WaitingNativeGroups == 0);
+#if !UE_BUILD_SHIPPING
+	UE_LOG(LogTemp, Display, TEXT("Voxel native preparation wait summary: yielded=%llu resumed=%llu"),
+		NativePreparationYields, NativePreparationResumes);
+#endif
+	NativePreparationYields = 0;
+	NativePreparationResumes = 0;
 	Publications.Reset();
 	SourceUpdateGenerations.Reset();
 	SourceVisibilityGenerations.Reset();
@@ -2310,7 +2261,7 @@ void FVoxelViewPublisher::DiscardPublication(const FPublicationRef& Publication,
 	if (Publication->bCanceled) return;
 	Publication->CoverageWork.Reset();
 	Publication->bCanceled = true;
-	// 阻塞中的索引 Worker 也持有 Publication，必须同时撤销，不能等容量释放才退出。
+	// 阻塞中的索引 Worker 仍持有冻结输入，撤销时同步取消，不能等容量释放才退出。
 	if (Publication->Updates.ContainsByPredicate([](const FUpdate& Update) { return Update.bNativeMeshPending; }))
 		Scheduler.CancelMatching([this, Serial = Publication->Serial](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
 		{
@@ -2341,16 +2292,69 @@ void FVoxelViewPublisher::DiscardPublication(const FPublicationRef& Publication,
 		Update.Components.Reset();
 	}
 	for (const auto& Pair : Publication->Visibility) ReleaseSourceGeneration(Pair.Key, Publication->Serial);
-	Publication->PreparedMeshes.Reset();
+}
+
+bool FVoxelViewPublisher::CanAdmitNativeGroup(const FGroup& InGroup) const
+{
+	return ActiveNativeGroups < MaximumNativeGroups &&
+		(InGroup.bNativePreparedWaiting || ActiveNativeGroups + WaitingNativeGroups < MaximumHeldNativeGroups);
+}
+
+bool FVoxelViewPublisher::AdmitNativeGroup(FGroup& InGroup)
+{
+	if (InGroup.bNativeAdmitted) return true;
+	if (!CanAdmitNativeGroup(InGroup)) return false;
+	if (InGroup.bNativePreparedWaiting)
+	{
+		check(WaitingNativeGroups > 0 && NativePreparationResumes < MAX_uint64);
+		--WaitingNativeGroups;
+		InGroup.bNativePreparedWaiting = false;
+		++NativePreparationResumes;
+	}
+	InGroup.bNativeAdmitted = true;
+	++ActiveNativeGroups;
+	check(ActiveNativeGroups + WaitingNativeGroups <= MaximumHeldNativeGroups);
+	return true;
+}
+
+bool FVoxelViewPublisher::YieldNativePreparation(const FPublicationRef& InPublication, FGroup& InGroup)
+{
+	if (!InGroup.bNativeAdmitted || InGroup.bNativePreparedWaiting || InGroup.bCommitted ||
+		InGroup.PreparedUpdates != InGroup.UpdateIndices.Num() || InGroup.NativeTransaction.IsValid() ||
+		InGroup.bNativeSubmitted || InGroup.NativeGroupLease || InGroup.NativeCoarse || InGroup.NativeLastChunk ||
+		!InGroup.NativeChanges.IsEmpty() || InGroup.NativeSourceCursor || InGroup.NativeBatchCursor ||
+		InGroup.NativeTriangleCursor || InGroup.bNativeControlWaiting || InGroup.bNativeBootstrapWaiting ||
+		InGroup.UpdateIndices.ContainsByPredicate([&InPublication](const int32 Index)
+		{
+			return InPublication->Updates[Index].bNativeMeshPending;
+		})) return false;
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherYieldPreparedNative);
+	ReleaseNativeGroup(InGroup);
+	InGroup.bNativePreparedWaiting = true;
+	++WaitingNativeGroups;
+	check(NativePreparationYields < MAX_uint64 && ActiveNativeGroups + WaitingNativeGroups <= MaximumHeldNativeGroups);
+	++NativePreparationYields;
+	return true;
 }
 
 void FVoxelViewPublisher::ReleaseNativeGroup(FGroup& InGroup)
 {
+	check(!(InGroup.bNativeAdmitted && InGroup.bNativePreparedWaiting));
+	const bool bHadAdmission = InGroup.bNativeAdmitted || InGroup.bNativePreparedWaiting;
+	if (InGroup.bNativePreparedWaiting)
+	{
+		check(WaitingNativeGroups > 0);
+		--WaitingNativeGroups;
+		InGroup.bNativePreparedWaiting = false;
+	}
 	if (InGroup.bNativeAdmitted)
 	{
 		check(ActiveNativeGroups > 0);
 		--ActiveNativeGroups;
 		InGroup.bNativeAdmitted = false;
+	}
+	if (bHadAdmission)
+	{
 		ReadySelectionCursors[0] = 0;
 		check(PrepareReadinessRevision < MAX_uint64);
 		++PrepareReadinessRevision;
@@ -2552,7 +2556,7 @@ void FVoxelViewPublisher::InsertReadyPrepare(FReadyGroup InReady)
 	++PrepareReadinessRevision;
 }
 
-void FVoxelViewPublisher::QueueReadyGroup(const FPublicationRef& InPublication, const int32 InGroupIndex)
+void FVoxelViewPublisher::QueueReadyGroup(const FPublicationRef& InPublication, const int32 InGroupIndex, const uint64 InPriorityRevision)
 {
 	if (!InPublication->bGroupsPrepared || !InPublication->Groups.IsValidIndex(InGroupIndex)) return;
 	FGroup& Group = InPublication->Groups[InGroupIndex];
@@ -2567,14 +2571,14 @@ void FVoxelViewPublisher::QueueReadyGroup(const FPublicationRef& InPublication, 
 		if (!Group.bCommitQueued)
 		{
 			Group.bCommitQueued = true;
-			InsertReadyCommit({InPublication, InGroupIndex, Group.Priority.Service, MAX_uint64});
+			InsertReadyCommit({InPublication, InGroupIndex, Group.Priority.Service, InPriorityRevision});
 		}
 	}
-	else if (!Group.bPrepareQueued && InPublication->PreparedMeshes[Group.UpdateIndices[Group.PreparedUpdates]] &&
+	else if (!Group.bPrepareQueued && InPublication->Updates[Group.UpdateIndices[Group.PreparedUpdates]].Source &&
 		!InPublication->Updates[Group.UpdateIndices[Group.PreparedUpdates]].bNativeMeshPending)
 	{
 		Group.bPrepareQueued = true;
-		InsertReadyPrepare({InPublication, InGroupIndex, Group.Priority.Service, MAX_uint64});
+		InsertReadyPrepare({InPublication, InGroupIndex, Group.Priority.Service, InPriorityRevision});
 	}
 }
 
@@ -2697,6 +2701,7 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 			if (bInCommit) Cursor = 0;
 			return Index;
 		}
+		if (!bInCommit && (!Ready.Publication->bCoveragePrepared || Ready.Publication->Plan)) continue;
 		// 队列已按安全带/距离/源优先/朝向排序；公平选择只在同一可运行前沿内轮转。
 		if (FirstRunnableIndex != INDEX_NONE)
 		{
@@ -2729,7 +2734,8 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 		}
 		if (!Group.bPriorityReady) continue;
 		const bool bNeedsNativeAdmission = !Group.bNativeAdmitted && HasNativeGroupWork(Ready.Publication.Get(), Group);
-		const bool bCheckCoverageGate = bInCommit || bNeedsNativeAdmission;
+		const bool bCheckCoverageGate = (bInCommit || bNeedsNativeAdmission) &&
+			(!Group.bIndependentInitial || Group.bPresentationCommitted);
 		// 失败证明只依赖门禁状态、绑定和本组结构；无关资源/其他owner不使它失效。
 		if (bCheckCoverageGate && CommitGateStateRevision &&
 			Group.CommitGateBlockedBindingRevision == CommitGateBindingRevision &&
@@ -2737,6 +2743,10 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 			Group.CommitGateBlockedGroupRevision == Ready.Publication->GroupRevision)
 		{
 			++CommitGateCacheHits;
+			if (bInCommit && YieldNativePreparation(Ready.Publication, Group))
+			{
+				if (bOutAdvanced) *bOutAdvanced = true;
+			}
 			continue;
 		}
 		const int32 Band = int32(Group.Priority.Service.Band);
@@ -2744,7 +2754,7 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 		if (bNear && NearHeadFound[Band]) continue;
 		if (!Group.bNativeAdmitted)
 		{
-			if (bNeedsNativeAdmission && ActiveNativeGroups >= MaximumNativeGroups) continue;
+			if (bNeedsNativeAdmission && !CanAdmitNativeGroup(Group)) continue;
 			// 完成所需的旧代先准入，否则新代持有槽位和资源会反过来阻塞它的前置依赖。
 			if (Group.Keys.ContainsByPredicate([this, &Ready](const auto& Key)
 			{
@@ -2797,6 +2807,10 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 				Group.CommitGateBlockedRevision = GateRevision;
 				Group.CommitGateBlockedBindingRevision = GateBindingRevision;
 				Group.CommitGateBlockedGroupRevision = GateGroupRevision;
+				if (bInCommit && YieldNativePreparation(Ready.Publication, Group))
+				{
+					if (bOutAdvanced) *bOutAdvanced = true;
+				}
 				continue;
 			}
 		}
@@ -2926,11 +2940,12 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 #if !UE_BUILD_SHIPPING
 	if (FPlatformTime::Seconds() >= NextPublisherDiagnostic)
 	{
-		UE_LOG(LogTemp, Display, TEXT("Publisher continuation diagnostic: pending=%d frozen=%d phase=%d cursor=%d selected=%d blocked=%d publications=%d priorityPhase=%d readyPrepare=%d readyCommit=%d activeNative=%d/%d pendingGraphCompared=%llu"),
+		UE_LOG(LogTemp, Display, TEXT("Publisher continuation diagnostic: pending=%d frozen=%d phase=%d cursor=%d selected=%d blocked=%d publications=%d priorityPhase=%d readyPrepare=%d readyCommit=%d activeNative=%d/%d pendingGraphCompared=%llu waitingNative=%d heldNativeLimit=%d yielded=%llu resumed=%llu"),
 			PendingGroups.Num(), PendingPlan ? PendingPlan->Groups.Num() : 0, PendingPlan ? PendingPlan->Phase : -1,
 			PendingPlan ? PendingPlan->Cursor : -1, PendingPlan ? PendingPlan->SelectedKeys.Num() : 0,
 			PendingPlan ? PendingPlan->BlockedComponents.Num() : 0, Publications.Num(), PriorityPlan ? PriorityPlan->Phase : -1,
-			ReadyPrepareGroups.Num(), ReadyCommitGroups.Num(), ActiveNativeGroups, MaximumNativeGroups, PendingPlan ? PendingPlan->Graph.GetComparedFootprints() : 0);
+			ReadyPrepareGroups.Num(), ReadyCommitGroups.Num(), ActiveNativeGroups, MaximumNativeGroups, PendingPlan ? PendingPlan->Graph.GetComparedFootprints() : 0,
+			WaitingNativeGroups, MaximumHeldNativeGroups, NativePreparationYields, NativePreparationResumes);
 		if (PriorityPlan)
 		{
 			UE_LOG(LogTemp, Display, TEXT("Publisher priority continuation: phase=%d cursor=%d/%d publications=%d inner=%d revision=%llu/%llu queryActive=%d queryStack=%d querySeen=%d"),
@@ -2962,10 +2977,11 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 					uint64 FirstSerial = Publication->Serial;
 					for (const auto& Key : Group.Keys)
 						if (const uint64* First = OwnerFirstSerial.Find(Key)) FirstSerial = FMath::Min(FirstSerial, *First);
-					UE_LOG(LogTemp, Display, TEXT("Publisher group diagnostic: serial=%llu index=%d keys=%d prepared=%d/%d priorityReady=%d class=%d source=%d first=%llu queued=%d/%d coverage=%d/%d"),
+					UE_LOG(LogTemp, Display, TEXT("Publisher group diagnostic: serial=%llu index=%d keys=%d prepared=%d/%d priorityReady=%d class=%d source=%d first=%llu queued=%d/%d coverage=%d/%d initial=%d independent=%d physicalCommitted=%d"),
 						Publication->Serial, Index, Group.Keys.Num(), Group.PreparedUpdates, Group.UpdateIndices.Num(),
 						Group.bPriorityReady, static_cast<int32>(Group.Priority.WorkClass), Group.Priority.SourcePriority, FirstSerial,
-						Group.bPrepareQueued, Group.bCommitQueued, Publication->CoverageIndex, Publication->Updates.Num());
+						Group.bPrepareQueued, Group.bCommitQueued, Publication->CoverageIndex, Publication->Updates.Num(),
+						Publication->bInitialLayout, Group.bIndependentInitial, Group.bPresentationCommitted);
 					if (Group.UpdateIndices.IsValidIndex(Group.PreparedUpdates))
 					{
 						const int32 UpdateIndex = Group.UpdateIndices[Group.PreparedUpdates];
@@ -3072,14 +3088,10 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 		{
 			AdmissionCursor %= Publications.Num();
 			const FPublicationRef Publication = Publications[AdmissionCursor++];
-			if (!Publication->bCanceled && !Publication->bFinished &&
-				((!Publication->bCoveragePrepared) ||
-				(Publication->bGroupsPrepared && !Publication->BuildOrder.IsEmpty()) || !Publication->bBuildOrderInitialized))
+			if (!Publication->bCanceled && !Publication->bFinished && !Publication->bCoveragePrepared)
 				bWorked = Run(EVoxelPublishPhase::Admission, [this, Publication, ServiceDeadline]
 				{
-					const bool bCoverageAdvanced = AdmitCoveragePreparation(Publication, ServiceDeadline);
-					const bool bBuildAdvanced = AdmitBuilds(Publication, ServiceDeadline);
-					return bCoverageAdvanced || bBuildAdvanced;
+					return AdmitCoveragePreparation(Publication, ServiceDeadline);
 				});
 		}
 		else if (Phase == 3 && !bPrepareSelectionExhausted && !ReadyPrepareGroups.IsEmpty() &&
@@ -3108,12 +3120,11 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 				Group.bPrepareQueued = false;
 				if (Group.bCommitted || Group.PreparedUpdates == Group.UpdateIndices.Num()) return true;
 				const int32 Index = Group.UpdateIndices[Group.PreparedUpdates];
-				if (!Publication->PreparedMeshes[Index]) return true;
-				if (!Group.bNativeAdmitted && HasNativeGroupWork(Publication.Get(), Group))
+				if (!Publication->Updates[Index].Source) return true;
+				if (!Group.bNativeAdmitted && HasNativeGroupWork(Publication.Get(), Group) && !AdmitNativeGroup(Group))
 				{
-					check(ActiveNativeGroups < MaximumNativeGroups);
-					Group.bNativeAdmitted = true;
-					++ActiveNativeGroups;
+					QueueReadyGroup(Publication, Ready.GroupIndex);
+					return false;
 				}
 				bool bComplete = false;
 				const auto* PreviousNativeMesh = Publication->Updates[Index].NativeMesh.Get();

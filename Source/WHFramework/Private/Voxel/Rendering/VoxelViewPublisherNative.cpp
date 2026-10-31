@@ -8,6 +8,7 @@
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/VoxelModule.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 namespace
 {
@@ -24,60 +25,144 @@ namespace
 			static_cast<uint16>(EVoxelTaskBlockReason::TerminalFailure))) != 0;
 	}
 
+	struct FNativeMeshReceipt
+	{
+		struct FInput
+		{
+			int32 UpdateIndex = INDEX_NONE;
+			FVoxelTaskStamp Stamp;
+			FVector Origin = FVector::ZeroVector;
+			double Scale = 1.0;
+			bool bAllowResidentOverlap = false;
+		};
+		TArray<FInput> Inputs;
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
+	};
+
+	struct FNativeMeshBatch final : FVoxelTaskCustomPayload
+	{
+		TSharedPtr<FNativeMeshReceipt, ESPMode::ThreadSafe> Receipt;
+		TArray<TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>> Sources;
+		TArray<TSharedPtr<const FVoxelTerrainCoarseMesh, ESPMode::ThreadSafe>> Meshes;
+		virtual uint64 GetAllocatedBytes() const override
+		{
+			uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FNativeMeshBatch>() +
+				VoxelBoundedAllocation::WorkerSharedBytes<FNativeMeshReceipt>() + Receipt->Inputs.GetAllocatedSize() +
+				Sources.GetAllocatedSize() + Meshes.GetAllocatedSize();
+			for (const auto& Mesh : Meshes) if (Mesh) Bytes += Mesh->GetAllocatedBytes();
+			return Bytes;
+		}
+		virtual uint64 GetResourceAccountedBytes() const override
+		{
+			uint64 Bytes = Receipt->Lease->Bytes();
+			for (const auto& Mesh : Meshes) if (Mesh) Bytes += Mesh->GetResourceAccountedBytes();
+			return Bytes;
+		}
+	};
+
 	struct FNativeMeshWorker
 	{
 		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 		FVoxelGenerationConsumerKey Consumer;
-		FVoxelTerrainCoarseMeshBuilder Builder;
+		TSharedPtr<FNativeMeshBatch, ESPMode::ThreadSafe> Batch;
+		TOptional<FVoxelTerrainCoarseMeshBuilder> Builder;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
-		FVoxelTaskStamp InputStamp;
 		TAtomic<bool> bWaitingCapacity{false};
 		TAtomic<uint64> CapacityVersion{0};
+		int32 SourceIndex = 0;
 		uint64 SourceTriangles = 0;
 		uint64 SliceCount = 0;
 		double NextDiagnosticSeconds = 0.0;
 
 		FNativeMeshWorker(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
-			const FVoxelGenerationConsumerKey& InConsumer, const bool bInAllowResidentOverlap)
-			: Resources(InResources), Consumer(InConsumer), Builder(InResources, InConsumer, true, bInAllowResidentOverlap)
+			const FVoxelGenerationConsumerKey& InConsumer, TSharedPtr<FNativeMeshBatch, ESPMode::ThreadSafe> InBatch)
+			: Resources(InResources), Consumer(InConsumer), Batch(MoveTemp(InBatch))
 		{
+		}
+
+		static void VisitInputs(const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			const auto& Worker = *static_cast<const FNativeMeshWorker*>(InContext);
+			const auto Visit = [&](const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease)
+			{
+				if (Lease && Lease->IsOwnedBy(Worker.Resources.Get()))
+					FVoxelGenerationRequiredSourceScope::VisitLease(Lease.Get(), InVisit);
+			};
+			Visit(Worker.InputLease);
+			for (const auto& Source : Worker.Batch->Sources) Visit(Source->ResourceLease);
+		}
+
+		static void VisitSources(const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+		{
+			VisitInputs(InContext, InVisit);
+			const auto& Worker = *static_cast<const FNativeMeshWorker*>(InContext);
+			for (const auto& Mesh : Worker.Batch->Meshes)
+				if (Mesh && Mesh->MetadataLease && Mesh->MetadataLease->IsOwnedBy(Worker.Resources.Get()))
+					FVoxelGenerationRequiredSourceScope::VisitLease(Mesh->MetadataLease.Get(), InVisit);
 		}
 
 		FVoxelTaskResult Advance(const TAtomic<bool>& InCancel)
 		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherNativeBatchAdvance);
 			FVoxelTaskResult Result;
 			bWaitingCapacity.Store(false);
+			const FVoxelGenerationRequiredSourceScope Sources(&Resources.Get(), this, &VisitSources);
 			const uint64 BeforeBuild = Resources->ReleaseVersionExcludingOwner(Consumer);
 			const double Started = FPlatformTime::Seconds();
 			const double Deadline = Started + 0.002;
-			int32 Microsteps = 1;
-			auto Progress = Builder.Advance(128, InCancel, Result.Error);
-			for (; Microsteps < 64 && Progress == EVoxelTerrainCoarseMeshProgress::Working &&
-				FPlatformTime::Seconds() < Deadline; ++Microsteps)
+			EVoxelTerrainCoarseMeshProgress Progress = EVoxelTerrainCoarseMeshProgress::Working;
+			int32 Microsteps = 0;
+			for (; Microsteps < 64 && FPlatformTime::Seconds() < Deadline; ++Microsteps)
 			{
-				Progress = Builder.Advance(128, InCancel, Result.Error);
+				if (InCancel.Load())
+				{
+					Progress = EVoxelTerrainCoarseMeshProgress::Canceled;
+					break;
+				}
+				const auto& Input = Batch->Receipt->Inputs[SourceIndex];
+				if (!Builder.IsSet())
+				{
+					Builder.Emplace(Resources, Consumer, true, Input.bAllowResidentOverlap);
+					if (!Builder->Initialize(Batch->Sources[SourceIndex], Input.Origin, Input.Scale, Input.Stamp, Result.Error))
+					{
+						Result.Error = TEXT("InvalidRequest: native coarse batch: ") + Result.Error;
+						Progress = EVoxelTerrainCoarseMeshProgress::Failed;
+						break;
+					}
+				}
+				Progress = Builder->Advance(128, InCancel, Result.Error);
+				if (Progress == EVoxelTerrainCoarseMeshProgress::Complete)
+				{
+					TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherNativeBatchSourceComplete);
+					Batch->Meshes[SourceIndex] = Builder->TakeResult();
+					if (!Batch->Meshes[SourceIndex])
+					{
+						Result.Error = TEXT("InvalidRequest: native coarse batch result");
+						Progress = EVoxelTerrainCoarseMeshProgress::Failed;
+						break;
+					}
+					Builder.Reset();
+					if (++SourceIndex == Batch->Sources.Num()) break;
+					Progress = EVoxelTerrainCoarseMeshProgress::Working;
+				}
+				else if (Progress != EVoxelTerrainCoarseMeshProgress::Working) break;
 			}
 			++SliceCount;
 #if !UE_BUILD_SHIPPING
 			const double Finished = FPlatformTime::Seconds();
-			if (Finished >= NextDiagnosticSeconds)
+			if (Finished >= NextDiagnosticSeconds || SourceIndex == Batch->Sources.Num())
 			{
-				const auto& Key = InputStamp.GeometryIdentity.Key;
-				const auto State = Resources->Snapshot();
-				UE_LOG(LogTemp, Display, TEXT("Native coarse index slice: publication=%llu representation=%d level=%d coordinate=(%d,%d,%d) triangles=%llu slice=%llu microsteps=%d elapsedMs=%.3f progress=%d input=%llu/%llu working=%llu/%llu staged=%llu/%llu resident=%llu/%llu"),
+				const auto& Key = Batch->Receipt->Inputs[0].Stamp.GeometryIdentity.Key;
+				UE_LOG(LogTemp, Display, TEXT("Native coarse batch slice: publication=%llu representation=%d level=%d coordinate=(%d,%d,%d) sources=%d/%d triangles=%llu slice=%llu microsteps=%d elapsedMs=%.3f progress=%d"),
 					Consumer.OwnerIncarnation, int32(Key.Representation), Key.Level, Key.Coordinate.X, Key.Coordinate.Y, Key.Coordinate.Z,
-					SourceTriangles, SliceCount, Microsteps, (Finished - Started) * 1000.0, int32(Progress),
-					State.Used[int32(EVoxelTerrainResourcePool::Input)], State.Limits.InputBytes,
-					State.Used[int32(EVoxelTerrainResourcePool::Working)], State.Limits.WorkingBytes,
-					State.Used[int32(EVoxelTerrainResourcePool::Staged)], State.Limits.StagedBytes,
-					State.Used[int32(EVoxelTerrainResourcePool::Resident)], State.Limits.ResidentBytes);
+					SourceIndex, Batch->Sources.Num(), SourceTriangles, SliceCount, Microsteps, (Finished - Started) * 1000.0, int32(Progress));
 				NextDiagnosticSeconds = Finished + 10.0;
 			}
 #endif
-			if (Progress == EVoxelTerrainCoarseMeshProgress::Complete)
+			if (SourceIndex == Batch->Sources.Num())
 			{
-				Result.CustomPayload = Builder.TakeResult();
-				Result.bSuccess = Result.CustomPayload.IsValid();
+				Result.CustomPayload = Batch;
+				Result.bSuccess = true;
 			}
 			else if (Progress == EVoxelTerrainCoarseMeshProgress::Working || Progress == EVoxelTerrainCoarseMeshProgress::CapacityBlocked)
 			{
@@ -149,6 +234,7 @@ FVoxelViewPublisher::ENativeUpdateWork FVoxelViewPublisher::GetNativeUpdateWork(
 
 bool FVoxelViewPublisher::HasNativeGroupWork(const FPublication& InPublication, const FGroup& InGroup) const
 {
+	if (InGroup.bPresentationCommitted) return false;
 	return InGroup.NativeTransaction.IsValid() || InGroup.NativeCoarse || !InGroup.NativeChanges.IsEmpty() ||
 		InGroup.UpdateIndices.ContainsByPredicate([this, &InPublication](const int32 Index)
 	{
@@ -222,27 +308,77 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 		RejectAdmission(true, EVoxelTaskBlockReason::TerminalFailure);
 		return true;
 	}
-	const bool bAllowResidentOverlap = TerrainRenderer->HasPresentedCoverage(FBox(FVector(OwnershipMin), FVector(OwnershipMax)));
+	const auto& Group = InPublication->Groups[Update.GroupIndex];
+	check(Group.UpdateIndices[Group.PreparedUpdates] == InIndex);
+	const int32 MaximumWorkers = FMath::Max(1, Module.GetTerrainFrameContext().GetAllocation().MaximumWorkers);
+	const int32 MaximumSources = FMath::DivideAndRoundUp(MaximumWorkers, FMath::Max(1, ActiveNativeGroups));
+	int32 SourceCount = 1;
+	for (; SourceCount < MaximumSources && Group.PreparedUpdates + SourceCount < Group.UpdateIndices.Num() &&
+		FPlatformTime::Seconds() < InDeadline; ++SourceCount)
+	{
+		const int32 NextIndex = Group.UpdateIndices[Group.PreparedUpdates + SourceCount];
+		const auto& Next = InPublication->Updates[NextIndex];
+		FIntVector NextMin, NextMax;
+		if (!Next.Source || !Next.Source->bValidated || !Next.bSourceDirty ||
+			Next.bRetainSource || Next.NativeMesh || Next.bNativeMeshPending || Next.bNativeAdmissionWaiting ||
+			!IsNativeGeometryCurrent(Next.NativeStamp) || GetNativeUpdateWork(InPublication.Get(), Next) != ENativeUpdateWork::Upload ||
+			(Next.Source->Stamp.bHasGeometryIdentity && Next.Source->Stamp != Next.NativeStamp) ||
+			(MeshValidator && !MeshValidator(*Next.Source)) ||
+			!Next.NativeStamp.GeometryIdentity.Key.TryBounds(Next.NativeStamp.GeometryIdentity.WorldMinZ,
+				Next.NativeStamp.GeometryIdentity.WorldMaxZ, NextMin, NextMax)) break;
+	}
+	TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_PublisherNativeBatchAdmission, SourceCount > 1);
+	uint64 InputBytes = VoxelBoundedAllocation::WorkerSharedBytes<FNativeMeshWorker>();
+	for (const uint64 Bytes : {VoxelBoundedAllocation::WorkerSharedBytes<FNativeMeshReceipt>(),
+		VoxelBoundedAllocation::WorkerSharedBytes<FNativeMeshBatch>(),
+		VoxelBoundedAllocation::ArrayBytes<FNativeMeshReceipt::FInput>(SourceCount),
+		VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>>(SourceCount),
+		VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelTerrainCoarseMesh, ESPMode::ThreadSafe>>(SourceCount)})
+	{
+		if (Bytes > MAX_uint64 - InputBytes)
+		{
+			RejectAdmission(true, EVoxelTaskBlockReason::Oversized);
+			return true;
+		}
+		InputBytes += Bytes;
+	}
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
-	const auto InputAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input,
-		VoxelBoundedAllocation::WorkerSharedBytes<FNativeMeshWorker>(), InputLease);
+	const auto InputAdmission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input, InputBytes, InputLease);
 	if (InputAdmission != EVoxelTerrainResourceAdmission::Granted)
 	{
 		const bool bTerminal = InputAdmission != EVoxelTerrainResourceAdmission::CapacityBlocked;
 		RejectAdmission(bTerminal, bTerminal ? EVoxelTaskBlockReason::TerminalFailure : EVoxelTaskBlockReason::InputMemory);
 		return true;
 	}
-	auto Worker = VoxelBoundedAllocation::MakeWorkerShared<FNativeMeshWorker>(InputLease, Resources, Consumer, bAllowResidentOverlap);
-	Worker->InputLease = MoveTemp(InputLease);
-	Worker->InputStamp = Update.NativeStamp;
-	for (const auto& Batch : Update.Source->Batches)
+	const auto Receipt = VoxelBoundedAllocation::MakeWorkerShared<FNativeMeshReceipt>(InputLease);
+	Receipt->Lease = InputLease;
+	Receipt->Inputs.Reserve(SourceCount);
+	const auto Batch = VoxelBoundedAllocation::MakeWorkerShared<FNativeMeshBatch>(InputLease);
+	Batch->Receipt = Receipt;
+	Batch->Sources.Reserve(SourceCount);
+	Batch->Meshes.Reserve(SourceCount);
+	Batch->Meshes.SetNum(SourceCount);
+	for (int32 Offset = 0; Offset < SourceCount; ++Offset)
 	{
-		Worker->SourceTriangles += uint64(Batch.Mesh.Triangles.Num() / 3);
+		const int32 Index = Group.UpdateIndices[Group.PreparedUpdates + Offset];
+		const auto& Source = InPublication->Updates[Index];
+		FIntVector Min, Max;
+		verify(Source.NativeStamp.GeometryIdentity.Key.TryBounds(Source.NativeStamp.GeometryIdentity.WorldMinZ,
+			Source.NativeStamp.GeometryIdentity.WorldMaxZ, Min, Max));
+		Receipt->Inputs.Add({Index, Source.NativeStamp, Source.Location / Module.BlockSize(), Source.Scale / Module.BlockSize(),
+			TerrainRenderer->HasPresentedCoverage(FBox(FVector(Min), FVector(Max)))});
+		Batch->Sources.Add(Source.Source);
 	}
-	FString Error;
-	if (!Worker->Builder.Initialize(Update.Source, Update.Location / Module.BlockSize(), Update.Scale / Module.BlockSize(), Update.NativeStamp, Error))
+	auto Worker = VoxelBoundedAllocation::MakeWorkerShared<FNativeMeshWorker>(InputLease, Resources, Consumer, Batch);
+	Worker->InputLease = MoveTemp(InputLease);
+	for (const auto& Source : Batch->Sources)
+		for (const auto& SourceBatch : Source->Batches) Worker->SourceTriangles += uint64(SourceBatch.Mesh.Triangles.Num() / 3);
+	FVoxelGenerationRequiredCapacity Required;
+	FString InputError;
+	const FVoxelGenerationRequiredSourceScope Inputs(&Resources.Get(), Worker.Get(), &FNativeMeshWorker::VisitInputs);
+	if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, Required, InputError))
 	{
-		RejectAdmission(true, EVoxelTaskBlockReason::TerminalFailure);
+		RejectAdmission(true, EVoxelTaskBlockReason::Oversized);
 		return true;
 	}
 	FVoxelTaskRequest Request;
@@ -258,15 +394,7 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 	Request.WorkClass = EVoxelWorkClass::Visible;
 	Request.InputBytes = Worker->InputLease->Bytes();
 	Request.GenerationConsumer = Consumer;
-	const auto& SourceLease = Update.Source->ResourceLease;
-	const bool bOwnSourceLease = SourceLease && SourceLease != Worker->InputLease && SourceLease->IsOwnedBy(Resources.Get());
-	const uint64 SourceInputBytes = bOwnSourceLease && SourceLease->GetPool() == EVoxelTerrainResourcePool::Input ? SourceLease->Bytes() : 0;
-	if (SourceInputBytes > MAX_uint64 - Worker->InputLease->Bytes())
-	{
-		RejectAdmission(true, EVoxelTaskBlockReason::Oversized);
-		return true;
-	}
-	Request.SetRequiredBindingInput(Worker->InputLease->Bytes() + SourceInputBytes, 1 + int32(bOwnSourceLease));
+	Request.SetRequiredBindingInput(Required.Bytes[int32(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
 	SetPublicationPriority(Request, *InPublication, MakeArrayView(&Update.GroupIndex, 1));
 	{
 		FString CallbackBindingError;
@@ -295,34 +423,59 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 	{
 		FString CallbackBindingError;
 		if (!Request.BindApply(Scheduler.GetTerrainResources(), (Request.GenerationConsumer.IsValid() ? Request.GenerationConsumer : Scheduler.GetControlConsumer()),
-			[this, InPublication, InIndex, Stamp = Update.NativeStamp](FVoxelTaskResult&& InResult)
+			[this, WeakPublication = TWeakPtr<FPublication>(InPublication), Receipt, GroupIndex = Update.GroupIndex](FVoxelTaskResult&& InResult)
 	{
-		if (InPublication->bCanceled || !InPublication->Updates.IsValidIndex(InIndex)) return;
-		auto& Target = InPublication->Updates[InIndex];
-		if (Target.NativeStamp != Stamp) return;
-		Target.bNativeMeshPending = false;
-		if (InResult.bCanceled && InResult.Stamp.WorldEpoch == WorldEpoch && IsNativeGeometryCurrent(Stamp) &&
-			!Scheduler.IsTerminal({InResult.Kind, InResult.Stamp}))
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherNativeBatchApply);
+		const auto PinnedPublication = WeakPublication.Pin();
+		if (!PinnedPublication) return;
+		const FPublicationRef Publication = PinnedPublication.ToSharedRef();
+		if (Publication->bCanceled) return;
+		bool bAllCurrent = InResult.Stamp.WorldEpoch == WorldEpoch;
+		for (const auto& Input : Receipt->Inputs)
 		{
-			Target.bNativeAdmissionWaiting = false;
-			QueueReadyGroup(InPublication, Target.GroupIndex);
+			if (!Publication->Updates.IsValidIndex(Input.UpdateIndex)) { bAllCurrent = false; continue; }
+			auto& Target = Publication->Updates[Input.UpdateIndex];
+			if (Target.NativeStamp != Input.Stamp) { bAllCurrent = false; continue; }
+			Target.bNativeMeshPending = false;
+			bAllCurrent &= IsNativeGeometryCurrent(Input.Stamp);
+		}
+		if (InResult.bCanceled && bAllCurrent && !Scheduler.IsTerminal({InResult.Kind, InResult.Stamp}))
+		{
+			for (const auto& Input : Receipt->Inputs) Publication->Updates[Input.UpdateIndex].bNativeAdmissionWaiting = false;
+			QueueReadyGroup(Publication, GroupIndex);
 			return;
 		}
-		if (!InResult.bSuccess || InResult.bCanceled || InResult.Stamp.WorldEpoch != WorldEpoch || !IsNativeGeometryCurrent(Stamp))
+		if (!InResult.bSuccess || InResult.bCanceled || !bAllCurrent)
 		{
 			const bool bTerminal = Scheduler.IsTerminal({InResult.Kind, InResult.Stamp}) ||
-				InResult.Error.StartsWith(TEXT("Oversized")) || InResult.Error.StartsWith(TEXT("CapacityUnachievable"));
-			DiscardPublication(InPublication, !bTerminal);
+				InResult.Error.StartsWith(TEXT("Oversized")) || InResult.Error.StartsWith(TEXT("CapacityUnachievable")) ||
+				InResult.Error.StartsWith(TEXT("InvalidRequest"));
+			DiscardPublication(Publication, !bTerminal);
 			if (!bTerminal) bRetry = true;
 			return;
 		}
-		Target.NativeMesh = StaticCastSharedPtr<const FVoxelTerrainCoarseMesh>(InResult.CustomPayload);
-		if (!Target.NativeMesh)
+		const auto Result = StaticCastSharedPtr<const FNativeMeshBatch>(InResult.CustomPayload);
+		bool bValid = Result && Result->Receipt == Receipt && Result->Meshes.Num() == Receipt->Inputs.Num();
+		for (int32 Index = 0; bValid && Index < Receipt->Inputs.Num(); ++Index)
 		{
-			DiscardPublication(InPublication);
-			bRetry = true;
+			const auto& Input = Receipt->Inputs[Index];
+			const auto& Mesh = Result->Meshes[Index];
+			bValid = Mesh && Mesh->Source == Publication->Updates[Input.UpdateIndex].Source &&
+				Mesh->Stamp == Input.Stamp && Mesh->WorldCellOrigin == Input.Origin && Mesh->CellScale == Input.Scale;
 		}
-		else QueueReadyGroup(InPublication, Target.GroupIndex);
+		if (!bValid)
+		{
+			DiscardPublication(Publication);
+			bRetry = true;
+			return;
+		}
+		for (int32 Index = 0; Index < Receipt->Inputs.Num(); ++Index)
+		{
+			const auto& Mesh = Result->Meshes[Index];
+			Mesh->WorkReceipt = InResult.WorkReceipt;
+			Publication->Updates[Receipt->Inputs[Index].UpdateIndex].NativeMesh = Mesh;
+		}
+		QueueReadyGroup(Publication, GroupIndex);
 	}, CallbackBindingError))
 		{
 			const bool bTerminal = !CallbackBindingError.StartsWith(TEXT("CapacityBlocked"));
@@ -330,21 +483,26 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 			return true;
 		}
 	}
-	Update.bNativeMeshPending = Scheduler.Enqueue(MoveTemp(Request));
-	if (!Update.bNativeMeshPending) RejectAdmission(NativePublisherIsTerminalAdmission(Request.Blocked), Request.Blocked);
+	for (const auto& Input : Receipt->Inputs) InPublication->Updates[Input.UpdateIndex].bNativeMeshPending = true;
+	if (!Scheduler.Enqueue(MoveTemp(Request)))
+	{
+		for (const auto& Input : Receipt->Inputs)
+			if (InPublication->Updates[Input.UpdateIndex].NativeStamp == Input.Stamp)
+				InPublication->Updates[Input.UpdateIndex].bNativeMeshPending = false;
+		RejectAdmission(NativePublisherIsTerminalAdmission(Request.Blocked), Request.Blocked);
+	}
 	return true;
 }
 
 bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublication, FGroup& InGroup, bool& bOutAdvanced)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherNativeGroupAdvance);
 	bOutAdvanced = false;
 	// 无几何与可见性工作的控制组沿原提交门禁完成，不占用原生准备并发槽位。
 	if (!HasNativeGroupWork(InPublication.Get(), InGroup)) return true;
 	if (!InGroup.bNativeAdmitted)
 	{
-		if (ActiveNativeGroups >= MaximumNativeGroups) return false;
-		InGroup.bNativeAdmitted = true;
-		++ActiveNativeGroups;
+		if (!AdmitNativeGroup(InGroup)) return false;
 		bOutAdvanced = true;
 	}
 	const auto NativeResources = Scheduler.GetTerrainResources();
@@ -352,6 +510,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 	{
 		const FVoxelViewPublisher& Owner;
 		const FPublication& Publication;
+		const FGroup& Group;
 		const FVoxelTerrainResources& Resources;
 
 		static void Enumerate(const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
@@ -362,8 +521,9 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 				if (Lease && Lease->IsOwnedBy(Context.Resources)) FVoxelGenerationRequiredSourceScope::VisitLease(Lease.Get(), InVisit);
 			};
 			Context.Owner.TerrainRenderer->VisitNativeControlSources(InVisit);
-			for (const auto& Update : Context.Publication.Updates)
+			for (const int32 Index : Context.Group.UpdateIndices)
 			{
+				const auto& Update = Context.Publication.Updates[Index];
 				if (Update.Source) FVoxelTerrainRenderer::VisitMeshSources(*Update.Source, Context.Resources, InVisit);
 				if (Update.NativeMesh)
 				{
@@ -376,19 +536,17 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 					if (Entry->NativeMesh->Source) FVoxelTerrainRenderer::VisitMeshSources(*Entry->NativeMesh->Source, Context.Resources, InVisit);
 				}
 			}
-			for (const auto& Group : Context.Publication.Groups)
-			{
-				Visit(Group.NativeGroupLease);
-				if (Group.NativeCoarse) FVoxelTerrainRenderer::VisitCoarseSources(*Group.NativeCoarse, Context.Resources, InVisit);
-				for (const auto& Change : Group.NativeChanges)
-					if (Change.Item) FVoxelTerrainRenderer::VisitCoarseSources(*Change.Item, Context.Resources, InVisit);
-			}
+			Visit(Context.Group.NativeGroupLease);
+			if (Context.Group.NativeCoarse) FVoxelTerrainRenderer::VisitCoarseSources(*Context.Group.NativeCoarse, Context.Resources, InVisit);
+			for (const auto& Change : Context.Group.NativeChanges)
+				if (Change.Item) FVoxelTerrainRenderer::VisitCoarseSources(*Change.Item, Context.Resources, InVisit);
 		}
 	};
-	const FNativeGroupSources SourceContext{*this, InPublication.Get(), NativeResources.Get()};
+	const FNativeGroupSources SourceContext{*this, InPublication.Get(), InGroup, NativeResources.Get()};
 	const FVoxelGenerationRequiredSourceScope SourceScope(&NativeResources.Get(), &SourceContext, &FNativeGroupSources::Enumerate);
 	const auto MeasureSources = [&](FVoxelGenerationRequiredCapacity& OutRequired)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherNativeGroupSources);
 		FString Error;
 		return FVoxelGenerationRequiredSourceScope::Collect(NativeResources.Get(), nullptr, OutRequired, Error);
 	};
@@ -471,15 +629,16 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		const uint64 BeforeAdmission = NativeResources->ReleaseVersionExcludingOwner(Consumer);
 		const auto MakeCurrent = [&](TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InLease)
 		{
-			return [this, InPublication, GroupIndex, Lease = MoveTemp(InLease)]
+			return [this, WeakPublication = TWeakPtr<FPublication>(InPublication), GroupIndex, Lease = MoveTemp(InLease)]
 			{
-				if (InPublication->bCanceled || !InPublication->Groups.IsValidIndex(GroupIndex)) return false;
-				for (const int32 Index : InPublication->Groups[GroupIndex].UpdateIndices)
+				const auto Publication = WeakPublication.Pin();
+				if (!Publication || Publication->bCanceled || !Publication->Groups.IsValidIndex(GroupIndex)) return false;
+				for (const int32 Index : Publication->Groups[GroupIndex].UpdateIndices)
 				{
-					if (!InPublication->Updates.IsValidIndex(Index)) return false;
-					const auto& Update = InPublication->Updates[Index];
+					if (!Publication->Updates.IsValidIndex(Index)) return false;
+					const auto& Update = Publication->Updates[Index];
 					if (!Entries.Contains(Update.SourceId)) return false;
-					const bool* Hidden = InPublication->Visibility.Find(Update.SourceId);
+					const bool* Hidden = Publication->Visibility.Find(Update.SourceId);
 					if ((!Hidden || !*Hidden) && (!IsNativeGeometryCurrent(Update.NativeStamp) ||
 						!Update.Source || (MeshValidator && !MeshValidator(*Update.Source)))) return false;
 				}
@@ -488,11 +647,12 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		};
 		const auto MakeSubmitted = [&](TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InLease)
 		{
-			return [InPublication, GroupIndex, Lease = MoveTemp(InLease)]
+			return [WeakPublication = TWeakPtr<FPublication>(InPublication), GroupIndex, Lease = MoveTemp(InLease)]
 			{
-				if (InPublication->Groups.IsValidIndex(GroupIndex))
+				const auto Publication = WeakPublication.Pin();
+				if (Publication && !Publication->bCanceled && Publication->Groups.IsValidIndex(GroupIndex))
 				{
-					auto& Group = InPublication->Groups[GroupIndex];
+					auto& Group = Publication->Groups[GroupIndex];
 					Group.bNativeSubmitted = true;
 					if (Group.NativeGroupLease) Group.NativeGroupLease->MarkPublished();
 				}

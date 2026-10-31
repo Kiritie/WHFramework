@@ -138,7 +138,6 @@ bool FVoxelFrozenGenerationProgressTest::RunTest(const FString& InParameters)
 			const auto Publication = MakeShared<FVoxelViewPublisher::FPublication>();
 			Publication->Serial = ++Publisher.BatchSerial;
 			Publication->bCoveragePrepared = true;
-			Publication->bBuildOrderInitialized = true;
 			const FVoxelPublishGroupKey Key = Generation == 0 || bSharedOwner
 				? Owner : FVoxelPublishGroupKey{1, FIntVector::ZeroValue, 1};
 			Publication->Callbacks.Add(Key, MakeShared<FVoxelViewPublisher::FGroupCallback>(
@@ -164,7 +163,6 @@ bool FVoxelFrozenGenerationProgressTest::RunTest(const FString& InParameters)
 	const auto ReadyPublication = MakeShared<FVoxelViewPublisher::FPublication>();
 	ReadyPublication->Serial = ++Publisher.BatchSerial;
 	ReadyPublication->bCoveragePrepared = true;
-	ReadyPublication->bBuildOrderInitialized = true;
 	auto& ReadyGroup = ReadyPublication->Groups.AddDefaulted_GetRef();
 	ReadyGroup.Keys.Add(Independent);
 	ReadyGroup.bPriorityReady = true;
@@ -343,8 +341,6 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			const auto SignalFixtureReady = [&Publisher](const FVoxelViewPublisher::FPublicationRef& Ready)
 			{
 				Ready->bGroupsPrepared = true;
-				Ready->bBuildOrderInitialized = true;
-				Ready->bBuildOrderDirty = false;
 				Ready->CoverageIndex = Ready->Updates.Num();
 				for (int32 GroupIndex = 0; GroupIndex < Ready->Groups.Num(); ++GroupIndex)
 					for (const int32 UpdateIndex : Ready->Groups[GroupIndex].UpdateIndices)
@@ -365,7 +361,6 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			Publication->Serial = ++Publisher.BatchSerial;
 			Publication->bCoveragePrepared = true;
 			Publication->Updates.SetNum(1);
-			Publication->PreparedMeshes.SetNum(1);
 			auto& Group = Publication->Groups.AddDefaulted_GetRef();
 			Group.Keys.Add(Slow);
 			Group.UpdateIndices.Add(0);
@@ -391,7 +386,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			InTest->TestFalse(TEXT("A newly committed independent owner finishes while an older mesh is missing"), Publisher.IsGroupBusy(Distant));
 			InTest->TestEqual(TEXT("Only the independent request callback runs"), NewCallbacks, 1);
 			InTest->TestEqual(TEXT("The waiting old callback remains untouched"), OldCallbacks, 0);
-			Publication->PreparedMeshes[0] = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
+			Publication->Updates[0].Source = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
 			SignalFixtureReady(Publication);
 			TickPublisherFrame(Publisher, *Module, Capture);
 			co_await FVoxelGameThreadContinuation::Yield();
@@ -676,7 +671,6 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			WaitingFine->bCoveragePrepared = true;
 			WaitingFine->Updates.SetNum(1);
 			WaitingFine->Updates[0].bUnchanged = true;
-			WaitingFine->PreparedMeshes.SetNum(1);
 			auto& WaitingGroup = WaitingFine->Groups.AddDefaulted_GetRef();
 			WaitingGroup.Keys.Add(Slow);
 			WaitingGroup.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Slow, Module->BlockSize());
@@ -725,7 +719,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 							FMath::Min(Bounds.Max.Y, WaitingGroup.Bounds.Max.Y) > FMath::Max(Bounds.Min.Y, WaitingGroup.Bounds.Min.Y);
 					});
 				}));
-			WaitingFine->PreparedMeshes[0] = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
+			WaitingFine->Updates[0].Source = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
 			SignalFixtureReady(WaitingFine);
 			while (Publisher.IsBusy() && FPlatformTime::Seconds() < NoopDeadline)
 			{
@@ -739,13 +733,13 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			ProjectedOwner->Serial = ++Publisher.BatchSerial;
 			ProjectedOwner->bCoveragePrepared = true;
 			ProjectedOwner->Updates.SetNum(1);
-			ProjectedOwner->PreparedMeshes.SetNum(1);
 			auto& ProjectedUpdate = ProjectedOwner->Updates[0];
 			ProjectedUpdate.SourceId = SourceId;
 			ProjectedUpdate.GroupIndex = 0;
 			const auto ProjectedSource = MakeNativeSource(Publisher, Scheduler);
 			ProjectedUpdate.NativeStamp = ProjectedSource->Stamp;
 			ProjectedUpdate.Source = ProjectedSource;
+			ProjectedUpdate.bNativeMeshPending = true;
 			ProjectedUpdate.Location = Entry.Location;
 			ProjectedUpdate.Scale = Entry.Scale;
 			ProjectedUpdate.Bounds = Entry.Bounds;
@@ -783,7 +777,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 				Restoring && (*Restoring)->bCoveragePrepared);
 			InTest->TestTrue(TEXT("Coverage comparison uses the preceding projected state instead of the stale committed state"),
 				Restoring && (*Restoring)->Updates.Num() == 1 && !(*Restoring)->Updates[0].bUnchanged);
-			ProjectedOwner->PreparedMeshes[0] = ProjectedSource;
+			ProjectedUpdate.bNativeMeshPending = false;
 			ProjectedUpdate.NativeMesh = BuildNativeGeometry(Scheduler, ProjectedSource);
 			SignalFixtureReady(ProjectedOwner);
 			const double ProjectionDeadline = FPlatformTime::Seconds() + 10.0;
@@ -848,10 +842,10 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			ClippedOwner->bCoveragePrepared = true;
 			ClippedOwner->CoverageIndex = 1;
 			ClippedOwner->Updates.SetNum(1);
-			ClippedOwner->PreparedMeshes.SetNum(1);
 			auto& ClipUpdate = ClippedOwner->Updates[0];
 			ClipUpdate.SourceId = ClippedSourceId;
 			ClipUpdate.Source = ClippedSource;
+			ClipUpdate.bNativeMeshPending = true;
 			ClipUpdate.NativeStamp = ClippedSource->Stamp;
 			ClipUpdate.NativeMesh = ClippedNativeMesh;
 			ClipUpdate.Scale = ClippedEntry.Scale;
@@ -887,7 +881,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 					Publisher.PriorityPlan ? Publisher.PriorityPlan->Cursor : -1, Publisher.bCommitOrderDirty,
 					Publisher.bCommitSelectionComplete, Publisher.ReadyCommitGroups.Num()));
 			}
-			ClippedOwner->PreparedMeshes[0] = ClippedSource;
+			ClipUpdate.bNativeMeshPending = false;
 			SignalFixtureReady(ClippedOwner);
 			TickPublisherFrame(Publisher, *Module, Capture);
 			co_await FVoxelGameThreadContinuation::Yield();
@@ -909,7 +903,6 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 				Waiting->Updates.SetNum(1);
 				Waiting->Updates[0].bUnchanged = true;
 				Waiting->Updates[0].GroupIndex = 0;
-				Waiting->PreparedMeshes.SetNum(1);
 				auto& WaitingOwner = Waiting->Groups.AddDefaulted_GetRef();
 				WaitingOwner.Keys.Add(Slow);
 				WaitingOwner.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Slow, Module->BlockSize());
@@ -936,7 +929,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 				Publisher.PendingGroups.FindChecked(Publisher.PendingGroupIds.FindChecked(Slow)).bCommitted);
 			InTest->TestTrue(TEXT("The complete connected parent handoff is deferred with its saturated child"),
 				Publisher.PendingGroupIds.Contains(Parent));
-			SlowGenerations[0]->PreparedMeshes[0] = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
+			SlowGenerations[0]->Updates[0].Source = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
 			SignalFixtureReady(SlowGenerations[0]);
 			TickPublisherFrame(Publisher, *Module, Capture);
 			co_await FVoxelGameThreadContinuation::Yield();
@@ -944,7 +937,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			co_await FVoxelGameThreadContinuation::Yield();
 			InTest->TestFalse(TEXT("The deferred group is admitted once one owner generation finishes"), Publisher.PendingGroupIds.Contains(Slow));
 			InTest->TestTrue(TEXT("The admitted parent still waits for its older child generation"), Publisher.IsGroupBusy(Parent));
-			SlowGenerations[1]->PreparedMeshes[0] = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
+			SlowGenerations[1]->Updates[0].Source = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
 			SignalFixtureReady(SlowGenerations[1]);
 			for (int32 Tick = 0; Tick < 4 && Publisher.IsBusy(); ++Tick)
 			{
@@ -983,7 +976,6 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			BlockedPublication->bCoveragePrepared = true;
 			BlockedPublication->CoverageIndex = 2;
 			BlockedPublication->Updates.SetNum(2);
-			BlockedPublication->PreparedMeshes.SetNum(2);
 			auto& BlockedUpdate = BlockedPublication->Updates[0];
 			BlockedUpdate.SourceId = SourceId;
 			BlockedUpdate.Source = ProjectedSource;
@@ -993,13 +985,11 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			BlockedUpdate.Exclusions = {FBox(FVector(12, 12, -100), FVector(16, 16, 100))};
 			BlockedUpdate.GroupIndex = 0;
 			BlockedUpdate.TerrainStage = 2;
-			BlockedPublication->PreparedMeshes[0] = ProjectedSource;
 			auto& IndependentUpdate = BlockedPublication->Updates[1];
 			IndependentUpdate.Source = CommittedSource;
 			IndependentUpdate.NativeStamp = CommittedSource->Stamp;
 			IndependentUpdate.GroupIndex = 1;
 			IndependentUpdate.bUnchanged = true;
-			BlockedPublication->PreparedMeshes[1] = CommittedSource;
 			BlockedPublication->Groups.SetNum(2);
 			BlockedPublication->Groups[0].Keys.Add(Surface);
 			BlockedPublication->Groups[0].Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Surface, Module->BlockSize());
@@ -1191,7 +1181,6 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			MovingPublication->CoverageIndex = 2;
 			MovingPublication->Groups.SetNum(2);
 			MovingPublication->Updates.SetNum(2);
-			MovingPublication->PreparedMeshes.Init(CommittedSource, 2);
 			for (int32 Index = 0; Index < 2; ++Index)
 			{
 				MovingPublication->Groups[Index].Keys.Add(Index == 0 ? Slow : Distant);
@@ -1199,6 +1188,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 					MovingPublication->Groups[Index].Keys[0], BlockSize);
 				MovingPublication->Groups[Index].UpdateIndices.Add(Index);
 				MovingPublication->Updates[Index].GroupIndex = Index;
+				MovingPublication->Updates[Index].Source = CommittedSource;
 			}
 			Publisher.SortGroups(MovingPublication);
 			Publisher.Publications.Add(MovingPublication);
@@ -1245,7 +1235,7 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 				Ready->CoverageIndex = 1;
 				Ready->Updates.SetNum(1);
 				Ready->Updates[0].GroupIndex = 0;
-				Ready->PreparedMeshes.Init(CommittedSource, 1);
+				Ready->Updates[0].Source = CommittedSource;
 				auto& ReadyGroup = Ready->Groups.AddDefaulted_GetRef();
 				ReadyGroup.Keys = MoveTemp(Keys);
 				ReadyGroup.Bounds = Bounds;
@@ -1327,8 +1317,8 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			InTest->TestTrue(TEXT("The unrelated middle group also eventually commits"), MiddleIndependent->Groups[0].bCommitted);
 			const auto FirstDeferredOwner = ReadyPublication({Surface}, FarChange);
 			const auto SecondDeferredOwner = ReadyPublication({Surface}, FarChange);
-			FirstDeferredOwner->PreparedMeshes[0].Reset();
-			SecondDeferredOwner->PreparedMeshes[0].Reset();
+			FirstDeferredOwner->Updates[0].Source.Reset();
+			SecondDeferredOwner->Updates[0].Source.Reset();
 			const auto DeferredNearby = ReadyPublication({Surface, Slow}, NearChange);
 			for (const auto& ActivePublication : Publisher.Publications) Publisher.RefreshGroupOrder(ActivePublication);
 			TMap<FVoxelPublishGroupKey, FVoxelViewPublisher::FGroupPriority> OneFrameDonations;
@@ -1550,10 +1540,10 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			const auto AdmissionPublication = MakeShared<FVoxelViewPublisher::FPublication>();
 			AdmissionPublication->Serial = ++AdmissionPublisher.BatchSerial;
 			AdmissionPublication->bCoveragePrepared = true;
+			AdmissionPublication->bGroupsPrepared = true;
 			constexpr int32 DistantUpdates = 140;
 			AdmissionPublication->CoverageIndex = DistantUpdates + 1;
 			AdmissionPublication->Updates.SetNum(DistantUpdates + 1);
-			AdmissionPublication->PreparedMeshes.SetNum(DistantUpdates + 1);
 			AdmissionPublication->Groups.SetNum(2);
 			AdmissionPublication->Groups[0].Keys.Add(Surface);
 			AdmissionPublication->Groups[0].Bounds = FarChange;
@@ -1584,13 +1574,16 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			AdmissionPublisher.UpdateGroupPriorities({});
 			auto& AdmissionFrame = Module->GetTerrainFrameContext();
 			AdmissionFrame.Begin(1, AdmissionFrame.GetFrameCounter() + 1, FPlatformTime::Seconds(), {});
-			do { AdmissionPublisher.AdmitBuilds(AdmissionPublication); } while (!AdmissionPublication->bBuildOrderInitialized || AdmissionPublication->bBuildOrderDirty);
+			for (int32 GroupIndex = 0; GroupIndex < AdmissionPublication->Groups.Num(); ++GroupIndex)
+				AdmissionPublisher.QueueReadyGroup(AdmissionPublication, GroupIndex);
+			FVoxelTerrainServiceCharge AdmissionCharge;
+			const double SelectionStarted = FPlatformTime::Seconds();
+			const int32 SelectedReady = AdmissionPublisher.SelectReadyGroup(AdmissionPublisher.ReadyPrepareGroups,
+				AdmissionPublisher.PrepareSelection, AdmissionCharge, false);
+			AdmissionPublisher.SettleReadyGroup(AdmissionPublisher.PrepareSelection, AdmissionCharge, SelectionStarted, true);
 			AdmissionFrame.End(FPlatformTime::Seconds());
-			InTest->TestTrue(TEXT("Current Critical native preparation is admitted ahead of 140 physically earlier distant updates"),
-				AdmissionPublication->PreparedMeshes[DistantUpdates] == AdmissionMesh);
-			int32 AdmittedMeshes = 0;
-			for (const auto& Mesh : AdmissionPublication->PreparedMeshes) AdmittedMeshes += Mesh.IsValid();
-			InTest->TestEqual(TEXT("Body reuse admission advances a bounded eight-index slice within the shared deadline"), AdmittedMeshes, 8);
+			if (!InTest->TestTrue(TEXT("原准备选择器在140个物理靠前的远源之前选中Critical近组"),
+				SelectedReady != INDEX_NONE && AdmissionPublisher.ReadyPrepareGroups[SelectedReady].GroupIndex == 1)) co_return;
 			int32 PreparedComponents = 0;
 			bool bNativeComplete = false;
 			InTest->TestTrue(TEXT("The actual native factory accepts the Critical source"), AdmissionPublisher.PrepareUpdate(

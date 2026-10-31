@@ -73,7 +73,7 @@ public:
 	bool DiscardUnchangedGroup(const FGuid& InGroup);
 	void SetValidation(const FGuid& InGroup, TFunction<bool()> InValidation);
 	TArray<FVoxelPublishGroupKey> TakeRetryOwners();
-	bool SetOwnershipChanged(const FGuid& InGroup, bool bInChanged);
+	bool SetOwnershipChanged(const FGuid& InGroup, bool bInChanged, bool bInInitialLayout = false);
 	bool SetTerrainStage(const FGuid& InGroup, int32 InTerrainStage);
 	void SetObservers(TConstArrayView<FVector> InObservers);
 	void Tick();
@@ -207,8 +207,9 @@ private:
 		int32 NativeBatchCursor = 0;
 		int32 NativeTriangleCursor = 0;
 		bool bNativeSubmitted = false;
-		// 从索引准备到呈现回执共用准入槽，避免等待提交的正文耗尽常驻池。
+		// 活动槽与尚无渲染工作的准备完成等待组共同受全局持有上限约束。
 		bool bNativeAdmitted = false;
+		bool bNativePreparedWaiting = false;
 		FVoxelGenerationConsumerKey NativeControlConsumer;
 		uint64 NativeControlVersion = 0;
 		uint64 NativeFrontendVersion = 0;
@@ -219,6 +220,7 @@ private:
 		// Proxy 接缝可能服务于 Fine 交接，实际更新阶段不能仅由 owner 类别推断。
 		int32 TerrainStage = 3;
 		bool bTransition = false;
+		bool bIndependentInitial = false;
 		TArray<int32> UpdateIndices;
 		TArray<FVoxelViewSourceId> VisibilitySources;
 		TArray<FVoxelPublishGroupKey> Keys;
@@ -226,6 +228,7 @@ private:
 		double FirstQueuedAt = 0.0;
 		uint64 QueueSequence = 0;
 		int32 PreparedUpdates = 0;
+		bool bPresentationCommitted = false;
 		bool bCommitted = false;
 		bool bPrepareQueued = false;
 		bool bCommitQueued = false;
@@ -248,6 +251,7 @@ private:
 		bool bCommitted = false;
 		FGroupCallbackPtr Callback;
 		bool bOwnershipChanged = true;
+		bool bInitialLayout = false;
 		FPriorityBoundsPtr DeferredPriorityBounds;
 		int32 TerrainStage = 3;
 		TSharedPtr<TFunction<bool()>> Validation;
@@ -269,6 +273,7 @@ private:
 	struct FPublication
 	{
 		uint64 Serial = 0;
+		bool bInitialLayout = false;
 		uint64 GroupRevision = 1;
 		uint64 IndexedGroupRevision = 0;
 		int32 DependencyIndexBuildCursor = 0;
@@ -284,15 +289,8 @@ private:
 		TMap<FVoxelPublishGroupKey, int32> TerrainStages;
 		TSet<FVoxelPublishGroupKey> OwnershipChanges;
 		TMap<FVoxelPublishGroupKey, FPriorityBoundsPtr> DeferredPriorityBounds;
-		TArray<FMeshPtr> PreparedMeshes;
 		FVoxelGameThreadContinuation CoverageWork;
 		int32 CoverageIndex = 0;
-		TArray<int32> BuildOrder;
-		TSet<int32> PendingBuildIndices;
-		int32 BuildInitializationIndex = 0;
-		int32 BuildHeapifyIndex = INDEX_NONE;
-		bool bBuildOrderInitialized = false;
-		bool bBuildOrderDirty = true;
 		bool bCoveragePrepared = false;
 		bool bCoveragePreparing = false;
 		bool bGroupsPrepared = true;
@@ -326,6 +324,7 @@ private:
 		FPublicationRef Key;
 		int32 Value = INDEX_NONE;
 		uint64 Revision = 0;
+		FGroupPriority Priority;
 		bool IsCurrent() const
 		{
 			return !Key->bCanceled && !Key->bFinished && Key->GroupRevision == Revision && Key->Groups.IsValidIndex(Value);
@@ -339,6 +338,7 @@ private:
 		FVoxelPublishBoundsIndex SpatialIndex;
 		FVoxelPublishBoundsIndex::FQuery SpatialQuery;
 		FGroup SpatialDemand;
+		FGroupPriority SpatialPriority;
 		bool bSpatialQueryActive = false;
 		TSet<const FDeferredPriorityDemand*> SeenDeferred;
 		TMap<FVoxelPublishGroupKey, FGroupPriority> Priorities;
@@ -371,7 +371,7 @@ private:
 	void InsertReadyPrepare(FReadyGroup InReady);
 	void IndexPublicationUpdate(const FPublicationRef& Publication, int32 InIndex);
 	void ReleaseSourceGeneration(FVoxelViewSourceId InSourceId, uint64 InSerial);
-	void QueueReadyGroup(const FPublicationRef& InPublication, int32 InGroupIndex);
+	void QueueReadyGroup(const FPublicationRef& InPublication, int32 InGroupIndex, uint64 InPriorityRevision = MAX_uint64);
 	void RebuildFirstOwners();
 	void SetOwnerActive(const FVoxelPublishGroupKey& InKey, uint64 InSerial, bool bInActive);
 	void InvalidateDependencyProofs(FPublication& InPublication);
@@ -387,6 +387,7 @@ private:
 	void BuildGroups(const FPublicationRef& Publication, bool bInPreparedCoverage = false);
 	void DeferSaturatedGroups(const FPublicationRef& Publication, TMap<FVoxelPublishGroupKey, FGroupPriority>& OutPriorities);
 	void AdvancePriorities();
+	void PublishResolvedPriority(const FPriorityGroup& InResolved, uint64 InRevision);
 	void UpdateGroupPriorities(TMap<FVoxelPublishGroupKey, FGroupPriority> InPriorities);
 	FUpdate TakePendingUpdate(int32 InIndex);
 	void SortGroups(const FPublicationRef& Publication);
@@ -399,6 +400,7 @@ private:
 	static bool HigherGroupPriority(const FGroupPriority& InFirst, const FGroupPriority& InSecond);
 	FGroupPriority BoundsPriority(TConstArrayView<FBox> InBounds, int32 InStage) const;
 	FGroupPriority GroupPriority(const FGroup& InGroup) const;
+	bool IsIndependentInitial(const FVoxelPublishGroupKey& InKey, bool bInInitialLayout) const;
 	static bool GroupsInteract(const FGroup& InFirst, const FGroup& InSecond);
 	void SetPublicationPriority(FVoxelTaskRequest& InOutRequest, const FPublication& InPublication, TConstArrayView<int32> InGroupIndices) const;
 	void RefreshTaskPriorities();
@@ -410,8 +412,6 @@ private:
 	bool CaptureCoverageSource(FVoxelViewSourceId InSourceId, bool bInRetainPresented, FUpdate& OutSource) const;
 	FVoxelGameThreadContinuation SetCoverageSourceSteps(const FGuid& InGroup, FVoxelViewSourceId InSourceId, FUpdate InSource,
 		TArray<FBox> InWorldCellBoxes, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
-	bool HigherBuildPriority(const FPublication& Publication, int32 First, int32 Second) const;
-	bool AdmitBuilds(const FPublicationRef& Publication, double InDeadline = MAX_dbl);
 	enum class ENativeUpdateWork : uint8
 	{
 		None,
@@ -426,6 +426,9 @@ private:
 	bool CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup);
 	void DiscardReadyGroup(const FPublicationRef& InPublication, FGroup& InGroup);
 	bool AdvanceNativeGroup(const FPublicationRef& InPublication, FGroup& InGroup, bool& bOutAdvanced);
+	bool CanAdmitNativeGroup(const FGroup& InGroup) const;
+	bool AdmitNativeGroup(FGroup& InGroup);
+	bool YieldNativePreparation(const FPublicationRef& InPublication, FGroup& InGroup);
 	void ReleaseNativeGroup(FGroup& InGroup);
 	bool IsNativeGeometryCurrent(const FVoxelTaskStamp& InStamp) const;
 	bool RunBudgetedPhase(FVoxelPublishBudget& InBudget, EVoxelPublishPhase InPhase, TFunctionRef<bool()> InOperation,
@@ -445,7 +448,11 @@ private:
 	uint64 BatchSerial = 0;
 	FGuid NativeOwnerId = FGuid::NewGuid();
 	static constexpr int32 MaximumNativeGroups = 8;
+	static constexpr int32 MaximumHeldNativeGroups = MaximumNativeGroups * 2;
 	int32 ActiveNativeGroups = 0;
+	int32 WaitingNativeGroups = 0;
+	uint64 NativePreparationYields = 0;
+	uint64 NativePreparationResumes = 0;
 	uint64 NativeSourceSerial = 0;
 	TMap<FVoxelViewSourceId, FEntry> Entries;
 	TArray<FVoxelPublishGroupKey> RetryOwners;

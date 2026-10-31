@@ -11,7 +11,7 @@ public:
 	void Initialize(const bool bInCount, const uint64 InPieceLimit, const uint64 InGeometryLimit, const uint64 InResultCapacity = 0)
 	{
 		bCount = bInCount; PieceLimit = InPieceLimit; GeometryLimit = InGeometryLimit; ResultCapacity = InResultCapacity;
-		PatchCursor = U = V = BatchCount = 0; TileSide = 4; bPatchStarted = false; PayloadBytes = 0; Mesh = {};
+		PatchCursor = U = V = BatchCount = 0; WindowCells = 4; bPatchStarted = false; PayloadBytes = 0; Mesh = {};
 	}
 
 	uint64 EstimatedBytes() const
@@ -41,7 +41,7 @@ public:
 		// 每片最多四乘四个真实采样单元；不能按固定四个世界 cell 过度拆分粗接口。
 		const int32 Step = FMath::Min(Inputs.GetSampleStep(), Original.Neighbor.SampleStepCells);
 		if (Step <= 0 || Step > MAX_int32 / 4) { OutError = TEXT("Invalid volume interface sample step"); return false; }
-		TileSide = 4 * Step;
+		const int32 TileSide = WindowCells * Step;
 		if (!bPatchStarted) { U = Original.Face.Min[TangentU]; V = Original.Face.Min[TangentV]; bPatchStarted = true; }
 		const int32 BatchBound = 12 * Registry.Definitions.Num();
 		const uint64 Scratch = 2 * VoxelBoundedAllocation::ArrayBytes<FVoxelRenderBatch>(BatchBound) +
@@ -68,7 +68,7 @@ public:
 			VoxelBoundedAllocation::ArrayBytes<FVoxelRenderBatch>(BatchCount) + NewBatchBytes + VoxelBoundedAllocation::ArrayBytes<FVoxelRenderBatch>(AddedBatches);
 		if (BuildPeak > PieceLimit)
 		{
-			if (TileSide > 1) { TileSide /= 2; return true; }
+			if (WindowCells > 1) { WindowCells /= 2; return true; }
 			OutError = TEXT("Oversized: minimum volume interface Piece peak"); return false;
 		}
 		if (PayloadBytes + AddedPayload + NewBatchBytes > GeometryLimit)
@@ -93,7 +93,7 @@ public:
 private:
 	FVoxelSectionMeshResult Mesh;
 	int32 PatchCursor = 0, U = 0, V = 0, BatchCount = 0;
-	int32 TileSide = 4;
+	int32 WindowCells = 4;
 	uint64 PayloadBytes = 0, PieceLimit = 0, GeometryLimit = 0, ResultCapacity = 0;
 	bool bCount = false;
 	bool bPatchStarted = false;

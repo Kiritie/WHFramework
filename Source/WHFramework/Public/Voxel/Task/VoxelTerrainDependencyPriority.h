@@ -15,6 +15,7 @@ public:
 	bool Register(const FGuid& InNode, const FVoxelTerrainServicePriority& InOwnPriority, FString& OutError);
 	bool SetDependencies(const FGuid& InNode, const TSet<FGuid>& InDependencies, FString& OutError);
 	void SetPriority(const FGuid& InNode, const FVoxelTerrainServicePriority& InPriority);
+	void RemoveDependency(const FGuid& InNode, const FGuid& InDependency);
 	void Remove(const FGuid& InNode);
 	int32 Advance(int32 InMaximumNodes, TFunctionRef<void(const FGuid&, const FVoxelTerrainServicePriority&)> InOnChanged);
 	const FVoxelTerrainServicePriority* Find(const FGuid& InNode) const;

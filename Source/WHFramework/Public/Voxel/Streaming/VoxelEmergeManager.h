@@ -14,6 +14,7 @@ class FVoxelRegionStore;
 struct FVoxelExactBaseGenerationWork;
 struct FVoxelExactOverlayDecodeWork;
 struct FVoxelEnvironmentColumnWork;
+struct FVoxelEnvironmentGeometryCapture;
 
 enum class EVoxelSectionChangeState : uint8
 {
@@ -242,10 +243,20 @@ private:
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> Retention;
 		TSharedPtr<const FVoxelGenerationEnvironmentInputs, ESPMode::ThreadSafe> EnvironmentInputs;
 		TOptional<FEnvironmentWait> EnvironmentWait;
+		TSharedPtr<FVoxelEnvironmentGeometryCapture, ESPMode::ThreadSafe> GeometryCapture;
+		TOptional<FVoxelTaskRequest> PendingGeometryCapture;
+		FString GeometryCaptureError;
+		double GeometryCaptureQueuedAt = 0.0;
+		bool bGeometryCaptureSubmitted = false;
+		bool bGeometryCaptureAdmissionWaiting = false;
+		uint64 GeometryCaptureAdmissionVersion = 0;
 		TOptional<FVoxelTerrainServicePriority> ContinuationPriority;
+		TOptional<FVoxelTerrainServicePriority> NaturalWaitPriority;
+		uint64 NaturalWaitWakeSerial = 0;
 		uint64 WakeSerial = 0;
 		uint64 NaturalWakeSerial = 0;
 		bool bNaturalReady = false;
+		bool bNaturalNeedsAdvance = false;
 		int32 SampleStep = 0;
 		TOptional<FVoxelTerrainGeometry> SamplingGeometry;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SampleRetentionStorageLease;
@@ -293,6 +304,8 @@ private:
 		bool bSubmitted = false;
 		TOptional<FVoxelTaskRequest> PendingRequest;
 	};
+	FVoxelGenerationDependencyStatus AdvanceEnvironmentGeometryCapture(const FVoxelGenerationConsumerKey& InConsumer, EVoxelWorkClass InWorkClass,
+		int32 InSourcePriority, double InDistanceScore, double InForwardScore);
 	bool ReserveEnvironmentStorage(FString& OutError);
 	FVoxelGenerationDependencyStatus DeferEnvironmentAdmission(const FIntPoint& InCell,
 		FEnvironmentColumnAttempt& InAttempt, TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
@@ -302,6 +315,7 @@ private:
 	FGuid EnvironmentTaskOwnerId = FGuid::NewGuid();
 	uint64 EnvironmentTaskIncarnation = 1;
 	uint64 NextEnvironmentTaskSerial = 0;
+	TSharedPtr<bool> EnvironmentCaptureLifetime = MakeShared<bool>(true);
 
 	bool bResetting = false;
 	uint64 CurrentInterestRevision = 0;

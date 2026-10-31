@@ -230,6 +230,138 @@ uint16 FVoxelEcologyGenerator::SelectLeaf(const FVoxelTreeSpecies& InSpecies, co
 	return InZ < -InRadius / 3 ? InSpecies.LeavesDark : InZ > InRadius / 3 ? InSpecies.LeavesLight : InSpecies.LeavesMid;
 }
 
+FIntRect FVoxelEcologyGenerator::TrunkSection(const int32 InHeight, const int32 InZ, const int32 InCrownRadius, const FVoxelStableId& InTreeId, const EVoxelTreeForm InForm)
+{
+	if (InHeight <= 0 || InZ < 0 || InZ >= InHeight) return {};
+	int32 Width = InHeight >= 24 && InForm != EVoxelTreeForm::LightTrunk && InForm != EVoxelTreeForm::Conifer ? 3 : 2;
+	if (InZ < 2) ++Width;
+	else if (InZ >= InHeight - InHeight / 4) Width = FMath::Max(2, Width - 1);
+	const int32 Limit = FMath::Clamp(InCrownRadius, 0, 2);
+	Width = FMath::Min(Width, Limit * 2 + 1);
+	const int32 LeanX = int32((InTreeId.Low >> 8) % 3) - 1;
+	const int32 LeanY = int32((InTreeId.High >> 8) % 3) - 1;
+	FIntPoint Min(-Width / 2, -Width / 2);
+	if (InZ >= InHeight / 2) Min.X += LeanX;
+	if (InZ >= InHeight * 2 / 3) Min.Y += LeanY;
+	Min.X = FMath::Clamp(Min.X, -Limit, Limit + 1 - Width);
+	Min.Y = FMath::Clamp(Min.Y, -Limit, Limit + 1 - Width);
+	return {Min, Min + FIntPoint(Width)};
+}
+
+FIntRect FVoxelEcologyGenerator::TrunkBounds(const int32 InHeight, const int32 InFirstZ, const int32 InLastZ, const int32 InCrownRadius, const FVoxelStableId& InTreeId, const EVoxelTreeForm InForm)
+{
+	const int32 FirstZ = FMath::Max(0, InFirstZ);
+	const int32 LastZ = FMath::Min(InHeight, InLastZ);
+	if (FirstZ >= LastZ) return {};
+	FIntRect Bounds = TrunkSection(InHeight, FirstZ, InCrownRadius, InTreeId, InForm);
+	for (const int32 Z : {2, InHeight / 2, InHeight * 2 / 3, InHeight - InHeight / 4})
+	{
+		if (Z <= FirstZ || Z >= LastZ) continue;
+		const FIntRect Section = TrunkSection(InHeight, Z, InCrownRadius, InTreeId, InForm);
+		Bounds.Min.X = FMath::Min(Bounds.Min.X, Section.Min.X);
+		Bounds.Min.Y = FMath::Min(Bounds.Min.Y, Section.Min.Y);
+		Bounds.Max.X = FMath::Max(Bounds.Max.X, Section.Max.X);
+		Bounds.Max.Y = FMath::Max(Bounds.Max.Y, Section.Max.Y);
+	}
+	return Bounds;
+}
+
+void FVoxelEcologyGenerator::CrownBounds(const int32 InRadius, const EVoxelTreeForm InForm, FIntVector& OutMin, FIntVector& OutMax)
+{
+	const int32 Radius = FMath::Max(0, InRadius);
+	OutMin = FIntVector(-Radius);
+	OutMax = FIntVector(Radius + 1);
+	int32 Horizontal = Radius;
+	if (InForm == EVoxelTreeForm::Sparse)
+	{
+		Horizontal = FMath::FloorToInt(FMath::Sqrt(0.75) * Radius);
+		const int32 Vertical = FMath::FloorToInt(0.55 * Radius);
+		OutMin.Z = -Vertical;
+		OutMax.Z = Vertical + 1;
+	}
+	else if (InForm == EVoxelTreeForm::Conifer)
+		Horizontal = FMath::FloorToInt(0.85 * Radius);
+	OutMin.X = OutMin.Y = -Horizontal;
+	OutMax.X = OutMax.Y = Horizontal + 1;
+}
+
+void FVoxelEcologyGenerator::CrownLobe(const int32 InIndex, const EVoxelTreeForm InForm, const FVoxelStableId& InTreeId, FVector& OutCenter, FVector& OutRadii)
+{
+	const FVector BroadleafCenters[] = {FVector(-0.26, 0.0, -0.15), FVector(0.26, 0.14, -0.10), FVector(0.0, -0.16, 0.24)};
+	const FVector BroadleafRadii[] = {FVector(0.70, 0.69, 0.59), FVector(0.69, 0.70, 0.58), FVector(0.64, 0.63, 0.62)};
+	const FVector BirchCenters[] = {FVector(-0.15, 0.0, -0.26), FVector(0.16, 0.08, 0.05), FVector(0.0, -0.06, 0.41)};
+	const FVector BirchRadii[] = {FVector(0.58, 0.56, 0.59), FVector(0.54, 0.56, 0.65), FVector(0.40, 0.41, 0.55)};
+	const bool bLightTrunk = InForm == EVoxelTreeForm::LightTrunk;
+	OutCenter = bLightTrunk ? BirchCenters[InIndex] : BroadleafCenters[InIndex];
+	OutRadii = bLightTrunk ? BirchRadii[InIndex] : BroadleafRadii[InIndex];
+	const double WidthScale = 0.94 + double((InTreeId.Low >> 16) % 7) * 0.01;
+	const double DepthScale = 0.94 + double((InTreeId.High >> 16) % 7) * 0.01;
+	OutRadii.X *= WidthScale;
+	OutRadii.Y *= DepthScale;
+}
+
+bool FVoxelEcologyGenerator::CrownIntersects(const FIntVector& InMin, const FIntVector& InMax, const int32 InRadius, const FVoxelStableId& InTreeId, const EVoxelTreeForm InForm)
+{
+	if (InMin.X >= InMax.X || InMin.Y >= InMax.Y || InMin.Z >= InMax.Z) return false;
+	if (InMax - InMin == FIntVector(1)) return ContainsCrown(InMin, InRadius, InTreeId, InForm);
+	if (InRadius <= 0)
+		return InMin.X <= 0 && InMin.Y <= 0 && InMin.Z <= 0 && InMax.X > 0 && InMax.Y > 0 && InMax.Z > 0;
+	FVector Min;
+	FVector Max;
+	for (int32 Axis = 0; Axis < 3; ++Axis)
+	{
+		const int64 Low = FMath::Max<int64>(InMin[Axis], -int64(InRadius));
+		const int64 High = FMath::Min<int64>(int64(InMax[Axis]) - 1, InRadius);
+		if (Low > High) return false;
+		Min[Axis] = double(Low) / InRadius;
+		Max[Axis] = double(High) / InRadius;
+	}
+	const auto DistanceToInterval = [](const double Low, const double High)
+	{
+		return Low > 0.0 ? Low : High < 0.0 ? -High : 0.0;
+	};
+	const double NearX = DistanceToInterval(Min.X, Max.X);
+	const double NearY = DistanceToInterval(Min.Y, Max.Y);
+	if (InForm == EVoxelTreeForm::Conifer)
+	{
+		const double Radius = FMath::Clamp((1.0 - Min.Z) * 0.48, 0.08, 0.85);
+		return NearX * NearX + NearY * NearY <= Radius * Radius;
+	}
+	if (InForm == EVoxelTreeForm::Sparse && (Min.Z > 0.55 || Max.Z < -0.55 || NearX * NearX + NearY * NearY > 0.75)) return false;
+	const double Turn = double(InTreeId.Low % 360) * UE_PI / 180.0;
+	const double Cosine = FMath::Cos(Turn);
+	const double Sine = FMath::Sin(Turn);
+	FVector RotatedMin(MAX_dbl);
+	FVector RotatedMax(-MAX_dbl);
+	for (const double X : {Min.X, Max.X})
+		for (const double Y : {Min.Y, Max.Y})
+		{
+			const double RotatedX = X * Cosine - Y * Sine;
+			const double RotatedY = X * Sine + Y * Cosine;
+			RotatedMin.X = FMath::Min(RotatedMin.X, RotatedX);
+			RotatedMin.Y = FMath::Min(RotatedMin.Y, RotatedY);
+			RotatedMax.X = FMath::Max(RotatedMax.X, RotatedX);
+			RotatedMax.Y = FMath::Max(RotatedMax.Y, RotatedY);
+		}
+	RotatedMin.Z = Min.Z;
+	RotatedMax.Z = Max.Z;
+	for (int32 Lobe = 0; Lobe < 3; ++Lobe)
+	{
+		FVector Center;
+		FVector Radii;
+		CrownLobe(Lobe, InForm, InTreeId, Center, Radii);
+		double DistanceSquared = 0.0;
+		for (int32 Axis = 0; Axis < 3; ++Axis)
+		{
+			const double Distance = DistanceToInterval((RotatedMin[Axis] - Center[Axis]) / Radii[Axis],
+				(RotatedMax[Axis] - Center[Axis]) / Radii[Axis]);
+			DistanceSquared += Distance * Distance;
+		}
+		if (DistanceSquared <= 1.0) return true;
+	}
+	return false;
+}
+
 bool FVoxelEcologyGenerator::ContainsCrown(const FIntVector& InOffset, const int32 InRadius, const FVoxelStableId& InTreeId, const EVoxelTreeForm InForm)
 {
 	if (InRadius <= 0)
@@ -249,17 +381,17 @@ bool FVoxelEcologyGenerator::ContainsCrown(const FIntVector& InOffset, const int
 		return Point.X * Point.X + Point.Y * Point.Y <= ConeRadius * ConeRadius;
 	}
 	if (InForm == EVoxelTreeForm::Sparse && (FMath::Abs(Point.Z) > 0.55 || Point.X * Point.X + Point.Y * Point.Y > 0.75)) return false;
-	if (InForm == EVoxelTreeForm::LightTrunk && Point.X * Point.X + Point.Y * Point.Y > 0.65) return false;
 	const double Turn = static_cast<double>(InTreeId.Low % 360) * UE_PI / 180.0;
 	const double Cosine = FMath::Cos(Turn);
 	const double Sine = FMath::Sin(Turn);
 	const FVector Rotated(Point.X * Cosine - Point.Y * Sine, Point.X * Sine + Point.Y * Cosine, Point.Z);
-	const FVector Centers[] = { FVector(-0.26, 0.0, -0.13), FVector(0.26, 0.15, -0.08), FVector(0.0, -0.16, 0.30) };
-	const FVector Radii[] = { FVector(0.72, 0.69, 0.72), FVector(0.70, 0.72, 0.67), FVector(0.62, 0.60, 0.67) };
 	double Distance = MAX_dbl;
 	for (int32 Index = 0; Index < 3; ++Index)
 	{
-		const FVector Delta = (Rotated - Centers[Index]) / Radii[Index];
+		FVector Center;
+		FVector Radii;
+		CrownLobe(Index, InForm, InTreeId, Center, Radii);
+		const FVector Delta = (Rotated - Center) / Radii;
 		Distance = FMath::Min(Distance, Delta.SizeSquared());
 	}
 	if (Distance > 1.0) return false;
@@ -305,8 +437,10 @@ void FVoxelEcologyGenerator::BuildTrees(
 			const int64 VisibleTrunkHeight = FMath::Min<int64>(Height, VoxelGeneration::WorldCellMaxExclusive - Anchor.Z);
 			for (int64 Z = 0; Z < VisibleTrunkHeight; ++Z)
 			{
-				AppendWorldWrite(InEmit, WideAnchor + FInt64Vector(0, 0, Z),
-					Species.Trunk, TrunkPriority, OwnerId);
+				const FIntRect Section = TrunkSection(Height, int32(Z), Recipe->Settings.Ecology.Tree.CrownRadius, OwnerId, Species.Form);
+				for (int32 Y = Section.Min.Y; Y < Section.Max.Y; ++Y)
+					for (int32 X = Section.Min.X; X < Section.Max.X; ++X)
+						AppendWorldWrite(InEmit, WideAnchor + FInt64Vector(X, Y, Z), Species.Trunk, TrunkPriority, OwnerId);
 			}
 			if (!Recipe->Ecology.TreeSpecies.IsEmpty())
 			{

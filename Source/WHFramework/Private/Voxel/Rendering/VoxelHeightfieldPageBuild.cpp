@@ -119,10 +119,10 @@ bool FVoxelHeightfieldPageBuild::Advance(const FVoxelMacroTerrainBuilder& InBuil
 		MacroPage.Side = int32(Geometry.Key.SideCells() / MacroPage.Step) + 1;
 		const int32 Count = MacroPage.Side * MacroPage.Side;
 		MacroPage.Height.Reserve(Count); MacroPage.WaterHeight.Reserve(Count); MacroPage.WaterKind.Reserve(Count);
-		MacroPage.SurfaceStates.Reserve(Count); MacroPage.ForestCoverage.Reserve(Count); MacroPage.SnowCoverage.Reserve(Count);
+		MacroPage.SurfaceStates.Reserve(Count); MacroPage.ForestCoverage.Reserve(Count);
 		MacroPage.Height.SetNumUninitialized(Count); MacroPage.WaterHeight.SetNumUninitialized(Count);
 		MacroPage.WaterKind.SetNumUninitialized(Count); MacroPage.SurfaceStates.SetNumUninitialized(Count);
-		MacroPage.ForestCoverage.SetNumUninitialized(Count); MacroPage.SnowCoverage.SetNumUninitialized(Count);
+		MacroPage.ForestCoverage.SetNumUninitialized(Count);
 		MacroPage.DistantCells.Reserve(MaximumWindowDistantCells * Shards.Num());
 		bAllocated = true;
 	}
@@ -136,7 +136,6 @@ bool FVoxelHeightfieldPageBuild::Advance(const FVoxelMacroTerrainBuilder& InBuil
 	CopyGrid(Part.WaterKind, Part.Side, MacroPage.WaterKind, MacroPage.Side, Offset);
 	CopyGrid(Part.SurfaceStates, Part.Side, MacroPage.SurfaceStates, MacroPage.Side, Offset);
 	CopyGrid(Part.ForestCoverage, Part.Side, MacroPage.ForestCoverage, MacroPage.Side, Offset);
-	CopyGrid(Part.SnowCoverage, Part.Side, MacroPage.SnowCoverage, MacroPage.Side, Offset);
 	MacroPage.Revision = FMath::Max(MacroPage.Revision, Part.Revision);
 	MacroPage.DistantCells.Append(Part.DistantCells);
 	if (++NextShard == Shards.Num())

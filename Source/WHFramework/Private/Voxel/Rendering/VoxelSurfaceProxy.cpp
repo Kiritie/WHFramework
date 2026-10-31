@@ -462,12 +462,14 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 					VoxelGeneration::FloorDivide(Anchor.Y - Origin.Y, StructureStep),
 					VoxelGeneration::FloorDivide(Anchor.Z, StructureStep));
 				if (StructureCells.Contains(CoarseAnchor)) return;
-				for (int32 Z = 0; Z < Height; ++Z)
+				for (const auto& Edit : InModifiedBlocks)
 				{
-					if (const FVoxelBlockState* Edit = InModifiedBlocks.Find(Anchor + FIntVector(0, 0, Z)))
-					{
-						if (*Edit != Trunk) return;
-					}
+					const int64 LocalZ = int64(Edit.Key.Z) - Anchor.Z;
+					if (LocalZ < 0 || LocalZ >= Height) continue;
+					const auto Section = FVoxelEcologyGenerator::TrunkSection(Height, int32(LocalZ), Trees.CrownRadius, TreeId, Species.Form);
+					const int64 LocalX = int64(Edit.Key.X) - Anchor.X;
+					const int64 LocalY = int64(Edit.Key.Y) - Anchor.Y;
+					if (LocalX >= Section.Min.X && LocalX < Section.Max.X && LocalY >= Section.Min.Y && LocalY < Section.Max.Y && Edit.Value != Trunk) return;
 				}
 				const int32 Radius = Trees.CrownRadius;
 				const FIntVector CrownCenter = Anchor + FIntVector(0, 0, Height - 1);
@@ -476,8 +478,7 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 					const int64 DX = static_cast<int64>(Edit.Key.X) - CrownCenter.X;
 					const int64 DY = static_cast<int64>(Edit.Key.Y) - CrownCenter.Y;
 					const int64 DZ = static_cast<int64>(Edit.Key.Z) - CrownCenter.Z;
-					if (FMath::Abs(DX) <= Radius && FMath::Abs(DY) <= Radius &&
-						FMath::Abs(DZ) <= Radius &&
+					if (FMath::Abs(DX) <= Radius && FMath::Abs(DY) <= Radius && FMath::Abs(DZ) <= Radius &&
 						FVoxelEcologyGenerator::ContainsCrown(FIntVector(DX, DY, DZ), Radius, TreeId, Species.Form))
 					{
 						FVoxelBlockState ExpectedLeaf;
@@ -485,24 +486,27 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 						if (Edit.Value != ExpectedLeaf && Edit.Value != Trunk) return;
 					}
 				}
-				AddCell(Anchor, Anchor + FIntVector(1, 1, Height), Trunk, TreeId);
-				const int32 CrownStep = FMath::Max(1, Radius / 3);
-				for (int32 Z = -Radius; Z <= Radius; Z += CrownStep)
+				for (int32 FirstZ = 0; FirstZ < Height; FirstZ += Step)
 				{
-					for (int32 Y = -Radius; Y <= Radius; Y += CrownStep)
-					{
-						for (int32 X = -Radius; X <= Radius; X += CrownStep)
-						{
-							const FIntVector Offset(X, Y, Z);
-							if (!FVoxelEcologyGenerator::ContainsCrown(Offset, Radius, TreeId, Species.Form)) continue;
-							Config->ToRuntime(FVoxelEcologyGenerator::SelectLeaf(Species, Z, Radius), Leaves);
-							const FIntVector Min = CrownCenter + Offset;
-							const FIntVector Max = Min + FIntVector(FMath::Min(CrownStep, Radius + 1 - X),
-								FMath::Min(CrownStep, Radius + 1 - Y), FMath::Min(CrownStep, Radius + 1 - Z));
-							AddCell(Min, Max, Leaves, TreeId);
-						}
-					}
+					const int32 LastZ = FMath::Min(Height, FirstZ + Step);
+					const FIntRect Section = FVoxelEcologyGenerator::TrunkBounds(Height, FirstZ, LastZ, Radius, TreeId, Species.Form);
+					AddCell(Anchor + FIntVector(Section.Min.X, Section.Min.Y, FirstZ),
+						Anchor + FIntVector(Section.Max.X, Section.Max.Y, LastZ), Trunk, TreeId);
 				}
+				const int32 CrownStep = FMath::Max(1, FMath::Min(Step, Radius * 2 + 1));
+				FIntVector ShapeMin;
+				FIntVector ShapeMax;
+				FVoxelEcologyGenerator::CrownBounds(Radius, Species.Form, ShapeMin, ShapeMax);
+				for (int32 Z = ShapeMin.Z; Z < ShapeMax.Z; Z += CrownStep)
+					for (int32 Y = ShapeMin.Y; Y < ShapeMax.Y; Y += CrownStep)
+						for (int32 X = ShapeMin.X; X < ShapeMax.X; X += CrownStep)
+						{
+							const FIntVector Min(X, Y, Z);
+							const FIntVector Max(FMath::Min(X + CrownStep, ShapeMax.X), FMath::Min(Y + CrownStep, ShapeMax.Y), FMath::Min(Z + CrownStep, ShapeMax.Z));
+							if (!FVoxelEcologyGenerator::CrownIntersects(Min, Max, Radius, TreeId, Species.Form)) continue;
+							Config->ToRuntime(FVoxelEcologyGenerator::SelectLeaf(Species, (Min.Z + Max.Z - 1) / 2, Radius), Leaves);
+							AddCell(CrownCenter + Min, CrownCenter + Max, Leaves, TreeId);
+						}
 			}, OutError, InCancel);
 		if (!bTreesEnumerated) return false;
 	}

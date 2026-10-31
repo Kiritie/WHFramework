@@ -47,12 +47,9 @@ struct FVoxelTerrainStageRootRequest
 struct FVoxelTerrainStageCacheIndex
 {
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	TMap<FVoxelTerrainSpatialKey, TSharedPtr<const FVoxelTerrainStageCacheNode, ESPMode::ThreadSafe>> Roots;
-	TSet<FVoxelTerrainSpatialKey> FailedRoots;
 	TSharedPtr<const FVoxelTerrainStageSpatialNode, ESPMode::ThreadSafe> Slots[12];
 	TSharedPtr<const FVoxelTerrainDomainSourceBatch, ESPMode::ThreadSafe> Sources;
 	FVoxelCoverageIndex Predecessor;
-	bool bIncremental = false;
 	uint64 OutputVersion = 0, WorldEpoch = 0;
 	uint8 MaximumLevel = 0;
 	int32 MaximumSamples = 0, MinZ = 0, MaxZ = 0;
@@ -197,28 +194,6 @@ namespace
 		return !Plan.CapacityCache || !Plan.Resources || Plan.CapacityCache->AccumulateRetainedInput(*Plan.Resources, nullptr, {}, Input, Count, !Plan.CapacityCache->bExternalCoverageFloor);
 	}
 
-	struct FStageRetainedFloor
-	{
-		void Add(const TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease, const FVoxelTerrainResources* Resources)
-		{
-			if (!Resources || !Lease || !Lease->IsOwnedBy(*Resources)) return;
-			for (int32 Index = 0; Index < Count; ++Index) if (Seen[Index] == Lease.Get()) return;
-			check(Count < UE_ARRAY_COUNT(Seen));
-			Seen[Count++] = Lease.Get();
-			if (Lease->GetPool() == EVoxelTerrainResourcePool::Input) Input += Lease->Bytes();
-			if (Lease->GetPool() == EVoxelTerrainResourcePool::Working) Working += Lease->Bytes();
-		}
-		void Bind(FVoxelTerrainStagePlan& Plan) const
-		{
-			Plan.RetainedInputBytes = Input;
-			Plan.RetainedWorkingBytes = Working;
-			Plan.RetainedLeaseCount = Count;
-		}
-		uint64 Input = 0, Working = 0;
-		int32 Count = 0;
-		const FVoxelTerrainResourceLease* Seen[5] = {};
-	};
-
 	bool StageCapacityPeak(const uint64* OldParts, const uint64* NewParts, const bool* Growing, const int32 Count,
 		uint64& OutPeak, uint64& OutBytes, FString& Error)
 	{
@@ -349,7 +324,7 @@ namespace
 			A.Source.VerticalFovDegrees == B.Source.VerticalFovDegrees && A.Source.ViewportHeightPixels == B.Source.ViewportHeightPixels &&
 			A.Source.GetSchedulingPriority() == B.Source.GetSchedulingPriority() &&
 			A.OuterRadiusCells == B.OuterRadiusCells && A.InnerRadiusCells == B.InnerRadiusCells &&
-			A.VerticalHalfExtentCells == B.VerticalHalfExtentCells;
+			A.VerticalHalfExtentCells == B.VerticalHalfExtentCells && A.MinimumSamplingDistanceCells == B.MinimumSamplingDistanceCells;
 	}
 
 	bool StageInfluences(const FVoxelTerrainSpatialKey& Key, const FIntVector& Min, const FIntVector& Max,

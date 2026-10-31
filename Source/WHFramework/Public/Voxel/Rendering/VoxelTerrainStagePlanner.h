@@ -20,6 +20,7 @@ struct WHFRAMEWORK_API FVoxelTerrainStageSource
 	int32 OuterRadiusCells = 0;
 	int32 VerticalHalfExtentCells = 0;
 	int32 InnerRadiusCells = 0;
+	int32 MinimumSamplingDistanceCells = 0;
 };
 
 // Domain 的不可变输入权威；Stage 仅保存同一个 batch 的冻结引用。

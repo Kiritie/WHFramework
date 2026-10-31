@@ -244,8 +244,8 @@ bool FVoxelChangeHierarchy::RegisterGeometry(const FVoxelTerrainGeometry& InGeom
 bool FVoxelChangeHierarchy::ReleaseGeometry(const FVoxelTerrainSpatialKey& InKey, FString& OutError)
 {
 	FWriteScopeLock Scope(Lock);
-	if (!PrepareStorageRequirements(OutError)) return false;
-	if (!PrepareCoverageRequirements(GeometryIndex, OutError)) return false;
+	if (!GeometryIndex.CanRemoveWithoutAllocation(InKey) &&
+		(!PrepareStorageRequirements(OutError) || !PrepareCoverageRequirements(GeometryIndex, OutError))) return false;
 	if (!GeometryIndex.Remove(InKey, OutError)) return Storage.Fail(GeometryIndex.GetLastResourceAdmission(), OutError);
 	GeometryIndex.MarkPublishedInputs();
 	const int32 Step = RetainedHaloSteps.FindRef(InKey);
@@ -273,21 +273,23 @@ bool FVoxelChangeHierarchy::RegisterFineShard(const FVoxelFineShardKey& InKey, F
 	if (!InKey.Validate(OutError) || (InKey.SideCells != 16 && InKey.SideCells != 32 && InKey.SideCells != 64))
 		return Storage.Fail(EVoxelTerrainResourceAdmission::InvalidRequest, OutError);
 	FWriteScopeLock Scope(Lock);
-	if (!PrepareStorageRequirements(OutError)) return false;
 	const FVoxelTerrainSpatialKey Spatial{EVoxelTerrainRepresentation::Fine, InKey.Min / InKey.SideCells,
 		uint8(FMath::FloorLog2(uint32(InKey.SideCells / 16)))};
-	if (FineShardReferences.FindRef(InKey) == MAX_int32)
+	int32* References = FineShardReferences.Find(InKey);
+	if (References && *References == MAX_int32)
 		return Storage.Fail(EVoxelTerrainResourceAdmission::CapacityUnachievable, OutError);
-	if (!ReserveEntry(Storage, FineShardReferences, InKey, OutError) ||
-		!ReserveEntry(Storage, FineShardRevisions, InKey, OutError)) return false;
 	if (FineShardIndex.Find(Spatial))
 	{
-		++FineShardReferences.FindChecked(InKey);
+		check(References && *References > 0 && FineShardRevisions.Contains(InKey));
+		++*References;
 		if (OutAdded) *OutAdded = false;
 		Storage.Succeed();
 		OutError.Reset();
 		return true;
 	}
+	if (!PrepareStorageRequirements(OutError)) return false;
+	if (!ReserveEntry(Storage, FineShardReferences, InKey, OutError) ||
+		!ReserveEntry(Storage, FineShardRevisions, InKey, OutError)) return false;
 	FVoxelCoverageRecord Record;
 	Record.Geometry.Key = Spatial;
 	Record.Geometry.SampleStepCells = 1;
@@ -310,13 +312,14 @@ bool FVoxelChangeHierarchy::RegisterFineShard(const FVoxelFineShardKey& InKey, F
 bool FVoxelChangeHierarchy::ReleaseFineShard(const FVoxelFineShardKey& InKey, FString& OutError)
 {
 	FWriteScopeLock Scope(Lock);
-	if (!PrepareStorageRequirements(OutError)) return false;
 	int32* References = FineShardReferences.Find(InKey);
 	if (References && *References == 1)
 	{
-		if (!PrepareCoverageRequirements(FineShardIndex, OutError)) return false;
-		if (!FineShardIndex.Remove({EVoxelTerrainRepresentation::Fine, InKey.Min / InKey.SideCells,
-			uint8(FMath::FloorLog2(uint32(InKey.SideCells / 16)))}, OutError))
+		const FVoxelTerrainSpatialKey Spatial{EVoxelTerrainRepresentation::Fine, InKey.Min / InKey.SideCells,
+			uint8(FMath::FloorLog2(uint32(InKey.SideCells / 16)))};
+		if (!FineShardIndex.CanRemoveWithoutAllocation(Spatial) &&
+			(!PrepareStorageRequirements(OutError) || !PrepareCoverageRequirements(FineShardIndex, OutError))) return false;
+		if (!FineShardIndex.Remove(Spatial, OutError))
 			return Storage.Fail(FineShardIndex.GetLastResourceAdmission(), OutError);
 		FineShardIndex.MarkPublishedInputs();
 		FineShardReferences.Remove(InKey);
