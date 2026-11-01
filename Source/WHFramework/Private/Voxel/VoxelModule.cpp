@@ -524,8 +524,11 @@ void UVoxelModule::OnRefresh(
 	const double Now = InterestStart;
 	const auto RenderCoverage = ViewManager ? ViewManager->CapturePresentedSnapshot() : nullptr;
 	const auto PhysicsCoverage = CollisionPresenter ? CollisionPresenter->CaptureSnapshot() : nullptr;
-	if ((RenderCoverage ? RenderCoverage->GetSerial() : 0) != LastPlannedRenderCoverageSerial ||
-		(PhysicsCoverage ? PhysicsCoverage->Serial : 0) != LastPlannedPhysicsCoverageSerial)
+	// 只有等待安全覆盖或窗口交接时，远处新回执才能改变驻留决策。
+	// 来源移动、配置和编辑仍通过各自的变更入口立即触发规划。
+	if (InterestRuntime && InterestRuntime->NeedsCoverageFeedback() &&
+		((RenderCoverage ? RenderCoverage->GetSerial() : 0) != LastPlannedRenderCoverageSerial ||
+		 (PhysicsCoverage ? PhysicsCoverage->Serial : 0) != LastPlannedPhysicsCoverageSerial))
 		bInterestDirty = true;
 
 	if ((bInterestDirty || (InterestRuntime && InterestRuntime->HasPlanningRetry())) &&
@@ -1438,6 +1441,7 @@ bool UVoxelModule::CaptureCollisionReceipt(const FIntVector& InSection, FVoxelPh
 void UVoxelModule::NotifyCollisionChanged(const FIntVector& InSection)
 {
 	check(IsInGameThread());
+	if (ViewManager) ViewManager->OnCollisionChanged(InSection);
 	if (NavigationPresenter) NavigationPresenter->InvalidateSection(InSection);
 	WakeSimulationSection(InSection);
 }
@@ -2433,12 +2437,14 @@ void UVoxelModule::PublishProjectEdit(const FVoxelEditBatch& InBatch)
 		if (CollisionPresenter)
 		{
 			CollisionPresenter->InvalidateSection(Patch.Section);
+			CollisionPresenter->InvalidateNeighbors(Patch.Section);
 		}
 		if (NavigationPresenter)
 		{
 			NavigationPresenter->InvalidateSection(Patch.Section);
 		}
 	}
+	bInterestDirty = true;
 	OnBlocksCommitted.Broadcast(InBatch);
 }
 
@@ -2544,8 +2550,9 @@ void UVoxelModule::RefreshInterest(
 	Request.Stamp = AttemptStamp;
 	const auto RenderRoot = ViewManager ? ViewManager->CapturePresentedSnapshot() : nullptr;
 	const auto PhysicsRoot = CollisionPresenter ? CollisionPresenter->CaptureSnapshot() : nullptr;
-	const int32 ShardCount = CurrentInterest->PublicationInputs ? CurrentInterest->PublicationInputs->FineShards.Num() : 0;
-	const int32 MaximumRows = CurrentInterest->PublicationInputs ? CurrentInterest->PublicationInputs->MaximumFeedbackSections : 0;
+	const bool bCaptureShards = InterestRuntime && InterestRuntime->HasPendingFineWindow();
+	const int32 ShardCount = bCaptureShards && CurrentInterest->PublicationInputs ? CurrentInterest->PublicationInputs->FineShards.Num() : 0;
+	const int32 MaximumRows = bCaptureShards && CurrentInterest->PublicationInputs ? CurrentInterest->PublicationInputs->MaximumFeedbackSections : 0;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> FeedbackLease;
 	const uint64 FeedbackBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelFineResidencyFeedback>() +
 		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelFineFeedbackCapture>() +
@@ -2562,7 +2569,8 @@ void UVoxelModule::RefreshInterest(
 	Feedback->PreparationSeconds = ViewSettings.Fine.MinimumPreparationSeconds;
 	for (const auto& Pair : Sources) Feedback->LastAcceptedPositions.Add(Pair.Key, Pair.Value.LastAcceptedPosition);
 	auto Capture = VoxelBoundedAllocation::MakeWorkerShared<FVoxelFineFeedbackCapture>(Feedback->ResourceLease, CurrentInterest.ToSharedRef(),
-		RenderRoot, PhysicsRoot, Runtime->GetChangeHierarchy(), Manifest, Shapes->GetContentHash(), ++SafetyCaptureSerial, Feedback.ToSharedRef());
+		RenderRoot, PhysicsRoot, Runtime->GetChangeHierarchy(), Manifest, Shapes->GetContentHash(), ++SafetyCaptureSerial,
+		bCaptureShards, Feedback.ToSharedRef());
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> WorkLease;
 	const uint64 WorkBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestTaskPayload>() +
 		VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestRuntime>() + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelInterestSet>() +
@@ -2626,8 +2634,10 @@ void UVoxelModule::RefreshInterest(
 		Payload->CandidateRuntime->BindPlanningResources(Resources, {EVoxelGenerationConsumerKind::WorldFact,
 			PlanningStamp.WorldEpoch, PlanningStamp.OwnerId, PlanningStamp.OwnerIncarnation,
 			EVoxelGenerationSpatialKind::Bounds, FIntVector(MIN_int32), FIntVector(MAX_int32), PlanningStamp.Token}, PlanningAge);
+		const auto ReadSection = [&Capture](const FIntVector& Key) { return Capture->ReadSection(Key); };
+		const FVoxelFineSectionLookup SectionLookup(ReadSection);
 		Payload->bChanged = Payload->CandidateRuntime->UpdateSnapshot(SourcesCapture->Values, WorldManifest, Settings,
-			Payload->Interest, Payload->Delta, Payload->bHasSnapshot, &Capture->GetFeedback().Get());
+			Payload->Interest, Payload->Delta, Payload->bHasSnapshot, &Capture->GetFeedback().Get(), &SectionLookup);
 		if (!Payload->Interest) Payload->Interest = VoxelBoundedAllocation::MakeWorkerShared<FVoxelInterestSet>(Payload->MetadataLease);
 		Payload->Interest->SafetyContentRevision = Capture->GetFeedback()->ContentRevision;
 		Payload->Interest->SafetyWorldEpoch = PlanningStamp.WorldEpoch;
@@ -2849,6 +2859,10 @@ void UVoxelModule::ApplyTask(FVoxelTaskResult&& InResult)
 				if (ViewManager)
 				{
 					ViewManager->InvalidateNeighbors(Section);
+				}
+				if (CollisionPresenter)
+				{
+					CollisionPresenter->NotifySectionDataReady(Section);
 				}
 				WakeSimulationSection(Section);
 				if (NavigationPresenter)
@@ -4653,10 +4667,15 @@ void UVoxelModule::NotifyTerrainSectionReplacement(const FIntVector& InSection, 
 bool UVoxelModule::IsTerrainSafeAt(const FGuid& InSource, const FBox& InWorldBounds) const
 {
 	const auto* Source = CurrentInterest->Sources.Find(InSource);
-	if (!IsReady() || !Source || !IsSourceAdmitted(InSource) || !InWorldBounds.IsValid ||
+	const FSource* RegisteredSource = Sources.Find(InSource);
+	if (!IsReady() || !Source || !RegisteredSource || !RegisteredSource->Owner.IsValid() ||
+		RegisteredSource->Value.Id != Source->Source.Id ||
+		RegisteredSource->Value.Capabilities != Source->Source.Capabilities ||
+		RegisteredSource->Value.Purpose != Source->Source.Purpose ||
+		RegisteredSource->Value.bInheritWorldView != Source->Source.bInheritWorldView || !InWorldBounds.IsValid ||
 		InWorldBounds.Min.ContainsNaN() || InWorldBounds.Max.ContainsNaN()) return false;
 	const bool bRequiresVisual = Source->Source.Has(EVoxelStreamingCapability::FineVisual);
-	// 角色安全依据本次实际占用范围；驻留窗口的预测屏障不能阻止在已就绪地形上落地。
+	// 来源位置或速度变化会使下一窗口暂未准入；实际移动仍以本次范围的最新物理和视觉回执为准。
 	if (bRequiresVisual && !ViewManager) return false;
 	const FVector Minimum = InWorldBounds.Min / BlockSize();
 	const FVector Maximum = InWorldBounds.Max / BlockSize();

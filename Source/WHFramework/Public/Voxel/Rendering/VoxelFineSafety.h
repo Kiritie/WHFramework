@@ -14,15 +14,17 @@ public:
 		TSharedPtr<const IVoxelTerrainPresentedSnapshot, ESPMode::ThreadSafe> InVisual,
 		TSharedPtr<const FVoxelCollisionCoverageSnapshot, ESPMode::ThreadSafe> InPhysics,
 		const FVoxelChangeHierarchy& InHierarchy, const FVoxelWorldManifest& InManifest,
-		uint64 InShapeRevision, uint64 InRootSerial,
+		uint64 InShapeRevision, uint64 InRootSerial, bool bInCaptureShards,
 		TSharedRef<FVoxelFineResidencyFeedback, ESPMode::ThreadSafe> InFeedback);
 	bool Advance(int32 InMaximumShards, const TAtomic<bool>& InCancel);
+	FVoxelFineSectionCoverage ReadSection(const FIntVector& InSection) const;
 	TSharedRef<const FVoxelFineResidencyFeedback, ESPMode::ThreadSafe> GetFeedback() const;
 	uint64 GetRenderSerial() const;
 	uint64 GetPhysicsSerial() const;
 	const FVoxelChangeHierarchySnapshot& GetVersions() const { return Hierarchy; }
 
 private:
+	FVoxelFineSectionCoverage BuildSectionCoverage(const FIntVector& InSection) const;
 	FVoxelFineSectionCoverage CaptureSection(const FIntVector& InSection);
 	TSharedRef<const FVoxelInterestSet, ESPMode::ThreadSafe> Interest;
 	TSharedPtr<const IVoxelTerrainPresentedSnapshot, ESPMode::ThreadSafe> Visual;
@@ -30,7 +32,7 @@ private:
 	FVoxelChangeHierarchySnapshot Hierarchy;
 	FVoxelWorldManifest Manifest;
 	uint64 ShapeRevision = 0;
+	bool bCaptureShards = false;
 	TSharedRef<FVoxelFineResidencyFeedback, ESPMode::ThreadSafe> Feedback;
 	int32 ShardCursor = 0;
-	int32 RuntimeCursor = 0;
 };

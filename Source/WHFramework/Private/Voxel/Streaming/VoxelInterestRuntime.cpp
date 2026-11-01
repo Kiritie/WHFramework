@@ -210,13 +210,36 @@ bool FVoxelInterestRuntime::NeedsUpdate(const FVoxelStreamingSource& InPrevious,
 	return ClassifySourceChange(InPrevious, InCurrent, InSettings, InAccepted) != EVoxelSourceChange::None;
 }
 
+bool FVoxelInterestRuntime::HasPendingFineWindow() const
+{
+	if (!SourceRoot) return false;
+	for (const auto& Pair : SourceRoot->Values)
+	{
+		const auto& State = *Pair.Value;
+		if (State.bHasFineResidency && State.FineResidency.GetPending().IsSet()) return true;
+	}
+	return false;
+}
+
+bool FVoxelInterestRuntime::NeedsCoverageFeedback() const
+{
+	if (!SourceRoot) return false;
+	for (const auto& Pair : SourceRoot->Values)
+	{
+		const auto& State = *Pair.Value;
+		if (State.bHasFineResidency &&
+			(State.bRequiresTravelBarrier || State.FineResidency.GetPending().IsSet())) return true;
+	}
+	return false;
+}
+
 bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSources,
 	const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
 	FVoxelInterestSet& OutInterest, FVoxelInterestDelta& OutDelta,
-	bool& bOutSnapshot, const FVoxelFineResidencyFeedback* InFeedback)
+	bool& bOutSnapshot, const FVoxelFineResidencyFeedback* InFeedback, const FVoxelFineSectionLookup* InSectionLookup)
 {
 	TSharedPtr<FVoxelInterestSet, ESPMode::ThreadSafe> Snapshot;
-	const bool bChanged = UpdateSnapshot(InSources, InManifest, InSettings, Snapshot, OutDelta, bOutSnapshot, InFeedback);
+	const bool bChanged = UpdateSnapshot(InSources, InManifest, InSettings, Snapshot, OutDelta, bOutSnapshot, InFeedback, InSectionLookup);
 	if (Snapshot) OutInterest = *Snapshot;
 	else if (LatestInterest) OutInterest = *LatestInterest;
 	return bChanged;
@@ -225,7 +248,7 @@ bool FVoxelInterestRuntime::Update(TConstArrayView<FVoxelStreamingSource> InSour
 bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource> InSources,
 	const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
 	TSharedPtr<FVoxelInterestSet, ESPMode::ThreadSafe>& OutInterest, FVoxelInterestDelta& OutDelta,
-	bool& bOutSnapshot, const FVoxelFineResidencyFeedback* InFeedback)
+	bool& bOutSnapshot, const FVoxelFineResidencyFeedback* InFeedback, const FVoxelFineSectionLookup* InSectionLookup)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_InterestRuntimeUpdate);
 	OutInterest.Reset();
@@ -414,9 +437,9 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 				Safety.CoverageRootSerial = InFeedback->CoverageRootSerial;
 				Safety.LastAcceptedPosition = InFeedback->LastAcceptedPositions.FindRef(Source.Id);
 				Safety.PredictionSeconds = Source.View.FinePredictionSeconds;
-				const auto Coverage = [InFeedback](const FIntVector& Key)
+				const auto Coverage = [InFeedback, InSectionLookup](const FIntVector& Key)
 				{
-					return InFeedback->Sections.FindRef(Key);
+					return InSectionLookup ? (*InSectionLookup)(Key) : InFeedback->Sections.FindRef(Key);
 				};
 				FVoxelFineSafetyResult SafetyResult;
 				if (InFeedback->LastAcceptedPositions.Contains(Source.Id) &&
@@ -428,7 +451,7 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 						TVoxelFineSetDelta<FVoxelFineShardKey> Committed;
 						State.FineResidency.CommitPending(State.FineResidency.GetPending()->Serial,
 							[InFeedback](const FVoxelFineShardKey& Key) { return InFeedback->Shards.FindRef(Key); },
-							[InFeedback](const FIntVector& Key) { return InFeedback->Sections.FindRef(Key).bWholeCollisionCommitted; },
+							[&Coverage](const FIntVector& Key) { return Coverage(Key).bWholeCollisionCommitted; },
 							Safety, Coverage, Committed, ConfigurationError, false);
 					}
 				}
@@ -439,6 +462,8 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 			bPlanChanged |= !PreviousSource || PreviousSource->bRequiresTravelBarrier != bTravelBarrier;
 			State.bRequiresTravelBarrier = bTravelBarrier;
 			bResidencyChanged |= PreviousResidency != State.FineResidency.GetResidencyRevision();
+			bRuntimeChanged |= Source.Has(EVoxelStreamingCapability::Collision) &&
+				AcceptedResidency != State.FineResidency.GetResidencyRevision();
 			if (bPolicyChanged || !bHadFineResidency || AcceptedResidency != State.FineResidency.GetResidencyRevision())
 			{
 				TVoxelFineSetDelta<FVoxelFineShardKey> ResidencyDelta;

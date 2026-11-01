@@ -83,6 +83,8 @@ struct WHFRAMEWORK_API FVoxelTaskStamp
 	FVoxelMacroTileKey MacroKey;
 	uint64 RegistryRevision = 0;
 	uint64 ShapeRevision = 0;
+	// 仅碰撞任务使用：相邻区块内容参与外露面判断。
+	uint64 NeighborRevision = 0;
 
 	bool operator==(const FVoxelTaskStamp& InOther) const;
 };
@@ -106,6 +108,7 @@ FORCEINLINE uint32 GetTypeHash(const FVoxelTaskStamp& InStamp)
 	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.MacroKey));
 	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.RegistryRevision));
 	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.ShapeRevision));
+	Hash = HashCombineFast(Hash, GetTypeHash(InStamp.NeighborRevision));
 	return Hash;
 }
 

@@ -12,6 +12,23 @@ uint64 FVoxelChangeHierarchySnapshot::GetSectionRevision(const FIntVector& InSec
 	return Record ? Record->Stamp.ContentRevision : 0;
 }
 
+uint64 FVoxelChangeHierarchySnapshot::GetNeighborSectionRevision(const FIntVector& InSection) const
+{
+	uint64 Revision = 0;
+	for (int32 Axis = 0; Axis < 3; ++Axis)
+	{
+		for (const int32 Direction : {-1, 1})
+		{
+			const int64 Coordinate = int64(InSection[Axis]) + Direction;
+			if (Coordinate < MIN_int32 || Coordinate > MAX_int32) continue;
+			FIntVector Neighbor = InSection;
+			Neighbor[Axis] = int32(Coordinate);
+			Revision = FMath::Max(Revision, GetSectionRevision(Neighbor));
+		}
+	}
+	return Revision;
+}
+
 uint64 FVoxelChangeHierarchySnapshot::GetFineShardRevision(const FVoxelFineShardKey& InKey) const
 {
 	const auto Bounds = InKey.Bounds();
@@ -570,6 +587,25 @@ uint64 FVoxelChangeHierarchy::GetSectionRevision(const FIntVector& InSection) co
 	FReadScopeLock Scope(Lock);
 	const uint64* Found = SectionRevision.Find(InSection);
 	return Found ? *Found : 0;
+}
+
+uint64 FVoxelChangeHierarchy::GetNeighborSectionRevision(const FIntVector& InSection) const
+{
+	FReadScopeLock Scope(Lock);
+	if (RevisionSerial == 0) return 0;
+	uint64 Revision = 0;
+	for (int32 Axis = 0; Axis < 3; ++Axis)
+	{
+		for (const int32 Direction : {-1, 1})
+		{
+			const int64 Coordinate = int64(InSection[Axis]) + Direction;
+			if (Coordinate < MIN_int32 || Coordinate > MAX_int32) continue;
+			FIntVector Neighbor = InSection;
+			Neighbor[Axis] = int32(Coordinate);
+			if (const uint64* Found = SectionRevision.Find(Neighbor)) Revision = FMath::Max(Revision, *Found);
+		}
+	}
+	return Revision;
 }
 
 uint64 FVoxelChangeHierarchy::GetContentRevision() const

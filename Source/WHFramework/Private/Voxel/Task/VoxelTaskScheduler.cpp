@@ -197,7 +197,8 @@ bool FVoxelTaskStamp::operator==(const FVoxelTaskStamp& InOther) const
 		SurfaceKey == InOther.SurfaceKey &&
 		MacroKey == InOther.MacroKey &&
 		RegistryRevision == InOther.RegistryRevision &&
-		ShapeRevision == InOther.ShapeRevision;
+		ShapeRevision == InOther.ShapeRevision &&
+		NeighborRevision == InOther.NeighborRevision;
 }
 
 FVoxelTaskResult& FVoxelTaskResult::operator=(FVoxelTaskResult&& InOther)

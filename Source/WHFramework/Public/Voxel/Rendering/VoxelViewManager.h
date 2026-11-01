@@ -243,6 +243,7 @@ public:
 	void InvalidateNeighbors(const FIntVector& InKey);
 	void OnContentChanged(const FIntVector& InSection);
 	void OnOwnershipChanged(const FVoxelFineShardKey& InKey);
+	void OnCollisionChanged(const FIntVector& InSection);
 	void OnPresentationReady(const FVoxelFineShardKey& InKey);
 	void OnGenerationDependencyReady(const FVoxelGenerationConsumerKey& InConsumer);
 
@@ -372,6 +373,8 @@ private:
 		int32 RenderTriangleCursor = 0;
 		int32 RenderLeaseCursor = -2;
 		int32 RenderAtomCursor = 0;
+		uint64 CollisionWaitMask = 0;
+		uint64 CollisionWaitDemandRevision = 0;
 		bool bRenderPrepared = false;
 		bool bPresentationComplete = false;
 		bool bCycleNeedsPresentation = false;

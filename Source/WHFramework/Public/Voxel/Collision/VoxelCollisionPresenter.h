@@ -10,6 +10,7 @@ class UVoxelCollisionComponent;
 struct FVoxelSectionCollisionResult;
 struct FVoxelCollisionEvidenceNode;
 struct FVoxelSectionSnapshot;
+struct FVoxelSection;
 
 struct WHFRAMEWORK_API FVoxelPhysicsReceipt
 {
@@ -25,6 +26,7 @@ struct WHFRAMEWORK_API FVoxelPhysicsReceipt
 	uint64 BodyGeneration = 0;
 	uint64 SectionIncarnation = 0;
 	FGuid PresenterOwnerId;
+	uint64 NeighborRevision = 0;
 
 	bool MatchesInput(const FVoxelTaskStamp& InInput, const FGuid& InSceneEpoch) const;
 };
@@ -46,6 +48,8 @@ public:
 	void Tick(const TMap<FIntVector, FVoxelExactDemand>& InDemand, uint64 InInterestRevision);
 	bool OnTask(FVoxelTaskResult&& InResult);
 	void InvalidateSection(const FIntVector& InSection);
+	void InvalidateNeighbors(const FIntVector& InSection);
+	void NotifySectionDataReady(const FIntVector& InSection);
 	bool EnsureNavigationDemand(
 		const FIntVector& InSection);
 	bool IsReady(const FIntVector& InSection) const;
@@ -88,12 +92,19 @@ private:
 		FIntVector Section = FIntVector::ZeroValue;
 		FBodyRecord* Previous = nullptr;
 		FBodyRecord* Next = nullptr;
+		FBodyRecord* ActivePrevious = nullptr;
+		FBodyRecord* ActiveNext = nullptr;
 		uint64 QueueSerial = 0;
 		int32 BoxCursor = 0;
 		double QueuedAt = 0.0;
 		bool bInstalled = false;
 		bool bRetiring = false;
 		bool bHasFailure = false;
+		bool bActive = false;
+		bool bInstalledEmpty = false;
+		uint8 RequestedUnknownHaloMask = 0;
+		uint8 InstalledUnknownHaloMask = 0;
+		uint8 OcclusionRefreshMask = 0;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> AdmissionInputLease;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> AdmissionOutputLease;
 		TSharedPtr<FVoxelSectionSnapshot, ESPMode::ThreadSafe> AdmissionSnapshot;
@@ -113,6 +124,7 @@ private:
 	void InstallEvidence(const FIntVector& InSection, FBodyRecord& InBody, bool bInRetired);
 	bool IsDemanded(const FIntVector& InSection) const;
 	void BeginRetirement(FBodyRecord& InBody);
+	bool IsReady(const FIntVector& InSection, const FVoxelSection* InData, const FBodyRecord* InBody) const;
 
 private:
 	UVoxelModule& Module;
@@ -125,8 +137,16 @@ private:
 	uint64 NextLeaseSerial = 0;
 	uint64 CoverageSerial = 0;
 	int32 DemandCursor = 0;
+	int32 CriticalDemandCursor = 0;
 	TSharedPtr<FControlState, ESPMode::ThreadSafe> Control;
 	TSharedPtr<const FVoxelCollisionCoverageSnapshot, ESPMode::ThreadSafe> Coverage;
 	FVoxelTerrainWorkSelection Selection;
 	double StepCostMicroseconds = 20.0;
+#if !UE_BUILD_SHIPPING
+	double NextActiveDiagnostic = 0.0;
+	uint64 EmptyBuilds = 0;
+	uint64 NonemptyBuilds = 0;
+	uint64 EmptyReceipts = 0;
+	uint64 NonemptyReceipts = 0;
+#endif
 };

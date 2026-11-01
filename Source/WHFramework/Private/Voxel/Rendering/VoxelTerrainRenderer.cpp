@@ -1672,6 +1672,10 @@ struct FVoxelTerrainRendererState : TSharedFromThis<FVoxelTerrainRendererState, 
 	uint64 PreparationPriorityPass = 1;
 	int32 PreparationDiagnosticCursor = 0;
 	double NextPreparationDiagnostic = 0.0;
+#if !UE_BUILD_SHIPPING
+	uint64 CollisionSealRejections = 0;
+	uint64 OtherSealRejections = 0;
+#endif
 	int32 NextPublicationPhase = 0;
 	double SealCostMicroseconds = 50.0;
 	int32 SealScanCursor = 0;
@@ -3100,10 +3104,11 @@ void FVoxelTerrainRendererState::AdvanceRootPreparations(const double InDeadline
 	{
 		NextPreparationDiagnostic = FPlatformTime::Seconds() + 5.0;
 		UE_LOG(LogTemp, Display,
-			TEXT("Native seal state: ready=%d issued=%d merge=%d mergeSerial=%llu mergeComplete=%d mergeWaiting=%d mergeSuspended=%d sealFault=%d preparationFault=%d uploadFault=%d estimateUs=%.3f"),
+			TEXT("Native seal state: ready=%d issued=%d merge=%d mergeSerial=%llu mergeComplete=%d mergeWaiting=%d mergeSuspended=%d sealFault=%d preparationFault=%d uploadFault=%d estimateUs=%.3f collisionRejected=%llu otherRejected=%llu"),
 			Ready.Num(), PendingIssued.Num(), RootMerge.IsValid(), RootMerge ? RootMerge->Consumer.RequestSerial : 0,
 			RootMerge && RootMerge->bComplete, RootMerge && RootMerge->bWaitingCapacity.Load(), RootMerge && RootMerge->bSuspended.Load(),
-			SealSelection.HasAccountingFault(), PreparationSelection.HasAccountingFault(), UploadSelection.HasAccountingFault(), SealCostMicroseconds);
+			SealSelection.HasAccountingFault(), PreparationSelection.HasAccountingFault(), UploadSelection.HasAccountingFault(), SealCostMicroseconds,
+			CollisionSealRejections, OtherSealRejections);
 		for (const FRootPreparation* Work : ActivePreparations)
 		{
 			const FIntVector Section = Work->Publication->Atoms.IsEmpty() ? FIntVector::ZeroValue : Work->Publication->Atoms[0]->Section;
@@ -3578,6 +3583,14 @@ FSnapshotPtr FVoxelTerrainRendererState::SealFrameSnapshot(const uint64 InFrameC
 			InterfacesCurrent(Pending, *Transaction, *Pending.Resources);
 		if (!bCurrent)
 		{
+#if !UE_BUILD_SHIPPING
+			const bool bMissingCollision = Transaction && Transaction->Changes.ContainsByPredicate([&Pending](const FVoxelFineOwnershipChange& Change)
+			{
+				return Change.bRequiresCollision && !Pending.IsCollisionCurrent(Change.Section, Change.After);
+			});
+			if (bMissingCollision) ++CollisionSealRejections;
+			else ++OtherSealRejections;
+#endif
 			AdvanceCoarseAdmissionVersion();
 			for (const auto& Change : Pending.Resources->CoarseChanges) PendingCoarseSources.Remove(Change.Item->SourceId);
 			TOptional<FVoxelFineHandoffTransaction> Canceled;

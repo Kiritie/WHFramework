@@ -62,6 +62,8 @@ struct WHFRAMEWORK_API FVoxelFineResidencyFeedback
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 };
 
+using FVoxelFineSectionLookup = TFunctionRef<FVoxelFineSectionCoverage(const FIntVector&)>;
+
 class WHFRAMEWORK_API FVoxelInterestRuntime
 {
 public:
@@ -75,14 +77,18 @@ public:
 	bool Update(TConstArrayView<FVoxelStreamingSource> InSources,
 		const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
 		FVoxelInterestSet& OutInterest, FVoxelInterestDelta& OutDelta,
-		bool& bOutSnapshot, const FVoxelFineResidencyFeedback* InFeedback = nullptr);
+		bool& bOutSnapshot, const FVoxelFineResidencyFeedback* InFeedback = nullptr,
+		const FVoxelFineSectionLookup* InSectionLookup = nullptr);
 	bool UpdateSnapshot(TConstArrayView<FVoxelStreamingSource> InSources,
 		const FVoxelWorldManifest& InManifest, const FVoxelViewSettings& InSettings,
 		TSharedPtr<FVoxelInterestSet, ESPMode::ThreadSafe>& OutInterest, FVoxelInterestDelta& OutDelta,
-		bool& bOutSnapshot, const FVoxelFineResidencyFeedback* InFeedback = nullptr);
+		bool& bOutSnapshot, const FVoxelFineResidencyFeedback* InFeedback = nullptr,
+		const FVoxelFineSectionLookup* InSectionLookup = nullptr);
 
 	void Reset();
 	bool HasPlanningRetry() const { return CoarsePlanner.HasRetryReady(); }
+	bool HasPendingFineWindow() const;
+	bool NeedsCoverageFeedback() const;
 	bool GetCoarsePlanningPending() const { return CoarsePlanner.HasPendingWork(); }
 	const FString& GetPlanningError() const { return LastPlanningError; }
 	void BindPlanningResources(TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,

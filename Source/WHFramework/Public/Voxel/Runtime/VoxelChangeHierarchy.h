@@ -32,6 +32,7 @@ struct WHFRAMEWORK_API FVoxelChangeHierarchySnapshot
 	int32 NaturalHorizontalInfluence = 0;
 	int32 NaturalUpwardInfluence = 0;
 	uint64 GetSectionRevision(const FIntVector& InSection) const;
+	uint64 GetNeighborSectionRevision(const FIntVector& InSection) const;
 	uint64 GetFineShardRevision(const FVoxelFineShardKey& InKey) const;
 	uint64 GetGeometryRevision(const FVoxelTerrainGeometry& InGeometry) const;
 };
@@ -92,6 +93,7 @@ public:
 	void SetTopology(const FVoxelLodTopologySettings& InLod);
 	void SetNaturalInfluence(int32 InHorizontalCells, int32 InUpwardCells);
 	uint64 GetSectionRevision(const FIntVector& InSection) const;
+	uint64 GetNeighborSectionRevision(const FIntVector& InSection) const;
 	uint64 GetContentRevision() const;
 	FVoxelChangeHierarchySnapshot CaptureVersionSnapshot() const;
 	bool IsVersionSnapshotCurrent(const FVoxelChangeHierarchySnapshot& InSnapshot,

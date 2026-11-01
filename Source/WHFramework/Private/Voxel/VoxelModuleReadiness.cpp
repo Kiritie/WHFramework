@@ -116,6 +116,8 @@ FVoxelGameThreadContinuation UVoxelModule::VerifyPlayerClaimSteps(FVoxelPlayerCl
 	}
 	for (const FIntVector& Key : Interest->CollisionSections)
 	{
+		if (Interest->FineResidency && !Interest->FineResidency->GetGuard().Contains(Key) &&
+			!Interest->SimulationSections.Contains(Key)) continue;
 		co_await FVoxelGameThreadContinuation::Yield();
 		if (!IsCurrent() || !IsCollisionReady(Key)) co_return;
 	}

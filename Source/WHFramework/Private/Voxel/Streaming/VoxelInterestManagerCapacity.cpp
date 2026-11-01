@@ -213,7 +213,7 @@ bool FVoxelInterestManager::SettleFinalization(FVoxelInterestSet& Interest, FStr
 
 bool FVoxelInterestManager::BuildPublicationInputs(FVoxelInterestSet& Interest, FString& OutError) const
 {
-	int64 FeedbackRows = Interest.Exact.Num();
+	int64 FeedbackRows = 0;
 	for (const auto& Pair : Interest.FineShardDemands)
 	{
 		const int64 Axis = Pair.Key.SideCells / 16;

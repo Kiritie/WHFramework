@@ -585,14 +585,22 @@ bool FVoxelInterestManager::RefreshPriorities(TConstArrayView<FVoxelStreamingSou
 		for (const FVoxelStreamingSource& Source : DataSources)
 		{
 			const auto* Contribution = InOutInterest.Sources.Find(Source.Id);
-			if (!Contribution || !Contribution->DataSections.Contains(Section)) continue;
+			if (!Contribution) continue;
+			const bool bDataContribution = Contribution->DataSections.Contains(Section);
+			if (!bDataContribution && !Contribution->CollisionSections.Contains(Section)) continue;
 			FVoxelTerrainTaskRole Role;
 			Role.bInteractive = Contribution->F0CoreSections.Contains(Section) ||
 				SectionIntersectsRadius(Section, Source.Center, Source.ExactRadius);
-			Role.bCollisionGuard = Contribution->CollisionSections.Contains(Section);
+			Role.bCollisionGuard = Contribution->FineResidency ?
+				(Source.Has(EVoxelStreamingCapability::Collision) && Contribution->FineResidency->GetGuard().Contains(Section)) ||
+					Contribution->SimulationSections.Contains(Section) :
+				Contribution->CollisionSections.Contains(Section);
 			Role.bAheadPrefetch = Contribution->FineDataSections.Contains(Section) && !Contribution->F0CoreSections.Contains(Section);
 			FVoxelTerrainServicePriority Candidate;
 			if (!FVoxelTerrainPriority::Resolve(Geometry, Role, MakeArrayView(&Source, 1), Source.View.FineLevel0RadiusCells, Candidate, OutError)) return false;
+			// 全窗口碰撞只补后台覆盖；近身数据、模拟和其他 Source 仍按各自真实需求提升优先级。
+			if (!bDataContribution && !Role.bInteractive && !Role.bCollisionGuard && !Role.bAheadPrefetch)
+				Candidate.Band = EVoxelTerrainServiceBand::P6;
 			if (!bFound || FVoxelTerrainWorkSelection::HigherPriority(Candidate, Demand.ServicePriority))
 			{
 				Demand.ServicePriority = Candidate;
@@ -667,9 +675,18 @@ bool FVoxelInterestManager::RefreshPriorities(TConstArrayView<FVoxelStreamingSou
 			}
 			if (!Role.bInteractive)
 			{
-				for (const FIntVector& Section : Contribution->CollisionSections)
+				const TSet<FIntVector>& Guard = Contribution->FineResidency && Source.Has(EVoxelStreamingCapability::Collision) ?
+					Contribution->FineResidency->GetGuard() : Contribution->CollisionSections;
+				for (const FIntVector& Section : Guard)
 				{
 					if (IntersectsShard(Section)) { Role.bCollisionGuard = true; break; }
+				}
+				if (!Role.bCollisionGuard && Contribution->FineResidency)
+				{
+					for (const FIntVector& Section : Contribution->SimulationSections)
+					{
+						if (IntersectsShard(Section)) { Role.bCollisionGuard = true; break; }
+					}
 				}
 			}
 			FVoxelTerrainServicePriority Candidate;
@@ -990,6 +1007,64 @@ void FVoxelInterestManager::AddExactSource(
 		InOutInterest.PlanningError = MoveTemp(Error);
 		return;
 	}
+	if (bFine && InSource.Has(EVoxelStreamingCapability::Collision))
+	{
+		// 碰撞跟随当前和准备中的 Fine 驻留窗口；近身保护区仍单独拥有移动优先级。
+		int64 AdditionalSections = 0;
+		for (const FVoxelFineShardKey& Shard : InFineResidency->GetResidentShards())
+		{
+			if (!Shard.Validate(Error)) { InOutInterest.PlanningError = MoveTemp(Error); return; }
+			const int64 Side = Shard.SideCells / InterestSectionSide;
+			AdditionalSections += Side * Side * Side;
+			if (AdditionalSections > MAX_int32) { InOutInterest.PlanningError = TEXT("Oversized: Fine collision rows"); return; }
+		}
+		const int64 DemandCount64 = int64(InOutInterest.Exact.Num()) + AdditionalSections;
+		const int64 CollisionCount64 = int64(SourceInterest.CollisionSections.Num()) + AdditionalSections;
+		if (DemandCount64 > MAX_int32 || CollisionCount64 > MAX_int32)
+		{ InOutInterest.PlanningError = TEXT("Oversized: Fine collision rows"); return; }
+		const int32 DemandCount = int32(DemandCount64), CollisionCount = int32(CollisionCount64);
+		if (Resources)
+		{
+			using VoxelGenerationAllocation::AllocatedBytes;
+			const uint64 OldBytes = InOutInterest.GetAllocatedBytes();
+			const uint64 NewBytes = OldBytes - AllocatedBytes(InOutInterest.Exact) - AllocatedBytes(SourceInterest.CollisionSections) +
+				FMath::Max<uint64>(AllocatedBytes(InOutInterest.Exact), VoxelBoundedAllocation::MapBytes<FIntVector, FVoxelExactDemand>(DemandCount)) +
+				FMath::Max<uint64>(AllocatedBytes(SourceInterest.CollisionSections), VoxelBoundedAllocation::SetBytes<FIntVector>(CollisionCount));
+			const uint64 Peak = OldBytes + NewBytes;
+			if (Peak > Resources->Snapshot().Limits.InputBytes)
+			{ InOutInterest.PlanningError = TEXT("Oversized: Fine collision allocation peak"); return; }
+			if ((!InOutInterest.DemandLease && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Input, FMath::Max<uint64>(1, Peak), InOutInterest.DemandLease)) ||
+				!InOutInterest.DemandLease->Resize(FMath::Max<uint64>(1, Peak)))
+			{ InOutInterest.PlanningError = TEXT("CapacityBlocked: Fine collision allocation peak"); return; }
+			InOutInterest.Exact.Reserve(DemandCount);
+			SourceInterest.CollisionSections.Reserve(CollisionCount);
+			check(InOutInterest.GetAllocatedBytes() <= NewBytes);
+			const bool bResized = InOutInterest.DemandLease->Resize(FMath::Max<uint64>(1, NewBytes));
+			check(bResized);
+		}
+		for (const FVoxelFineShardKey& Shard : InFineResidency->GetResidentShards())
+		{
+			const int32 Side = Shard.SideCells / InterestSectionSide;
+			const FIntVector Base = Shard.Min / InterestSectionSide;
+			for (int32 Z = 0; Z < Side; ++Z)
+			{
+				const int32 SectionZ = Base.Z + Z;
+				if (int64(SectionZ) * InterestSectionSide >= InManifest.Settings.MaxZ ||
+					(int64(SectionZ) + 1) * InterestSectionSide <= InManifest.Settings.MinZ) continue;
+				for (int32 Y = 0; Y < Side; ++Y)
+				{
+					for (int32 X = 0; X < Side; ++X)
+					{
+						const FIntVector Key = Base + FIntVector(X, Y, Z);
+						SourceInterest.CollisionSections.Add(Key);
+						FVoxelExactDemand& Demand = InOutInterest.Exact.FindOrAdd(Key);
+						Demand.bData = true;
+						Demand.bCollision = true;
+					}
+				}
+			}
+		}
+	}
 	if (bReadiness)
 	{
 		for (const FIntVector& Key : SourceInterest.DataSections)
@@ -1002,7 +1077,7 @@ void FVoxelInterestManager::AddExactSource(
 			FVoxelExactDemand& Warmup = InOutInterest.Warmup.FindOrAdd(Key);
 			Warmup.bData = true;
 			Warmup.bWarmupData = true;
-			Warmup.bWarmupCollision |= SourceInterest.CollisionSections.Contains(Key);
+			Warmup.bWarmupCollision |= GuardKeys.Contains(Key) || SourceInterest.SimulationSections.Contains(Key);
 			Warmup.bFineRender |= CoreKeys.Contains(Key);
 		}
 	}

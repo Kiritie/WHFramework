@@ -12,6 +12,7 @@ struct WHFRAMEWORK_API FVoxelSectionCollisionResult
 	TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> WorkReceipt;
 	FVoxelTaskStamp Stamp;
 	TArray<FBox> Boxes;
+	uint8 UnknownHaloMask = 0;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 
 	uint64 Bytes() const

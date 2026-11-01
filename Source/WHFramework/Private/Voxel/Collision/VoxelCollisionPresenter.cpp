@@ -7,6 +7,7 @@
 #include "Physics/Experimental/PhysScene_Chaos.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "PhysicsEngine/BoxElem.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "PBDRigidsSolver.h"
 #include "Chaos/SimCallbackObject.h"
 #include "Voxel/Components/VoxelCollisionComponent.h"
@@ -42,6 +43,41 @@ struct FVoxelCollisionPresenter::FPhysicsSyncCommand
 struct FVoxelCollisionPresenter::FControlState
 {
 	TVoxelCollisionBodyIndex<FBodyRecord> Index;
+	FBodyRecord* ActiveHead = nullptr;
+	FBodyRecord* ActiveCursor = nullptr;
+	int32 ActiveCount = 0;
+
+	void Activate(FBodyRecord& InBody)
+	{
+		if (InBody.bActive) return;
+		InBody.ActiveNext = ActiveHead;
+		if (ActiveHead) ActiveHead->ActivePrevious = &InBody;
+		ActiveHead = &InBody;
+		if (!ActiveCursor) ActiveCursor = &InBody;
+		InBody.bActive = true;
+		++ActiveCount;
+	}
+
+	void Deactivate(FBodyRecord& InBody)
+	{
+		if (!InBody.bActive) return;
+		FBodyRecord* Next = InBody.ActiveNext;
+		if (InBody.ActivePrevious) InBody.ActivePrevious->ActiveNext = Next;
+		else ActiveHead = Next;
+		if (Next) Next->ActivePrevious = InBody.ActivePrevious;
+		if (ActiveCursor == &InBody) ActiveCursor = Next ? Next : ActiveHead;
+		InBody.ActivePrevious = InBody.ActiveNext = nullptr;
+		InBody.bActive = false;
+		--ActiveCount;
+		check(ActiveCount >= 0 && (ActiveCount != 0 || (!ActiveHead && !ActiveCursor)));
+	}
+
+	FBodyRecord* NextActive()
+	{
+		FBodyRecord* Body = ActiveCursor;
+		if (Body) ActiveCursor = Body->ActiveNext ? Body->ActiveNext : ActiveHead;
+		return Body;
+	}
 };
 
 namespace
@@ -129,6 +165,7 @@ FVoxelCollisionPresenter::FBodyRecord* FVoxelCollisionPresenter::FindOrAddBody(
 void FVoxelCollisionPresenter::RemoveBody(FBodyRecord& InBody)
 {
 	check(Control);
+	Control->Deactivate(InBody);
 	Control->Index.Remove(InBody);
 }
 
@@ -149,6 +186,7 @@ bool FVoxelCollisionPresenter::EnsureNavigationDemand(const FIntVector& InSectio
 	auto* Body = FindOrAddBody(Consumer);
 	if (!Body) return false;
 	if (Body->RequestedStamp.OwnerIncarnation == 0) Body->RequestedStamp = CaptureInputStamp(InSection);
+	if (!IsReady(InSection)) Control->Activate(*Body);
 	return true;
 }
 
@@ -159,7 +197,8 @@ bool FVoxelPhysicsReceipt::MatchesInput(const FVoxelTaskStamp& InInput, const FG
 		SceneEpoch == InSceneEpoch && PhysicsStep != INDEX_NONE && BodyGeneration != 0 &&
 		Section == InInput.Section && SectionToken == InInput.Token && SectionIncarnation == InInput.OwnerIncarnation &&
 		DataRevision == InInput.Revision && ContentRevision == InInput.GeometryRevision &&
-		RegistryRevision == InInput.RegistryRevision && ShapeRevision == InInput.ShapeRevision;
+		RegistryRevision == InInput.RegistryRevision && ShapeRevision == InInput.ShapeRevision &&
+		NeighborRevision == InInput.NeighborRevision;
 }
 
 FVoxelTaskStamp FVoxelCollisionPresenter::CaptureInputStamp(const FIntVector& InSection) const
@@ -174,6 +213,7 @@ FVoxelTaskStamp FVoxelCollisionPresenter::CaptureInputStamp(const FIntVector& In
 	Stamp.Revision = Data->CommittedRevision;
 	Stamp.Section = InSection;
 	Stamp.GeometryRevision = Module.GetRuntime()->GetChangeHierarchy().GetSectionRevision(InSection);
+	Stamp.NeighborRevision = Module.GetRuntime()->GetChangeHierarchy().GetNeighborSectionRevision(InSection);
 	Stamp.RegistryRevision = Module.GetRegistry()->Hash;
 	Stamp.ShapeRevision = Module.GetShapes()->GetContentHash();
 	return Stamp;
@@ -198,62 +238,141 @@ FVoxelCollisionPresenter::PreparePhysicsSync(const FIntVector& InSection)
 
 void FVoxelCollisionPresenter::Tick(const TMap<FIntVector, FVoxelExactDemand>& InDemand, const uint64 InInterestRevision)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_CollisionServiceTick);
 	const auto Snapshot = Module.GetCurrentInterestSnapshot();
 	if (!Snapshot || !Snapshot->PublicationInputs) return;
 	const auto& Keys = Snapshot->PublicationInputs->RuntimeSections;
 	const double Deadline = Module.GetTerrainFrameContext().Deadline(0.5);
-	struct FOperation { FIntVector Section; bool bBody = false; };
-	for (int32 Work = 0; Work < 16 && FPlatformTime::Seconds() < Deadline; ++Work)
+#if !UE_BUILD_SHIPPING
+	if (FPlatformTime::Seconds() >= NextActiveDiagnostic)
 	{
-		TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<128>> Candidates;
-		TArray<FOperation, TInlineAllocator<128>> Operations;
-		const double Now = FPlatformTime::Seconds();
-		for (int32 Scan = 0; Scan < FMath::Min(64, Keys.Num()); ++Scan)
+		UE_LOG(LogTemp, Display, TEXT("Voxel collision work: records=%d active=%d emptyBuilds=%llu nonemptyBuilds=%llu emptyReceipts=%llu nonemptyReceipts=%llu"),
+			Control ? Control->Index.Num() : 0, Control ? Control->ActiveCount : 0,
+			EmptyBuilds, NonemptyBuilds, EmptyReceipts, NonemptyReceipts);
+		NextActiveDiagnostic = FPlatformTime::Seconds() + 5.0;
+	}
+#endif
+	struct FOperation { FIntVector Section; bool bBody = false; };
+	if (FPlatformTime::Seconds() >= Deadline) return;
+	TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<128>> Candidates;
+	TArray<FOperation, TInlineAllocator<128>> Operations;
+	const double QueuedAt = FPlatformTime::Seconds();
+	const auto NeighborsReadyForBackground = [&](const FIntVector& Key, const FVoxelExactDemand& Demand)
+	{
+		if (Demand.bMovementCriticalCollision || Demand.bWarmupCollision || Demand.bSimulation) return true;
+		for (int32 Axis = 0; Axis < 3; ++Axis)
 		{
-			DemandCursor %= Keys.Num();
-			const FIntVector Key = Keys[DemandCursor++];
-			const auto* Demand = InDemand.Find(Key);
-			const auto* Data = Module.GetRuntime()->FindSection(Key);
-			const FBodyRecord* Body = FindBody(Key);
-			if (!Demand || (!Demand->bCollision && !Demand->bWarmupCollision) || !Data ||
-				Data->Status != EVoxelSectionStatus::DataReady || IsReady(Key) || (Body && (Body->Prepared || Body->Sync))) continue;
-			const auto Stamp = CaptureInputStamp(Key);
-			if (Scheduler.Has(Stamp, EVoxelTaskKind::BuildCollision) ||
-				(Body && Body->bHasFailure && Body->FailedStamp == Stamp)) continue;
-			auto& Candidate = Candidates.AddDefaulted_GetRef();
-			Candidate.Index = Operations.Add({Key, false});
-			Candidate.Priority = Demand->ServicePriority;
-			Candidate.FirstQueuedSeconds = Body && Body->RequestedStamp == Stamp ? Body->QueuedAt : Now;
-			Candidate.Sequence = Data->Stamp.Token;
-			Candidate.EstimatedMicroseconds = StepCostMicroseconds;
-			Candidate.bRunnable = true;
-		}
-		for (int32 Scan = 0; Control && Scan < FMath::Min(32, Control->Index.Num()); ++Scan)
-		{
-			const auto* Body = Control->Index.NextForScan();
-			check(Body);
-			const FIntVector Key = Body->Section;
-			if (!Body || (Body->Sync && !Body->Sync->bComplete.Load()) ||
-				(Body->PreparingComponent && Body->PreparingComponent->IsDetachedCookRunning())) continue;
-			const bool bGenerate = !Body->Prepared && !Body->Sync && !Body->bRetiring && IsDemanded(Key);
-			if (bGenerate)
+			for (const int32 Direction : {-1, 1})
 			{
-				const auto* Data = Module.GetRuntime()->FindSection(Key);
-				if (!Data || Data->Status != EVoxelSectionStatus::DataReady || IsReady(Key)) continue;
-				const auto Stamp = CaptureInputStamp(Key);
-				if (Scheduler.Has(Stamp, EVoxelTaskKind::BuildCollision) ||
-					(Body->bHasFailure && Body->FailedStamp == Stamp)) continue;
+				const int64 Coordinate = int64(Key[Axis]) + Direction;
+				if (Coordinate < MIN_int32 || Coordinate > MAX_int32) continue;
+				FIntVector Neighbor = Key;
+				Neighbor[Axis] = int32(Coordinate);
+				const auto* NeighborDemand = InDemand.Find(Neighbor);
+				if (!NeighborDemand || !NeighborDemand->bData) continue;
+				const auto* NeighborData = Module.GetRuntime()->FindSection(Neighbor);
+				if (!NeighborData || NeighborData->Status != EVoxelSectionStatus::DataReady) return false;
 			}
+		}
+		return true;
+	};
+	const auto AddDemandCandidate = [&](const FIntVector& Key)
+	{
+		const auto* Demand = InDemand.Find(Key);
+		const auto* Data = Module.GetRuntime()->FindSection(Key);
+		const FBodyRecord* Body = FindBody(Key);
+		if (!Demand || (!Demand->bCollision && !Demand->bWarmupCollision) || !Data ||
+			Data->Status != EVoxelSectionStatus::DataReady ||
+			(IsReady(Key, Data, Body) && (!Body || Body->OcclusionRefreshMask == 0))) return;
+		if (Body && (Body->Prepared || Body->Sync))
+		{
+			if ((Body->Sync && !Body->Sync->bComplete.Load()) ||
+				(Body->PreparingComponent && Body->PreparingComponent->IsDetachedCookRunning())) return;
 			auto& Candidate = Candidates.AddDefaulted_GetRef();
-			Candidate.Index = Operations.Add({Key, !bGenerate});
-			if (const auto* Demand = InDemand.Find(Key)) Candidate.Priority = Demand->ServicePriority;
-			else if (bGenerate) Candidate.Priority = {EVoxelTerrainServiceBand::P2, 0.0, 0.0, 0, OwnerId};
-			else Candidate.Priority = {EVoxelTerrainServiceBand::P6, 0.0, 0.0, MAX_int32, OwnerId};
+			Candidate.Index = Operations.Add({Key, true});
+			Candidate.Priority = Demand->ServicePriority;
 			Candidate.FirstQueuedSeconds = Body->QueuedAt;
 			Candidate.Sequence = Body->QueueSerial;
 			Candidate.EstimatedMicroseconds = StepCostMicroseconds;
 			Candidate.bRunnable = true;
+			return;
 		}
+		const auto Stamp = CaptureInputStamp(Key);
+		if (Scheduler.Has(Stamp, EVoxelTaskKind::BuildCollision) ||
+			(Body && Body->bHasFailure && Body->FailedStamp == Stamp)) return;
+		if (!NeighborsReadyForBackground(Key, *Demand)) return;
+		auto& Candidate = Candidates.AddDefaulted_GetRef();
+		Candidate.Index = Operations.Add({Key, false});
+		Candidate.Priority = Demand->ServicePriority;
+		Candidate.FirstQueuedSeconds = Body && Body->RequestedStamp == Stamp ? Body->QueuedAt : QueuedAt;
+		Candidate.Sequence = Data->Stamp.Token;
+		Candidate.EstimatedMicroseconds = StepCostMicroseconds;
+		Candidate.bRunnable = true;
+	};
+	const auto AddBodyCandidate = [&](FBodyRecord* Body)
+	{
+		if (!Body || (Body->Sync && !Body->Sync->bComplete.Load()) ||
+			(Body->PreparingComponent && Body->PreparingComponent->IsDetachedCookRunning())) return;
+		const FIntVector Key = Body->Section;
+		const bool bGenerate = !Body->Prepared && !Body->Sync && !Body->bRetiring && IsDemanded(Key);
+		if (bGenerate)
+		{
+			const auto* Data = Module.GetRuntime()->FindSection(Key);
+			if (!Data || Data->Status != EVoxelSectionStatus::DataReady) return;
+			if (IsReady(Key, Data, Body) && Body->OcclusionRefreshMask == 0)
+			{
+				Control->Deactivate(*Body);
+				return;
+			}
+			const auto Stamp = CaptureInputStamp(Key);
+			if (Body->bHasFailure && Body->FailedStamp == Stamp)
+			{
+				Control->Deactivate(*Body);
+				return;
+			}
+			if (Scheduler.Has(Stamp, EVoxelTaskKind::BuildCollision)) return;
+			if (const auto* Demand = InDemand.Find(Key); Demand && !NeighborsReadyForBackground(Key, *Demand)) return;
+		}
+		auto& Candidate = Candidates.AddDefaulted_GetRef();
+		Candidate.Index = Operations.Add({Key, !bGenerate});
+		if (const auto* Demand = InDemand.Find(Key)) Candidate.Priority = Demand->ServicePriority;
+		else if (bGenerate) Candidate.Priority = {EVoxelTerrainServiceBand::P2, 0.0, 0.0, 0, OwnerId};
+		else Candidate.Priority = {EVoxelTerrainServiceBand::P6, 0.0, 0.0, MAX_int32, OwnerId};
+		Candidate.FirstQueuedSeconds = Body->QueuedAt;
+		Candidate.Sequence = Body->QueueSerial;
+		Candidate.EstimatedMicroseconds = StepCostMicroseconds;
+		Candidate.bRunnable = true;
+	};
+	// 全窗口碰撞可能包含数万个 Section；关键移动需求须独立轮询，不能等待全表扫描。
+	const TArray<int32>& Critical = Snapshot->ExactAdmissionLanes[0];
+	for (int32 Scan = 0; Scan < FMath::Min(32, Critical.Num()); ++Scan)
+	{
+		CriticalDemandCursor %= Critical.Num();
+		AddDemandCandidate(Snapshot->ExactOrder[Critical[CriticalDemandCursor++]]);
+	}
+	for (int32 Scan = 0; Scan < FMath::Min(32, Keys.Num()); ++Scan)
+	{
+		DemandCursor %= Keys.Num();
+		AddDemandCandidate(Keys[DemandCursor++]);
+	}
+	// 已提交的碰撞工作直接参与同一个服务选择，避免被数万个已安装记录淹没。
+	const int32 ActiveScans = Control ? FMath::Min(32, Control->ActiveCount) : 0;
+	for (int32 Scan = 0; Control && Scan < ActiveScans && Control->ActiveCount > 0; ++Scan)
+	{
+		auto* Body = Control->NextActive();
+		check(Body);
+		AddBodyCandidate(Body);
+	}
+	for (int32 Scan = 0; Control && Scan < FMath::Min(32, Control->Index.Num()); ++Scan)
+	{
+		auto* Body = Control->Index.NextForScan();
+		check(Body);
+		if (!Body->bActive) AddBodyCandidate(Body);
+	}
+	// 候选每帧采样一次；同一 Section 本帧只推进一步，避免每步重复扫描整个候选集。
+	for (int32 Work = 0; Work < 16 && FPlatformTime::Seconds() < Deadline; ++Work)
+	{
+		const double Now = FPlatformTime::Seconds();
 		FVoxelTerrainServiceCapacity Capacity;
 		Capacity.bAllowOverdueOpportunity = Module.GetTerrainFrameContext().IsOverdueOpportunityAvailable();
 		FVoxelTerrainServiceCharge Charge;
@@ -263,9 +382,16 @@ void FVoxelCollisionPresenter::Tick(const TMap<FIntVector, FVoxelExactDemand>& I
 		if (Charge.bOverdueOpportunity) Module.GetTerrainFrameContext().ConsumeOverdueOpportunity();
 		const double Start = FPlatformTime::Seconds();
 		const auto Operation = Operations[Chosen];
+		for (auto& Candidate : Candidates)
+		{
+			if (Candidate.bRunnable && Operations[Candidate.Index].Section == Operation.Section)
+				Candidate.bRunnable = false;
+		}
 		if (Operation.bBody)
 		{
 			if (auto* Body = FindBody(Operation.Section)) AdvanceBody(Operation.Section, *Body);
+			if (auto* Body = FindBody(Operation.Section); Body && !Body->Prepared && !Body->Sync &&
+				((IsReady(Operation.Section) && Body->OcclusionRefreshMask == 0) || Body->bHasFailure)) Control->Deactivate(*Body);
 		}
 		else if (const auto* Data = Module.GetRuntime()->FindSection(Operation.Section))
 		{
@@ -294,6 +420,7 @@ bool FVoxelCollisionPresenter::OnTask(FVoxelTaskResult&& InResult)
 	{
 		Body->FailedStamp = InResult.Stamp;
 		Body->bHasFailure = true;
+		if (!Body->Prepared && !Body->Sync) Control->Deactivate(*Body);
 		return true;
 	}
 	if (Body->PreparingComponent && Body->PreparedStamp != InResult.Stamp)
@@ -302,10 +429,15 @@ bool FVoxelCollisionPresenter::OnTask(FVoxelTaskResult&& InResult)
 		Body->PreparingComponent.Reset();
 		Body->PreparingLease.Reset();
 	}
+#if !UE_BUILD_SHIPPING
+	if (InResult.Collision->Boxes.IsEmpty()) ++EmptyBuilds;
+	else ++NonemptyBuilds;
+#endif
 	Body->Prepared = MoveTemp(InResult.Collision);
 	Body->bHasFailure = false;
 	Body->PreparedStamp = InResult.Stamp;
 	Body->BoxCursor = 0;
+	Control->Activate(*Body);
 	return true;
 }
 
@@ -321,6 +453,17 @@ void FVoxelCollisionPresenter::AdvanceBody(const FIntVector& InSection, FBodyRec
 				InBody.InstalledStamp.GeometryRevision,
 				InBody.InstalledStamp.RegistryRevision, InBody.InstalledStamp.ShapeRevision, ++NextBodyGeneration,
 				InBody.InstalledStamp.OwnerIncarnation, OwnerId};
+			InBody.Receipt.NeighborRevision = InBody.InstalledStamp.NeighborRevision;
+			if (InBody.SyncPrepared)
+			{
+				InBody.InstalledUnknownHaloMask = InBody.SyncPrepared->UnknownHaloMask;
+				InBody.RequestedUnknownHaloMask = InBody.InstalledUnknownHaloMask;
+				InBody.OcclusionRefreshMask &= InBody.InstalledUnknownHaloMask;
+#if !UE_BUILD_SHIPPING
+				if (InBody.SyncPrepared->Boxes.IsEmpty()) ++EmptyReceipts;
+				else ++NonemptyReceipts;
+#endif
+			}
 			InBody.bInstalled = true;
 			if (InBody.Component) InBody.Component->MarkPhysicsCommitted();
 			if (InBody.SyncPrepared && InBody.SyncPrepared->WorkReceipt) InBody.SyncPrepared->WorkReceipt->Resolve(true);
@@ -363,6 +506,29 @@ void FVoxelCollisionPresenter::AdvanceBody(const FIntVector& InSection, FBodyRec
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, OwnerId, Data->Incarnation, InSection, ++NextLeaseSerial);
 	if (!InBody.EvidenceLease && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Resident,
 		33 * EvidenceNodeBytes() + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelCollisionCoverageSnapshot>(), InBody.EvidenceLease, 34)) return;
+	if (InBody.Prepared->Boxes.IsEmpty() && !InBody.PreparingComponent)
+	{
+		FPhysScene* Scene = Module.GetWorld()->GetPhysicsScene();
+		if (!Scene || !Scene->GetSolver()) return;
+		auto NewSync = PreparePhysicsSync(InSection);
+		if (!NewSync) return;
+		// 空碰撞无需 UObject 或 Chaos Actor；旧物理体仍在同一场景锁内撤销并等待 PT 回执。
+		FPhysicsCommand::ExecuteWrite(Scene, [&]
+		{
+			if (InBody.Component) InBody.Component->DestroyComponent();
+		});
+		InBody.RetiringComponent = MoveTemp(InBody.Component);
+		InBody.RetiringLease = MoveTemp(InBody.InstalledLease);
+		InBody.InstalledStamp = InBody.PreparedStamp;
+		InBody.SyncPrepared = MoveTemp(InBody.Prepared);
+		InBody.bInstalled = false;
+		InBody.bInstalledEmpty = true;
+		InBody.Sync = MoveTemp(NewSync);
+		Module.NotifyCollisionChanged(InSection);
+		const auto Sync = InBody.Sync;
+		Scene->GetSolver()->EnqueueCommandImmediate(FPhysicsSyncCommand{Sync, Scene->GetSolver()});
+		return;
+	}
 	if (!InBody.PreparingComponent)
 	{
 		const uint64 PhysicalPeak = sizeof(UVoxelCollisionComponent) + sizeof(UBodySetup) + 4096 +
@@ -444,6 +610,7 @@ void FVoxelCollisionPresenter::AdvanceBody(const FIntVector& InSection, FBodyRec
 	InBody.InstalledStamp = InBody.PreparedStamp;
 	InBody.SyncPrepared = MoveTemp(InBody.Prepared);
 	InBody.bInstalled = false;
+	InBody.bInstalledEmpty = false;
 	InBody.Sync = MoveTemp(NewSync);
 	Module.NotifyCollisionChanged(InSection);
 	const auto Sync = InBody.Sync;
@@ -496,6 +663,7 @@ void FVoxelCollisionPresenter::BeginRetirement(FBodyRecord& InBody)
 	InBody.RetiringLease = MoveTemp(InBody.InstalledLease);
 	InBody.PreparingComponent.Reset(); InBody.PreparingLease.Reset(); InBody.Prepared.Reset();
 	InBody.Sync = MoveTemp(NewSync);
+	Control->Activate(InBody);
 	Module.NotifyCollisionChanged(InBody.Section);
 	const auto Sync = InBody.Sync;
 	Scene->GetSolver()->EnqueueCommandImmediate(FPhysicsSyncCommand{Sync, Scene->GetSolver()});
@@ -565,6 +733,13 @@ void FVoxelCollisionPresenter::RequestCollision(const FIntVector& InSection, con
 		}
 		auto Snapshot = VoxelBoundedAllocation::MakeWorkerShared<FVoxelSectionSnapshot>(InputLease);
 		if (!Module.GetRuntime()->CaptureSnapshot(InSection, *Snapshot, InputLease)) return;
+		Body->RequestedUnknownHaloMask = 0;
+		for (int32 Face = 0; Face < 6; ++Face)
+		{
+			if (!Snapshot->Known[Face]) Body->RequestedUnknownHaloMask |= uint8(1u << Face);
+		}
+		// 邻区已再次卸载时不循环重建；下次真实就绪通知会重新唤醒。
+		Body->OcclusionRefreshMask &= uint8(~Body->RequestedUnknownHaloMask);
 		Body->AdmissionSnapshot = MoveTemp(Snapshot);
 		Body->AdmissionInputLease = MoveTemp(InputLease);
 		Body->AdmissionOutputLease = MoveTemp(OutputLease);
@@ -577,7 +752,8 @@ void FVoxelCollisionPresenter::RequestCollision(const FIntVector& InSection, con
 		Request.SourcePriority = InDemand.ServicePriority.SourcePriority;
 		Request.DistanceScore = InDemand.ServicePriority.DistanceCells;
 		Request.ForwardScore = InDemand.ServicePriority.ForwardScore;
-		Request.WorkClass = FVoxelTerrainWorkSelection::IsNear(Request.ServiceBand) ? EVoxelWorkClass::Critical : EVoxelWorkClass::Interactive;
+		Request.WorkClass = FVoxelTerrainWorkSelection::IsNear(Request.ServiceBand) ? EVoxelWorkClass::Critical :
+			Request.ServiceBand == EVoxelTerrainServiceBand::P6 ? EVoxelWorkClass::Background : EVoxelWorkClass::Interactive;
 		Request.FirstRunnableSeconds = Body->QueuedAt;
 		Request.InputBytes = InputBytes;
 		Request.SetRequiredBindingInput(Body->AdmissionInputLease->Bytes(), 2);
@@ -647,6 +823,7 @@ void FVoxelCollisionPresenter::InvalidateSection(const FIntVector& InSection)
 		Body->AdmissionOutputLease.Reset();
 		Body->AdmissionConsumer = {};
 		Body->bCapacityBlocked = false;
+		Control->Activate(*Body);
 	}
 	Scheduler.CancelMatching([&InSection](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
 	{
@@ -654,14 +831,55 @@ void FVoxelCollisionPresenter::InvalidateSection(const FIntVector& InSection)
 	});
 }
 
+void FVoxelCollisionPresenter::InvalidateNeighbors(const FIntVector& InSection)
+{
+	for (int32 Axis = 0; Axis < 3; ++Axis)
+	{
+		for (const int32 Direction : {-1, 1})
+		{
+			const int64 Coordinate = int64(InSection[Axis]) + Direction;
+			if (Coordinate < MIN_int32 || Coordinate > MAX_int32) continue;
+			FIntVector Neighbor = InSection;
+			Neighbor[Axis] = int32(Coordinate);
+			if (!FindBody(Neighbor)) continue;
+			InvalidateSection(Neighbor);
+			Module.NotifyCollisionChanged(Neighbor);
+		}
+	}
+}
+
+void FVoxelCollisionPresenter::NotifySectionDataReady(const FIntVector& InSection)
+{
+	if (!Control) return;
+	for (int32 Face = 0; Face < 6; ++Face)
+	{
+		const int32 Axis = Face / 2;
+		const int32 Direction = (Face & 1) ? -1 : 1;
+		const int64 Coordinate = int64(InSection[Axis]) - Direction;
+		if (Coordinate < MIN_int32 || Coordinate > MAX_int32) continue;
+		FIntVector Neighbor = InSection;
+		Neighbor[Axis] = int32(Coordinate);
+		auto* Body = FindBody(Neighbor);
+		const uint8 Mask = uint8(1u << Face);
+		if (!Body || !((Body->RequestedUnknownHaloMask | Body->InstalledUnknownHaloMask) & Mask)) continue;
+		Body->OcclusionRefreshMask |= Mask;
+		Control->Activate(*Body);
+	}
+}
+
 bool FVoxelCollisionPresenter::IsReady(const FIntVector& InSection) const
 {
 	const auto* Data = Module.GetRuntime() ? Module.GetRuntime()->FindSection(InSection) : nullptr;
 	const auto* Body = FindBody(InSection);
-	const auto* Receipt = Coverage ? Coverage->Find(InSection) : nullptr;
-	return Data && Data->Status == EVoxelSectionStatus::DataReady && Body && Body->bInstalled &&
-		Body->Component && Body->Component->HasInstalledPhysics() &&
-		Receipt && Receipt->MatchesInput(CaptureInputStamp(InSection), SceneEpoch);
+	return IsReady(InSection, Data, Body);
+}
+
+bool FVoxelCollisionPresenter::IsReady(const FIntVector& InSection, const FVoxelSection* InData, const FBodyRecord* InBody) const
+{
+	if (!InData || InData->Status != EVoxelSectionStatus::DataReady || !InBody || !InBody->bInstalled ||
+		!((InBody->bInstalledEmpty && !InBody->Component) || (InBody->Component && InBody->Component->HasInstalledPhysics()))) return false;
+	// 同一个 PT 回执同步写入 Body 和不可变 Coverage；热路径无需再次遍历覆盖树。
+	return InBody->Receipt.MatchesInput(CaptureInputStamp(InSection), SceneEpoch);
 }
 
 TSharedPtr<const FVoxelCollisionCoverageSnapshot, ESPMode::ThreadSafe> FVoxelCollisionPresenter::CaptureSnapshot() const
@@ -673,7 +891,9 @@ bool FVoxelCollisionPresenter::CaptureCurrentReceipt(const FIntVector& InSection
 	FVoxelPhysicsReceipt& OutReceipt) const
 {
 	if (!IsReady(InSection)) return false;
-	OutReceipt = *Coverage->Find(InSection);
+	const auto* Receipt = Coverage ? Coverage->Find(InSection) : nullptr;
+	if (!Receipt || !Receipt->MatchesInput(CaptureInputStamp(InSection), SceneEpoch)) return false;
+	OutReceipt = *Receipt;
 	return true;
 }
 
@@ -695,5 +915,10 @@ void FVoxelCollisionPresenter::Reset()
 	Control.Reset();
 	Coverage.Reset();
 	DemandCursor = 0;
+	CriticalDemandCursor = 0;
+#if !UE_BUILD_SHIPPING
+	NextActiveDiagnostic = 0.0;
+	EmptyBuilds = NonemptyBuilds = EmptyReceipts = NonemptyReceipts = 0;
+#endif
 	Selection.Reset();
 }

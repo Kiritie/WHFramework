@@ -7,19 +7,18 @@ FVoxelFineFeedbackCapture::FVoxelFineFeedbackCapture(TSharedRef<const FVoxelInte
 	TSharedPtr<const IVoxelTerrainPresentedSnapshot, ESPMode::ThreadSafe> InVisual,
 	TSharedPtr<const FVoxelCollisionCoverageSnapshot, ESPMode::ThreadSafe> InPhysics,
 	const FVoxelChangeHierarchy& InHierarchy, const FVoxelWorldManifest& InManifest,
-	const uint64 InShapeRevision, const uint64 InRootSerial,
+	const uint64 InShapeRevision, const uint64 InRootSerial, const bool bInCaptureShards,
 	TSharedRef<FVoxelFineResidencyFeedback, ESPMode::ThreadSafe> InFeedback)
 	: Interest(InInterest), Visual(MoveTemp(InVisual)), Physics(MoveTemp(InPhysics)), Hierarchy(InHierarchy.CaptureVersionSnapshot()),
-	  Manifest(InManifest), ShapeRevision(InShapeRevision), Feedback(InFeedback)
+	  Manifest(InManifest), ShapeRevision(InShapeRevision), bCaptureShards(bInCaptureShards), Feedback(InFeedback)
 {
 	Feedback->WorldEpoch = Visual ? Visual->GetWorldEpoch() : Physics ? Physics->WorldEpoch : 0;
 	Feedback->CoverageRootSerial = InRootSerial;
 	Feedback->ContentRevision = Hierarchy.ContentRevision;
 }
 
-FVoxelFineSectionCoverage FVoxelFineFeedbackCapture::CaptureSection(const FIntVector& InSection)
+FVoxelFineSectionCoverage FVoxelFineFeedbackCapture::BuildSectionCoverage(const FIntVector& InSection) const
 {
-	if (const auto* Existing = Feedback->Sections.Find(InSection)) return *Existing;
 	FVoxelFineSectionCoverage Coverage;
 	Coverage.WorldEpoch = Feedback->WorldEpoch;
 	Coverage.CoverageRootSerial = Feedback->CoverageRootSerial;
@@ -40,23 +39,32 @@ FVoxelFineSectionCoverage FVoxelFineFeedbackCapture::CaptureSection(const FIntVe
 	Coverage.bWholeCollisionCommitted = Receipt && Receipt->WorldEpoch == Feedback->WorldEpoch &&
 		Receipt->PhysicsStep != INDEX_NONE && Receipt->BodyGeneration != 0 &&
 		Receipt->RegistryRevision == Manifest.RegistryHash && Receipt->ShapeRevision == ShapeRevision &&
-		Receipt->ContentRevision == Hierarchy.GetSectionRevision(InSection);
+		Receipt->ContentRevision == Hierarchy.GetSectionRevision(InSection) &&
+		Receipt->NeighborRevision == Hierarchy.GetNeighborSectionRevision(InSection);
+	return Coverage;
+}
+
+FVoxelFineSectionCoverage FVoxelFineFeedbackCapture::CaptureSection(const FIntVector& InSection)
+{
+	if (const auto* Existing = Feedback->Sections.Find(InSection)) return *Existing;
+	const FVoxelFineSectionCoverage Coverage = BuildSectionCoverage(InSection);
 	Feedback->Sections.Add(InSection, Coverage);
 	return Coverage;
+}
+
+FVoxelFineSectionCoverage FVoxelFineFeedbackCapture::ReadSection(const FIntVector& InSection) const
+{
+	if (const auto* Existing = Feedback->Sections.Find(InSection)) return *Existing;
+	// 与原先预采集的运行区一致：非运行需求且未被分片检查过的 Section 仍视为缺失。
+	return Interest->Exact.Contains(InSection) ? BuildSectionCoverage(InSection) : FVoxelFineSectionCoverage();
 }
 
 bool FVoxelFineFeedbackCapture::Advance(const int32 InMaximumShards, const TAtomic<bool>& InCancel)
 {
 	if (InCancel.Load() || InMaximumShards < 1) return false;
-	if (!Interest->PublicationInputs) return true;
-	// 安全查询先完整采集实际运行区；驻留分片只需找到首个缺失项即可判为未就绪。
-	const auto& RuntimeSections = Interest->PublicationInputs->RuntimeSections;
-	for (int32 Work = 0; Work < InMaximumShards * 8 && RuntimeSections.IsValidIndex(RuntimeCursor); ++Work)
-	{
-		if (InCancel.Load()) return false;
-		CaptureSection(RuntimeSections[RuntimeCursor++]);
-	}
-	if (RuntimeCursor < RuntimeSections.Num()) return false;
+	// 没有待交接窗口时，安全范围由 ReadSection 按需查询，不预扫整个 Fine 驻留区。
+	if (!bCaptureShards || !Interest->PublicationInputs) return true;
+	// 安全扫掠按需从冻结的视觉和物理回执根读取；分片检查仍保留有界续跑。
 	const auto& Shards = Interest->PublicationInputs->FineShards;
 	for (int32 Work = 0; Work < InMaximumShards && Shards.IsValidIndex(ShardCursor); ++Work)
 	{

@@ -2329,6 +2329,11 @@ EVoxelWorkClass FVoxelEmergeManager::ResolveWorkClass(const FVoxelExactDemand& I
 	{
 		return EVoxelWorkClass::Critical;
 	}
+	if (InDemand.ServicePriority.Band == EVoxelTerrainServiceBand::P6 && InDemand.bCollision &&
+		!InDemand.bExact && !InDemand.bSimulation && !InDemand.bFineData && !InDemand.bFineRender)
+	{
+		return EVoxelWorkClass::Background;
+	}
 
 	return InDemand.bExact || InDemand.bCollision || InDemand.bSimulation ? EVoxelWorkClass::ExactData : EVoxelWorkClass::Visible;
 }

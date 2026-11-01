@@ -711,6 +711,7 @@ void FVoxelViewManager::ProcessFineShardAdmissions(const double InDeadline)
 				int32 DependencySlots = 0;
 				int32 InflightSamplesReady = 0;
 				int32 PresentationComplete = 0;
+				int32 CollisionWaitSlots = 0;
 				for (const auto& Key : CurrentInputs->FineShards)
 				{
 					const auto* Slot = FineShardSlots.Find(Key);
@@ -724,6 +725,7 @@ void FVoxelViewManager::ProcessFineShardAdmissions(const double InDeadline)
 					{
 						++ReadySlots;
 						if (Slot->bPresentationComplete) ++PresentationComplete;
+						if (Slot->CollisionWaitMask != 0) ++CollisionWaitSlots;
 					}
 					else if (!Slot->Build.GetFailure().IsEmpty()) ++FailedSlots;
 					else if (Slot->bWaitingAdmissionCapacity) ++CapacitySlots;
@@ -731,9 +733,9 @@ void FVoxelViewManager::ProcessFineShardAdmissions(const double InDeadline)
 					else if (Slot->bDependencyWake) ++RunnableSlots;
 					else ++DependencySlots;
 				}
-				UE_LOG(LogTemp, Display, TEXT("Voxel Fine admission census: wanted=%d missingSlots=%d submitted=%d meshReady=%d failed=%d capacityFlag=%d pendingRequest=%d runnableFlag=%d dependencyWaiting=%d inflightSamplesReady=%d slotPresentationComplete=%d"),
+				UE_LOG(LogTemp, Display, TEXT("Voxel Fine admission census: wanted=%d missingSlots=%d submitted=%d meshReady=%d failed=%d capacityFlag=%d pendingRequest=%d runnableFlag=%d dependencyWaiting=%d inflightSamplesReady=%d slotPresentationComplete=%d collisionWaitSlots=%d"),
 					CurrentInputs->FineShards.Num(), MissingSlots, SubmittedSlots, ReadySlots, FailedSlots, CapacitySlots,
-					RequestSlots, RunnableSlots, DependencySlots, InflightSamplesReady, PresentationComplete);
+					RequestSlots, RunnableSlots, DependencySlots, InflightSamplesReady, PresentationComplete, CollisionWaitSlots);
 			}
 		}
 	};
@@ -1307,6 +1309,22 @@ void FVoxelViewManager::OnFineOwnershipChanged(const FIntVector& InSection)
 	}
 }
 
+void FVoxelViewManager::OnCollisionChanged(const FIntVector& InSection)
+{
+	for (const int32 Side : {16, 32, 64})
+	{
+		FIntVector Min;
+		if (!FVoxelFineSpatial::TrySnap(InSection * 16, Side, Min)) continue;
+		auto* Slot = FineShardSlots.Find({Min, Side});
+		if (!Slot || Slot->CollisionWaitMask == 0) continue;
+		const int32 AtomSide = Side / 16;
+		const FIntVector Local = InSection - Min / 16;
+		const int32 Index = Local.X + AtomSide * (Local.Y + AtomSide * Local.Z);
+		check(Index >= 0 && Index < AtomSide * AtomSide * AtomSide && Index < 64);
+		Slot->CollisionWaitMask &= ~(1ull << Index);
+	}
+}
+
 void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FinePresentation);
@@ -1334,15 +1352,35 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 			const auto& Key = Queue[Index];
 			FFineShardSlot* Slot = FineShardSlots.Find(Key);
 			if (!Slot || !Slot->Build.IsMeshReady()) continue;
+			if (Slot->CollisionWaitDemandRevision != GetViewInterest().DemandRevision)
+			{
+				Slot->CollisionWaitMask = 0;
+				Slot->CollisionWaitDemandRevision = GetViewInterest().DemandRevision;
+			}
 			if (Slot->bRenderPrepared && Slot->RenderGeometry == Slot->Build.GetPreparedGeometry() &&
 				Slot->RenderLeaseCursor >= Slot->RenderGeometry->Pieces.Num())
 			{
 				const int32 AtomCount = Slot->RenderAtoms.Num();
-				bool bAllPending = AtomCount > 0;
-				for (int32 AtomIndex = 0; AtomIndex < AtomCount && bAllPending; ++AtomIndex)
-					bAllPending = Slot->RenderTransactions[AtomIndex].IsValid() &&
-						Renderer.IsTransactionPending(Slot->RenderTransactions[AtomIndex]);
-				if (bAllPending) continue;
+				bool bAllWaitingOrPresented = AtomCount > 0;
+				bool bHasWait = false;
+				const int32 AtomSide = Key.SideCells / 16;
+				for (int32 AtomIndex = 0; AtomIndex < AtomCount && bAllWaitingOrPresented; ++AtomIndex)
+				{
+					if ((Slot->CollisionWaitMask & (1ull << AtomIndex)) != 0 ||
+						(Slot->RenderTransactions[AtomIndex].IsValid() && Renderer.IsTransactionPending(Slot->RenderTransactions[AtomIndex])))
+					{
+						bHasWait = true;
+						continue;
+					}
+					const FIntVector Section = Key.Min / 16 + FIntVector(AtomIndex % AtomSide,
+						(AtomIndex / AtomSide) % AtomSide, AtomIndex / (AtomSide * AtomSide));
+					if (Key.SideCells > 16 && GetInputRoot().FineWanted.Contains(Section) && IsFineGeometryPrepared(Section)) continue;
+					const auto& Atom = Slot->RenderAtoms[AtomIndex];
+					const auto* Existing = Renderer.FindPresentedAtom(Section);
+					bAllWaitingOrPresented = Atom && Existing && Existing->Evidence.Owner == Atom->Evidence.Owner &&
+						Existing->Evidence.Content == Atom->Evidence.Content;
+				}
+				if (bAllWaitingOrPresented && bHasWait) continue;
 			}
 			if (Slot->RenderGeometry == Slot->Build.GetPreparedGeometry())
 			{
@@ -1458,6 +1496,8 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 			Slot.RenderPieceCursor = Slot.RenderBatchCursor = Slot.RenderAtomCursor = 0;
 			Slot.RenderTriangleCursor = 0;
 			Slot.RenderLeaseCursor = -2;
+			Slot.CollisionWaitMask = 0;
+			Slot.CollisionWaitDemandRevision = GetViewInterest().DemandRevision;
 			Slot.bRenderPrepared = false;
 			Slot.bPresentationComplete = Slot.bCycleNeedsPresentation = false;
 		}
@@ -1582,7 +1622,16 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 				Existing->Evidence.Owner == Atom->Evidence.Owner && Existing->Evidence.Content == Atom->Evidence.Content) continue;
 			Slot.bCycleNeedsPresentation = true;
 			const auto* RuntimeDemand = GetViewInterest().Exact.Find(Section);
-			const bool bAtomRequiresCollision = RuntimeDemand && (RuntimeDemand->bCollision || RuntimeDemand->bWarmupCollision);
+			// 全窗口后台碰撞不应延迟已准备好的远处画面；近身、预热和模拟仍要求先有真实物理回执。
+			const bool bAtomRequiresCollision = RuntimeDemand &&
+				(RuntimeDemand->bMovementCriticalCollision || RuntimeDemand->bWarmupCollision || RuntimeDemand->bSimulation);
+			if (bAtomRequiresCollision && !Module.IsCollisionReady(Section))
+			{
+				// 碰撞回执到达前不创建 Native 事务，避免封存失败后重复准备和合并。
+				Slot.CollisionWaitMask |= 1ull << AtomIndex;
+				continue;
+			}
+			Slot.CollisionWaitMask &= ~(1ull << AtomIndex);
 			if (!Atoms.IsEmpty() && bRequiresCollision != bAtomRequiresCollision) continue;
 			bRequiresCollision = bAtomRequiresCollision;
 			Atoms.Add(Atom);
