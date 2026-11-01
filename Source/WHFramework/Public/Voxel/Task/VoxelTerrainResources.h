@@ -66,6 +66,13 @@ struct WHFRAMEWORK_API FVoxelTerrainResourceGrantDiagnostics
 	int32 LargestCount = 0;
 };
 
+struct WHFRAMEWORK_API FVoxelTerrainResourceGrantQuery
+{
+	EVoxelTerrainResourcePool Pool = EVoxelTerrainResourcePool::Input;
+	TArrayView<FVoxelTerrainResourceGrantSnapshot> Largest;
+	FVoxelTerrainResourceGrantDiagnostics Result;
+};
+
 class FVoxelTerrainResources;
 
 /** A shared handle to one reservation. Copying the handle never grants bytes. */
@@ -134,6 +141,8 @@ public:
 	FVoxelTerrainResourceGrantDiagnostics SnapshotGrants(
 		EVoxelTerrainResourcePool InPool,
 		TArrayView<FVoxelTerrainResourceGrantSnapshot> OutLargest) const;
+	// 各池最多一项查询；同一次原账本遍历填入调用者固定存储，共享同一版本快照。
+	void SnapshotGrants(TArrayView<FVoxelTerrainResourceGrantQuery> InOutQueries) const;
 	FVoxelGenerationConsumerKey GetControlConsumer() const { return ControlConsumer; }
 	// owner 由完整 ConsumerKey 标识；同模块其它任务的释放仍可唤醒容量等待。
 	// 最近两个不同 owner 的释放事件足以查询任一 owner 的最新外部释放，不增加监听表。

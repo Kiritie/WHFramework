@@ -2070,9 +2070,15 @@ FVoxelTaskScheduler::GetDiagnostics() const
 	Result.CompletedSelectionAdmission = CompletedSelection.GetLastResourceAdmission();
 	Result.CriticalAdmissionDeferrals = CriticalAdmissionDeferrals;
 	Result.CriticalPending = 0;
+	Result.PendingWithoutWorkReceipt = 0;
+	Result.ReceiptCapacityBlockedRequests = 0;
+	Result.ReceiptRegistrationBlockedRequests = 0;
 	for (const FVoxelTaskRequest& Request : Pending)
 	{
 		Result.CriticalPending += Request.WorkClass == EVoxelWorkClass::Critical ? 1 : 0;
+		Result.PendingWithoutWorkReceipt += !Request.WorkReceipt ? 1 : 0;
+		Result.ReceiptCapacityBlockedRequests += Request.bReceiptCapacityBlocked ? 1 : 0;
+		Result.ReceiptRegistrationBlockedRequests += Request.bReceiptRegistrationBlocked ? 1 : 0;
 	}
 	Result.CriticalRunning = 0;
 	for (const FRunning& Task : Running)

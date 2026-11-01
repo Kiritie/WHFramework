@@ -300,7 +300,7 @@ void FVoxelViewManager::AdvanceInterestWorkspace(const double InDeadline)
 
 bool FVoxelViewManager::TryCommitInterestRoot()
 {
-	if (!InterestWorkspace || InterestWorkspace->Phase != 13 || CommittedWorkspaceEvents) return false;
+	if (!InterestWorkspace || InterestWorkspace->Phase != 13 || CommittedWorkspaceEvents || InitialLayoutContinuation.IsValid()) return false;
 	const auto Latest = InterestWorkspace->Snapshot;
 	if (!Latest || !Module.CanCommitTerrainInterest(*Latest))
 	{
@@ -315,6 +315,13 @@ bool FVoxelViewManager::TryCommitInterestRoot()
 			!InterestWorkspace->Retirements.IsEmpty() || !InterestWorkspace->LayoutChanges.IsEmpty()))
 	{
 		InterestWorkspace->Root->bInitialLayout = false;
+	}
+	else if (AppliedInputRoot && AppliedInputRoot->bInitialLayout && !InterestWorkspace->bGeometryChanged &&
+		InterestWorkspace->ChangedCoverage.IsEmpty() && InterestWorkspace->Retirements.IsEmpty() && InterestWorkspace->LayoutChanges.IsEmpty())
+	{
+		InterestWorkspace->Root->InitialFineExclusions = AppliedInputRoot->InitialFineExclusions;
+		InterestWorkspace->Root->InitialHeightfieldExclusions = AppliedInputRoot->InitialHeightfieldExclusions;
+		InterestWorkspace->Root->InitialTransitionExclusions = AppliedInputRoot->InitialTransitionExclusions;
 	}
 	// 同一次GT步骤交换全部Wanted、根索引、布局与查询快照。
 	auto Previous = MoveTemp(AppliedInputRoot);

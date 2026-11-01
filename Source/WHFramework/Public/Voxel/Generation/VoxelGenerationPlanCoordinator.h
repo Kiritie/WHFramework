@@ -141,6 +141,24 @@ private:
 		FVoxelTerrainServicePriority Priority;
 		uint64 SubscriptionId = 0;
 	};
+	struct FPendingRequestStorage
+	{
+		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+		FVoxelTaskRequest Request;
+	};
+	// 状态目录只持有可空句柄；实际大请求仅在待入队时由原 Input 租约构造。
+	struct FPendingRequest
+	{
+		FPendingRequest() = default;
+		FPendingRequest(const FPendingRequest&) = delete;
+		FPendingRequest& operator=(const FPendingRequest&) = delete;
+		FPendingRequest(FPendingRequest&&) = default;
+		FPendingRequest& operator=(FPendingRequest&&) = default;
+		TSharedPtr<FPendingRequestStorage, ESPMode::ThreadSafe> Record;
+		bool IsSet() const { return Record.IsValid(); }
+		FVoxelTaskRequest& GetValue() { check(Record); return Record->Request; }
+		const FVoxelTaskRequest& GetValue() const { check(Record); return Record->Request; }
+	};
 	struct FState
 	{
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PrerequisitesLease;
@@ -154,7 +172,7 @@ private:
 		TSharedPtr<FVoxelGenerationCacheRetentionLease, ESPMode::ThreadSafe> PrerequisiteRetention;
 		// 在原状态槽持有实际捕获与部分绑定，拒收不能重新创建任务正文。
 		TSharedPtr<FVoxelTaskCustomPayload, ESPMode::ThreadSafe> PendingReadDependencies;
-		TOptional<FVoxelTaskRequest> PendingRequest;
+		FPendingRequest PendingRequest;
 		EVoxelPlanDependencyState State = EVoxelPlanDependencyState::Missing;
 		EVoxelWorkClass WorkClass = EVoxelWorkClass::Background;
 		int32 SourcePriority = MAX_int32;
@@ -163,7 +181,10 @@ private:
 		FVoxelTerrainServicePriority ServicePriority;
 		FString Error;
 		TMap<FVoxelGenerationConsumerKey, FDonation> Donations;
+		// 原捐赠表内胜出项的订阅身份；自身优先级仍只保存在原图节点。
+		uint64 BestDonationId = 0;
 		uint64 AttemptId = 0;
+		double AttemptFirstRunnableSeconds = -1.0;
 		uint64 CapacityVersion = 0;
 		uint64 TaskCapacityVersion = 0;
 		uint64 TaskQueueVersion = 0;
@@ -233,6 +254,8 @@ private:
 		FGuid AdmissionHead;
 		FGuid AdmissionTail;
 		int32 AdmissionCount = 0;
+		int32 PendingRequestCount = 0;
+		uint64 PendingRequestBytes = 0;
 		int32 StatesCapacity = 0;
 		int32 ConsumersCapacity = 0;
 		int32 FactsCapacity = 0;
@@ -240,6 +263,9 @@ private:
 		uint64 SubscriptionCancellations = 0;
 		uint64 ForgottenInFlight = 0;
 		uint64 CanceledResults = 0;
+		uint64 DonationMutations = 0;
+		uint64 DonationRescans = 0;
+		uint64 DonationVerifications = 0;
 		bool bQueuedPrioritiesDirty = false;
 	};
 	struct FDonationGrowth
@@ -286,6 +312,10 @@ private:
 	void UnlinkSubscriptionWake(FConsumerState& InConsumer, FSubscription& InSubscription);
 
 	void ResolveDonations(FState& InOutState);
+	void UpdateDonation(FState& InOutState, const FVoxelGenerationConsumerKey& InConsumer, const FDonation& InDonation);
+	void ApplyDonationPriority(FState& InOutState, const FVoxelTerrainServicePriority& InPriority,
+		EVoxelWorkClass InWorkClass, uint64 InBestDonationId);
+	void RecordDonationMutation(const FState& InState);
 	void RemoveSubscription(const FVoxelGenerationPlanDependency& InDependency,
 		const FVoxelGenerationConsumerKey& InConsumer, uint64 InSubscriptionId);
 	void WakeConsumers(const FVoxelGenerationPlanDependency& InDependency);
@@ -296,6 +326,9 @@ private:
 	void LinkPendingAdmission(FState& InState);
 	void UnlinkPendingAdmission(FState& InState);
 	void ClearPendingRequest(FState& InState);
+	bool PreparePendingRequest(const FVoxelGenerationPlanDependency& InDependency, FState& InState);
+	TSharedPtr<FPendingRequestStorage, ESPMode::ThreadSafe> DetachPendingRequest(FState& InState);
+	void AttachPendingRequest(FState& InState, TSharedPtr<FPendingRequestStorage, ESPMode::ThreadSafe> InRecord);
 	void FailAdmission(const FVoxelGenerationPlanDependency& InDependency, FState& InState,
 		const FString& InError, EVoxelTaskBlockReason InReason);
 	void WaitForTaskAdmission(FState& InState, uint64 InVersion, EVoxelTaskBlockReason InReason);
@@ -305,6 +338,7 @@ private:
 	void RefreshQueuedPriorities();
 	bool RegisterClosure(const FVoxelGenerationPlanDependency& InDependency, FClosureRegistration& InRegistration, FString& OutError);
 	void AdvancePriorityDonations();
+	void LogStorageDiagnostics(double InNow);
 	void ForgetFact(const FVoxelGenerationPlanDependency& InDependency, bool bReleasePrerequisites = true);
 	bool ArePrerequisitesReady(const FState& InState) const;
 
@@ -323,4 +357,5 @@ private:
 	uint64 EnvironmentOwnerIncarnation = 1;
 	uint64 NextSubscriptionId = 0;
 	uint64 NextAttemptId = 0;
+	double NextStorageDiagnosticSeconds = 0.0;
 };

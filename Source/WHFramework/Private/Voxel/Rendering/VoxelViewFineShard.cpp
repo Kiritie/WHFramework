@@ -319,7 +319,7 @@ namespace
 }
 
 
-bool FVoxelViewManager::ReserveFineShardSlots(const int32 InCount, FString& OutError)
+bool FVoxelViewManager::ReserveFineShardSlots(const int32 InCount, FString& OutError, const bool bExactCapacity)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FineSlotBacking);
 	if (InCount < 0)
@@ -339,15 +339,16 @@ bool FVoxelViewManager::ReserveFineShardSlots(const int32 InCount, FString& OutE
 			TEXT("CapacityBlocked: Fine slot backing waits for an external release") : TEXT("Oversized: Fine slot backing is unreachable");
 		return false;
 	}
-	int32 Capacity = int32(FMath::Max<int64>(InCount,
+	int32 Capacity = bExactCapacity ? InCount : int32(FMath::Max<int64>(InCount,
 		FMath::Min<int64>(MAX_int32, FMath::Max<int64>(64, int64(FineShardBackingCapacity) * 2))));
 	uint64 FinalBytes = 0;
+	uint64 PeakBytes = 0;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Candidate;
 	const auto ReserveBacking = [&](const int32 InCapacity)
 	{
 		FinalBytes = FineShardSlots.GetAllocatedSize() + FineShardSlotOrder.GetAllocatedSize();
 		for (const auto& Queue : FinePresentationQueues) FinalBytes += Queue.GetAllocatedSize();
-		uint64 PeakBytes = FinalBytes;
+		PeakBytes = FinalBytes;
 		const auto CountGrowth = [&FinalBytes, &PeakBytes](const uint64 OldBytes, const uint64 NewBytes)
 		{
 			if (NewBytes <= OldBytes) return;
@@ -370,6 +371,20 @@ bool FVoxelViewManager::ReserveFineShardSlots(const int32 InCount, FString& OutE
 	}
 	if (FineShardBackingAdmission != EVoxelTerrainResourceAdmission::Granted)
 	{
+#if !UE_BUILD_SHIPPING
+		static double NextBackingFailureLog = 0.0;
+		const double Now = FPlatformTime::Seconds();
+		if (Now >= NextBackingFailureLog)
+		{
+			const auto State = Resources->Snapshot();
+			UE_LOG(LogTemp, Display, TEXT("Voxel Fine backing admission: requested=%d current=%d capacity=%d attempted=%d currentBytes=%llu peakBytes=%llu used=%llu limit=%llu admission=%d releaseVersion=%llu"),
+				InCount, FineShardSlots.Num(), FineShardBackingCapacity, Capacity,
+				FineShardBackingLease ? FineShardBackingLease->Bytes() : 0, PeakBytes,
+				State.Used[int32(EVoxelTerrainResourcePool::Input)], State.Limits.InputBytes,
+				int32(FineShardBackingAdmission), Before);
+			NextBackingFailureLog = Now + 5.0;
+		}
+#endif
 		FineShardBackingRejectedCount = InCount;
 		FineShardBackingReleaseVersion = Before;
 		OutError = FineShardBackingAdmission == EVoxelTerrainResourceAdmission::CapacityBlocked ?
@@ -390,6 +405,15 @@ bool FVoxelViewManager::ReserveFineShardSlots(const int32 InCount, FString& OutE
 	verify(FineShardBackingLease->Resize(ActualBytes));
 	FineShardBackingCapacity = Capacity;
 	FineShardBackingRejectedCount = 0;
+#if !UE_BUILD_SHIPPING
+	if (bExactCapacity)
+	{
+		const auto State = Resources->Snapshot();
+		UE_LOG(LogTemp, Display, TEXT("Voxel Fine initial backing: requested=%d current=%d capacity=%d bytes=%llu used=%llu limit=%llu"),
+			InCount, FineShardSlots.Num(), Capacity, ActualBytes,
+			State.Used[int32(EVoxelTerrainResourcePool::Input)], State.Limits.InputBytes);
+	}
+#endif
 	OutError.Reset();
 	return true;
 }
@@ -644,10 +668,19 @@ void FVoxelViewManager::ProcessFineShardAdmissions(const double InDeadline)
 	const auto& Interest = GetViewInterest();
 	if (!Interest.PublicationInputs || Interest.PublicationInputs->FineShards.IsEmpty()) return;
 	const double Deadline = FMath::Min(InDeadline, TerrainDeadline(Module.GetViewSettings().Budget.AdmissionMilliseconds));
-	const double StartedScanning = FPlatformTime::Seconds();
+	double StartedScanning = FPlatformTime::Seconds();
 	if (StartedScanning >= Deadline) return;
-	const double ScanDeadline = StartedScanning + (Deadline - StartedScanning) * 0.5;
 	const auto& Keys = Interest.PublicationInputs->FineShards;
+	const auto& Root = GetInputRoot();
+	const int64 InitialCount = int64(Keys.Num()) + Root.FineWanted.Num();
+	if (Root.bInitialLayout && InitialCount <= MAX_int32 && InitialCount > FineShardBackingCapacity)
+	{
+		FString Error;
+		ReserveFineShardSlots(int32(InitialCount), Error, true);
+		StartedScanning = FPlatformTime::Seconds();
+		if (StartedScanning >= Deadline) return;
+	}
+	const double ScanDeadline = StartedScanning + (Deadline - StartedScanning) * 0.5;
 	TArray<FVoxelTerrainServiceCandidate, TInlineAllocator<64>> Candidates;
 	TArray<FVoxelFineShardKey, TInlineAllocator<64>> Captured;
 	int32 Submitted = 0;
@@ -802,7 +835,21 @@ bool FVoxelViewManager::RequestFineShard(const FVoxelFineShardKey& InKey)
 	if (!Slot)
 	{
 		FString Error;
-		if (FineShardSlots.Num() == MAX_int32 || !ReserveFineShardSlots(FineShardSlots.Num() + 1, Error)) return false;
+		if (FineShardSlots.Num() == MAX_int32 || !ReserveFineShardSlots(FineShardSlots.Num() + 1, Error))
+		{
+#if !UE_BUILD_SHIPPING
+			static double NextFineSlotFailureLog = 0.0;
+			const double Now = FPlatformTime::Seconds();
+			if (Now >= NextFineSlotFailureLog)
+			{
+				UE_LOG(LogTemp, Display, TEXT("Voxel Fine slot admission: min=%s side=%d slots=%d capacity=%d rejected=%d admission=%d error=%s"),
+					*InKey.Min.ToString(), InKey.SideCells, FineShardSlots.Num(), FineShardBackingCapacity,
+					FineShardBackingRejectedCount, int32(FineShardBackingAdmission), *Error);
+				NextFineSlotFailureLog = Now + 5.0;
+			}
+#endif
+			return false;
+		}
 		FVoxelFineMeshInput Input;
 		Input.WorldEpoch = WorldEpoch;
 		check(NextFineShardIncarnation < MAX_uint64);
@@ -1262,6 +1309,7 @@ void FVoxelViewManager::OnFineOwnershipChanged(const FIntVector& InSection)
 
 void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FinePresentation);
 	if (!AppliedInterestSnapshot || FineShardSlotOrder.IsEmpty()) return;
 	const double Deadline = FMath::Min(InDeadline, TerrainDeadline(0.25));
 	const double StartedScanning = FPlatformTime::Seconds();
@@ -1392,7 +1440,7 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 		Atom->Evidence.GeometryLease = Geometry;
 		return Atom;
 	};
-	const auto Advance = [&]
+	const auto Advance = [&]() -> bool
 	{
 		if (Slot.RenderGeometry != Geometry)
 		{
@@ -1400,7 +1448,7 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 			if (!Slot.RenderAtoms.IsEmpty())
 			{
 				Slot.RenderAtoms.Pop(EAllowShrinking::No);
-				return;
+				return true;
 			}
 			Slot.RenderGeometry = Geometry;
 			for (auto& Transaction : Slot.RenderTransactions) Transaction.Invalidate();
@@ -1424,7 +1472,7 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 				if (!Lease->IsOwnedBy(Resources.Get()))
 				{
 					ObserveRenderAdmission(EVoxelTerrainResourceAdmission::InvalidRequest, Before);
-					return;
+					return false;
 				}
 				const bool bAllowOverlap = Renderer.HasPresentedCoverage(FBox(FVector(Key.Bounds().Min), FVector(Key.Bounds().Max)));
 				if (!Lease->Transfer(EVoxelTerrainResourcePool::Resident) &&
@@ -1433,11 +1481,11 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 					const auto Limits = Resources->Snapshot().Limits;
 					ObserveRenderAdmission(Lease->Bytes() > Limits.ResidentBytes && (!bAllowOverlap || Lease->Bytes() > Limits.OverlapBytes) ?
 						EVoxelTerrainResourceAdmission::CapacityUnachievable : EVoxelTerrainResourceAdmission::CapacityBlocked, Before);
-					return;
+					return false;
 				}
 			}
 			++Slot.RenderLeaseCursor;
-			return;
+			return true;
 		}
 		const int32 AtomSide = Key.SideCells / 16;
 		const int32 AtomCount = AtomSide * AtomSide * AtomSide;
@@ -1447,8 +1495,12 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 			const int32 AtomIndex = Slot.RenderAtoms.Num();
 			const FIntVector Section = Key.Min / 16 + FIntVector(AtomIndex % AtomSide,
 				(AtomIndex / AtomSide) % AtomSide, AtomIndex / (AtomSide * AtomSide));
-			if (auto Atom = MakeAtom(Section)) Slot.RenderAtoms.Add(MoveTemp(Atom));
-			return;
+			if (auto Atom = MakeAtom(Section))
+			{
+				Slot.RenderAtoms.Add(MoveTemp(Atom));
+				return true;
+			}
+			return false;
 		}
 		if (Geometry->Pieces.IsValidIndex(Slot.RenderPieceCursor))
 		{
@@ -1458,17 +1510,17 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 				++Slot.RenderPieceCursor;
 				Slot.RenderBatchCursor = 0;
 				Slot.RenderTriangleCursor = 0;
-				return;
+				return true;
 			}
-			if (Piece.Mesh->Batches[Slot.RenderBatchCursor].Mesh.Triangles.IsEmpty()) { ++Slot.RenderBatchCursor; return; }
+			if (Piece.Mesh->Batches[Slot.RenderBatchCursor].Mesh.Triangles.IsEmpty()) { ++Slot.RenderBatchCursor; return true; }
 			const FIntVector Section(int32(FVoxelFineSpatial::FloorDivide(Piece.Key.Min.X, 16)),
 				int32(FVoxelFineSpatial::FloorDivide(Piece.Key.Min.Y, 16)), int32(FVoxelFineSpatial::FloorDivide(Piece.Key.Min.Z, 16)));
 			const FIntVector LocalSection = Section - Key.Min / 16;
 			if (LocalSection.X < 0 || LocalSection.Y < 0 || LocalSection.Z < 0 ||
-				LocalSection.X >= AtomSide || LocalSection.Y >= AtomSide || LocalSection.Z >= AtomSide) return;
+				LocalSection.X >= AtomSide || LocalSection.Y >= AtomSide || LocalSection.Z >= AtomSide) return false;
 			const int32 PieceAtomIndex = LocalSection.X + AtomSide * (LocalSection.Y + AtomSide * LocalSection.Z);
 			const auto Atom = Slot.RenderAtoms[PieceAtomIndex];
-			if (!Atom) return;
+			if (!Atom) return false;
 			const uint64 OldRefBytes = Atom->Chunks.GetAllocatedSize();
 			const uint64 RefBytes = FMath::Max<uint64>(OldRefBytes,
 				VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>>(Atom->Chunks.Num() + 1));
@@ -1477,7 +1529,7 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 			const auto Admission = Atom->MetadataLease->TryResize(PeakBytes,
 				FineShardBackingLease ? FineShardBackingLease->Bytes() : 0, FineShardBackingLease ? 1 : 0);
 			ObserveRenderAdmission(Admission, Before);
-			if (Admission != EVoxelTerrainResourceAdmission::Granted) return;
+			if (Admission != EVoxelTerrainResourceAdmission::Granted) return false;
 			Atom->Chunks.Reserve(Atom->Chunks.Num() + 1);
 			check(Atom->Chunks.GetAllocatedSize() <= RefBytes);
 			verify(Atom->MetadataLease->Resize(Atom->GetAllocatedBytes()));
@@ -1490,13 +1542,13 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 			if (!Chunk)
 			{
 				ObserveRenderAdmission(ChunkAdmission, BeforeChunk);
-				return;
+				return false;
 			}
 			Atom->Chunks.Add(Chunk);
 			Atom->Evidence.bKnownEmpty = false;
 			Slot.RenderTriangleCursor += UploadCount;
 			if (Slot.RenderTriangleCursor == TriangleCount) { ++Slot.RenderBatchCursor; Slot.RenderTriangleCursor = 0; }
-			return;
+			return true;
 		}
 		Slot.bRenderPrepared = true;
 		TArray<TSharedPtr<const FVoxelTerrainRenderAtom, ESPMode::ThreadSafe>, TInlineAllocator<8>> Atoms;
@@ -1516,7 +1568,7 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 				{
 					PendingTransaction.Invalidate();
 					Slot.RenderAdmission = EVoxelTerrainResourceAdmission::InvalidRequest;
-					return;
+					return false;
 				}
 				if (Renderer.IsTransactionPending(PendingTransaction)) { Slot.bCycleNeedsPresentation = true; continue; }
 				PendingTransaction.Invalidate();
@@ -1540,7 +1592,7 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 		if (Atoms.IsEmpty())
 		{
 			if (Slot.RenderAtomCursor == AtomCount && !Slot.bCycleNeedsPresentation) Slot.bPresentationComplete = true;
-			return;
+			return !Slot.bPresentationComplete && !Slot.bCycleNeedsPresentation;
 		}
 		FGuid Transaction;
 		EVoxelTerrainResourceAdmission TransactionAdmission = EVoxelTerrainResourceAdmission::Granted;
@@ -1568,12 +1620,19 @@ void FVoxelViewManager::PrepareFineShardPresentations(const double InDeadline)
 			&TransactionAdmission, Slot.Consumer))
 		{
 			for (const int32 Index : AtomIndices) Slot.RenderTransactions[Index] = Transaction;
+			return true;
 		}
 		else if (TransactionAdmission != EVoxelTerrainResourceAdmission::Granted)
 			ObserveRenderAdmission(TransactionAdmission, BeforeTransaction);
+		return false;
 	};
-	Advance();
-	// 每次实际服务只消费一个微步骤，后续步骤重新累计等待年龄。
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_FinePresentationAdvance);
+		// 同一候选在原0.25ms量子内推进；无进展、容量或外部依赖等待立即让出。
+		for (int32 Step = 0; Step < 32 && FPlatformTime::Seconds() < Deadline; ++Step)
+			if (!Advance()) break;
+	}
+	// 每次有界服务批次按真实耗时结算，随后重新累计等待年龄。
 	Slot.PresentationQueuedAt = FPlatformTime::Seconds();
 	if (Slot.bPresentationComplete && Slot.PresentationQueueIndex != INDEX_NONE)
 	{

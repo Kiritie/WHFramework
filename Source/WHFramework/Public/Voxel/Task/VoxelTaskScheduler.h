@@ -575,6 +575,9 @@ struct WHFRAMEWORK_API FVoxelTaskDiagnostics
 	// 单 flag 可重叠计数，不能求和解释为任务数。
 	FKindBlockCounts BlockedByKind;
 	int32 BlockedRequests = 0;
+	int32 PendingWithoutWorkReceipt = 0;
+	int32 ReceiptCapacityBlockedRequests = 0;
+	int32 ReceiptRegistrationBlockedRequests = 0;
 	uint64 DuplicateRequests = 0;
 	uint64 OversizedRequests = 0;
 	uint64 CapacityDeferrals = 0;

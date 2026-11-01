@@ -300,9 +300,28 @@ const FVoxelTerrainServicePriority* FVoxelTerrainDependencyPriority::Find(const 
 	return Node ? &Node->Effective : nullptr;
 }
 
+const FVoxelTerrainServicePriority* FVoxelTerrainDependencyPriority::FindOwn(const FGuid& InNode) const
+{
+	const FNode* Node = Storage ? Storage->Nodes.Find(InNode) : nullptr;
+	return Node ? &Node->Own : nullptr;
+}
+
 bool FVoxelTerrainDependencyPriority::IsPending() const
 {
 	return DirtyHead.IsValid();
+}
+
+void FVoxelTerrainDependencyPriority::LogStorageDiagnostics() const
+{
+#if !UE_BUILD_SHIPPING
+	UE_LOG(LogTemp, Display, TEXT("Voxel priority control storage: owner=%s epoch=%llu incarnation=%llu serial=%llu name=Nodes entries=%d capacity=%d maxIndex=%d nativeBytes=%llu lease=%llu granted=%llu nodeBytes=%llu"),
+		*Consumer.OwnerId.ToString(), Consumer.WorldEpoch, Consumer.OwnerIncarnation, Consumer.RequestSerial,
+		Storage ? Storage->Nodes.Num() : 0, Storage ? Storage->Capacity : 0,
+		Storage ? Storage->Nodes.GetMaxIndex() : 0,
+		Storage ? VoxelGenerationAllocation::AllocatedBytes(Storage->Nodes) : 0,
+		Storage && Storage->NodesLease ? Storage->NodesLease->Serial() : 0,
+		Storage && Storage->NodesLease ? Storage->NodesLease->Bytes() : 0, uint64(sizeof(FNode)));
+#endif
 }
 
 bool FVoxelTerrainDependencyPriority::HasConsumers(const FGuid& InNode) const

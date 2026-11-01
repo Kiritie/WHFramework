@@ -598,17 +598,38 @@ FVoxelTerrainResourceGrantDiagnostics FVoxelTerrainResources::SnapshotGrants(
 	const EVoxelTerrainResourcePool InPool,
 	const TArrayView<FVoxelTerrainResourceGrantSnapshot> OutLargest) const
 {
+	FVoxelTerrainResourceGrantQuery Query{InPool, OutLargest};
+	SnapshotGrants(MakeArrayView(&Query, 1));
+	return Query.Result;
+}
+
+void FVoxelTerrainResources::SnapshotGrants(const TArrayView<FVoxelTerrainResourceGrantQuery> InOutQueries) const
+{
+	constexpr int32 PoolCount = int32(EVoxelTerrainResourcePool::Count);
+	check(InOutQueries.Num() <= PoolCount);
 	FScopeLock Lock(&Mutex);
-	FVoxelTerrainResourceGrantDiagnostics Result;
-	Result.Resources = State;
-	if (InPool >= EVoxelTerrainResourcePool::Count) return Result;
-	const int32 Capacity = FMath::Min(16, OutLargest.Num());
+	int32 QueryForPool[PoolCount];
+	for (int32& Index : QueryForPool) Index = INDEX_NONE;
+	for (int32 Index = 0; Index < InOutQueries.Num(); ++Index)
+	{
+		auto& Query = InOutQueries[Index];
+		Query.Result = {};
+		Query.Result.Resources = State;
+		if (Query.Pool >= EVoxelTerrainResourcePool::Count) continue;
+		check(QueryForPool[int32(Query.Pool)] == INDEX_NONE);
+		QueryForPool[int32(Query.Pool)] = Index;
+	}
 	for (int32 SlotIndex = 0; SlotIndex < EntryCapacity; ++SlotIndex)
 	{
 		const FEntrySlot& Slot = EntryPages[SlotIndex / FEntryPage::Size]->Slots[SlotIndex % FEntryPage::Size];
 		if (!Slot.Serial) continue;
 		const FEntry& Entry = Slot.Entry;
-		if (Entry.Pool != InPool) continue;
+		const int32 QueryIndex = QueryForPool[int32(Entry.Pool)];
+		if (QueryIndex == INDEX_NONE) continue;
+		auto& Query = InOutQueries[QueryIndex];
+		auto& Result = Query.Result;
+		const auto OutLargest = Query.Largest;
+		const int32 Capacity = FMath::Min(16, OutLargest.Num());
 		const int32 Kind = int32(Entry.Attempt.Kind);
 		check(Kind >= 0 && Kind < FVoxelTerrainResourceGrantDiagnostics::ConsumerKindCount);
 		Result.ConsumerBytes[Kind] += Entry.Bytes;
@@ -623,7 +644,6 @@ FVoxelTerrainResourceGrantDiagnostics FVoxelTerrainResources::SnapshotGrants(
 		OutLargest[Index] = {Slot.Serial, Entry.Attempt, Entry.Bytes, Entry.bPublished};
 		Result.LargestCount = FMath::Min(Result.LargestCount + 1, Capacity);
 	}
-	return Result;
 }
 
 EVoxelTerrainResourcePool FVoxelTerrainResources::GetPool(const uint64 InSerial) const

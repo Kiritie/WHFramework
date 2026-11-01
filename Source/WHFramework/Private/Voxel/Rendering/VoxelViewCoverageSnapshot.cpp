@@ -3,6 +3,7 @@
 #include "Voxel/Rendering/VoxelProxyBuilder.h"
 #include "Voxel/Rendering/VoxelViewPublisher.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
+#include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 
 FVoxelGameThreadContinuation FVoxelViewManager::AcquireCoverageCapacitySteps(const uint64 InBytes,
@@ -34,6 +35,27 @@ FVoxelGameThreadContinuation FVoxelViewManager::CaptureCoverageCandidateSteps(
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& OutLease, bool& OutComplete) const
 {
 	OutComplete = false;
+	if (GetInputRoot().bInitialLayout)
+	{
+		const auto& Root = GetInputRoot();
+		const uint64 Bytes = VoxelBoundedAllocation::SetBytes<FIntVector>(Root.FineWanted.Num()) +
+			VoxelBoundedAllocation::SetBytes<FVoxelViewKey>(Root.ProxyWanted.Num()) +
+			VoxelBoundedAllocation::SetBytes<FVoxelSurfaceTileKey>(Root.SurfaceWanted.Num()) +
+			VoxelBoundedAllocation::SetBytes<FVoxelMacroTileKey>(Root.MacroWanted.Num());
+		bool bCapacity = false;
+		co_await AcquireCoverageCapacitySteps(Bytes, OutLease, bCapacity);
+		if (!bCapacity) co_return;
+		OutFine.Reserve(Root.FineWanted.Num());
+		OutProxy.Reserve(Root.ProxyWanted.Num());
+		OutSurface.Reserve(Root.SurfaceWanted.Num());
+		OutMacro.Reserve(Root.MacroWanted.Num());
+		co_await VoxelGameThread::AppendSteps(OutFine, Root.FineWanted);
+		co_await VoxelGameThread::AppendSteps(OutProxy, Root.ProxyWanted);
+		co_await VoxelGameThread::AppendSteps(OutSurface, Root.SurfaceWanted);
+		co_await VoxelGameThread::AppendSteps(OutMacro, Root.MacroWanted);
+		OutComplete = true;
+		co_return;
+	}
 	const int32 QueryCount = bActiveCoverageFull ? 1 : ActiveDirtyCoverageRects.Num();
 	for (int32 Query = 0; Query < QueryCount; ++Query)
 	{
