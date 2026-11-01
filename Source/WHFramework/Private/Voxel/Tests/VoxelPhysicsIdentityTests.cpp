@@ -96,13 +96,13 @@ bool FVoxelCollisionFrozenBuildTest::RunTest(const FString& InParameters)
 	const auto Resources = MakeShared<FVoxelTerrainResources, ESPMode::ThreadSafe>();
 	Resources->Configure({});
 	const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() +
-		VoxelBoundedAllocation::ArrayBytes<FBox>(1);
+		VoxelBoundedAllocation::ArrayBytes<FVector3f>(24) + VoxelBoundedAllocation::ArrayBytes<int32>(36);
 	if (!Resources->Acquire(FVoxelGenerationConsumerKey::Section(17, Owner, 29, Snapshot.Section, 1),
 		EVoxelTerrainResourcePool::Staged, Bytes, Result.ResourceLease)) return false;
 	if (!TestTrue(TEXT("生产 Builder 在已授予容量内生成整个实心 Section"),
 		FVoxelCollisionBuilder::Build(Snapshot, Registry, Shapes, Result))) return false;
-	TestEqual(TEXT("立方体贪心合并保留为一个完整盒"), Result.Boxes.Num(), 1);
-	TestTrue(TEXT("合并盒覆盖整个 Section"), Result.Boxes[0] == FBox(FVector::ZeroVector, FVector(16)));
+	TestEqual(TEXT("完整 Section 的六个外露面合并成十二个三角形"), Result.Triangles.Num(), 36);
+	TestTrue(TEXT("碰撞表面覆盖整个 Section"), Result.LocalBounds == FBox(FVector::ZeroVector, FVector(16)));
 	TestTrue(TEXT("建造期间保留所有者"), Result.Stamp.OwnerId == Owner);
 	TestEqual(TEXT("资源实例不被构建 Token 覆盖"), Result.Stamp.OwnerIncarnation, uint64(29));
 	TestEqual(TEXT("保留冻结内容版本"), Result.Stamp.GeometryRevision, uint64(31));
@@ -114,8 +114,8 @@ bool FVoxelCollisionFrozenBuildTest::RunTest(const FString& InParameters)
 	++Registry.Hash;
 	TestFalse(TEXT("重建峰值不足时在分配前等待"), FVoxelCollisionBuilder::Build(Snapshot, Registry, Shapes, Result));
 	TestTrue(TEXT("等待保留旧输出完整身份"), Result.Stamp == Installed);
-	TestEqual(TEXT("等待保留旧碰撞盒"), Result.Boxes.Num(), 1);
-	if (!Result.ResourceLease->Resize(Bytes + Result.Boxes.GetAllocatedSize())) return false;
+	TestEqual(TEXT("等待保留旧碰撞三角形"), Result.Triangles.Num(), 36);
+	if (!Result.ResourceLease->Resize(Bytes + Result.Vertices.GetAllocatedSize() + Result.Triangles.GetAllocatedSize())) return false;
 	TAtomic<bool> Canceled{true};
 	TestFalse(TEXT("取消不发布候选或新版 Registry 身份"), FVoxelCollisionBuilder::Build(Snapshot, Registry, Shapes, Result, &Canceled));
 	TestTrue(TEXT("取消保留旧身份"), Result.Stamp == Installed);
@@ -154,26 +154,29 @@ bool FVoxelCollisionExactCapacityTest::RunTest(const FString& InParameters)
 				(Scenario == 3 && Index == 0);
 			Snapshot.Blocks[Index] = bSolid ? FVoxelBlockState{1, 0}.Pack() : FVoxelBlockState{}.Pack();
 		}
-		const int32 ExpectedBoxes = Scenario == 0 ? 0 : Scenario == 1 ? 1 : Scenario == 2 ? VoxelBlock::Volume / 2 :
-			Shapes.Get(EVoxelShapeKind::Stair, 0).CollisionBoxes.Num();
+		const int32 ExpectedQuads = Scenario == 0 ? 0 : Scenario == 1 ? 6 : Scenario == 2 ? 6 * VoxelBlock::Volume / 2 :
+			Shapes.Get(EVoxelShapeKind::Stair, 0).Quads.Num();
 		FVoxelSectionCollisionResult Result;
 		const uint64 GrantedBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() +
-			VoxelBoundedAllocation::ArrayBytes<FBox>(ExpectedBoxes);
+			VoxelBoundedAllocation::ArrayBytes<FVector3f>(ExpectedQuads * 4) +
+			VoxelBoundedAllocation::ArrayBytes<int32>(ExpectedQuads * 6);
 		if (!Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, GrantedBytes, Result.ResourceLease)) return false;
 		const uint64 Serial = Result.ResourceLease->Serial();
 		if (!TestTrue(TEXT("空、实心、棋盘与非立方 Shape 只用真实 Count 的输出额度"),
 			FVoxelCollisionBuilder::Build(Snapshot, Registry, Shapes, Result))) return false;
-		TestEqual(TEXT("完整碰撞形状数量保持"), Result.Boxes.Num(), ExpectedBoxes);
-		TestTrue(TEXT("数组真实容量未超过 Count 上界"), uint64(Result.Boxes.GetAllocatedSize()) <=
-			VoxelBoundedAllocation::ArrayBytes<FBox>(ExpectedBoxes));
+		TestEqual(TEXT("完整碰撞面数量保持"), Result.Triangles.Num(), ExpectedQuads * 6);
+		TestTrue(TEXT("数组真实容量未超过 Count 上界"), uint64(Result.Vertices.GetAllocatedSize()) <=
+			VoxelBoundedAllocation::ArrayBytes<FVector3f>(ExpectedQuads * 4) && uint64(Result.Triangles.GetAllocatedSize()) <=
+			VoxelBoundedAllocation::ArrayBytes<int32>(ExpectedQuads * 6));
 		TestEqual(TEXT("结算保持原租约身份"), Result.ResourceLease->Serial(), Serial);
 		TestEqual(TEXT("结算保持 Staged 生命周期"), Result.ResourceLease->GetPool(), EVoxelTerrainResourcePool::Staged);
 		TestEqual(TEXT("Staged 只保留真实数组容量"), Result.ResourceLease->Bytes(), Result.Bytes());
 		if (Scenario == 3)
 		{
-			const auto& Expected = Shapes.Get(EVoxelShapeKind::Stair, 0).CollisionBoxes;
+			const auto& Expected = Shapes.Get(EVoxelShapeKind::Stair, 0).Quads;
 			for (int32 Index = 0; Index < Expected.Num(); ++Index)
-				TestTrue(TEXT("非立方碰撞盒未被精简成 Filled"), Result.Boxes[Index] == Expected[Index]);
+				for (int32 Vertex = 0; Vertex < 4; ++Vertex)
+					TestTrue(TEXT("楼梯碰撞面复用原始形状顶点"), Result.Vertices[Index * 4 + Vertex] == FVector3f(Expected[Index].Vertices[Vertex]));
 		}
 	}
 	return true;
@@ -196,7 +199,7 @@ bool FVoxelCollisionRetainedCapacityTest::RunTest(const FString& InParameters)
 	Snapshot.Revision = 23;
 	Snapshot.Blocks.Init(FVoxelBlockState{1, 0}.Pack(), VoxelBlock::Volume);
 	FVoxelTerrainResourceLimits Limits;
-	Limits.StagedBytes = 2 * 1024 * 1024;
+	Limits.StagedBytes = 32 * 1024 * 1024;
 	const auto Control = FVoxelGenerationConsumerKey::Section(17, FGuid::NewGuid(), 1, {}, 1);
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	FString Error;
@@ -208,8 +211,7 @@ bool FVoxelCollisionRetainedCapacityTest::RunTest(const FString& InParameters)
 	{
 		const auto Consumer = FVoxelGenerationConsumerKey::Section(17, Control.OwnerId, 1, FIntVector(Index, 0, 0), Index + 2);
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> OutputLease;
-		const uint64 CompletionBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() +
-			VoxelBoundedAllocation::ArrayBytes<FBox>(16384);
+		const uint64 CompletionBytes = FVoxelCollisionBuilder::MaximumOutputBytes();
 		if (!TestTrue(TEXT("保留已有完成结果时仍能接纳下一任务的原始完成上界"),
 			Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Staged, CompletionBytes, OutputLease))) return false;
 		const uint64 Serial = OutputLease->Serial();
@@ -224,7 +226,7 @@ bool FVoxelCollisionRetainedCapacityTest::RunTest(const FString& InParameters)
 	TestEqual(TEXT("所有未提交 CPU 结果仍在 Staged 如实计费"),
 		Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Staged)], RetainedBytes);
 	TestEqual(TEXT("未借 Resident 容量完成测试"), Resources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Resident)], uint64(0));
-	TestTrue(TEXT("256 个实心 Section 只保留实际合并后的数组"), RetainedBytes < Limits.StagedBytes / 2);
+	TestTrue(TEXT("256 个实心 Section 只保留实际合并后的三角面数组"), RetainedBytes < Limits.StagedBytes / 2);
 	return true;
 }
 

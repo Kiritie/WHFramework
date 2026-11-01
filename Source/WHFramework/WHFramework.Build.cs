@@ -44,6 +44,7 @@ public class WHFramework : ModuleRules
 				"RHI",
 				"RenderCore",
 				"Chaos",
+				"ChaosCore",
 				"Slate",
 				"Projects",
 				"Paper2D",

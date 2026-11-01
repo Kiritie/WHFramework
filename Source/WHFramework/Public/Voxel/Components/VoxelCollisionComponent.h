@@ -14,6 +14,7 @@ struct FVoxelDetachedPhysicsCook;
 class FVoxelPhysicsRetirement;
 class FVoxelTerrainWorkReceipt;
 struct FVoxelPhysicsRetirementTicket;
+struct FVoxelSectionCollisionResult;
 
 UCLASS()
 class WHFRAMEWORK_API UVoxelCollisionComponent : public UPrimitiveComponent
@@ -26,6 +27,8 @@ public:
 	static uint64 PreparedReclaimBytes();
 	bool BeginPrepare(int32 InBoxCount, double InBlockSize,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InPhysicalLease = nullptr);
+	bool BeginPrepareTriangles(TSharedPtr<const FVoxelSectionCollisionResult, ESPMode::ThreadSafe> InTriangles,
+		double InBlockSize, TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InPhysicalLease = nullptr);
 	bool AppendPreparedBoxes(TConstArrayView<FBox> InBoxes);
 	bool BeginDetachedCook(FVoxelTaskScheduler& InScheduler,
 		const FVoxelGenerationConsumerKey& InConsumer,
@@ -58,13 +61,16 @@ private:
 	FBox LocalBounds = FBox(FVector::ZeroVector, FVector::ZeroVector);
 	double BlockSize = 0.0;
 	int32 ExpectedBoxes = 0;
+	int32 ExpectedTriangles = 0;
 	bool bPreparing = false;
 	bool bInstalled = false;
+	bool bTriangleMode = false;
 	bool bNativeCapacityBlocked = false;
 	FGuid CookOwnerId = FGuid::NewGuid();
 	TSharedPtr<FVoxelDetachedPhysicsCook, ESPMode::ThreadSafe> Cook;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PreparedPhysicalLease;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PreparedReclaimLease;
+	TSharedPtr<const FVoxelSectionCollisionResult, ESPMode::ThreadSafe> PreparedTriangleInput;
 	TSharedPtr<FVoxelPhysicsRetirement, ESPMode::ThreadSafe> Retirement;
 	TSharedPtr<FVoxelPhysicsRetirementTicket, ESPMode::ThreadSafe> NativeTicket;
 	TOptional<FVoxelTaskRequest> PendingCookTask;

@@ -7,12 +7,14 @@
 #include "Physics/Experimental/PhysScene_Chaos.h"
 #include "Physics/PhysicsInterfaceCore.h"
 #include "Physics/PhysicsInterfaceTypes.h"
+#include "Chaos/TriangleMeshImplicitObject.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/Package.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Collision/VoxelPhysicsRetirement.h"
+#include "Voxel/Geometry/VoxelCollisionBuilder.h"
 #include "PhysicsProxy/SingleParticlePhysicsProxy.h"
 #include "PBDRigidsSolver.h"
 
@@ -29,6 +31,10 @@ struct FVoxelDetachedPhysicsCook : FVoxelPhysicsRetirementPayload
 	FBodyCollisionData CollisionData;
 	FTransform Transform;
 	FPhysicsActorHandle Actor = nullptr;
+	TSharedPtr<const FVoxelSectionCollisionResult, ESPMode::ThreadSafe> TriangleInput;
+	TArray<Chaos::FTriangleMeshImplicitObjectPtr> TriangleMeshes;
+	double BlockSize = 0.0;
+	bool bTriangleMode = false;
 	TAtomic<bool> bCanceled{false};
 	TAtomic<bool> bComplete{false};
 	TAtomic<bool> bApplied{false};
@@ -41,7 +47,11 @@ struct FVoxelDetachedPhysicsCook : FVoxelPhysicsRetirementPayload
 	{
 		// 未安装的 Actor 没有 Scene 读者；最后一个强引用只由 Worker 清理任务释放。
 		if (Actor) FPhysicsInterface::ReleaseActor(Actor, nullptr);
-		if (bReleaseInputs.Load() && Setup) Setup->AggGeom.BoxElems.Empty();
+		if (bReleaseInputs.Load() && Setup)
+		{
+			Setup->AggGeom.BoxElems.Empty();
+			Setup->TriMeshGeometries.Empty();
+		}
 	}
 };
 
@@ -78,26 +88,77 @@ namespace
 	{
 		TSharedPtr<FVoxelDetachedPhysicsCook, ESPMode::ThreadSafe> Work;
 
+		bool BuildTriangleMesh() const
+		{
+			const auto& Input = Work->TriangleInput;
+			if (!Input || Input->Vertices.IsEmpty() || Input->Triangles.IsEmpty() || Input->Triangles.Num() % 3 != 0 ||
+				!FMath::IsFinite(Work->BlockSize) || Work->BlockSize <= 0.0) return false;
+			TMap<FVector3f, int32> Welded;
+			TArray<FVector3f> Vertices;
+			TArray<int32> Remap;
+			Welded.Reserve(Input->Vertices.Num());
+			Vertices.Reserve(Input->Vertices.Num());
+			Remap.SetNumUninitialized(Input->Vertices.Num());
+			for (int32 Index = 0; Index < Input->Vertices.Num(); ++Index)
+			{
+				if ((Index & 4095) == 0 && Work->bCanceled.Load()) return false;
+				const FVector3f Position = Input->Vertices[Index] * float(Work->BlockSize);
+				if (Position.ContainsNaN()) return false;
+				if (const int32* Existing = Welded.Find(Position)) Remap[Index] = *Existing;
+				else
+				{
+					const int32 Added = Vertices.Add(Position);
+					Welded.Add(Position, Added);
+					Remap[Index] = Added;
+				}
+			}
+			Chaos::FTriangleMeshImplicitObject::ParticlesType Particles;
+			Particles.AddParticles(Vertices.Num());
+			for (int32 Index = 0; Index < Vertices.Num(); ++Index) Particles.SetX(Index, Vertices[Index]);
+			TArray<Chaos::TVector<int32, 3>> Triangles;
+			Triangles.Reserve(Input->Triangles.Num() / 3);
+			for (int32 Index = 0; Index < Input->Triangles.Num(); Index += 3)
+			{
+				if ((Index & 4095) == 0 && Work->bCanceled.Load()) return false;
+				const int32 A = Input->Triangles[Index], B = Input->Triangles[Index + 1], C = Input->Triangles[Index + 2];
+				if (!Remap.IsValidIndex(A) || !Remap.IsValidIndex(B) || !Remap.IsValidIndex(C)) return false;
+				const int32 WA = Remap[A], WB = Remap[B], WC = Remap[C];
+				if (WA == WB || WB == WC || WC == WA ||
+					FVector3f::CrossProduct(Vertices[WB] - Vertices[WA], Vertices[WC] - Vertices[WA]).SizeSquared() <= UE_SMALL_NUMBER)
+					return false;
+				Triangles.Emplace(WA, WB, WC);
+			}
+			TArray<uint16> MaterialIndices;
+			Chaos::FTriangleMeshImplicitObjectPtr Mesh(new Chaos::FTriangleMeshImplicitObject(
+				MoveTemp(Particles), MoveTemp(Triangles), MoveTemp(MaterialIndices)));
+			Work->TriangleMeshes.Add(MoveTemp(Mesh));
+			return true;
+		}
+
 		void operator()() const
 		{
 			if (!Work->bCanceled.Load())
 			{
+				if (Work->bTriangleMode && !BuildTriangleMesh()) Work->bFailed.Store(true);
 				FActorCreationParams ActorParams;
 				ActorParams.InitialTM = Work->Transform;
 				ActorParams.bStatic = true;
 				// Scene 为空：生成期间不能进入查询、模拟或 Broadphase 集合。
-				FPhysicsInterface::CreateActor(ActorParams, Work->Actor);
+				if (!Work->bFailed.Load() && !Work->bCanceled.Load()) FPhysicsInterface::CreateActor(ActorParams, Work->Actor);
 				if (Work->Actor)
 				{
 					FGeometryAddParams Geometry;
-					Geometry.bDoubleSided = false;
+					Geometry.bDoubleSided = Work->bTriangleMode;
 					Geometry.CollisionData = Work->CollisionData;
-					Geometry.CollisionTraceType = CTF_UseSimpleAsComplex;
+					Geometry.CollisionTraceType = Work->bTriangleMode ? CTF_UseComplexAsSimple : CTF_UseSimpleAsComplex;
 					Geometry.Scale = FVector::OneVector;
 					Geometry.SimpleMaterial = Work->Material.Get();
+					UPhysicalMaterial* ComplexMaterial = Work->Material.Get();
+					if (Work->bTriangleMode && ComplexMaterial) Geometry.ComplexMaterials = MakeArrayView(&ComplexMaterial, 1);
 					Geometry.LocalTransform = FTransform::Identity;
 					Geometry.WorldTransform = Work->Transform;
 					Geometry.Geometry = &Work->Setup->AggGeom;
+					Geometry.TriMeshGeometries = MakeArrayView(Work->TriangleMeshes);
 					FPhysicsInterface::AddGeometry(Work->Actor, Geometry);
 					Work->bFailed.Store(FPhysicsInterface::GetNumShapes(Work->Actor) == 0);
 				}
@@ -107,7 +168,9 @@ namespace
 			{
 				if (Work->Actor) FPhysicsInterface::ReleaseActor(Work->Actor, nullptr);
 				Work->Setup->AggGeom.BoxElems.Empty();
+				Work->TriangleMeshes.Empty();
 			}
+			Work->TriangleInput.Reset();
 			Work->bComplete.Store(true);
 		}
 	};
@@ -117,6 +180,7 @@ namespace
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> TaskLease;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PhysicalLease;
 		TSharedPtr<FVoxelDetachedPhysicsCook, ESPMode::ThreadSafe> Work;
+		TSharedPtr<const FVoxelSectionCollisionResult, ESPMode::ThreadSafe> TriangleInput;
 		TArray<FKBoxElem> Boxes;
 
 		void operator()() const
@@ -139,7 +203,7 @@ UVoxelCollisionComponent::UVoxelCollisionComponent()
 
 bool UVoxelCollisionComponent::ShouldCreatePhysicsState() const
 {
-	return bInstalled && ExpectedBoxes > 0 && Super::ShouldCreatePhysicsState();
+	return bInstalled && (bTriangleMode ? ExpectedTriangles > 0 : ExpectedBoxes > 0) && Super::ShouldCreatePhysicsState();
 }
 
 void UVoxelCollisionComponent::OnCreatePhysicsState()
@@ -212,7 +276,42 @@ bool UVoxelCollisionComponent::BeginPrepare(const int32 InBoxCount, const double
 	Setup->AggGeom.BoxElems.Reserve(InBoxCount);
 	BlockSize = InBlockSize;
 	ExpectedBoxes = InBoxCount;
+	ExpectedTriangles = 0;
+	bTriangleMode = false;
+	PreparedTriangleInput.Reset();
 	LocalBounds = FBox(ForceInit);
+	bPreparing = true;
+	bInstalled = false;
+	CookAttemptConsumer = {};
+	bCookCapacityBlocked = false;
+	bCookAdmissionFailed = false;
+	return true;
+}
+
+bool UVoxelCollisionComponent::BeginPrepareTriangles(
+	TSharedPtr<const FVoxelSectionCollisionResult, ESPMode::ThreadSafe> InTriangles, const double InBlockSize,
+	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InPhysicalLease)
+{
+	check(IsInGameThread());
+	if (IsPhysicsStateCreated() || Cook || PendingCookTask.IsSet() || !InTriangles ||
+		InTriangles->Vertices.IsEmpty() || InTriangles->Triangles.IsEmpty() || InTriangles->Triangles.Num() % 3 != 0 ||
+		!InTriangles->LocalBounds.IsValid || !FMath::IsFinite(InBlockSize) || InBlockSize <= 0.0) return false;
+	if (InPhysicalLease)
+	{
+		auto Reclaim = InPhysicalLease->Split(PreparedReclaimBytes());
+		if (!Reclaim) return false;
+		PreparedReclaimLease = MoveTemp(Reclaim);
+		PreparedPhysicalLease = MoveTemp(InPhysicalLease);
+	}
+	Setup = NewObject<UBodySetup>(GetTransientPackage());
+	Setup->CollisionTraceFlag = CTF_UseComplexAsSimple;
+	Setup->bDoubleSidedGeometry = true;
+	BlockSize = InBlockSize;
+	ExpectedBoxes = 0;
+	ExpectedTriangles = InTriangles->Triangles.Num() / 3;
+	LocalBounds = FBox(InTriangles->LocalBounds.Min * BlockSize, InTriangles->LocalBounds.Max * BlockSize);
+	PreparedTriangleInput = MoveTemp(InTriangles);
+	bTriangleMode = true;
 	bPreparing = true;
 	bInstalled = false;
 	CookAttemptConsumer = {};
@@ -252,8 +351,9 @@ bool UVoxelCollisionComponent::BeginDetachedCook(
 	TSharedPtr<FVoxelPhysicsRetirement, ESPMode::ThreadSafe> InRetirement)
 {
 	check(IsInGameThread());
-	if (!bPreparing || !Setup || Setup->AggGeom.BoxElems.Num() != ExpectedBoxes) return false;
-	if (ExpectedBoxes == 0 || bCookAdmissionFailed || (Cook && !PendingCookTask.IsSet())) return true;
+	if (!bPreparing || !Setup || Setup->AggGeom.BoxElems.Num() != ExpectedBoxes ||
+		(bTriangleMode && (!PreparedTriangleInput || ExpectedTriangles <= 0))) return false;
+	if ((!bTriangleMode && ExpectedBoxes == 0) || bCookAdmissionFailed || (Cook && !PendingCookTask.IsSet())) return true;
 	if (!InRetirement) return false;
 	const auto InResources = InScheduler.GetTerrainResources();
 	if (!CookAttemptConsumer.IsValid())
@@ -300,12 +400,15 @@ bool UVoxelCollisionComponent::BeginDetachedCook(
 		Work->PhysicalLease = MoveTemp(InPhysicalLease);
 		Work->Consumer = CookConsumer;
 		Work->Setup.Reset(Setup);
+		Work->bTriangleMode = bTriangleMode;
+		Work->TriangleInput = PreparedTriangleInput;
+		Work->BlockSize = BlockSize;
 		BodyInstance.OwnerComponent = this;
 		BodyInstance.SourceObject = GetOwner();
 		BodyInstance.BodySetup = Setup;
 		BodyInstance.Scale3D = FVector::OneVector;
 		BodyInstance.BuildBodyFilterData(Work->CollisionData.CollisionFilterData);
-		FBodyInstance::BuildBodyCollisionFlags(Work->CollisionData.CollisionFlags, ECollisionEnabled::QueryAndPhysics, false);
+		FBodyInstance::BuildBodyCollisionFlags(Work->CollisionData.CollisionFlags, ECollisionEnabled::QueryAndPhysics, bTriangleMode);
 		Work->Material.Reset(BodyInstance.GetSimplePhysicalMaterial());
 		// 材质的懒初始化只在 GT 执行；Worker 只消费冻结的物理材质。
 		if (Work->Material) Work->Material->GetPhysicsMaterial();
@@ -424,7 +527,7 @@ bool UVoxelCollisionComponent::PrepareNativeRetirement(
 {
 	check(IsInGameThread());
 	bNativeCapacityBlocked = false;
-	if (ExpectedBoxes == 0) return true;
+	if (!bTriangleMode && ExpectedBoxes == 0) return true;
 	if (!Cook || !Cook->bComplete.Load() || !Cook->bApplied.Load() || Cook->bFailed.Load() ||
 		Cook->bCanceled.Load() || !Cook->Actor || !Retirement) return false;
 	if (!Retirement->PrepareTicket(Cook->Actor, Cook->Consumer, Cook, NativeTicket, bNativeCapacityBlocked)) return false;
@@ -442,12 +545,19 @@ TSharedPtr<FVoxelPhysicsRetirementTicket, ESPMode::ThreadSafe> UVoxelCollisionCo
 bool UVoxelCollisionComponent::InstallPreparedPhysics()
 {
 	check(IsInGameThread());
-	if (!bPreparing || !Setup || Setup->AggGeom.BoxElems.Num() != ExpectedBoxes) return false;
-	if (ExpectedBoxes == 0) LocalBounds = FBox(FVector::ZeroVector, FVector::ZeroVector);
-	if (ExpectedBoxes != 0)
+	if (!bPreparing || !Setup || Setup->AggGeom.BoxElems.Num() != ExpectedBoxes ||
+		(bTriangleMode && ExpectedTriangles <= 0)) return false;
+	if (!bTriangleMode && ExpectedBoxes == 0) LocalBounds = FBox(FVector::ZeroVector, FVector::ZeroVector);
+	if (bTriangleMode || ExpectedBoxes != 0)
 	{
 		if (!Cook || !Cook->bComplete.Load() || Cook->bFailed.Load() || Cook->bCanceled.Load() || !Cook->Actor ||
 			!NativeTicket || !NativeTicket->bRegistered || NativeTicket->bNativeRetired.Load()) return false;
+		if (bTriangleMode)
+		{
+			if (Cook->TriangleMeshes.Num() != 1) return false;
+			Setup->TriMeshGeometries = Cook->TriangleMeshes;
+			Setup->bCreatedPhysicsMeshes = true;
+		}
 		FPhysScene* Scene = GetWorld() ? GetWorld()->GetPhysicsScene() : nullptr;
 		if (!Scene) return false;
 		BodyInstance.SetPhysicsActor(Cook->Actor);
@@ -466,6 +576,7 @@ bool UVoxelCollisionComponent::InstallPreparedPhysics()
 	}
 	else bInstalled = true;
 	bPreparing = false;
+	PreparedTriangleInput.Reset();
 	UpdateBounds();
 	return HasInstalledPhysics();
 }
@@ -491,6 +602,7 @@ void UVoxelCollisionComponent::ReleasePreparedInputs(
 			Reclaim.TaskLease = MoveTemp(PreparedReclaimLease);
 			Reclaim.PhysicalLease = MoveTemp(PreparedPhysicalLease);
 			Reclaim.Boxes = MoveTemp(Setup->AggGeom.BoxElems);
+			Reclaim.TriangleInput = MoveTemp(PreparedTriangleInput);
 			UE::Tasks::Launch(UE_SOURCE_LOCATION, MoveTemp(Reclaim));
 		}
 		return;
@@ -500,6 +612,7 @@ void UVoxelCollisionComponent::ReleasePreparedInputs(
 	FDetachedPhysicsReclaimTask Reclaim;
 	Reclaim.TaskLease = MoveTemp(Cook->ReclaimTaskLease);
 	Reclaim.PhysicalLease = MoveTemp(InPhysicalLease);
+	Reclaim.TriangleInput = MoveTemp(PreparedTriangleInput);
 	if (!Cook->bComplete.Load()) Cook->bCanceled.Store(true);
 	else if (Setup) Reclaim.Boxes = MoveTemp(Setup->AggGeom.BoxElems);
 	Reclaim.Work = MoveTemp(Cook);
@@ -521,7 +634,7 @@ void UVoxelCollisionComponent::OnComponentDestroyed(const bool bDestroyingHierar
 
 bool UVoxelCollisionComponent::HasInstalledPhysics() const
 {
-	return bInstalled && !bPreparing && Setup && (ExpectedBoxes == 0 ||
+	return bInstalled && !bPreparing && Setup && ((!bTriangleMode && ExpectedBoxes == 0) ||
 		(IsPhysicsStateCreated() && BodyInstance.IsValidBodyInstance()));
 }
 

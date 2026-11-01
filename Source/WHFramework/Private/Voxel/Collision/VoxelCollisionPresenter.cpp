@@ -6,7 +6,6 @@
 #include "Physics/PhysicsInterfaceCore.h"
 #include "Physics/Experimental/PhysScene_Chaos.h"
 #include "PhysicsEngine/BodySetup.h"
-#include "PhysicsEngine/BoxElem.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "PBDRigidsSolver.h"
 #include "Chaos/SimCallbackObject.h"
@@ -430,13 +429,12 @@ bool FVoxelCollisionPresenter::OnTask(FVoxelTaskResult&& InResult)
 		Body->PreparingLease.Reset();
 	}
 #if !UE_BUILD_SHIPPING
-	if (InResult.Collision->Boxes.IsEmpty()) ++EmptyBuilds;
+	if (InResult.Collision->IsEmpty()) ++EmptyBuilds;
 	else ++NonemptyBuilds;
 #endif
 	Body->Prepared = MoveTemp(InResult.Collision);
 	Body->bHasFailure = false;
 	Body->PreparedStamp = InResult.Stamp;
-	Body->BoxCursor = 0;
 	Control->Activate(*Body);
 	return true;
 }
@@ -460,7 +458,7 @@ void FVoxelCollisionPresenter::AdvanceBody(const FIntVector& InSection, FBodyRec
 				InBody.RequestedUnknownHaloMask = InBody.InstalledUnknownHaloMask;
 				InBody.OcclusionRefreshMask &= InBody.InstalledUnknownHaloMask;
 #if !UE_BUILD_SHIPPING
-				if (InBody.SyncPrepared->Boxes.IsEmpty()) ++EmptyReceipts;
+				if (InBody.SyncPrepared->IsEmpty()) ++EmptyReceipts;
 				else ++NonemptyReceipts;
 #endif
 			}
@@ -506,7 +504,7 @@ void FVoxelCollisionPresenter::AdvanceBody(const FIntVector& InSection, FBodyRec
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, OwnerId, Data->Incarnation, InSection, ++NextLeaseSerial);
 	if (!InBody.EvidenceLease && !Resources->Acquire(Consumer, EVoxelTerrainResourcePool::Resident,
 		33 * EvidenceNodeBytes() + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelCollisionCoverageSnapshot>(), InBody.EvidenceLease, 34)) return;
-	if (InBody.Prepared->Boxes.IsEmpty() && !InBody.PreparingComponent)
+	if (InBody.Prepared->IsEmpty() && !InBody.PreparingComponent)
 	{
 		FPhysScene* Scene = Module.GetWorld()->GetPhysicsScene();
 		if (!Scene || !Scene->GetSolver()) return;
@@ -531,10 +529,10 @@ void FVoxelCollisionPresenter::AdvanceBody(const FIntVector& InSection, FBodyRec
 	}
 	if (!InBody.PreparingComponent)
 	{
-		const uint64 PhysicalPeak = sizeof(UVoxelCollisionComponent) + sizeof(UBodySetup) + 4096 +
+		// 覆盖焊接索引、Chaos 顶点、三角形和构建 BVH 的同时存活峰值。
+		const uint64 PhysicalPeak = sizeof(UVoxelCollisionComponent) + sizeof(UBodySetup) + 65536 +
 			UVoxelCollisionComponent::PreparedReclaimBytes() +
-			VoxelBoundedAllocation::ArrayBytes<FKBoxElem>(InBody.Prepared->Boxes.Num()) +
-			uint64(InBody.Prepared->Boxes.Num()) * 1024;
+			uint64(InBody.Prepared->Vertices.Num()) * 128 + uint64(InBody.Prepared->Triangles.Num() / 3) * 256;
 		if (!Resources->Acquire(Consumer, InBody.Component ? EVoxelTerrainResourcePool::ResidentOverlap :
 			EVoxelTerrainResourcePool::Resident, PhysicalPeak, InBody.PreparingLease, 1)) return;
 		AActor* Owner = Module.GetTypedOuter<AActor>();
@@ -543,14 +541,7 @@ void FVoxelCollisionPresenter::AdvanceBody(const FIntVector& InSection, FBodyRec
 		InBody.PreparingComponent.Reset(Component);
 		Component->SetWorldLocation(FVector(InSection * 16) * Module.BlockSize());
 		Component->RegisterComponent();
-		if (!Component->BeginPrepare(InBody.Prepared->Boxes.Num(), Module.BlockSize(), InBody.PreparingLease)) return;
-	}
-	if (InBody.BoxCursor < InBody.Prepared->Boxes.Num())
-	{
-		const int32 Count = FMath::Min(64, InBody.Prepared->Boxes.Num() - InBody.BoxCursor);
-		if (!InBody.PreparingComponent->AppendPreparedBoxes(MakeArrayView(InBody.Prepared->Boxes.GetData() + InBody.BoxCursor, Count))) return;
-		InBody.BoxCursor += Count;
-		return;
+		if (!Component->BeginPrepareTriangles(InBody.Prepared, Module.BlockSize(), InBody.PreparingLease)) return;
 	}
 	const auto* CurrentDemand = Module.GetCurrentInterest().Exact.Find(InSection);
 	const FVoxelTerrainServicePriority ServicePriority = CurrentDemand &&
@@ -571,7 +562,6 @@ void FVoxelCollisionPresenter::AdvanceBody(const FIntVector& InSection, FBodyRec
 		InBody.PreparingComponent->DestroyComponent();
 		InBody.PreparingComponent.Reset();
 		InBody.PreparingLease.Reset();
-		InBody.BoxCursor = 0;
 		if (bCanceled)
 		{
 			InBody.bHasFailure = false;
@@ -704,8 +694,7 @@ void FVoxelCollisionPresenter::RequestCollision(const FIntVector& InSection, con
 	}
 	const uint64 InputBytes = VoxelBoundedAllocation::InitialGrowBytes<uint32>(4096) +
 		6 * VoxelBoundedAllocation::InitialGrowBytes<uint32>(256) + VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionSnapshot>();
-	const uint64 OutputBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() +
-		VoxelBoundedAllocation::ArrayBytes<FBox>(16384);
+	const uint64 OutputBytes = FVoxelCollisionBuilder::MaximumOutputBytes();
 	if (!Body->AdmissionSnapshot)
 	{
 		const uint64 BeforeInput = Resources->ReleaseVersionExcludingOwner(Body->AdmissionConsumer);

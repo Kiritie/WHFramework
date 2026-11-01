@@ -1,7 +1,15 @@
 #include "Voxel/Geometry/VoxelCollisionBuilder.h"
 #include "Voxel/Chunks/VoxelSectionKey.h"
+#include "Voxel/Geometry/VoxelFaceMerger.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
+
+uint64 FVoxelCollisionBuilder::MaximumOutputBytes()
+{
+	return VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() +
+		VoxelBoundedAllocation::ArrayBytes<FVector3f>(MaximumQuads * 4) +
+		VoxelBoundedAllocation::ArrayBytes<int32>(MaximumQuads * 6);
+}
 
 bool FVoxelCollisionBuilder::Build(
 	const FVoxelSectionSnapshot& InSnapshot,
@@ -10,17 +18,17 @@ bool FVoxelCollisionBuilder::Build(
 	FVoxelSectionCollisionResult& OutResult,
 	const TAtomic<bool>* InCancel)
 {
-	int32 BoxCount = 0;
-	if (!VisitBoxes(InSnapshot, InRegistry, InShapes, [&BoxCount](const FBox&)
+	int32 QuadCount = 0;
+	if (!VisitQuads(InSnapshot, InRegistry, InShapes, [&QuadCount](const FVector*)
 	{
-		++BoxCount;
+		++QuadCount;
 		return true;
 	}, InCancel)) return false;
 
-	// 候选成功前旧输出仍有效，容量授予必须覆盖两份数组同时存活的峰值。
-	const uint64 CandidateBytes = VoxelBoundedAllocation::ArrayBytes<FBox>(BoxCount);
+	const uint64 VertexBytes = VoxelBoundedAllocation::ArrayBytes<FVector3f>(QuadCount * 4);
+	const uint64 IndexBytes = VoxelBoundedAllocation::ArrayBytes<int32>(QuadCount * 6);
 	const uint64 PeakBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() +
-		OutResult.Boxes.GetAllocatedSize() + CandidateBytes;
+		OutResult.Vertices.GetAllocatedSize() + OutResult.Triangles.GetAllocatedSize() + VertexBytes + IndexBytes;
 	if (OutResult.ResourceLease && OutResult.ResourceLease->Bytes() < PeakBytes) return false;
 
 	FVoxelSectionCollisionResult Candidate;
@@ -49,146 +57,251 @@ bool FVoxelCollisionBuilder::Build(
 				const int32 Index = Cell.X + VoxelBlock::Size * (Cell.Y + VoxelBlock::Size * Cell.Z);
 				const FVoxelBlockState State = FVoxelBlockState::Unpack(InSnapshot.Blocks[Index]);
 				const auto* Definition = State.IsAir() ? nullptr : InRegistry.Find(State.TypeId);
-				if (Definition && Definition->bSolid) { Candidate.UnknownHaloMask |= uint8(1u << Face); break; }
+				if (!Definition || !Definition->bSolid) continue;
+				const auto* Shape = Definition->FindShape(InShapes, State.State);
+				if (Shape && !Shape->CollisionBoxes.IsEmpty())
+				{
+					Candidate.UnknownHaloMask |= uint8(1u << Face);
+					break;
+				}
 			}
 		}
 	}
-	Candidate.Boxes.Reserve(BoxCount);
-	check(uint64(Candidate.Boxes.GetAllocatedSize()) <= CandidateBytes);
-	if (!VisitBoxes(InSnapshot, InRegistry, InShapes, [&Candidate, BoxCount](const FBox& Box)
+	Candidate.Vertices.Reserve(QuadCount * 4);
+	Candidate.Triangles.Reserve(QuadCount * 6);
+	check(uint64(Candidate.Vertices.GetAllocatedSize()) <= VertexBytes);
+	check(uint64(Candidate.Triangles.GetAllocatedSize()) <= IndexBytes);
+	if (!VisitQuads(InSnapshot, InRegistry, InShapes, [&Candidate, QuadCount](const FVector* Points)
 	{
-		if (Candidate.Boxes.Num() >= BoxCount) return false;
-		Candidate.Boxes.Add(Box);
+		if (Candidate.Vertices.Num() / 4 >= QuadCount) return false;
+		const int32 Base = Candidate.Vertices.Num();
+		for (int32 Index = 0; Index < 4; ++Index)
+		{
+			if (Points[Index].ContainsNaN()) return false;
+			Candidate.Vertices.Add(FVector3f(Points[Index]));
+			Candidate.LocalBounds += Points[Index];
+		}
+		// 顶点顺序与 Fine 可视表面相同；Chaos 物理三角形使用外向绕序。
+		Candidate.Triangles.Append({Base, Base + 1, Base + 2, Base, Base + 2, Base + 3});
 		return true;
-	}, InCancel) || Candidate.Boxes.Num() != BoxCount || (InCancel && InCancel->Load())) return false;
+	}, InCancel) || Candidate.Vertices.Num() != QuadCount * 4 ||
+		Candidate.Triangles.Num() != QuadCount * 6 || (InCancel && InCancel->Load())) return false;
 	OutResult = MoveTemp(Candidate);
-	if (OutResult.ResourceLease)
-	{
-		verify(OutResult.ResourceLease->Resize(OutResult.Bytes()));
-	}
+	if (OutResult.ResourceLease) verify(OutResult.ResourceLease->Resize(OutResult.Bytes()));
 	return true;
 }
 
-bool FVoxelCollisionBuilder::VisitBoxes(
+bool FVoxelCollisionBuilder::VisitQuads(
 	const FVoxelSectionSnapshot& InSnapshot,
 	const FVoxelRegistrySnapshot& InRegistry,
 	const FVoxelShapeRegistry& InShapes,
-	TFunctionRef<bool(const FBox&)> InVisit,
+	TFunctionRef<bool(const FVector*)> InVisit,
 	const TAtomic<bool>* InCancel)
 {
-	constexpr int32 MaxBoxes = 16384;
 	if (InSnapshot.GridSide != VoxelBlock::Size || InSnapshot.Blocks.Num() != VoxelBlock::Volume ||
 		(InCancel && InCancel->Load())) return false;
-	int32 BoxCount = 0;
-	const auto AddBox = [&InVisit, &BoxCount](const FBox& Box)
+	int32 QuadCount = 0;
+	const auto Emit = [&InVisit, &QuadCount](const FVector* Points)
 	{
-		if (BoxCount == MaxBoxes || !InVisit(Box)) return false;
-		++BoxCount;
+		if (QuadCount == MaximumQuads || !InVisit(Points)) return false;
+		++QuadCount;
 		return true;
 	};
-	// 完整立方体才能证明相邻面被完全遮挡；特殊形状和未知邻区均保守视为可能通行。
+	bool bInvalidNeighbor = false;
+	const auto Classify = [&](const FVoxelBlockState State) -> uint8
+	{
+		if (!InRegistry.IsValid(State)) { bInvalidNeighbor = true; return 0; }
+		if (State.IsAir()) return 0;
+		const auto* Definition = InRegistry.Find(State.TypeId);
+		if (!Definition->bSolid) return 0;
+		if (Definition->Shape == EVoxelShapeKind::FullCube && Definition->StateGeometry.IsEmpty()) return 1;
+		const auto* Shape = Definition->FindShape(InShapes, State.State);
+		if (!Shape) { bInvalidNeighbor = true; return 0; }
+		if (Shape->CollisionBoxes.IsEmpty()) return 0;
+		if (Shape->CollisionBoxes.Num() == 1 && Shape->CollisionBoxes[0].Min == FVector::ZeroVector &&
+			Shape->CollisionBoxes[0].Max == FVector::OneVector) return 1;
+		return 2;
+	};
 	uint8 Occupancy[VoxelBlock::Volume] = {};
-	uint8 Filled[VoxelBlock::Volume] = {};
 	for (int32 Index = 0; Index < VoxelBlock::Volume; ++Index)
 	{
 		if (InCancel && InCancel->Load()) return false;
 		const FVoxelBlockState State = FVoxelBlockState::Unpack(InSnapshot.Blocks[Index]);
-		if (!InRegistry.IsValid(State)) return false;
-		if (State.IsAir()) continue;
-		const auto* Definition = InRegistry.Find(State.TypeId);
-		if (!Definition->bSolid) continue;
-		Occupancy[Index] = Definition->Shape == EVoxelShapeKind::FullCube ? 1 : 2;
+		Occupancy[Index] = Classify(State);
+		if (bInvalidNeighbor) return false;
 	}
-	bool bInvalidNeighbor = false;
-	const auto IsFullyOccupied = [&](const FIntVector& Position)
+	const auto NeighborOccupancy = [&](const FIntVector& Position) -> uint8
 	{
 		if (Position.X >= 0 && Position.X < VoxelBlock::Size && Position.Y >= 0 && Position.Y < VoxelBlock::Size &&
 			Position.Z >= 0 && Position.Z < VoxelBlock::Size)
-		{
-			return Occupancy[Position.X + VoxelBlock::Size * (Position.Y + VoxelBlock::Size * Position.Z)] == 1;
-		}
+			return Occupancy[Position.X + VoxelBlock::Size * (Position.Y + VoxelBlock::Size * Position.Z)];
 		FVoxelBlockState Neighbor;
-		if (!InSnapshot.TrySample(Position, Neighbor)) return false;
-		if (!InRegistry.IsValid(Neighbor)) { bInvalidNeighbor = true; return false; }
-		if (Neighbor.IsAir()) return false;
-		const auto* Definition = InRegistry.Find(Neighbor.TypeId);
-		return Definition && Definition->bSolid && Definition->Shape == EVoxelShapeKind::FullCube;
+		return InSnapshot.TrySample(Position, Neighbor) ? Classify(Neighbor) : 0;
 	};
+	const auto NeighborShape = [&](const FIntVector& Position) -> const FVoxelResolvedShape*
+	{
+		FVoxelBlockState Neighbor;
+		if (!InSnapshot.TrySample(Position, Neighbor) || Neighbor.IsAir()) return nullptr;
+		const auto* Definition = InRegistry.Find(Neighbor.TypeId);
+		const auto* Shape = Definition ? Definition->FindShape(InShapes, Neighbor.State) : nullptr;
+		if (!Shape) bInvalidNeighbor = true;
+		return Shape;
+	};
+	const auto EmitRectangle = [&Emit](const uint8 Face, const double Plane, const double UMin, const double UMax,
+		const double VMin, const double VMax)
+	{
+		const int32 Axis = Face / 2, UAxis = (Axis + 1) % 3, VAxis = (Axis + 2) % 3;
+		const double Us[4] = {UMin, UMax, UMax, UMin};
+		const double Vs[4] = {VMin, VMin, VMax, VMax};
+		FVector Points[4];
+		for (int32 Index = 0; Index < 4; ++Index)
+		{
+			Points[Index] = FVector::ZeroVector;
+			Points[Index][Axis] = Plane;
+			Points[Index][UAxis] = Us[Index];
+			Points[Index][VAxis] = Vs[Index];
+		}
+		if (Face & 1) Swap(Points[1], Points[3]);
+		return Emit(Points);
+	};
+	// 在真实碰撞盒边界上切分矩形，避免半砖等相邻形状留下内部碰撞面。
+	const auto EmitUncovered = [&](const uint8 Face, const double Plane, const double UMin, const double UMax,
+		const double VMin, const double VMax, const TArray<FBox>* SelfBoxes, const FIntVector& SelfCell,
+		const int32 SelfIndex, const TArray<FBox>* NeighborBoxes, const FIntVector& NeighborCell)
+	{
+		const int32 Axis = Face / 2, UAxis = (Axis + 1) % 3, VAxis = (Axis + 2) % 3;
+		const int32 SelfCount = SelfBoxes ? SelfBoxes->Num() : 0;
+		const int32 Total = SelfCount + (NeighborBoxes ? NeighborBoxes->Num() : 0);
+		const auto Partition = [&](auto&& Recurse, const double U0, const double U1,
+			const double V0, const double V1, const int32 Start) -> bool
+		{
+			if (InCancel && InCancel->Load()) return false;
+			for (int32 Index = Start; Index < Total; ++Index)
+			{
+				const bool bSelf = Index < SelfCount;
+				const int32 BoxIndex = bSelf ? Index : Index - SelfCount;
+				if (bSelf && BoxIndex == SelfIndex) continue;
+				const FBox& Box = bSelf ? (*SelfBoxes)[BoxIndex] : (*NeighborBoxes)[BoxIndex];
+				const FIntVector& Offset = bSelf ? SelfCell : NeighborCell;
+				const double MinAxis = Box.Min[Axis] + Offset[Axis];
+				const double MaxAxis = Box.Max[Axis] + Offset[Axis];
+				const bool bAcross = (Face & 1) ? MaxAxis >= Plane && MinAxis < Plane : MinAxis <= Plane && MaxAxis > Plane;
+				const bool bEarlierCoplanar = bSelf && BoxIndex < SelfIndex &&
+					((Face & 1) ? MinAxis == Plane : MaxAxis == Plane);
+				if (!bAcross && !bEarlierCoplanar) continue;
+				const double CutU0 = FMath::Max(U0, Box.Min[UAxis] + Offset[UAxis]);
+				const double CutU1 = FMath::Min(U1, Box.Max[UAxis] + Offset[UAxis]);
+				const double CutV0 = FMath::Max(V0, Box.Min[VAxis] + Offset[VAxis]);
+				const double CutV1 = FMath::Min(V1, Box.Max[VAxis] + Offset[VAxis]);
+				if (CutU0 >= CutU1 || CutV0 >= CutV1) continue;
+				return (U0 >= CutU0 || Recurse(Recurse, U0, CutU0, V0, V1, Index + 1)) &&
+					(CutU1 >= U1 || Recurse(Recurse, CutU1, U1, V0, V1, Index + 1)) &&
+					(V0 >= CutV0 || Recurse(Recurse, CutU0, CutU1, V0, CutV0, Index + 1)) &&
+					(CutV1 >= V1 || Recurse(Recurse, CutU0, CutU1, CutV1, V1, Index + 1));
+			}
+			return EmitRectangle(Face, Plane, U0, U1, V0, V1);
+		};
+		return Partition(Partition, UMin, UMax, VMin, VMax, 0);
+	};
+	uint8 Mask[VoxelBlock::Size * VoxelBlock::Size] = {};
+	for (uint8 Face = 0; Face < 6; ++Face)
+	{
+		const int32 Axis = Face / 2, UAxis = (Axis + 1) % 3, VAxis = (Axis + 2) % 3;
+		for (int32 Slice = 0; Slice < VoxelBlock::Size; ++Slice)
+		{
+			if (InCancel && InCancel->Load()) return false;
+			for (int32 V = 0; V < VoxelBlock::Size; ++V)
+				for (int32 U = 0; U < VoxelBlock::Size; ++U)
+				{
+					FIntVector Cell = FIntVector::ZeroValue;
+					Cell[Axis] = Slice; Cell[UAxis] = U; Cell[VAxis] = V;
+					const int32 Index = Cell.X + VoxelBlock::Size * (Cell.Y + VoxelBlock::Size * Cell.Z);
+					Mask[U + VoxelBlock::Size * V] = 0;
+					if (Occupancy[Index] != 1) continue;
+					const FIntVector NeighborCell = Cell + VoxelCoord::Direction(Face);
+					const uint8 Neighbor = NeighborOccupancy(NeighborCell);
+					if (Neighbor == 0) Mask[U + VoxelBlock::Size * V] = 1;
+					else if (Neighbor == 2)
+					{
+						const auto* Shape = NeighborShape(NeighborCell);
+						if (!Shape || !EmitUncovered(Face, Slice + ((Face & 1) ? 0 : 1), U, U + 1, V, V + 1,
+							nullptr, Cell, INDEX_NONE, &Shape->CollisionBoxes, NeighborCell)) return false;
+					}
+				}
+			if (bInvalidNeighbor) return false;
+			for (int32 V = 0; V < VoxelBlock::Size; ++V)
+				for (int32 U = 0; U < VoxelBlock::Size;)
+				{
+					if (!Mask[U + VoxelBlock::Size * V]) { ++U; continue; }
+					FIntRect Rect;
+					if (!FVoxelFaceMerger::Grow(FIntPoint(U, V), FIntPoint(VoxelBlock::Size),
+						[&Mask](int32 X, int32 Y) { return Mask[X + VoxelBlock::Size * Y] != 0; }, Rect, InCancel)) return false;
+					if (!EmitRectangle(Face, Slice + ((Face & 1) ? 0 : 1), Rect.Min.X, Rect.Max.X, Rect.Min.Y, Rect.Max.Y)) return false;
+					for (int32 Y = Rect.Min.Y; Y < Rect.Max.Y; ++Y)
+						for (int32 X = Rect.Min.X; X < Rect.Max.X; ++X) Mask[X + VoxelBlock::Size * Y] = 0;
+					U = Rect.Max.X;
+				}
+		}
+	}
 	for (int32 Index = 0; Index < VoxelBlock::Volume; ++Index)
 	{
 		if (InCancel && InCancel->Load()) return false;
-		if (Occupancy[Index] == 0) continue;
+		if (Occupancy[Index] != 2) continue;
 		const FIntVector Cell = VoxelCoord::Unlinear(uint16(Index));
-		bool bExposed = false;
-		for (int32 Axis = 0; Axis < 3 && !bExposed; ++Axis)
-		{
-			for (const int32 Direction : {-1, 1})
-			{
-				FIntVector Neighbor = Cell;
-				Neighbor[Axis] += Direction;
-				if (!IsFullyOccupied(Neighbor)) { bExposed = true; break; }
-			}
-		}
-		if (bInvalidNeighbor) return false;
-		if (!bExposed) continue;
-		if (Occupancy[Index] == 1)
-		{
-			Filled[Index] = 1;
-			continue;
-		}
 		const FVoxelBlockState State = FVoxelBlockState::Unpack(InSnapshot.Blocks[Index]);
-		const auto* Shape = InRegistry.Find(State.TypeId)->FindShape(InShapes, State.State);
+		const auto* Definition = InRegistry.Find(State.TypeId);
+		const auto* Shape = Definition ? Definition->FindShape(InShapes, State.State) : nullptr;
 		if (!Shape) return false;
-		const FVector Position(Cell);
+		if (Shape->CollisionBoxes.IsEmpty()) continue;
 		for (const FBox& Box : Shape->CollisionBoxes)
 		{
-			if (!AddBox(FBox(Box.Min + Position, Box.Max + Position))) return false;
+			if (!Box.IsValid || Box.Min.ContainsNaN() || Box.Max.ContainsNaN() ||
+				Box.Min.X >= Box.Max.X || Box.Min.Y >= Box.Max.Y || Box.Min.Z >= Box.Max.Z) return false;
 		}
-	}
-
-	auto At = [&Filled](const int32 X, const int32 Y, const int32 Z) -> uint8&
-	{
-		return Filled[X + VoxelBlock::Size * Y + VoxelBlock::Size * VoxelBlock::Size * Z];
-	};
-	for (int32 Z = 0; Z < VoxelBlock::Size; ++Z)
-	{
-		for (int32 Y = 0; Y < VoxelBlock::Size; ++Y)
+		if (!Shape->Quads.IsEmpty() && Shape->CollisionBoxes == Shape->SelectionBoxes)
 		{
-			for (int32 X = 0; X < VoxelBlock::Size; ++X)
+			for (const FVoxelShapeQuad& Quad : Shape->Quads)
 			{
-				if (InCancel && InCancel->Load()) return false;
-				if (!At(X, Y, Z)) continue;
-				int32 Width = 1, Height = 1, Depth = 1;
-				while (X + Width < VoxelBlock::Size && At(X + Width, Y, Z)) ++Width;
-				bool bBlocked = false;
-				while (Y + Height < VoxelBlock::Size && !bBlocked)
+				const FIntVector NeighborCell = Cell + VoxelCoord::Direction(Quad.Face);
+				const uint8 Neighbor = Quad.bBoundary ? NeighborOccupancy(NeighborCell) : 0;
+				if (bInvalidNeighbor) return false;
+				if (Neighbor == 1) continue;
+				if (Neighbor == 2)
 				{
-					for (int32 DX = 0; DX < Width; ++DX)
-					{
-						if (!At(X + DX, Y + Height, Z)) { bBlocked = true; break; }
-					}
-					if (!bBlocked) ++Height;
+					const auto* Other = NeighborShape(NeighborCell);
+					const int32 Axis = Quad.Face / 2, UAxis = (Axis + 1) % 3, VAxis = (Axis + 2) % 3;
+					FBox Bounds(ForceInit);
+					for (const FVector& Vertex : Quad.Vertices) Bounds += Vertex + FVector(Cell);
+					if (!Other || !EmitUncovered(Quad.Face, Bounds.Min[Axis], Bounds.Min[UAxis], Bounds.Max[UAxis],
+						Bounds.Min[VAxis], Bounds.Max[VAxis], nullptr, Cell, INDEX_NONE,
+						&Other->CollisionBoxes, NeighborCell)) return false;
 				}
-				bBlocked = false;
-				while (Z + Depth < VoxelBlock::Size && !bBlocked)
+				else
 				{
-					for (int32 DY = 0; DY < Height && !bBlocked; ++DY)
-					{
-						for (int32 DX = 0; DX < Width; ++DX)
-						{
-							if (!At(X + DX, Y + DY, Z + Depth)) { bBlocked = true; break; }
-						}
-					}
-					if (!bBlocked) ++Depth;
+					FVector Points[4];
+					for (int32 Vertex = 0; Vertex < 4; ++Vertex) Points[Vertex] = Quad.Vertices[Vertex] + FVector(Cell);
+					if (!Emit(Points)) return false;
 				}
-				for (int32 DZ = 0; DZ < Depth; ++DZ)
-				{
-					for (int32 DY = 0; DY < Height; ++DY)
-					{
-						for (int32 DX = 0; DX < Width; ++DX) At(X + DX, Y + DY, Z + DZ) = 0;
-					}
-				}
-				if (!AddBox(FBox(FVector(X, Y, Z), FVector(X + Width, Y + Height, Z + Depth)))) return false;
+			}
+			continue;
+		}
+		for (int32 BoxIndex = 0; BoxIndex < Shape->CollisionBoxes.Num(); ++BoxIndex)
+		{
+			const FBox& Box = Shape->CollisionBoxes[BoxIndex];
+			for (uint8 Face = 0; Face < 6; ++Face)
+			{
+				const int32 Axis = Face / 2, UAxis = (Axis + 1) % 3, VAxis = (Axis + 2) % 3;
+				const double Plane = (Face & 1) ? Box.Min[Axis] : Box.Max[Axis];
+				const bool bBoundary = Plane == ((Face & 1) ? 0.0 : 1.0);
+				const FIntVector NeighborCell = Cell + VoxelCoord::Direction(Face);
+				const uint8 Neighbor = bBoundary ? NeighborOccupancy(NeighborCell) : 0;
+				if (bInvalidNeighbor) return false;
+				if (Neighbor == 1) continue;
+				const auto* Other = Neighbor == 2 ? NeighborShape(NeighborCell) : nullptr;
+				if ((Neighbor == 2 && !Other) || !EmitUncovered(Face, Cell[Axis] + Plane,
+					Cell[UAxis] + Box.Min[UAxis], Cell[UAxis] + Box.Max[UAxis],
+					Cell[VAxis] + Box.Min[VAxis], Cell[VAxis] + Box.Max[VAxis],
+					&Shape->CollisionBoxes, Cell, BoxIndex, Other ? &Other->CollisionBoxes : nullptr, NeighborCell)) return false;
 			}
 		}
 	}

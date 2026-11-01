@@ -95,7 +95,6 @@ private:
 		FBodyRecord* ActivePrevious = nullptr;
 		FBodyRecord* ActiveNext = nullptr;
 		uint64 QueueSerial = 0;
-		int32 BoxCursor = 0;
 		double QueuedAt = 0.0;
 		bool bInstalled = false;
 		bool bRetiring = false;
