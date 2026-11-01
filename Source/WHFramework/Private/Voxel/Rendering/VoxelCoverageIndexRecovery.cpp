@@ -42,14 +42,15 @@ bool FVoxelViewManager::ApplyCoverageIndexRecord(const FVoxelCoverageRecord& InR
 	// 生产工作区提前按全部潜在键预留。独立调用也必须先保证失败记录槽，再尝试 COW 路径。
 	if (!CoverageIndexRetries.Contains(Key) && !ReserveCoverageIndexRetries(CoverageIndexRetries.Num() + 1)) return false;
 	FString Error;
-	const bool bRemove = !InRecord.bWanted && !InRecord.bReady && !InRecord.bCommitted;
-	const auto Apply = [&InRecord, bRemove, &Error](FVoxelCoverageIndex& Index)
+	const auto Apply = [&Error](FVoxelCoverageIndex& Index, const FVoxelCoverageRecord& Record)
 	{
-		if (!bRemove) return Index.Upsert(InRecord, Error);
-		Index.Remove(InRecord.Geometry.Key, Error);
+		if (Record.bWanted || Record.bReady || Record.bCommitted) return Index.Upsert(Record, Error);
+		Index.Remove(Record.Geometry.Key, Error);
 		return Error.IsEmpty();
 	};
-	const bool bComplete = Apply(CoverageIndex) && (!Key.IsColumn() || Apply(HeightfieldCoverageIndex));
+	FVoxelCoverageRecord HeightfieldRecord = InRecord;
+	HeightfieldRecord.bCommitted = false;
+	const bool bComplete = Apply(CoverageIndex, InRecord) && (!Key.IsColumn() || Apply(HeightfieldCoverageIndex, HeightfieldRecord));
 	if (bComplete)
 	{
 		CoverageIndexRetries.Remove(Key);

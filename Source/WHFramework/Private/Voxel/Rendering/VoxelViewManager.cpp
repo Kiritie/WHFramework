@@ -2823,7 +2823,8 @@ bool FVoxelViewManager::IsHeightfieldTransitionPresented(const FVoxelHeightfield
 	const uint64* Desired = DesiredTransitionSignatures.Find(InKey);
 	const uint64* Built = HeightfieldTransitionSignatures.Find(InKey);
 	const FVoxelViewSourceId SourceId = HeightfieldTransitionSources.FindRef(InKey);
-	return Desired && Built && *Built == *Desired && (!SourceId || Publisher->HasPresentation(SourceId));
+	return Desired && Built && *Built == *Desired &&
+		(!SourceId || (Publisher->IsCommitted(SourceId) && !Publisher->IsHidden(SourceId)));
 }
 
 bool FVoxelViewManager::VolumeHandoffAffectsHeightfield(const FVoxelHeightfieldNodeKey& InKey) const
@@ -3834,11 +3835,13 @@ FVoxelTerrainReadinessSnapshot FVoxelViewManager::CaptureTerrainReadiness() cons
 			Target.RequiredSections = Sections.Num();
 			Target.bMeshReady = !Sections.IsEmpty();
 			Target.bKnownEmpty = !Sections.IsEmpty();
+			Target.bNativeGeometryReady = !Sections.IsEmpty();
 			for (const FIntVector& Section : Sections)
 			{
 				const FVoxelSection* Data = Module.GetRuntime()->FindSection(Section);
 				Target.bFailed |= Data && Data->Status == EVoxelSectionStatus::Failed;
-				const bool bPresented = IsLatestFinePresented(Section);
+				const auto* Actual = Publisher->GetTerrainRenderer().FindPresentedNativeAtom(Section);
+				const bool bPresented = Actual && IsFinePresentationCurrent(Actual->Evidence);
 				const bool bPrepared = IsFineGeometryPrepared(Section);
 				// F1+ 从独立采样生成，不创建 Runtime Section；当前版本几何证明其采样已完成。
 				const bool bShardDataReady = !GetInputRoot().FineWanted.Contains(Section) && (bPrepared || bPresented);
@@ -3846,12 +3849,15 @@ FVoxelTerrainReadinessSnapshot FVoxelViewManager::CaptureTerrainReadiness() cons
 				Target.PresentedSections += bPresented ? 1 : 0;
 				Target.bMeshReady &= bPrepared || bPresented;
 				Target.bPublishing |= bPrepared && !bPresented;
-				const auto* Actual = Publisher->GetTerrainRenderer().FindPresentedAtom(Section);
-				Target.bKnownEmpty &= bPresented && Actual && Actual->Evidence.bKnownEmpty;
+				const bool bNativeReady = bPresented && Actual->bDrawMetricsAvailable;
+				Target.bKnownEmpty &= bNativeReady && Actual->DrawTriangles == 0;
+				Target.bNativeGeometryReady &= bNativeReady;
+				if (bNativeReady) Target.NativeTriangles += Actual->DrawTriangles;
 			}
 			Target.bDataReady = Target.RequiredSections > 0 && Target.ReadySections == Target.RequiredSections;
 			Target.bPresented = Target.RequiredSections > 0 && Target.PresentedSections == Target.RequiredSections;
 			Target.bVisible = Target.bPresented;
+			Target.bNativeKnownEmpty = Target.bNativeGeometryReady && Target.NativeTriangles == 0;
 		}
 		else
 		{
@@ -3925,9 +3931,24 @@ FVoxelTerrainReadinessSnapshot FVoxelViewManager::CaptureTerrainReadiness() cons
 					Target.MeshBytes = Metrics->MeshBytes;
 				}
 			}
+			bool bFinalPartition = false;
+			Target.bNativeGeometryReady = Target.bPresented && Publisher->GetPresentedTriangles(SourceId, Target.NativeTriangles, bFinalPartition);
+			Target.bNativeKnownEmpty = Target.bNativeGeometryReady && bFinalPartition && GetInputRoot().bInitialLayout && Target.NativeTriangles == 0;
+			Target.bKnownEmpty |= Target.bMeshReady && Target.bNativeKnownEmpty;
 		}
 		if (Key.Representation != EVoxelTerrainRepresentation::Fine)
 			Target.bVisible = Target.bMeshReady && SourceId && !Publisher->IsHidden(SourceId) && Publisher->IsPresented(SourceId);
+		if (!Target.bKnownEmpty && Target.bPresented && !Target.bNativeGeometryReady)
+		{
+			Target.bPresented = false;
+			Target.PresentationGate = TEXT("NativePresentationPending");
+		}
+		if (!Target.bKnownEmpty && Target.bNativeGeometryReady && Target.NativeTriangles == 0)
+		{
+			Target.bPresented = false;
+			Target.PresentationGate = TEXT("NativeCoverageEmpty");
+		}
+		Target.bVisible = Target.bPresented && Target.bNativeGeometryReady && Target.NativeTriangles > 0;
 		if (Target.PresentationGate.IsNone())
 		{
 			Target.PresentationGate = Target.bFailed ? TEXT("Failed") : !Target.bDataReady ? TEXT("DataPending") :
@@ -7631,19 +7652,21 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 								   ? VoxelViewLod::SurfaceSide(Module.GetViewSettings().Lod, Pair.Key.Level)
 								   : VoxelViewLod::MacroSide(Module.GetViewSettings().Lod, Pair.Key.Level);
 		FVoxelViewSourceId SourceId = HeightfieldTransitionSources.FindRef(Pair.Key);
-		if (!Publisher->StageImmutable(BeginPublishGroup({static_cast<uint8>(Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 4 : 5),
-										   Pair.Key.Coordinate, Pair.Key.Level}),
-				SourceId, FVector(Pair.Key.Coordinate.X * TileSide, Pair.Key.Coordinate.Y * TileSide, 0) * Module.BlockSize(), Module.BlockSize(), Mesh,
-				Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 2 : 3, true))
+		const FGuid Group = BeginPublishGroup({static_cast<uint8>(Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 4 : 5),
+			Pair.Key.Coordinate, Pair.Key.Level});
+		if (HasRenderableMesh(*Mesh) || SourceId)
 		{
-			MarkPublishGroupCoverageDirty(FVoxelPublishGroupKey{
-				static_cast<uint8>(Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 4 : 5), Pair.Key.Coordinate, Pair.Key.Level});
-			continue;
+			if (!Publisher->StageImmutable(Group, SourceId,
+					FVector(Pair.Key.Coordinate.X * TileSide, Pair.Key.Coordinate.Y * TileSide, 0) * Module.BlockSize(), Module.BlockSize(), Mesh,
+					Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 2 : 3, true))
+			{
+				MarkPublishGroupCoverageDirty(FVoxelPublishGroupKey{
+					static_cast<uint8>(Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 4 : 5), Pair.Key.Coordinate, Pair.Key.Level});
+				continue;
+			}
+			HeightfieldTransitionSources.Add(Pair.Key, SourceId);
+			co_await SetCoverage(Group, SourceId, {});
 		}
-		HeightfieldTransitionSources.Add(Pair.Key, SourceId);
-		co_await SetCoverage(BeginPublishGroup({static_cast<uint8>(Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 4 : 5),
-								 Pair.Key.Coordinate, Pair.Key.Level}),
-			SourceId, {});
 		HeightfieldToCommit.Add(Pair.Key, Pair.Value);
 	}
 	TSet<FVoxelHeightfieldNodeKey> BlockedHeightfieldNodes;
@@ -8020,14 +8043,18 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 			continue;
 		const FGuid Group = BeginPublishGroup(
 			{static_cast<uint8>(Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 4 : 5), Pair.Key.Coordinate, Pair.Key.Level});
-		if (Publisher->HasPresentation(Pair.Value) && (BlockedHeightfieldNodes.Contains(Pair.Key) || HandoffPending(Rect)))
+		const bool bBlocked = BlockedHeightfieldNodes.Contains(Pair.Key) || HandoffPending(Rect);
+		if (bBlocked)
 		{
-			co_await SetSharedCoverage(Group, Pair.Value, CommonTransitionBoxes);
 			HeightfieldToCommit.Remove(Pair.Key);
-			continue;
+			if (Publisher->HasPresentation(Pair.Value))
+			{
+				co_await SetSharedCoverage(Group, Pair.Value, CommonTransitionBoxes);
+				continue;
+			}
 		}
 		co_await SetCoverage(Group, Pair.Value, {}, CommonTransitionBoxes);
-		Publisher->SetHidden(Group, Pair.Value, !DesiredTransitionSignatures.Contains(Pair.Key) || BlockedHeightfieldNodes.Contains(Pair.Key));
+		Publisher->SetHidden(Group, Pair.Value, !DesiredTransitionSignatures.Contains(Pair.Key) || bBlocked);
 	}
 	const double SourcesMilliseconds = (FPlatformTime::Seconds() - ResolveStart) * 1000.0 - PlanMilliseconds - BoxesMilliseconds;
 	TMap<FVoxelPublishGroupKey, TArray<FVoxelViewKey>> PreviousNodesByGroup;
@@ -8104,10 +8131,11 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 			GeneratedForCommit.Add(Key, *Metrics);
 	}
 	TFunction<void(TConstArrayView<FVoxelPublishGroupKey>)> OnGroupCommitted =
-		[this, Generated = MoveTemp(GeneratedForCommit), Target = MoveTemp(TargetNodesByGroup),
+		[this, Incarnation = TaskOwnerIncarnation, Generated = MoveTemp(GeneratedForCommit), Target = MoveTemp(TargetNodesByGroup),
 			Volume = MoveTemp(VolumeByGroup), Heightfield = MoveTemp(HeightfieldByGroup),
 			VolumeSignatures = MoveTemp(VolumeToCommit), HeightfieldSignatures = MoveTemp(HeightfieldToCommit)](TConstArrayView<FVoxelPublishGroupKey> Keys)
 	{
+		if (Incarnation != TaskOwnerIncarnation) return;
 		bTerrainBuildStageDirty = true;
 		for (const FVoxelPublishGroupKey& Key : Keys)
 		{
@@ -8126,7 +8154,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 				if (const auto* Metrics = Generated.Find(Spatial))
 				{
 					auto Presented = *Metrics;
-					Presented.bPresented = Publisher->GetPresentedMeshCost(SourceId, Presented.Vertices, Presented.Triangles, Presented.MeshBytes);
+					Presented.bPresented = Publisher->GetPresentedSourceMeshCost(SourceId, Presented.Vertices, Presented.Triangles, Presented.MeshBytes);
 					if (Presented.bPresented)
 						PresentedGeometryMetrics.Add(Spatial, Presented);
 					else
@@ -8159,6 +8187,11 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveTransitionVisibilitySteps
 				{
 					if (const uint64* Signature = HeightfieldSignatures.Find(Node))
 					{
+						const uint64* DesiredSignature = DesiredTransitionSignatures.Find(Node);
+						const FVoxelViewSourceId SourceId = HeightfieldTransitionSources.FindRef(Node);
+						if (!DesiredSignature || *DesiredSignature != *Signature ||
+							(SourceId && (!Publisher->IsCommitted(SourceId) || Publisher->IsHidden(SourceId))))
+							continue;
 						HeightfieldTransitionSignatures.Add(Node, *Signature);
 						const uint64* Prepared = PreparedTransitionSignatures.Find(Node);
 						if (Prepared && *Prepared == *Signature)

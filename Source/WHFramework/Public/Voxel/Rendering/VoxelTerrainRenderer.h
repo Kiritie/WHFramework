@@ -32,6 +32,7 @@ struct WHFRAMEWORK_API FVoxelTerrainCoarseDrawPiece
 
 struct WHFRAMEWORK_API FVoxelTerrainCoarseDrawNode
 {
+	uint64 Triangles = 0;
 	TSharedPtr<const FVoxelTerrainCoarsePatchNode, ESPMode::ThreadSafe> Patch;
 	TSharedPtr<const FVoxelTerrainCoarseDrawNode, ESPMode::ThreadSafe> Children[2];
 	TSharedPtr<const FVoxelTerrainCoarseDrawPiece, ESPMode::ThreadSafe> FirstPiece;
@@ -55,6 +56,10 @@ struct WHFRAMEWORK_API FVoxelTerrainRenderCoarse final : FVoxelTaskCustomPayload
 {
 	FGuid SourceId;
 	bool bBoundaryOnly = false;
+	bool bFinalPartition = false;
+	TArray<FBox> CoverageExclusions;
+	uint64 DrawTriangles = 0;
+	bool bDrawMetricsAvailable = false;
 	TSharedPtr<const FVoxelTerrainCoarseMesh, ESPMode::ThreadSafe> Geometry;
 	FVoxelFineOwnerEvidence Evidence;
 	TArray<TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>> SourceChunks;
@@ -65,6 +70,8 @@ struct WHFRAMEWORK_API FVoxelTerrainRenderCoarse final : FVoxelTaskCustomPayload
 	mutable TAtomic<bool> bResidentResourcesReady{false};
 	mutable FVoxelTerrainCoarseRetirementAttempt RetirementAttempt;
 	bool IsResourceReady() const;
+	bool Owns(const FBox& InWorldCellBounds) const;
+	void UpdateDrawMetrics();
 	virtual uint64 GetAllocatedBytes() const override;
 };
 
@@ -96,6 +103,8 @@ struct WHFRAMEWORK_API FVoxelTerrainRenderAtom final : FVoxelTaskCustomPayload
 	TArray<FVoxelTerrainAtomDrawRange> DrawRanges;
 	TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> FineGeometry;
 	int32 SourceDrawRangeCount = 0;
+	uint64 DrawTriangles = 0;
+	bool bDrawMetricsAvailable = false;
 	uint8 SuppressedFaceMask = 0;
 	bool bUseDrawRanges = false;
 	TArray<TSharedPtr<const FVoxelFineBoundarySnapshot, ESPMode::ThreadSafe>> Boundaries;
@@ -170,6 +179,8 @@ public:
 	void AdvanceFramePublication();
 	void AdvanceRetirement(TFunction<void(const FIntVector&)> InOnRetired, double InDeadline = MAX_dbl);
 	const FVoxelFinePresentedAtom* FindPresentedAtom(const FIntVector& InSection) const;
+	const FVoxelTerrainRenderAtom* FindPresentedNativeAtom(const FIntVector& InSection) const;
+	bool GetPresentedCoarseTriangles(const FVoxelTaskStamp& InStamp, const FGuid& InSourceId, uint64& OutTriangles, bool& bOutFinalPartition) const;
 	TSharedPtr<const IVoxelTerrainPresentedSnapshot, ESPMode::ThreadSafe> CapturePresentedSnapshot() const;
 	bool HasPresentedCoverage(const FBox& InCellBounds) const;
 	bool RequiresF0RuntimeData(const FIntVector& InSection,

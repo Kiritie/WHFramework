@@ -1650,14 +1650,19 @@ bool FVoxelViewManager::IsLatestFinePresented(const FIntVector& InSection) const
 		}
 	}
 #endif
-	if (!Actual || Actual->Stamp.WorldEpoch != WorldEpoch || Actual->Evidence.Content.SampleStepCells != 1 ||
-		(Actual->Evidence.Owner.Kind != EVoxelFineOwnerKind::F0 && Actual->Evidence.Owner.Kind != EVoxelFineOwnerKind::F1Plus)) return false;
-	const auto Geometry = StaticCastSharedPtr<const FVoxelFineShardGeometry>(Actual->Evidence.GeometryLease);
+	return Actual && Actual->Stamp.WorldEpoch == WorldEpoch && IsFinePresentationCurrent(Actual->Evidence);
+}
+
+bool FVoxelViewManager::IsFinePresentationCurrent(const FVoxelFineOwnerEvidence& InEvidence) const
+{
+	if (InEvidence.Content.WorldEpoch != WorldEpoch || InEvidence.Content.SampleStepCells != 1 ||
+		(InEvidence.Owner.Kind != EVoxelFineOwnerKind::F0 && InEvidence.Owner.Kind != EVoxelFineOwnerKind::F1Plus)) return false;
+	const auto Geometry = StaticCastSharedPtr<const FVoxelFineShardGeometry>(InEvidence.GeometryLease);
 	return Geometry && Module.IsOverlayVersionCurrent(Geometry->OverlayVersion) &&
-		Actual->Evidence.Content.GeneratorIdentity == Module.GetManifest().BaseSampleHash &&
-		Actual->Evidence.Content.RecipeRevision == Module.GetManifest().RecipeHash &&
-		Actual->Evidence.Content.RegistryRevision == Module.GetRegistry()->Hash &&
-		Actual->Evidence.Content.ShapeRevision == Module.GetShapes()->GetContentHash() &&
+		InEvidence.Content.GeneratorIdentity == Module.GetManifest().BaseSampleHash &&
+		InEvidence.Content.RecipeRevision == Module.GetManifest().RecipeHash &&
+		InEvidence.Content.RegistryRevision == Module.GetRegistry()->Hash &&
+		InEvidence.Content.ShapeRevision == Module.GetShapes()->GetContentHash() &&
 		Geometry->Attempt.Input.DataRevision == Module.GetRuntime()->GetChangeHierarchy().GetFineShardRevision(Geometry->Attempt.Input.Shard);
 }
 

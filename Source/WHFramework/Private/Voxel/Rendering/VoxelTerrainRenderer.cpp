@@ -505,7 +505,7 @@ namespace
 			if (Node->Item)
 			{
 				const auto& Item = *Node->Item;
-				if (!Item.bBoundaryOnly && Item.OwnershipBounds.IsInsideOrOn(Box.Min) && Item.OwnershipBounds.IsInsideOrOn(Box.Max) &&
+				if (!Item.bBoundaryOnly && Item.Owns(Box) &&
 					(!Best || FinerCoarse(Item.Geometry->Stamp.GeometryIdentity, Best->Geometry->Stamp.GeometryIdentity))) Best = &Item;
 			}
 			else for (const auto& Child : Node->Children) Self(Self, Child);
@@ -616,16 +616,42 @@ namespace
 				}
 			return false;
 		}
-		bool SharesCoarseOwner(const FAtomPublication& Other, const FCoarseNodePtr& CoarseRoot) const
+		bool AddsFineCoverageOnly() const
 		{
+			return CoarseChanges.IsEmpty() && !Atoms.IsEmpty() && !Atoms.ContainsByPredicate([](const FAtomPtr& Atom)
+			{
+				return Atom->Evidence.Owner.Kind != EVoxelFineOwnerKind::F0 && Atom->Evidence.Owner.Kind != EVoxelFineOwnerKind::F1Plus;
+			});
+		}
+		bool RequiresCoarsePatch(const FVoxelTerrainRenderCoarse& Item) const
+		{
+			if (CoarseChanges.ContainsByPredicate([&Item](const FVoxelTerrainCoarseMutation& Change)
+			{
+				return Change.Item->SourceId == Item.SourceId;
+			})) return true;
+			if (Item.bFinalPartition) return false;
+			if (Item.bBoundaryOnly)
+			{
+				if (Item.Evidence.bKnownEmpty) return false;
+				if (Item.bDrawMetricsAvailable && Item.DrawTriangles == 0 && AddsFineCoverageOnly()) return false;
+			}
+			return true;
+		}
+		bool SharesCoarseOwner(const FAtomPublication& Other, const FCoarseNodePtr& CoarseRoot,
+			const FVoxelTerrainRenderCoarse** OutSharedOwner = nullptr) const
+		{
+			if (OutSharedOwner) *OutSharedOwner = nullptr;
 			const FBox FirstBounds = GetChangedBounds().ExpandBy(32.0);
 			const FBox OtherBounds = Other.GetChangedBounds().ExpandBy(32.0);
 			const auto Visit = [&](auto&& Self, const FCoarseTreeNode* Node) -> bool
 			{
 				if (!Node || !Node->CellBounds.Intersect(FirstBounds) || !Node->CellBounds.Intersect(OtherBounds)) return false;
-				// 相隔的 Fine 或 Coarse 写入仍可能重建同一粗表示的 Patch / Draw 叶子。
-				// 共享粗来源必须串行；不同粗来源的局部根仍可并行准备。
-				if (Node->Item) return true;
+				if (Node->Item)
+				{
+					if (!RequiresCoarsePatch(*Node->Item) && !Other.RequiresCoarsePatch(*Node->Item)) return false;
+					if (OutSharedOwner) *OutSharedOwner = Node->Item.Get();
+					return true;
+				}
 				for (const auto& Child : Node->Children) if (Self(Self, Child.Get())) return true;
 				return false;
 			};
@@ -875,10 +901,14 @@ namespace
 			Exclusions = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainCoarseExclusions>(Lease);
 			Exclusions->Lease = MoveTemp(Lease);
 			Current = Item;
+			CoverageCursor = 0;
 			FineWalk.Reset();
 			ExclusionWalk.Reset();
-			if (Root) FineWalk.Add({Root, 0});
-			if (CoarseRoot) ExclusionWalk.Add({CoarseRoot, 0});
+			if (!Item->bFinalPartition)
+			{
+				if (Root) FineWalk.Add({Root, 0});
+				if (CoarseRoot) ExclusionWalk.Add({CoarseRoot, 0});
+			}
 			return true;
 		}
 
@@ -1028,8 +1058,19 @@ namespace
 						else if (const auto Child = Frame.Node->Children[Frame.Child++]) Owners.Add({Child, 0});
 						continue;
 					}
+					if (!Publication->RequiresCoarsePatch(*Frame.Node->Item))
+					{
+						Owners.Pop(EAllowShrinking::No);
+						continue;
+					}
 					if (!BeginItem(Frame.Node->Item, Result.Error)) return Blocked();
 					Owners.Pop(EAllowShrinking::No);
+					continue;
+				}
+				if (CoverageCursor < Current->CoverageExclusions.Num())
+				{
+					if (!AddExclusion(Current->CoverageExclusions[CoverageCursor], Result.Error)) return Blocked();
+					++CoverageCursor;
 					continue;
 				}
 				if (!FineWalk.IsEmpty())
@@ -1087,6 +1128,7 @@ namespace
 				TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ItemLease;
 				TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PathLease;
 				const uint64 ItemBytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainRenderCoarse>() +
+					VoxelBoundedAllocation::ArrayBytes<FBox>(Current->CoverageExclusions.Num()) +
 					VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>>(Current->SourceChunks.Num()) +
 					VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelTerrainCoarseDrawNode, ESPMode::ThreadSafe>>(Current->Geometry->Roots.Num());
 				if (!AcquireNative(EVoxelTerrainResourcePool::Input, VoxelBoundedAllocation::WorkerSharedBytes<FPreparedCoarse>(), Lease, Result.Error) ||
@@ -1101,6 +1143,9 @@ namespace
 				auto& Item = *Prepared->Item;
 				Item.SourceId = Current->SourceId;
 				Item.bBoundaryOnly = Current->bBoundaryOnly;
+				Item.bFinalPartition = Current->bFinalPartition;
+				Item.CoverageExclusions.Reserve(Current->CoverageExclusions.Num());
+				Item.CoverageExclusions.Append(Current->CoverageExclusions);
 				Item.MetadataLease = MoveTemp(ItemLease);
 				Item.Geometry = Current->Geometry;
 				Item.Evidence = Current->Evidence;
@@ -1143,6 +1188,7 @@ namespace
 		TArray<FDrawWalk, TInlineAllocator<64>> DrawWalk;
 		TArray<FDrawReadinessWalk, TInlineAllocator<64>> ReadinessDrawWalk;
 		FCoarsePtr Current;
+		int32 CoverageCursor = 0;
 		TSharedPtr<FVoxelTerrainCoarseExclusions, ESPMode::ThreadSafe> Exclusions;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> BuilderLease;
 		TUniquePtr<FVoxelTerrainCoarsePatchBuilder> Builder;
@@ -1290,6 +1336,7 @@ namespace
 			const auto SameGeometry = [](const FCoarsePtr& A, const FCoarsePtr& B)
 			{
 				return A->SourceId == B->SourceId && A->bBoundaryOnly == B->bBoundaryOnly &&
+					A->bFinalPartition == B->bFinalPartition && A->CoverageExclusions == B->CoverageExclusions &&
 					A->Geometry->GeometryIdentity == B->Geometry->GeometryIdentity && A->Geometry->Stamp == B->Geometry->Stamp;
 			};
 			if (!SameGeometry(Base->Item, Latest->Item) || !SameGeometry(Base->Item, Prepared->Item))
@@ -1301,6 +1348,7 @@ namespace
 				TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PatchLease;
 				if (!AcquireNativeResident(
 					VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainRenderCoarse>() +
+						VoxelBoundedAllocation::ArrayBytes<FBox>(Prepared->Item->CoverageExclusions.Num()) +
 					VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>>(Prepared->Item->SourceChunks.Num()) +
 						VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelTerrainCoarseDrawNode, ESPMode::ThreadSafe>>(Roots), ItemLease) ||
 					!AcquireNativeResident(
@@ -1311,6 +1359,9 @@ namespace
 				MergedItem->MetadataLease = MoveTemp(ItemLease);
 				MergedItem->SourceId = Prepared->Item->SourceId;
 				MergedItem->bBoundaryOnly = Prepared->Item->bBoundaryOnly;
+				MergedItem->bFinalPartition = Prepared->Item->bFinalPartition;
+				MergedItem->CoverageExclusions.Reserve(Prepared->Item->CoverageExclusions.Num());
+				MergedItem->CoverageExclusions.Append(Prepared->Item->CoverageExclusions);
 				MergedItem->Geometry = Prepared->Item->Geometry;
 				MergedItem->Evidence = Prepared->Item->Evidence;
 				MergedItem->OwnershipBounds = Prepared->Item->OwnershipBounds;
@@ -1357,11 +1408,16 @@ namespace
 						Out = MoveTemp(Node);
 						return true;
 					},
-					[](FVoxelTerrainCoarseDrawNode& Node)
+					[this](FVoxelTerrainCoarseDrawNode& Node)
 					{
 						auto Patch = ConstCastSharedPtr<FVoxelTerrainCoarsePatchNode>(Node.Patch);
+						Node.Triangles = 0;
 						for (int32 Child = 0; Child < 2; ++Child)
+						{
 							Patch->Children[Child] = Node.Children[Child] ? Node.Children[Child]->Patch : nullptr;
+							Node.Triangles += Node.Children[Child] ? Node.Children[Child]->Triangles :
+								MergedItem->Geometry->Ranges[MergedItem->Geometry->Ranges[Patch->Range].Children[Child]].TriangleCount;
+						}
 					});
 				if (Progress != EVoxelPersistentMergeProgress::Complete) return Progress;
 				MergedItem->DrawRoots[MergeRoot] = Draw.GetResult();
@@ -1373,6 +1429,7 @@ namespace
 			}
 			TSharedPtr<FCoarseTreeNode, ESPMode::ThreadSafe> Node;
 			if (!AllocateNode(Node, &FCoarseTreeNode::Lease)) return EVoxelPersistentMergeProgress::CapacityBlocked;
+			MergedItem->UpdateDrawMetrics();
 			Node->Item = MoveTemp(MergedItem);
 			MergedPatch.Reset();
 			FinishCoarse(*Node);
@@ -2220,7 +2277,27 @@ bool FVoxelTerrainRenderCoarse::IsResourceReady() const
 
 uint64 FVoxelTerrainRenderCoarse::GetAllocatedBytes() const
 {
-	return VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainRenderCoarse>() + SourceChunks.GetAllocatedSize() + DrawRoots.GetAllocatedSize();
+	return VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainRenderCoarse>() + SourceChunks.GetAllocatedSize() + DrawRoots.GetAllocatedSize() +
+		CoverageExclusions.GetAllocatedSize();
+}
+
+bool FVoxelTerrainRenderCoarse::Owns(const FBox& InWorldCellBounds) const
+{
+	if (!OwnershipBounds.IsInsideOrOn(InWorldCellBounds.Min) || !OwnershipBounds.IsInsideOrOn(InWorldCellBounds.Max)) return false;
+	return !CoverageExclusions.ContainsByPredicate([&InWorldCellBounds](const FBox& Box)
+	{
+		return Box.Min.X < InWorldCellBounds.Max.X && Box.Max.X > InWorldCellBounds.Min.X &&
+			Box.Min.Y < InWorldCellBounds.Max.Y && Box.Max.Y > InWorldCellBounds.Min.Y &&
+			Box.Min.Z < InWorldCellBounds.Max.Z && Box.Max.Z > InWorldCellBounds.Min.Z;
+	});
+}
+
+void FVoxelTerrainRenderCoarse::UpdateDrawMetrics()
+{
+	DrawTriangles = 0;
+	for (int32 Root = 0; Root < DrawRoots.Num(); ++Root)
+		DrawTriangles += DrawRoots[Root] ? DrawRoots[Root]->Triangles : Geometry->Ranges[Geometry->Roots[Root]].TriangleCount;
+	bDrawMetricsAvailable = true;
 }
 
 #include "VoxelTerrainRendererNativeState.inl"
@@ -2761,6 +2838,9 @@ bool FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 				continue;
 			}
 			// 先建立尚未封存的局部根；全部真实 chunk 的就绪在末尾统一核对。
+			Fine.Item->DrawTriangles = 0;
+			for (const auto& Range : Fine.Item->DrawRanges) Fine.Item->DrawTriangles += Range.TriangleCount;
+			Fine.Item->bDrawMetricsAvailable = true;
 			if (!Transfer(Fine.Item->MetadataLease)) return false;
 			Work.Root = SetAtom(Work.Root, Fine.Item, 31, Fine.PathLease, Work.CellSize);
 			Work.FineUpload = Fine.Next;
@@ -2835,6 +2915,7 @@ bool FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 		{
 			if (Work.UploadRoot == Item.DrawRoots.Num())
 			{
+				Item.UpdateDrawMetrics();
 				if (!Transfer(Item.MetadataLease) || !Transfer(Item.Patch->MetadataLease)) return false;
 				Work.CoarseRoot = SetCoarse(Work.CoarseRoot, Item.Geometry->Stamp.GeometryIdentity.Key, Item.SourceId,
 					Work.Upload->Item, 77, Work.Upload->PathLease);
@@ -2890,6 +2971,18 @@ bool FVoxelTerrainRendererState::AdvanceRootUpload(FVoxelTerrainRenderer& Render
 			continue;
 		}
 		// 所有上传仍受原 Working/Resident 授额约束；最终扫描前不会封存或发布。
+		Walk.Result->Triangles = 0;
+		if (Range.IsLeaf())
+		{
+			for (auto Piece = Walk.Result->FirstPiece; Piece; Piece = Piece->Next)
+				Walk.Result->Triangles += Piece->Chunk->SourceTriangleCount;
+		}
+		else
+		{
+			for (int32 Child = 0; Child < 2; ++Child)
+				Walk.Result->Triangles += Walk.Result->Children[Child] ? Walk.Result->Children[Child]->Triangles :
+					Item.Geometry->Ranges[Range.Children[Child]].TriangleCount;
+		}
 		CompleteDraw(Walk.Result);
 	}
 	return Step > 0 && !Work.bUploadComplete;
@@ -3035,6 +3128,25 @@ void FVoxelTerrainRendererState::AdvanceRootPreparations(const double InDeadline
 			++Logged;
 			const auto Work = Pending.Preparation;
 			const FIntVector Section = Pending.Resources->Atoms.IsEmpty() ? FIntVector::ZeroValue : Pending.Resources->Atoms[0]->Section;
+			if (!Work)
+			{
+				const FVoxelTerrainRenderCoarse* Shared = nullptr;
+				for (const FRootPreparation* Active : ActivePreparations)
+				{
+					if (FPlatformTime::Seconds() >= Deadline) break;
+					if (Active->Publication->SharesCoarseOwner(*Pending.Resources, Active->BaseSnapshot ? Active->BaseSnapshot->CoarseRoot : nullptr, &Shared) ||
+						Active->Publication->SharesCoarseOwner(*Pending.Resources, LastSealedSnapshot ? LastSealedSnapshot->CoarseRoot : nullptr, &Shared)) break;
+				}
+				if (Shared)
+				{
+					const auto& Key = Shared->Geometry->Stamp.GeometryIdentity.Key;
+					UE_LOG(LogTemp, Display, TEXT("Native shared coarse wait: section=%s source=%s representation=%d level=%d coordinate=(%d,%d,%d) boundary=%d finalPartition=%d masks=%d trianglesKnown=%d triangles=%llu rawEmpty=%d fineOnly=%d"),
+						*Section.ToString(), *Shared->SourceId.ToString(), int32(Key.Representation), Key.Level,
+						Key.Coordinate.X, Key.Coordinate.Y, Key.Coordinate.Z, Shared->bBoundaryOnly, Shared->bFinalPartition,
+						Shared->CoverageExclusions.Num(), Shared->bDrawMetricsAvailable, Shared->DrawTriangles,
+						Shared->Evidence.bKnownEmpty, Pending.Resources->AddsFineCoverageOnly());
+				}
+			}
 			UE_LOG(LogTemp, Display, TEXT("Native publication: section=%s atoms=%d coarse=%d band=%d waiting=%d terminal=%d prep=%d phase=%d enqueued=%d decoded=%d uploaded=%d fineUpload=%d admission=%d merge=%d ready=%d active=%d"),
 				*Section.ToString(), Pending.Resources->Atoms.Num(), Pending.Resources->CoarseChanges.Num(),
 				int32(Pending.Priority.Band), Pending.bPreparationAdmissionWaiting,
@@ -4185,9 +4297,27 @@ const FVoxelFinePresentedAtom* FVoxelTerrainRenderer::FindPresentedAtom(const FI
 	return State ? State->Handoff.FindPresentedAtom(InSection) : nullptr;
 }
 
+const FVoxelTerrainRenderAtom* FVoxelTerrainRenderer::FindPresentedNativeAtom(const FIntVector& InSection) const
+{
+	if (!State || !State->PresentedSnapshot || State->PresentedSnapshot->WorldEpoch != State->Epoch) return nullptr;
+	const auto Atom = FindFineAtom(State->PresentedSnapshot->Root, InSection);
+	return Atom.Get();
+}
+
 TSharedPtr<const IVoxelTerrainPresentedSnapshot, ESPMode::ThreadSafe> FVoxelTerrainRenderer::CapturePresentedSnapshot() const
 {
 	return State ? State->PresentedSnapshot : nullptr;
+}
+
+bool FVoxelTerrainRenderer::GetPresentedCoarseTriangles(const FVoxelTaskStamp& InStamp, const FGuid& InSourceId,
+	uint64& OutTriangles, bool& bOutFinalPartition) const
+{
+	if (!State || !State->PresentedSnapshot || State->PresentedSnapshot->WorldEpoch != InStamp.WorldEpoch) return false;
+	const auto Item = FindCoarseItem(State->PresentedSnapshot->CoarseRoot, InStamp.GeometryIdentity.Key, InSourceId);
+	if (!Item || Item->Geometry->Stamp != InStamp || !Item->bDrawMetricsAvailable) return false;
+	OutTriangles = Item->DrawTriangles;
+	bOutFinalPartition = Item->bFinalPartition;
+	return true;
 }
 
 bool FVoxelTerrainRenderer::HasPresentedCoverage(const FBox& InCellBounds) const

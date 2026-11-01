@@ -220,16 +220,13 @@ FVoxelViewPublisher::ENativeUpdateWork FVoxelViewPublisher::GetNativeUpdateWork(
 	{
 		return Entry->bPresented && !Entry->bHidden ? ENativeUpdateWork::Remove : ENativeUpdateWork::None;
 	}
-	if (Hidden)
-	{
-		const bool bPresentedMatches = Entry->bPresented && !Entry->bHidden && Entry->NativeMesh &&
-			Entry->PresentedSource == InUpdate.Source && Entry->PresentedNativeStamp == InUpdate.NativeStamp &&
-			Entry->NativeMesh->Source == InUpdate.Source && Entry->NativeMesh->Stamp == InUpdate.NativeStamp &&
-			Entry->NativeMesh->WorldCellOrigin == InUpdate.Location / Module.BlockSize() &&
-			Entry->NativeMesh->CellScale == InUpdate.Scale / Module.BlockSize();
-		if (!bPresentedMatches) return ENativeUpdateWork::Upload;
-	}
-	return !InUpdate.bUnchanged && InUpdate.bSourceDirty ? ENativeUpdateWork::Upload : ENativeUpdateWork::None;
+	const bool bPresentedMatches = Entry->bPresented && !Entry->bHidden && Entry->NativeMesh &&
+		Entry->PresentedSource == InUpdate.Source && Entry->PresentedNativeStamp == InUpdate.NativeStamp &&
+		Entry->Exclusions == InUpdate.Exclusions &&
+		Entry->NativeMesh->Source == InUpdate.Source && Entry->NativeMesh->Stamp == InUpdate.NativeStamp &&
+		Entry->NativeMesh->WorldCellOrigin == InUpdate.Location / Module.BlockSize() &&
+		Entry->NativeMesh->CellScale == InUpdate.Scale / Module.BlockSize();
+	return !bPresentedMatches || !InUpdate.bUnchanged ? ENativeUpdateWork::Upload : ENativeUpdateWork::None;
 }
 
 bool FVoxelViewPublisher::HasNativeGroupWork(const FPublication& InPublication, const FGroup& InGroup) const
@@ -247,7 +244,21 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 {
 	(void)InOutPreparedComponents;
 	FUpdate& Update = InPublication->Updates[InIndex];
-	if (Update.Source && Update.Source->Stamp.bHasGeometryIdentity && Update.Source->Stamp != Update.NativeStamp) return false;
+	const ENativeUpdateWork Work = GetNativeUpdateWork(InPublication.Get(), Update);
+	if (Work == ENativeUpdateWork::Upload)
+	{
+		const bool bGeometryCurrent = IsNativeGeometryCurrent(Update.NativeStamp);
+		const bool bSourceMatches = Update.Source && (!Update.Source->Stamp.bHasGeometryIdentity || Update.Source->Stamp == Update.NativeStamp);
+		const bool bInputsCurrent = Update.Source && (!MeshValidator || MeshValidator(*Update.Source));
+		if (!bGeometryCurrent || !bSourceMatches || !bInputsCurrent)
+		{
+			const auto& Key = Update.NativeStamp.GeometryIdentity.Key;
+			UE_LOG(LogTemp, Display, TEXT("Publisher rejected native source: serial=%llu group=%d update=%d representation=%d level=%d coordinate=(%d,%d,%d) geometryCurrent=%d sourceMatches=%d inputsCurrent=%d"),
+				InPublication->Serial, Update.GroupIndex, InIndex, int32(Key.Representation), Key.Level,
+				Key.Coordinate.X, Key.Coordinate.Y, Key.Coordinate.Z, bGeometryCurrent, bSourceMatches, bInputsCurrent);
+			return false;
+		}
+	}
 	if (!Update.bSourceDirty && !Update.NativeMesh)
 		if (const auto* Entry = Entries.Find(Update.SourceId); Entry && Entry->NativeMesh &&
 			Entry->PresentedSource == Update.Source && Entry->PresentedNativeStamp == Update.NativeStamp &&
@@ -256,7 +267,7 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 	if (Update.NativeMesh && (Update.NativeMesh->Source != Update.Source || Update.NativeMesh->Stamp != Update.NativeStamp ||
 		Update.NativeMesh->WorldCellOrigin != Update.Location / Module.BlockSize() ||
 		Update.NativeMesh->CellScale != Update.Scale / Module.BlockSize())) Update.NativeMesh.Reset();
-	bOutComplete = GetNativeUpdateWork(InPublication.Get(), Update) != ENativeUpdateWork::Upload || Update.NativeMesh.IsValid();
+	bOutComplete = Work != ENativeUpdateWork::Upload || Update.NativeMesh.IsValid();
 	if (bOutComplete || Update.bNativeMeshPending || FPlatformTime::Seconds() >= InDeadline) return true;
 	// 只等待会生产同一冻结网格的前代；无索引工作的控制更新不是生产者。
 	if (Update.bRetainSource && !Update.bSourceDirty)
@@ -278,9 +289,6 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 			if (PreviousPublication && GetNativeUpdateWork(*PreviousPublication, *Previous) == ENativeUpdateWork::Upload) return true;
 		}
 	}
-	if (!Update.Source || !IsNativeGeometryCurrent(Update.NativeStamp) ||
-		(Update.Source->Stamp.bHasGeometryIdentity && Update.Source->Stamp != Update.NativeStamp) ||
-		(MeshValidator && !MeshValidator(*Update.Source))) return false;
 	const auto Resources = Scheduler.GetTerrainResources();
 	const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, NativeOwnerId,
 		InPublication->Serial, FIntVector(MIN_int32, 7, InIndex), Update.NativeStamp.Token);
@@ -294,7 +302,7 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 		Stamp.OwnerIncarnation = InPublication->Serial;
 		Stamp.Section = FIntVector(MIN_int32, 7, InIndex);
 		Scheduler.ObserveDemand(EVoxelTaskKind::BuildViewCoverage, Stamp, Reason);
-		if (bTerminal) DiscardPublication(InPublication, false);
+		if (bTerminal) DiscardGroup(InPublication, InPublication->Groups[Update.GroupIndex], TEXT("NativeMeshAdmission"), false);
 		else
 		{
 			Update.NativeAdmissionVersion = BeforeAdmission;
@@ -429,7 +437,7 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 		const auto PinnedPublication = WeakPublication.Pin();
 		if (!PinnedPublication) return;
 		const FPublicationRef Publication = PinnedPublication.ToSharedRef();
-		if (Publication->bCanceled) return;
+		if (Publication->bCanceled || !Publication->Groups.IsValidIndex(GroupIndex) || Publication->Groups[GroupIndex].bCommitted) return;
 		bool bAllCurrent = InResult.Stamp.WorldEpoch == WorldEpoch;
 		for (const auto& Input : Receipt->Inputs)
 		{
@@ -437,7 +445,8 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 			auto& Target = Publication->Updates[Input.UpdateIndex];
 			if (Target.NativeStamp != Input.Stamp) { bAllCurrent = false; continue; }
 			Target.bNativeMeshPending = false;
-			bAllCurrent &= IsNativeGeometryCurrent(Input.Stamp);
+			bAllCurrent &= IsNativeGeometryCurrent(Input.Stamp) && Target.Source &&
+				(!MeshValidator || MeshValidator(*Target.Source));
 		}
 		if (InResult.bCanceled && bAllCurrent && !Scheduler.IsTerminal({InResult.Kind, InResult.Stamp}))
 		{
@@ -447,10 +456,12 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 		}
 		if (!InResult.bSuccess || InResult.bCanceled || !bAllCurrent)
 		{
+			UE_LOG(LogTemp, Display, TEXT("Publisher rejected native result: serial=%llu group=%d inputs=%d success=%d canceled=%d current=%d error=%s"),
+				Publication->Serial, GroupIndex, Receipt->Inputs.Num(), InResult.bSuccess, InResult.bCanceled, bAllCurrent, *InResult.Error);
 			const bool bTerminal = Scheduler.IsTerminal({InResult.Kind, InResult.Stamp}) ||
 				InResult.Error.StartsWith(TEXT("Oversized")) || InResult.Error.StartsWith(TEXT("CapacityUnachievable")) ||
 				InResult.Error.StartsWith(TEXT("InvalidRequest"));
-			DiscardPublication(Publication, !bTerminal);
+			DiscardGroup(Publication, Publication->Groups[GroupIndex], TEXT("NativeMeshResult"), !bTerminal);
 			if (!bTerminal) bRetry = true;
 			return;
 		}
@@ -465,7 +476,7 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 		}
 		if (!bValid)
 		{
-			DiscardPublication(Publication);
+			DiscardGroup(Publication, Publication->Groups[GroupIndex], TEXT("NativeMeshIdentity"));
 			bRetry = true;
 			return;
 		}
@@ -574,7 +585,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		}
 		else
 		{
-			DiscardPublication(InPublication, false);
+			DiscardGroup(InPublication, InGroup, TEXT("NativeControlAdmission"), false);
 			bOutAdvanced = true;
 		}
 	};
@@ -582,7 +593,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 	{
 		if (TerrainRenderer->ConsumeTransactionFailure(InGroup.NativeTransaction))
 		{
-			DiscardPublication(InPublication, false);
+			DiscardGroup(InPublication, InGroup, TEXT("NativeTransactionFailure"), false);
 			bOutAdvanced = true;
 			return false;
 		}
@@ -632,7 +643,8 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 			return [this, WeakPublication = TWeakPtr<FPublication>(InPublication), GroupIndex, Lease = MoveTemp(InLease)]
 			{
 				const auto Publication = WeakPublication.Pin();
-				if (!Publication || Publication->bCanceled || !Publication->Groups.IsValidIndex(GroupIndex)) return false;
+				if (!Publication || Publication->bCanceled || !Publication->Groups.IsValidIndex(GroupIndex) ||
+					Publication->Groups[GroupIndex].bCommitted) return false;
 				for (const int32 Index : Publication->Groups[GroupIndex].UpdateIndices)
 				{
 					if (!Publication->Updates.IsValidIndex(Index)) return false;
@@ -650,7 +662,8 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 			return [WeakPublication = TWeakPtr<FPublication>(InPublication), GroupIndex, Lease = MoveTemp(InLease)]
 			{
 				const auto Publication = WeakPublication.Pin();
-				if (Publication && !Publication->bCanceled && Publication->Groups.IsValidIndex(GroupIndex))
+				if (Publication && !Publication->bCanceled && Publication->Groups.IsValidIndex(GroupIndex) &&
+					!Publication->Groups[GroupIndex].bCommitted)
 				{
 					auto& Group = Publication->Groups[GroupIndex];
 					Group.bNativeSubmitted = true;
@@ -711,7 +724,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 	const auto* Entry = Entries.Find(Update.SourceId);
 	if (!Entry)
 	{
-		DiscardPublication(InPublication, false);
+		DiscardGroup(InPublication, InGroup, TEXT("NativeSourceMissing"), false);
 		bOutAdvanced = true;
 		return false;
 	}
@@ -725,7 +738,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 	const auto RenderGeometry = bRemove ? Entry->NativeMesh : Update.NativeMesh;
 	if (!RenderGeometry || !RenderGeometry->Source)
 	{
-		DiscardPublication(InPublication, false);
+		DiscardGroup(InPublication, InGroup, TEXT("NativeGeometryMissing"), false);
 		bOutAdvanced = true;
 		return false;
 	}
@@ -775,7 +788,9 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 			(RenderSource->FrozenSurface && !Retain(RenderSource->FrozenSurface->ResourceLease)) ||
 			(RenderSource->FrozenMacro && !Retain(RenderSource->FrozenMacro->ResourceLease)) ||
 			(RenderSource->FrozenWater && !Retain(RenderSource->FrozenWater->ResourceLease))) return false;
+		const TArray<FBox>& CoverageExclusions = bRemove ? Entry->Exclusions : Update.Exclusions;
 		const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FVoxelTerrainRenderCoarse>() +
+			VoxelBoundedAllocation::ArrayBytes<FBox>(CoverageExclusions.Num()) +
 			VoxelBoundedAllocation::ArrayBytes<TSharedPtr<const FVoxelTerrainRenderChunk, ESPMode::ThreadSafe>>(RenderSource->Batches.Num());
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
 		const uint64 BeforeAdmission = Resources->ReleaseVersionExcludingOwner(Consumer);
@@ -804,6 +819,11 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		Item->MetadataLease = MoveTemp(Lease);
 		Item->SourceId = Update.SourceId.Value;
 		Item->bBoundaryOnly = bRemove ? Entry->bTransition : Update.bTransition;
+		Item->bFinalPartition = InPublication->bInitialLayout && !Item->bBoundaryOnly;
+		Item->CoverageExclusions.Reserve(CoverageExclusions.Num());
+		for (const FBox& Box : CoverageExclusions)
+			Item->CoverageExclusions.Add(FBox(RenderGeometry->WorldCellOrigin + Box.Min * RenderGeometry->CellScale,
+				RenderGeometry->WorldCellOrigin + Box.Max * RenderGeometry->CellScale));
 		Item->Geometry = RenderGeometry;
 		Item->SourceChunks.Reserve(RenderSource->Batches.Num());
 		Item->SourceChunks.SetNum(RenderSource->Batches.Num());

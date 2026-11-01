@@ -2045,7 +2045,7 @@ bool FVoxelViewPublisher::CommitReadyGroups(const FPublicationRef& Publication, 
 		});
 		if (!bCurrent)
 		{
-			DiscardReadyGroup(Publication, Group);
+			DiscardGroup(Publication, Group, TEXT("CommitValidation"));
 			bAdvanced = true;
 			continue;
 		}
@@ -2081,33 +2081,64 @@ bool FVoxelViewPublisher::CommitReadyGroups(const FPublicationRef& Publication, 
 	return bAdvanced;
 }
 
-void FVoxelViewPublisher::DiscardReadyGroup(const FPublicationRef& InPublication, FGroup& InGroup)
+void FVoxelViewPublisher::DiscardGroup(const FPublicationRef& InPublication, FGroup& InGroup,
+	const TCHAR* InReason, const bool bInAllowRetry)
 {
-	check(InGroup.PreparedUpdates == InGroup.UpdateIndices.Num());
+	if (InGroup.bCommitted) return;
+	InGroup.bCommitted = true;
+	if (!InPublication->bCanceled && InGroup.UpdateIndices.ContainsByPredicate([&InPublication](const int32 Index)
+	{
+		return InPublication->Updates[Index].bNativeMeshPending;
+	}))
+		Scheduler.CancelMatching([this, &InPublication, &InGroup](const EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
+		{
+			return Kind == EVoxelTaskKind::BuildViewCoverage && Stamp.WorldEpoch == WorldEpoch &&
+				Stamp.OwnerId == NativeOwnerId && Stamp.OwnerIncarnation == InPublication->Serial &&
+				Stamp.Section.X == MIN_int32 && Stamp.Section.Y == 7 && InGroup.UpdateIndices.Contains(Stamp.Section.Z);
+		});
 	for (const int32 Index : InGroup.UpdateIndices)
 	{
 		FUpdate& Update = InPublication->Updates[Index];
-		check(!Update.bNativeMeshPending);
 		ReleaseSourceGeneration(Update.SourceId, InPublication->Serial);
 		for (const auto& Component : Update.Components)
 		{
 			if (Component) Component->DestroyComponent();
 		}
 		Update.Components.Reset();
+		Update.bNativeMeshPending = false;
+		Update.bNativeAdmissionWaiting = false;
+		Update.CommonBoxes.Reset();
 		Update.Source.Reset();
 		Update.NativeMesh.Reset();
 	}
-	for (const auto SourceId : InGroup.VisibilitySources) ReleaseSourceGeneration(SourceId, InPublication->Serial);
-	InGroup.bCommitted = true;
+	for (const auto SourceId : InGroup.VisibilitySources)
+	{
+		ReleaseSourceGeneration(SourceId, InPublication->Serial);
+		InPublication->Visibility.Remove(SourceId);
+	}
 	InGroup.NativeTransaction.Invalidate();
 	ReleaseNativeGroup(InGroup);
 	for (const auto& Key : InGroup.Keys)
 	{
 		SetOwnerActive(Key, InPublication->Serial, false);
-		RetryOwners.AddUnique(Key);
+		if (bInAllowRetry) RetryOwners.AddUnique(Key);
+		InPublication->Callbacks.Remove(Key);
+		InPublication->Validations.Remove(Key);
+		InPublication->DeferredPriorityBounds.Remove(Key);
 	}
 	bFirstOwnersDirty = true;
 	bActiveBusyKeysDirty = true;
+	ReadySelectionCursors[0] = 0;
+	check(PrepareReadinessRevision < MAX_uint64);
+	++PrepareReadinessRevision;
+	InvalidateCommitReadiness();
+	if (!InPublication->bCanceled)
+	{
+		InPublication->bFinished = !InPublication->Groups.ContainsByPredicate([](const FGroup& Group) { return !Group.bCommitted; });
+		UE_LOG(LogTemp, Display, TEXT("Publisher discarded group: serial=%llu group=%d groups=%d keys=%d updates=%d reason=%s retry=%d"),
+			InPublication->Serial, int32(&InGroup - InPublication->Groups.GetData()), InPublication->Groups.Num(),
+			InGroup.Keys.Num(), InGroup.UpdateIndices.Num(), InReason, bInAllowRetry);
+	}
 }
 
 bool FVoxelViewPublisher::CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup)
@@ -2268,30 +2299,25 @@ void FVoxelViewPublisher::DiscardPublication(const FPublicationRef& Publication,
 			return Kind == EVoxelTaskKind::BuildViewCoverage && Stamp.WorldEpoch == WorldEpoch &&
 				Stamp.OwnerId == NativeOwnerId && Stamp.OwnerIncarnation == Serial;
 		});
-	for (auto& Group : Publication->Groups) ReleaseNativeGroup(Group);
-	for (const auto& Group : Publication->Groups) if (!Group.bCommitted)
-		for (const auto& Key : Group.Keys)
-		{
-			SetOwnerActive(Key, Publication->Serial, false);
-			if (bInAllowRetry) RetryOwners.AddUnique(Key);
-		}
-	bFirstOwnersDirty = true;
-	++PriorityRevision;
-	bPrioritiesDirty = true;
-	bActiveBusyKeysDirty = true;
-	for (FUpdate& Update : Publication->Updates)
+	for (auto& Group : Publication->Groups) DiscardGroup(Publication, Group, TEXT("PublicationCanceled"), bInAllowRetry);
+	for (auto& Update : Publication->Updates)
 	{
 		ReleaseSourceGeneration(Update.SourceId, Publication->Serial);
+		Update.CommonBoxes.Reset();
 		Update.NativeMesh.Reset();
 		Update.Source.Reset();
-		if (!Entries.Contains(Update.SourceId)) continue;
-		for (UVoxelMeshComponent* Component : Update.Components)
+		for (const auto& Component : Update.Components)
 		{
 			if (Component) RetiredComponents.Add(Component);
 		}
 		Update.Components.Reset();
 	}
 	for (const auto& Pair : Publication->Visibility) ReleaseSourceGeneration(Pair.Key, Publication->Serial);
+	Publication->Visibility.Reset();
+	bFirstOwnersDirty = true;
+	++PriorityRevision;
+	bPrioritiesDirty = true;
+	bActiveBusyKeysDirty = true;
 }
 
 bool FVoxelViewPublisher::CanAdmitNativeGroup(const FGroup& InGroup) const
@@ -2369,19 +2395,27 @@ void FVoxelViewPublisher::ReleaseNativeGroup(FGroup& InGroup)
 void FVoxelViewPublisher::Forget(FVoxelViewSourceId InSourceId)
 {
 	const FVoxelViewSourceId Key(InSourceId);
-	// 值标识不会像弱 UObject 引用一样自动失效，撤销仍引用它的在途事务。
 	for (const auto& Publication : Publications)
 	{
 		if (Publication->bCanceled || Publication->bFinished) continue;
-		if (Publication->Updates.ContainsByPredicate([&](const FUpdate& Update)
+		if (!Publication->bGroupsPrepared)
 		{
-			return Update.SourceId == Key && Publication->Groups.IsValidIndex(Update.GroupIndex) &&
-				!Publication->Groups[Update.GroupIndex].bCommitted;
-		}) || Publication->Visibility.Contains(Key))
+			if (Publication->Visibility.Contains(Key) || Publication->Updates.ContainsByPredicate([Key](const FUpdate& Update)
+			{
+				return Update.SourceId == Key;
+			})) DiscardPublication(Publication);
+			continue;
+		}
+		for (auto& Group : Publication->Groups)
 		{
-			DiscardPublication(Publication);
+			if (Group.bCommitted) continue;
+			if (Group.VisibilitySources.Contains(Key) || Group.UpdateIndices.ContainsByPredicate([&Publication, Key](const int32 Index)
+			{
+				return Publication->Updates[Index].SourceId == Key;
+			})) DiscardGroup(Publication, Group, TEXT("SourceForgotten"));
 		}
 	}
+
 	PendingVisibility.Remove(Key);
 	if (const int32* Index = PendingUpdateIndices.Find(Key)) TakePendingUpdate(*Index);
 	if (const auto* Entry = Entries.Find(Key))
@@ -2717,7 +2751,7 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 			(bInCommit ? Group.CommitWaitTick : Group.PrepareWaitTick) == PublisherTickSerial) continue;
 		if (bInCommit && Group.NativeTransaction.IsValid() && TerrainRenderer->ConsumeTransactionFailure(Group.NativeTransaction))
 		{
-			DiscardPublication(Ready.Publication, false);
+			DiscardGroup(Ready.Publication, Group, TEXT("NativeTransactionFailure"), false);
 			Cursor = 0;
 			return Index;
 		}
@@ -2728,7 +2762,7 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 			UE_LOG(LogTemp, Display, TEXT("Publisher abandoned native transaction: serial=%llu group=%d transaction=%s updates=%d groups=%d"),
 				Ready.Publication->Serial, Ready.GroupIndex, *Group.NativeTransaction.ToString(),
 				Group.UpdateIndices.Num(), Ready.Publication->Groups.Num());
-			DiscardReadyGroup(Ready.Publication, Group);
+			DiscardGroup(Ready.Publication, Group, TEXT("NativeTransactionAbandoned"));
 			Cursor = 0;
 			return Index;
 		}
@@ -3132,7 +3166,7 @@ void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommi
 				const bool bWasAdmissionWaiting = Publication->Updates[Index].bNativeAdmissionWaiting;
 				if (!PrepareUpdate(Publication, Index, Deadline, PreparedComponents, bComplete))
 				{
-					DiscardPublication(Publication);
+					DiscardGroup(Publication, Group, TEXT("NativeSourceInvalid"));
 					bRetry = true;
 					return true;
 				}
@@ -3352,7 +3386,7 @@ bool FVoxelViewPublisher::RunBudgetedPhase(FVoxelPublishBudget& InBudget, const 
 	return bAdvanced;
 }
 
-bool FVoxelViewPublisher::GetPresentedMeshCost(FVoxelViewSourceId InSourceId, uint64& OutVertices, uint64& OutTriangles, uint64& OutBytes) const
+bool FVoxelViewPublisher::GetPresentedSourceMeshCost(FVoxelViewSourceId InSourceId, uint64& OutVertices, uint64& OutTriangles, uint64& OutBytes) const
 {
 	const FEntry* Entry = Entries.Find(InSourceId);
 	if (!Entry || !Entry->bPresented || !InSourceId || Entry->bHidden)
@@ -3361,4 +3395,11 @@ bool FVoxelViewPublisher::GetPresentedMeshCost(FVoxelViewSourceId InSourceId, ui
 	OutTriangles = Entry->PresentedTriangles;
 	OutBytes = Entry->PresentedBytes;
 	return true;
+}
+
+bool FVoxelViewPublisher::GetPresentedTriangles(FVoxelViewSourceId InSourceId, uint64& OutTriangles, bool& bOutFinalPartition) const
+{
+	const FEntry* Entry = Entries.Find(InSourceId);
+	return Entry && IsCommitted(InSourceId) && !Entry->bHidden && Entry->Source == Entry->PresentedSource &&
+		TerrainRenderer->GetPresentedCoarseTriangles(Entry->PresentedNativeStamp, InSourceId.Value, OutTriangles, bOutFinalPartition);
 }

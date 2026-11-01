@@ -94,7 +94,8 @@ public:
 	bool IsPresented(FVoxelViewSourceId InSourceId) const;
 	bool IsCommitted(FVoxelViewSourceId InSourceId) const;
 	bool HasPresentation(FVoxelViewSourceId InSourceId) const;
-	bool GetPresentedMeshCost(FVoxelViewSourceId InSourceId, uint64& OutVertices, uint64& OutTriangles, uint64& OutBytes) const;
+	bool GetPresentedSourceMeshCost(FVoxelViewSourceId InSourceId, uint64& OutVertices, uint64& OutTriangles, uint64& OutBytes) const;
+	bool GetPresentedTriangles(FVoxelViewSourceId InSourceId, uint64& OutTriangles, bool& bOutFinalPartition) const;
 	FVoxelFrameTimings GetFrameTimings() const { return FrameTimings; }
 	FVoxelTerrainRenderer& GetTerrainRenderer() const { return *TerrainRenderer; }
 	bool IsCurrentAtomEvidence(const FIntVector& InSection, const FVoxelFineOwnerEvidence& InEvidence) const;
@@ -424,7 +425,7 @@ private:
 	bool CommitReadyGroups(const FPublicationRef& Publication, int32& InOutCommitted, double InDeadline,
 		const TMap<FVoxelPublishGroupKey, uint64>& InFirstOwners, int32 InGroupIndex = INDEX_NONE);
 	bool CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup);
-	void DiscardReadyGroup(const FPublicationRef& InPublication, FGroup& InGroup);
+	void DiscardGroup(const FPublicationRef& InPublication, FGroup& InGroup, const TCHAR* InReason, bool bInAllowRetry = true);
 	bool AdvanceNativeGroup(const FPublicationRef& InPublication, FGroup& InGroup, bool& bOutAdvanced);
 	bool CanAdmitNativeGroup(const FGroup& InGroup) const;
 	bool AdmitNativeGroup(FGroup& InGroup);

@@ -273,6 +273,7 @@ private:
 	template<typename KeyType, typename ValueType>
 	bool PrepareMap(TMap<KeyType, ValueType>& InMap, int32 InRequired, int32& InCapacity,
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& InLease, FString& OutError);
+	static void VisitControlSources(const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit);
 	bool PrepareStorage(FString& OutError);
 	bool PreparePrerequisites(FState& InState, int32 InRequired, FString& OutError);
 	bool GetPrerequisiteRange(const FVoxelGenerationPlanDependency& InDependency, FIntPoint& OutMin,

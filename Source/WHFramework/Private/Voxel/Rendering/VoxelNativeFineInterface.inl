@@ -14,8 +14,7 @@ FCoarsePtr FindCoarseOwner(const FCoarseNodePtr& Root, const FIntVector& Section
 	FCoarsePtr Best;
 	const auto Consider = [&Best, &Box](const FCoarsePtr& Item)
 	{
-		if (Item && !Item->bBoundaryOnly && Item->OwnershipBounds.IsInsideOrOn(Box.Min) &&
-			Item->OwnershipBounds.IsInsideOrOn(Box.Max) && (!Best ||
+		if (Item && !Item->bBoundaryOnly && Item->Owns(Box) && (!Best ||
 			FinerCoarse(Item->Geometry->Stamp.GeometryIdentity, Best->Geometry->Stamp.GeometryIdentity))) Best = Item;
 	};
 	const auto Visit = [&](auto&& Self, const FCoarseNodePtr& Node) -> void

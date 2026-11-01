@@ -91,6 +91,21 @@ FVoxelGenerationPlanCoordinator::~FVoxelGenerationPlanCoordinator()
 	Reset();
 }
 
+void FVoxelGenerationPlanCoordinator::VisitControlSources(const void* InContext, FVoxelGenerationRequiredSourceScope::FVisit InVisit)
+{
+	const auto& Owner = *static_cast<const FVoxelGenerationPlanCoordinator*>(InContext);
+	uint64 CacheBytes;
+	int32 CacheLeaseCount;
+	Owner.Cache->GetRequiredInputCapacity(CacheBytes, CacheLeaseCount);
+	if (CacheLeaseCount) InVisit({&Owner.Cache.Get(), 0, EVoxelTerrainResourcePool::Input, CacheBytes, CacheLeaseCount});
+	for (const auto* Lease : {Owner.Config->InputLease.Get(), Owner.Config->RecipeInputLease.Get()})
+		if (Lease && Lease->IsOwnedBy(Owner.Resources.Get())) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, InVisit);
+	if (Owner.Storage)
+		for (const auto* Lease : {Owner.Storage->ResourceLease.Get(), Owner.Storage->StatesLease.Get(), Owner.Storage->ConsumersLease.Get(),
+			Owner.Storage->FactsLease.Get(), Owner.Storage->EnvironmentLease.Get()})
+			if (Lease && Lease->IsOwnedBy(Owner.Resources.Get())) FVoxelGenerationRequiredSourceScope::VisitLease(Lease, InVisit);
+}
+
 bool FVoxelGenerationPlanCoordinator::PrepareStorage(FString& OutError)
 {
 	check(IsInGameThread());
@@ -105,17 +120,7 @@ bool FVoxelGenerationPlanCoordinator::PrepareStorage(FString& OutError)
 	if (!Cache->BindHydrologyRecipe(Config->Recipe->RecipeHash, Config->Recipe->AlgorithmVersion, OutError)) return false;
 	if (Storage) return true;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this,
-		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
-		{
-			const auto& Owner = *static_cast<const FVoxelGenerationPlanCoordinator*>(Context);
-			uint64 CacheBytes;
-			int32 CacheLeaseCount;
-			Owner.Cache->GetRequiredInputCapacity(CacheBytes, CacheLeaseCount);
-			if (CacheLeaseCount) Visit({&Owner.Cache.Get(), 0, EVoxelTerrainResourcePool::Input, CacheBytes, CacheLeaseCount});
-			for (const auto* Original : {Owner.Config->InputLease.Get(), Owner.Config->RecipeInputLease.Get()})
-				if (Original && Original->IsOwnedBy(Owner.Resources.Get())) FVoxelGenerationRequiredSourceScope::VisitLease(Original, Visit);
-		});
+	FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this, &VisitControlSources);
 	FVoxelGenerationRequiredCapacity Required;
 	if (!FVoxelGenerationRequiredSourceScope::Collect(Resources.Get(), nullptr, Required, OutError)) return false;
 	const auto Admission = Resources->TryAcquire(ControlConsumer, EVoxelTerrainResourcePool::Input,
@@ -146,19 +151,7 @@ bool FVoxelGenerationPlanCoordinator::PrepareMap(TMap<KeyType, ValueType>& InMap
 	if (InRequired <= InCapacity) return true;
 	const int32 Capacity = FMath::Max(InRequired, FMath::Max(4, InCapacity * 2));
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this,
-		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
-		{
-			const auto& Owner = *static_cast<const FVoxelGenerationPlanCoordinator*>(Context);
-			uint64 CacheBytes;
-			int32 CacheLeaseCount;
-			Owner.Cache->GetRequiredInputCapacity(CacheBytes, CacheLeaseCount);
-			if (CacheLeaseCount) Visit({&Owner.Cache.Get(), 0, EVoxelTerrainResourcePool::Input, CacheBytes, CacheLeaseCount});
-			for (const auto* Original : {Owner.Config->InputLease.Get(), Owner.Config->RecipeInputLease.Get(),
-				Owner.Storage->ResourceLease.Get(), Owner.Storage->StatesLease.Get(), Owner.Storage->ConsumersLease.Get(),
-				Owner.Storage->FactsLease.Get(), Owner.Storage->EnvironmentLease.Get()})
-				if (Original && Original->IsOwnedBy(Owner.Resources.Get())) FVoxelGenerationRequiredSourceScope::VisitLease(Original, Visit);
-		});
+	FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this, &VisitControlSources);
 	// 原map仍占有旧backing；新租约与它同时存在，来源按原serial去重。
 	FVoxelGenerationRequiredSourceScope PreviousMapSource(&Resources.Get(), InLease.Get());
 	FVoxelGenerationRequiredCapacity Required;
@@ -191,19 +184,7 @@ bool FVoxelGenerationPlanCoordinator::PreparePrerequisites(FState& InState, cons
 	const int32 Capacity = FMath::Min(MaximumHydrologyDependencies,
 		FMath::Max(InRequired, FMath::Max(4, InState.PrerequisitesCapacity * 2)));
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> Lease;
-	FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this,
-		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
-		{
-			const auto& Owner = *static_cast<const FVoxelGenerationPlanCoordinator*>(Context);
-			uint64 CacheBytes;
-			int32 CacheLeaseCount;
-			Owner.Cache->GetRequiredInputCapacity(CacheBytes, CacheLeaseCount);
-			if (CacheLeaseCount) Visit({&Owner.Cache.Get(), 0, EVoxelTerrainResourcePool::Input, CacheBytes, CacheLeaseCount});
-			for (const auto* Original : {Owner.Config->InputLease.Get(), Owner.Config->RecipeInputLease.Get(),
-				Owner.Storage->ResourceLease.Get(), Owner.Storage->StatesLease.Get(), Owner.Storage->ConsumersLease.Get(),
-				Owner.Storage->FactsLease.Get(), Owner.Storage->EnvironmentLease.Get()})
-				if (Original && Original->IsOwnedBy(Owner.Resources.Get())) FVoxelGenerationRequiredSourceScope::VisitLease(Original, Visit);
-		});
+	FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this, &VisitControlSources);
 	FVoxelGenerationRequiredSourceScope StateSources(&Resources.Get(), &InState,
 		[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
 		{
@@ -842,11 +823,13 @@ void FVoxelGenerationPlanCoordinator::RejectTaskBinding(const FVoxelGenerationPl
 
 int32 FVoxelGenerationPlanCoordinator::AdvancePendingAdmissions(const double InDeadline, const int32 InMaximumFacts)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanPendingAdmissions);
 	if (!Storage)
 	{
 		return 0;
 	}
 	FVoxelTaskScheduler::FEnqueueBatch EnqueueBatch(Scheduler);
+	FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this, &VisitControlSources);
 	const int32 Maximum = FMath::Min(FMath::Max(0, InMaximumFacts), Storage->AdmissionCount);
 	int32 Processed = 0;
 	while (Storage && Storage->AdmissionHead.IsValid() && Processed < Maximum && FPlatformTime::Seconds() <= InDeadline)
@@ -884,7 +867,7 @@ int32 FVoxelGenerationPlanCoordinator::AdvancePendingAdmissions(const double InD
 				LinkPendingAdmission(Storage->States.FindChecked(Dependency));
 			}
 		}
-		else if (State.PendingRequest.IsSet())
+		else if (State.State == EVoxelPlanDependencyState::Missing)
 		{
 			LinkPendingAdmission(State);
 		}
@@ -1423,21 +1406,9 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 	const auto CapturedStorage = Storage;
 	FVoxelGenerationDependencyStatus Status;
 	{
-		// 先销毁依赖登记临时链，再统一启动任务，避免调度回调重入旧闭包。
+		// 登记期间保留原批次边界，事实任务由原准入队列按共享期限推进。
 		FVoxelTaskScheduler::FEnqueueBatch EnqueueBatch(Scheduler);
-		FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this,
-			[](const void* Context, FVoxelGenerationRequiredSourceScope::FVisit Visit)
-			{
-				const auto& Owner = *static_cast<const FVoxelGenerationPlanCoordinator*>(Context);
-				uint64 CacheBytes;
-				int32 CacheLeaseCount;
-				Owner.Cache->GetRequiredInputCapacity(CacheBytes, CacheLeaseCount);
-				if (CacheLeaseCount) Visit({&Owner.Cache.Get(), 0, EVoxelTerrainResourcePool::Input, CacheBytes, CacheLeaseCount});
-				for (const auto* Original : {Owner.Config->InputLease.Get(), Owner.Config->RecipeInputLease.Get(),
-					Owner.Storage->ResourceLease.Get(), Owner.Storage->StatesLease.Get(), Owner.Storage->ConsumersLease.Get(),
-					Owner.Storage->FactsLease.Get(), Owner.Storage->EnvironmentLease.Get()})
-					if (Original && Original->IsOwnedBy(Owner.Resources.Get())) FVoxelGenerationRequiredSourceScope::VisitLease(Original, Visit);
-			});
+		FVoxelGenerationRequiredSourceScope RootSources(&Resources.Get(), this, &VisitControlSources);
 		FClosureRegistration Registration(*this);
 		FClosureDemand Desired(*this);
 		{
@@ -1746,13 +1717,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 				const auto Dependency = Storage->PriorityFacts.FindChecked(Node);
 				auto& State = Storage->States.FindChecked(Dependency);
 				const FGuid Next = State.NextDesired;
-				bool bWaitingPrerequisites = false;
-				if (State.State == EVoxelPlanDependencyState::Missing && !State.bInFlight)
-				{
-					if (State.PendingRequest.IsSet()) LinkPendingAdmission(State);
-					else if (ArePrerequisitesReady(State)) Queue(Dependency, State);
-					else bWaitingPrerequisites = true;
-				}
+				if (State.State == EVoxelPlanDependencyState::Missing && !State.bInFlight) LinkPendingAdmission(State);
 				if (Storage != Desired.CapturedStorage || !Storage || Storage->Owner != this || Storage->Consumers.FindByHash(ConsumerHash, InConsumer) == nullptr)
 				{
 					Status.bReady = false;
@@ -1761,7 +1726,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 				}
 				const auto* Current = Storage->States.Find(Dependency);
 				if (!Current || (Current->State != EVoxelPlanDependencyState::Ready &&
-					!Current->bInFlight && !Current->bAdmissionLinked && !bWaitingPrerequisites)) Status.bNeedsAdvance = true;
+					!Current->bInFlight && !Current->bAdmissionLinked)) Status.bNeedsAdvance = true;
 				if (Current && Current->State == EVoxelPlanDependencyState::Failed)
 				{
 					Status.bReady = false;
@@ -2290,8 +2255,8 @@ bool FVoxelGenerationPlanCoordinator::SetFactDependencies(const FVoxelGeneration
 bool FVoxelGenerationPlanCoordinator::RegisterClosure(const FVoxelGenerationPlanDependency& InDependency,
 	FClosureRegistration& InRegistration, FString& OutError)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanRegisterClosure);
-	if (auto* Existing = Storage->States.Find(InDependency); Existing && Existing->PriorityNode.IsValid())
+	auto* Existing = Storage->States.Find(InDependency);
+	if (Existing && Existing->PriorityNode.IsValid())
 	{
 		if (Existing->bRegistering)
 		{
@@ -2299,7 +2264,11 @@ bool FVoxelGenerationPlanCoordinator::RegisterClosure(const FVoxelGenerationPlan
 			return false;
 		}
 		// 当前 Ensure 只在完整登记后加入 Desired；共享前置不再重复遍历，作用域结束即清除。
-		if (Existing->bDesired) return true;
+		if (Existing->bDesired || (Existing->Prerequisites.IsEmpty() && PriorityGraph.GetDependencyCount(Existing->PriorityNode) == 0)) return true;
+	}
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanRegisterClosure);
+	if (Existing && Existing->PriorityNode.IsValid())
+	{
 		Existing->bRegistering = true;
 		ON_SCOPE_EXIT
 		{

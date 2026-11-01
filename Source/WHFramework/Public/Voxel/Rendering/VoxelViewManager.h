@@ -45,6 +45,7 @@ struct FVoxelBoundaryTransitionContext;
 struct FVoxelFrozenHeightfieldInputs;
 struct FVoxelAffectedRepresentationKeys;
 struct FVoxelFineShardGeometry;
+struct FVoxelFineOwnerEvidence;
 struct FVoxelTerrainRenderAtom;
 class IVoxelTerrainPresentedSnapshot;
 
@@ -80,6 +81,9 @@ struct WHFRAMEWORK_API FVoxelTerrainTargetReadiness
 	uint64 MeshTriangles = 0;
 	uint64 MeshBytes = 0;
 	bool bMeshMetricsAvailable = false;
+	uint64 NativeTriangles = 0;
+	bool bNativeGeometryReady = false;
+	bool bNativeKnownEmpty = false;
 	bool bDataReady = false;
 	bool bMeshReady = false;
 	bool bPresented = false;
@@ -257,6 +261,7 @@ public:
 	TSharedPtr<const IVoxelTerrainPresentedSnapshot, ESPMode::ThreadSafe> CapturePresentedSnapshot() const;
 	bool IsFinePresented(const FIntVector& InSection) const;
 	bool IsLatestFinePresented(const FIntVector& InSection) const;
+	bool IsFinePresentationCurrent(const FVoxelFineOwnerEvidence& InEvidence) const;
 	bool IsTerrainGeometryPresented(const FVoxelTerrainGeometry& InGeometry) const;
 	bool RequiresSectionData(const FIntVector& InKey) const;
 	FVoxelPrimaryFineReadiness GetPrimaryFineReadiness(
