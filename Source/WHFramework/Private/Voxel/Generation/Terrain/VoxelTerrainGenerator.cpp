@@ -14,25 +14,30 @@ FVoxelTerrainGenerator::FVoxelTerrainGenerator(
 
 FVoxelLandformSample FVoxelTerrainGenerator::SampleLandform(int32 InX, int32 InY) const
 {
-    return Landform.Sample(InX, InY, Climate->Sample(InX, InY));
+    return Landform.SampleWithRidge(InX, InY, Climate->SampleRidgeQ15(InX, InY));
 }
 
 int32 FVoxelTerrainGenerator::SampleSurfaceHeight(int32 InX, int32 InY) const
 {
-    const FVoxelClimateSample ClimateSample = Climate->Sample(InX, InY);
-    const FVoxelLandformSample LandformSample = Landform.Sample(InX, InY, ClimateSample);
+    const FVoxelTerrainClimateSample ClimateSample = Climate->SampleTerrainClimate(InX, InY);
+    const FVoxelLandformSample LandformSample = Landform.SampleWithRidge(InX, InY, ClimateSample.RidgeQ15);
     return SampleRawHeight(InX, InY, ClimateSample, LandformSample);
 }
 
 FVoxelMacroTerrainSample FVoxelTerrainGenerator::SampleMacro(int32 InX, int32 InY) const
 {
-    const FVoxelClimateSample ClimateSample = Climate->Sample(InX, InY);
-    return SampleMacro(InX, InY, ClimateSample);
+    return SampleMacroFromTerrainClimate(InX, InY, Climate->SampleTerrainClimate(InX, InY));
 }
 
 FVoxelMacroTerrainSample FVoxelTerrainGenerator::SampleMacro(int32 InX, int32 InY, const FVoxelClimateSample& InClimate) const
 {
-    const FVoxelLandformSample LandformSample = Landform.Sample(InX, InY, InClimate);
+    return SampleMacroFromTerrainClimate(InX, InY, FVoxelTerrainClimateSample(InClimate));
+}
+
+FVoxelMacroTerrainSample FVoxelTerrainGenerator::SampleMacroFromTerrainClimate(
+    int32 InX, int32 InY, const FVoxelTerrainClimateSample& InClimate) const
+{
+    const FVoxelLandformSample LandformSample = Landform.SampleWithRidge(InX, InY, InClimate.RidgeQ15);
 
     FVoxelMacroTerrainSample Result;
     Result.SurfaceZ = SampleRawHeight(InX, InY, InClimate, LandformSample);
@@ -53,7 +58,7 @@ int32 FVoxelTerrainGenerator::SampleDensityQ16(
 int32 FVoxelTerrainGenerator::SampleRawHeight(
     int32 InX,
     int32 InY,
-    const FVoxelClimateSample& InClimate,
+    const FVoxelTerrainClimateSample& InClimate,
     const FVoxelLandformSample& InLandform) const
 {
     const FVoxelGenerationSettings& Settings = Recipe->Settings;
@@ -121,13 +126,13 @@ int32 FVoxelTerrainGenerator::SampleSlopePermille(int32 InX, int32 InY, int32 In
     // 边缘使用相同距离的单侧差分，不把域外样本 Clamp 成重复边缘 cell。
     const int32 SampleX = static_cast<int32>(VoxelGeneration::IsWorldCell(int64(InX) + 4) ? int64(InX) + 4 : int64(InX) - 4);
     const int32 SampleY = static_cast<int32>(VoxelGeneration::IsWorldCell(int64(InY) + 4) ? int64(InY) + 4 : int64(InY) - 4);
-    const FVoxelClimateSample XClimate = Climate->Sample(SampleX, InY);
-    const FVoxelClimateSample YClimate = Climate->Sample(InX, SampleY);
+    const FVoxelTerrainClimateSample XClimate = Climate->SampleTerrainClimate(SampleX, InY);
+    const FVoxelTerrainClimateSample YClimate = Climate->SampleTerrainClimate(InX, SampleY);
 
     const int32 XHeight = SampleRawHeight(
-        SampleX, InY, XClimate, Landform.Sample(SampleX, InY, XClimate));
+        SampleX, InY, XClimate, Landform.SampleWithRidge(SampleX, InY, XClimate.RidgeQ15));
     const int32 YHeight = SampleRawHeight(
-        InX, SampleY, YClimate, Landform.Sample(InX, SampleY, YClimate));
+        InX, SampleY, YClimate, Landform.SampleWithRidge(InX, SampleY, YClimate.RidgeQ15));
 
     const int64 Delta = FMath::Max(
         FMath::Abs(int64(XHeight) - InCenterHeight),

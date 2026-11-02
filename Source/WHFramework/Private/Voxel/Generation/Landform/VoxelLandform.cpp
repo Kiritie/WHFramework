@@ -29,6 +29,14 @@ FVoxelLandformSample FVoxelLandformGenerator::Sample(
 	const int32 InY,
 	const FVoxelClimateSample& InClimate) const
 {
+	return SampleWithRidge(InX, InY, InClimate.RidgeQ15);
+}
+
+FVoxelLandformSample FVoxelLandformGenerator::SampleWithRidge(
+	const int32 InX,
+	const int32 InY,
+	const int32 InRidgeQ15) const
+{
 	const FVoxelGenerationSettings& Generation = Recipe->Settings;
 	const FVoxelLandformGenerationSettings& Settings = Generation.Landform;
 	const int32 WarpX = static_cast<int32>(
@@ -62,7 +70,7 @@ FVoxelLandformSample FVoxelLandformGenerator::Sample(
 		static_cast<int64>(BandWeight(Domain, -5000, 22000)) *
 		FMath::Clamp(-Relief - 2000, 0, 16000) / 8000);
 
-	const int32 Ridge = FMath::Clamp(FMath::Abs(InClimate.RidgeQ15), 0, 32767);
+	const int32 Ridge = FMath::Clamp(FMath::Abs(InRidgeQ15), 0, 32767);
 	Result.MountainQ15 = static_cast<int32>(
 		static_cast<int64>(Result.MountainQ15) * 3 *
 		(24576 + Ridge / 4) / 32767);

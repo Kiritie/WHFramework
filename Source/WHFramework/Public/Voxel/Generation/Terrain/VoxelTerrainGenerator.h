@@ -5,6 +5,7 @@
 #include "Voxel/Generation/Landform/VoxelLandform.h"
 
 class FVoxelClimateGenerator;
+struct FVoxelTerrainClimateSample;
 
 class WHFRAMEWORK_API FVoxelTerrainGenerator
 {
@@ -21,7 +22,8 @@ public:
     int32 SampleDensityQ16(const FIntVector& InCell, const FVoxelMacroTerrainSample& InMacro) const;
 
 private:
-    int32 SampleRawHeight(int32 InX, int32 InY, const FVoxelClimateSample& InClimate,
+    FVoxelMacroTerrainSample SampleMacroFromTerrainClimate(int32 InX, int32 InY, const FVoxelTerrainClimateSample& InClimate) const;
+    int32 SampleRawHeight(int32 InX, int32 InY, const FVoxelTerrainClimateSample& InClimate,
         const FVoxelLandformSample& InLandform) const;
     int32 SampleSlopePermille(int32 InX, int32 InY, int32 InCenterHeight) const;
 

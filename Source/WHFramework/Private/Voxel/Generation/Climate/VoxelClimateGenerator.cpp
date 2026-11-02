@@ -26,26 +26,40 @@ FVoxelClimateSample FVoxelClimateGenerator::Sample(int32 InX, int32 InY) const
         Settings.ClimatePeriod,
         0x2169A938707B0147ull);
 
-    Result.ContinentalnessQ15 = VoxelGeneration::Noise2D(
+    const FVoxelTerrainClimateSample TerrainClimate = SampleTerrainClimate(InX, InY);
+    Result.ContinentalnessQ15 = TerrainClimate.ContinentalnessQ15;
+    Result.ErosionQ15 = TerrainClimate.ErosionQ15;
+    Result.RidgeQ15 = TerrainClimate.RidgeQ15;
+    return Result;
+}
+
+FVoxelTerrainClimateSample FVoxelClimateGenerator::SampleTerrainClimate(int32 InX, int32 InY) const
+{
+    const FVoxelGenerationSettings& Settings = Recipe->Settings;
+    const int32 ContinentalnessQ15 = VoxelGeneration::Noise2D(
         Settings.Seed,
         InX,
         InY,
         Settings.ContinentalPeriod,
         0x9B8D72D6C5AE4C13ull);
 
-    Result.ErosionQ15 = VoxelGeneration::Noise2D(
+    const int32 ErosionQ15 = VoxelGeneration::Noise2D(
         Settings.Seed,
         InX,
         InY,
         Settings.ErosionPeriod,
         0x58C3EEB621C8109Dull);
 
-    Result.RidgeQ15 = VoxelGeneration::Noise2D(
+    return FVoxelTerrainClimateSample(ContinentalnessQ15, ErosionQ15, SampleRidgeQ15(InX, InY));
+}
+
+int32 FVoxelClimateGenerator::SampleRidgeQ15(int32 InX, int32 InY) const
+{
+    const FVoxelGenerationSettings& Settings = Recipe->Settings;
+    return VoxelGeneration::Noise2D(
         Settings.Seed,
         InX,
         InY,
         Settings.MountainPeriod,
         0x7A835FDE28C04E51ull);
-
-    return Result;
 }
