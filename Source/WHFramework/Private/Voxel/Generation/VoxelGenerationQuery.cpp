@@ -1647,7 +1647,8 @@ bool FVoxelGenerationQuery::SampleColumnSymbols(
 	const FIntPoint& InColumn,
 	const int32 InMinZ,
 	const TArrayView<uint32> OutValues,
-	FString& OutError) const
+	FString& OutError,
+	const FVoxelColumnSample* InNaturalColumn) const
 {
 	const int32 InCount = OutValues.Num();
 	if (!Prepared.bSymbolsPrepared || InCount <= 0 ||
@@ -1658,9 +1659,57 @@ bool FVoxelGenerationQuery::SampleColumnSymbols(
 		return false;
 	}
 	FVoxelColumnSample Column;
-	if (!SampleEnvironmentColumn(InColumn.X, InColumn.Y, Column, OutError, Prepared.Cancel))
+	if (InNaturalColumn)
+	{
+		if (!ValidateConsumer(OutError)) return false;
+		if ((Prepared.Cancel && Prepared.Cancel->Load()) || CacheGeneration != Cache->GetHydrologyGeneration())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		Column = *InNaturalColumn;
+	}
+	else if (!SampleEnvironmentColumn(InColumn.X, InColumn.Y, Column, OutError, Prepared.Cancel))
 	{
 		return false;
+	}
+	// 该段高于地形、地表水和含水层，且没有能写入该范围的生态、结构或特征。
+	// 洞穴只能挖空，地下装饰在 SurfaceZ - 8 以上无效；项目和存档覆盖仍在之后应用。
+	if (int64(InMinZ) > int64(Column.DensityHeight) && int64(InMinZ) > int64(Column.SurfaceZ) - 8 &&
+		InMinZ > Column.SurfaceWaterZ && InMinZ > Config->Recipe->Settings.LavaCeiling &&
+		Prepared.Ecology.IsEmpty() && Prepared.Structures.IsEmpty() && Prepared.Features.IsEmpty())
+	{
+		if (Prepared.Cancel && Prepared.Cancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+#if !UE_BUILD_SHIPPING
+		static const bool bValidateAirColumns = FParse::Param(FCommandLine::Get(), TEXT("ValidateVoxelAirColumns"));
+		if (bValidateAirColumns && (GetTypeHash(FIntVector(InColumn.X, InColumn.Y, InMinZ)) & 2047u) == 0)
+		{
+			for (int32 Index = 0; Index < InCount; ++Index)
+			{
+				uint32 Reference = 0;
+				if (!ResolveSymbol(FIntVector(InColumn.X, InColumn.Y, InMinZ + Index), Column, Reference, OutError)) return false;
+				if (Reference != uint32(Config->Recipe->Palette.Air))
+				{
+					OutError = FString::Printf(TEXT("Voxel air column fast path mismatch at (%d,%d,%d): reference=%u"),
+						InColumn.X, InColumn.Y, InMinZ + Index, Reference);
+					return false;
+				}
+			}
+			static TAtomic<uint64> CheckedColumns{0};
+			const uint64 Checked = CheckedColumns.IncrementExchange() + 1;
+			if ((Checked & (Checked - 1)) == 0)
+			{
+				UE_LOG(LogTemp, Display, TEXT("Voxel air column reference checks: %llu"), Checked);
+			}
+		}
+#endif
+		for (uint32& Value : OutValues) Value = Config->Recipe->Palette.Air;
+		OutError.Reset();
+		return true;
 	}
 	for (int32 Index = 0; Index < InCount; ++Index)
 	{

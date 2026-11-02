@@ -1,8 +1,52 @@
 #include "Voxel/Geometry/VoxelCollisionBuilder.h"
 #include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Geometry/VoxelFaceMerger.h"
+#include "Voxel/Rendering/VoxelFineShardBuild.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
+
+bool FVoxelSectionCollisionResult::BindFineGeometry(
+	TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> InGeometry, const FIntVector& InSection)
+{
+	if (!InGeometry || !InGeometry->bCoverageValidated || !Vertices.IsEmpty() || !Triangles.IsEmpty()) return false;
+	const FIntVector SectionMin = InSection * VoxelBlock::Size;
+	int64 Volume = 0;
+	int64 VertexCount = 0;
+	int64 IndexCount = 0;
+	FBox Bounds(ForceInit);
+	for (const FVoxelFineMeshPiece& Piece : InGeometry->Pieces)
+	{
+		const FIntVector Owner(int32(FVoxelFineSpatial::FloorDivide(Piece.Key.Min.X, VoxelBlock::Size)),
+			int32(FVoxelFineSpatial::FloorDivide(Piece.Key.Min.Y, VoxelBlock::Size)),
+			int32(FVoxelFineSpatial::FloorDivide(Piece.Key.Min.Z, VoxelBlock::Size)));
+		if (Owner != InSection) continue;
+		const FIntVector Offset = Piece.Key.Min - SectionMin;
+		if (!Piece.bCollisionMeshCompatible || !Piece.Mesh || !Piece.Mesh->bValidated || Piece.Key.SideCells <= 0 ||
+			Offset.GetMin() < 0 || Offset.GetMax() + Piece.Key.SideCells > VoxelBlock::Size) return false;
+		Volume += int64(Piece.Key.SideCells) * Piece.Key.SideCells * Piece.Key.SideCells;
+		bool bHasBlockingFaces = false;
+		for (const FVoxelRenderBatch& Batch : Piece.Mesh->Batches)
+		{
+			if (Batch.CollisionMode != EVoxelMeshCollisionMode::Blocking) continue;
+			if (Batch.Mesh.Triangles.Num() % 3 != 0) return false;
+			VertexCount += Batch.Mesh.Vertices.Num();
+			IndexCount += Batch.Mesh.Triangles.Num();
+			bHasBlockingFaces |= !Batch.Mesh.Triangles.IsEmpty();
+		}
+		if (bHasBlockingFaces)
+		{
+			if (!Piece.Mesh->LocalBounds.IsValid) return false;
+			Bounds += FBox(Piece.Mesh->LocalBounds.Min + FVector(Offset), Piece.Mesh->LocalBounds.Max + FVector(Offset));
+		}
+	}
+	if (Volume != VoxelBlock::Volume || VertexCount > MAX_int32 || IndexCount > MAX_int32 ||
+		(IndexCount && (!VertexCount || !Bounds.IsValid))) return false;
+	FineVertexCount = int32(VertexCount);
+	FineIndexCount = int32(IndexCount);
+	LocalBounds = Bounds;
+	FineGeometry = MoveTemp(InGeometry);
+	return true;
+}
 
 uint64 FVoxelCollisionBuilder::MaximumOutputBytes()
 {

@@ -13,6 +13,7 @@ namespace
 		bool bVisible = false;
 		FVoxelRuntimeFaceRef Texture;
 		EVoxelRenderGroup Group = EVoxelRenderGroup::Opaque;
+		EVoxelMeshCollisionMode CollisionMode = EVoxelMeshCollisionMode::None;
 		bool operator==(const FFineFaceKey& InOther) const = default;
 	};
 
@@ -35,9 +36,26 @@ namespace
 		FVoxelFineMeshEstimate Estimate;
 	};
 
-	uint32 BatchKey(const EVoxelRenderGroup InGroup, const uint16 InBank)
+	uint32 BatchKey(const EVoxelRenderGroup InGroup, const uint16 InBank, const EVoxelMeshCollisionMode InCollisionMode)
 	{
-		return (uint32(InGroup) << 16) | InBank;
+		return (uint32(InCollisionMode) << 24) | (uint32(InGroup) << 16) | InBank;
+	}
+
+	EVoxelMeshCollisionMode CollisionMode(const FVoxelRuntimeDefinition& InDefinition)
+	{
+		if (InDefinition.bSolid) return EVoxelMeshCollisionMode::Blocking;
+		if (InDefinition.Shape == EVoxelShapeKind::Fluid) return EVoxelMeshCollisionMode::WaterOverlap;
+		if (InDefinition.Shape == EVoxelShapeKind::CrossPlant) return EVoxelMeshCollisionMode::FoliageOverlap;
+		return EVoxelMeshCollisionMode::None;
+	}
+
+	bool SupportsSharedBlockingMesh(const FVoxelBlockState InBlock, const FVoxelRegistrySnapshot& InRegistry)
+	{
+		if (InBlock.IsAir()) return true;
+		const auto* Definition = InRegistry.Find(InBlock.TypeId);
+		if (!Definition) return false;
+		return Definition->bSolid ? Definition->bOccludes && Definition->Shape == EVoxelShapeKind::FullCube &&
+			Definition->StateGeometry.IsEmpty() : !Definition->bOccludes;
 	}
 
 	int32 LowerBound(const TArray<FBatchPlan>& InPlans, const uint32 InKey)
@@ -95,11 +113,12 @@ namespace
 
 	bool PrimitiveBound(const FVoxelSectionSnapshot& InSource, const FIntVector& InOffset, const int32 InSide,
 		const FVoxelRegistrySnapshot& InRegistry, const FVoxelShapeRegistry& InShapes,
-		const TAtomic<bool>& InCancel, int32& OutBound, bool& OutKnownEmpty)
+		const TAtomic<bool>& InCancel, int32& OutBound, bool& OutKnownEmpty, bool& OutCollisionMeshCompatible)
 	{
 		uint64 Count = 0;
 		bool bClosedCubes = true;
 		OutKnownEmpty = false;
+		OutCollisionMeshCompatible = true;
 		for (int32 Z = 0; Z < InSide; ++Z)
 		{
 			if (InCancel.Load()) return false;
@@ -109,6 +128,7 @@ namespace
 				{
 					FVoxelBlockState Block;
 					if (!InSource.TrySample(InOffset + FIntVector(X, Y, Z), Block)) return false;
+					OutCollisionMeshCompatible &= SupportsSharedBlockingMesh(Block, InRegistry);
 					if (Block.IsAir())
 					{
 						bClosedCubes = false;
@@ -151,6 +171,7 @@ namespace
 					FVoxelBlockState Neighbor;
 					if (!InSource.TrySample(Cell, Current) ||
 						!InSource.TrySample(Cell + VoxelCoord::Direction(Face), Neighbor)) return false;
+					OutCollisionMeshCompatible &= SupportsSharedBlockingMesh(Neighbor, InRegistry);
 					if (VoxelFaceVisibility::ShouldRender(InRegistry, InShapes, Current, Neighbor, Face, nullptr)) return true;
 				}
 			}
@@ -167,14 +188,17 @@ namespace
 		const FIntVector& InTextureOffset, const int32 InSide, const int32 InTextureSide,
 		const double InRepeats, const FVoxelRegistrySnapshot& InRegistry,
 		const FVoxelShapeRegistry& InShapes, TArray<FFineFaceKey>& InMask,
-		const TAtomic<bool>& InCancel, EmitterType&& InEmit)
+		const TAtomic<bool>& InCancel, bool& InOutCollisionMeshCompatible, EmitterType&& InEmit)
 	{
 		const auto Visible = [&](const FIntVector& Cell, const FVoxelBlockState Block,
 			const uint8 Face, const FVoxelShapeQuad* Quad)
 		{
 			FVoxelBlockState Neighbor;
-			return InSource.TrySample(InSampleOffset + Cell + VoxelCoord::Direction(Face), Neighbor) &&
-				VoxelFaceVisibility::ShouldRender(InRegistry, InShapes, Block, Neighbor, Face, Quad);
+			if (!InSource.TrySample(InSampleOffset + Cell + VoxelCoord::Direction(Face), Neighbor)) return false;
+			const int32 SectionCoordinate = (InSampleOffset + Cell)[Face / 2] & (VoxelBlock::Size - 1);
+			if ((Face & 1) ? SectionCoordinate == 0 : SectionCoordinate == VoxelBlock::Size - 1)
+				InOutCollisionMeshCompatible &= SupportsSharedBlockingMesh(Neighbor, InRegistry);
+			return VoxelFaceVisibility::ShouldRender(InRegistry, InShapes, Block, Neighbor, Face, Quad);
 		};
 		FPrimitiveWorkspace Workspace;
 		for (uint8 Face = 0; Face < 6; ++Face)
@@ -214,6 +238,7 @@ namespace
 						FFineFaceKey& Entry = InMask[X + InSide * Y];
 						Entry.bVisible = true;
 						Entry.Group = Definition->RenderGroup;
+						Entry.CollisionMode = CollisionMode(*Definition);
 						Entry.Texture = Definition->Face(Block.State,
 							FVoxelShapeRegistry::RotateFace(Face, uint8((4 - (Block.State & 3)) & 3)));
 					}
@@ -266,7 +291,7 @@ namespace
 							Swap(Workspace.Vertices[1], Workspace.Vertices[3]);
 							Swap(Workspace.UV[1], Workspace.UV[3]);
 						}
-						if (!InEmit(Key.Group, Key.Texture, Workspace.Vertices, Workspace.UV, FVector::ZeroVector, false))
+						if (!InEmit(Key.Group, Key.CollisionMode, Key.Texture, Workspace.Vertices, Workspace.UV, FVector::ZeroVector, false))
 						{
 							return false;
 						}
@@ -314,7 +339,7 @@ namespace
 						{
 							continue;
 						}
-						if (!InEmit(Definition->RenderGroup, Definition->Face(Block.State, Quad.MaterialFace),
+						if (!InEmit(Definition->RenderGroup, CollisionMode(*Definition), Definition->Face(Block.State, Quad.MaterialFace),
 							Quad.Vertices, Quad.UV, FVector(Cell), Definition->Shape == EVoxelShapeKind::CrossPlant))
 						{
 							return false;
@@ -445,8 +470,7 @@ bool FVoxelFineShardMeshing::Initialize(const uint64 InMaximumPieceBytes,
 			MaximumBank = FMath::Max(MaximumBank, uint32(Definition.UpperFaces[Face].Bank));
 		}
 	}
-	// 批次键只含渲染组和 Bank；固定快照的二维键域给出无分配的保守上界。
-	MaximumBatchCount = Registry->Definitions.IsEmpty() ? 0 : int32((MaximumGroup + 1) * (MaximumBank + 1));
+	MaximumBatchCount = Registry->Definitions.IsEmpty() ? 0 : int32(4 * (MaximumGroup + 1) * (MaximumBank + 1));
 	MaximumPieceBytes = InMaximumPieceBytes;
 	MaximumTotalGeometryBytes = InMaximumTotalGeometryBytes;
 	const int32 PieceSide = FMath::Min(Side, 16);
@@ -732,7 +756,9 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 	const FIntVector Offset = Key.Min - Samples->Attempt.Input.Shard.Min;
 	int32 Bound = 0;
 	bool bKnownEmpty = false;
-	if (!PrimitiveBound(Samples->Snapshot, Offset, Key.SideCells, *Registry, *Shapes, InCancel, Bound, bKnownEmpty))
+	bool bCollisionMeshCompatible = false;
+	if (!PrimitiveBound(Samples->Snapshot, Offset, Key.SideCells, *Registry, *Shapes, InCancel, Bound, bKnownEmpty,
+		bCollisionMeshCompatible))
 	{
 		OutError = InCancel.Load() ? TEXT("Canceled") : TEXT("Invalid Fine primitive input");
 		Abort();
@@ -740,7 +766,7 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 		return State;
 	}
 	const int32 PrimitiveCount = Bound;
-	// 每个定义最多提供六个普通面和六个上半面，批次只按渲染组与纹理 Bank 区分。
+	// 每个定义最多提供六个普通面和六个上半面。
 	Bound = bKnownEmpty ? 0 : FMath::Min(MaximumBatchCount,
 		int32(FMath::Min<int64>(Bound, 12ll * Registry->Definitions.Num())));
 	using namespace VoxelBoundedAllocation;
@@ -813,10 +839,10 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 		return State;
 	}
 	Mask.SetNum(MaskCells, EAllowShrinking::No);
-	const auto CountEmitter = [&](EVoxelRenderGroup Group, const FVoxelRuntimeFaceRef& Texture,
+	const auto CountEmitter = [&](EVoxelRenderGroup Group, EVoxelMeshCollisionMode InCollisionMode, const FVoxelRuntimeFaceRef& Texture,
 		const FVector*, const FVector2D*, const FVector&, bool)
 	{
-		const uint32 Id = BatchKey(Group, Texture.Bank);
+		const uint32 Id = BatchKey(Group, Texture.Bank, InCollisionMode);
 		const int32 Index = LowerBound(Plan.Batches, Id);
 		if (!Plan.Batches.IsValidIndex(Index) || Plan.Batches[Index].Key != Id)
 		{
@@ -838,7 +864,7 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 		return true;
 	};
 	if (!bKnownEmpty && !VisitFinePrimitives(Samples->Snapshot, Offset, Offset, Key.SideCells, Samples->Snapshot.GridSide,
-		TextureRepeatsPerCell, *Registry, *Shapes, Mask, InCancel, CountEmitter))
+		TextureRepeatsPerCell, *Registry, *Shapes, Mask, InCancel, bCollisionMeshCompatible, CountEmitter))
 	{
 		OutError = InCancel.Load() ? TEXT("Canceled") : TEXT("EstimateMismatch: Fine count traversal");
 		Abort();
@@ -920,8 +946,9 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 	for (const FBatchPlan& Batch : Plan.Batches)
 	{
 		FVoxelRenderBatch& Render = Candidate->Batches.AddDefaulted_GetRef();
-		Render.Group = static_cast<EVoxelRenderGroup>(Batch.Key >> 16);
+		Render.Group = static_cast<EVoxelRenderGroup>((Batch.Key >> 16) & 0xff);
 		Render.Bank = uint16(Batch.Key);
+		Render.CollisionMode = static_cast<EVoxelMeshCollisionMode>(Batch.Key >> 24);
 		if (!ReserveMesh(Render.Mesh, Batch))
 		{
 			OutError = TEXT("EstimateMismatch: Fine attribute capacity");
@@ -930,10 +957,10 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 			return State;
 		}
 	}
-	const auto BuildEmitter = [&](const EVoxelRenderGroup Group, const FVoxelRuntimeFaceRef& Texture,
+	const auto BuildEmitter = [&](const EVoxelRenderGroup Group, const EVoxelMeshCollisionMode InCollisionMode, const FVoxelRuntimeFaceRef& Texture,
 		const FVector* Vertices, const FVector2D* UV, const FVector& Cell, const bool bPlant)
 	{
-		const uint32 Id = BatchKey(Group, Texture.Bank);
+		const uint32 Id = BatchKey(Group, Texture.Bank, InCollisionMode);
 		const int32 Index = LowerBound(Plan.Batches, Id);
 		if (!Plan.Batches.IsValidIndex(Index) || Plan.Batches[Index].Key != Id)
 		{
@@ -964,7 +991,7 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 		return true;
 	};
 	if (!bKnownEmpty && !VisitFinePrimitives(Samples->Snapshot, Offset, Offset, Key.SideCells, Samples->Snapshot.GridSide,
-		TextureRepeatsPerCell, *Registry, *Shapes, Mask, InCancel, BuildEmitter))
+		TextureRepeatsPerCell, *Registry, *Shapes, Mask, InCancel, bCollisionMeshCompatible, BuildEmitter))
 	{
 		OutError = InCancel.Load() ? TEXT("Canceled") : TEXT("EstimateMismatch: Fine bounded build");
 		Abort();
@@ -1004,7 +1031,7 @@ EVoxelFineBuildProgress FVoxelFineShardMeshing::Advance(const TAtomic<bool>& InC
 	ActualResult = WorkerSharedBytes<FVoxelSectionMeshResult>() + Candidate->AllocatedBytes();
 	verify(ResultLease->TryResize(ActualResult) == EVoxelTerrainResourceAdmission::Granted);
 	check(Geometry->Pieces.Num() < Geometry->Pieces.Max());
-	Geometry->Pieces.Add({Key, Candidate});
+	Geometry->Pieces.Add({Key, Candidate, bCollisionMeshCompatible});
 	Geometry->bKnownEmpty &= !bHasTriangles;
 	Geometry->PeakTemporaryBytes = FMath::Max(Geometry->PeakTemporaryBytes,
 		FMath::Max(CountPeak, ActualMetadata + Mask.GetAllocatedSize()));

@@ -44,6 +44,7 @@
 #include "Voxel/Runtime/VoxelFineOverlayRead.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/VoxelModule.h"
+#include "VoxelSeamPolicy.h"
 
 struct FVoxelHeightfieldCoveragePlan final : FVoxelTaskCustomPayload
 {
@@ -422,6 +423,7 @@ FVoxelViewManager::FVoxelViewManager(
 	  WorldEpoch(InWorldEpoch),
 	  TerrainFrameBudget(InModule.GetTerrainFrameContext().GetPublishBudget())
 {
+	UE_LOG(LogTemp, Display, TEXT("Voxel terrain seam generation: enabled=%d"), int32(VoxelSeamPolicy::IsEnabled()));
 	const auto SelectionConsumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, TaskOwnerId, TaskOwnerIncarnation, {}, 1);
 	FineShardAdmissionSelection.BindResources(Scheduler.GetTerrainResources(), SelectionConsumer);
 	FineShardPresentationSelection.BindResources(Scheduler.GetTerrainResources(), SelectionConsumer);
@@ -1114,7 +1116,7 @@ void FVoxelViewManager::ProcessServiceAdmissions(const bool bInDataOnly, const d
 				break;
 			}
 			case EVoxelViewAdmissionKind::VoxelProxy:
-				if (!bInDataOnly && GetInputRoot().bInitialLayout) continue;
+				if (!bInDataOnly && GetInputRoot().bInitialLayout && VoxelSeamPolicy::IsEnabled()) continue;
 				Identity.Kind = bInDataOnly ? EVoxelTaskKind::GenerateVoxelProxy : EVoxelTaskKind::BuildVoxelProxy;
 				Geometry = Interest.FindGeometry(Admission.ProxyKey);
 				Revision = Hierarchy.GetVoxelProxyRevision(Admission.ProxyKey);
@@ -2712,6 +2714,7 @@ void FVoxelViewManager::RebuildHeightfieldTransitions(const FCoveragePassSnapsho
 void FVoxelViewManager::PumpHeightfieldTransitions(const double InDeadline)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewHeightfieldTransitionAdmissions);
+	if (!VoxelSeamPolicy::IsEnabled()) return;
 	if (UnsubmittedTransitionOwners.IsEmpty())
 		return;
 	const auto Config = Module.GetGenerationConfig();
@@ -2902,6 +2905,7 @@ void FVoxelViewManager::ApplyHeightfieldTransition(const FVoxelHeightfieldNodeKe
 
 bool FVoxelViewManager::IsHeightfieldTransitionPresented(const FVoxelHeightfieldNodeKey& InKey) const
 {
+	if (!VoxelSeamPolicy::IsEnabled()) return true;
 	const uint64* Desired = DesiredTransitionSignatures.Find(InKey);
 	const uint64* Built = HeightfieldTransitionSignatures.Find(InKey);
 	const FVoxelViewSourceId SourceId = HeightfieldTransitionSources.FindRef(InKey);
@@ -3025,6 +3029,7 @@ bool FVoxelViewManager::AreHeightfieldInputsCurrent(const FVoxelFrozenHeightfiel
 void FVoxelViewManager::PumpVolumeTransitions(const double InDeadline)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewVolumeTransitionAdmissions);
+	if (!VoxelSeamPolicy::IsEnabled()) return;
 	if (UnsubmittedVolumeOwners.IsEmpty())
 		return;
 	const auto Registry = Module.GetRegistry();
@@ -3902,6 +3907,7 @@ FVoxelTerrainReadinessSnapshot FVoxelViewManager::CaptureTerrainReadiness() cons
 				PendingNeighborTransitions.Add(Edge.Neighbor, Pair.Key);
 		}
 	}
+	TSet<FIntVector> CountedFineSections;
 	Snapshot.Targets.Reserve(Interest.Geometry.Num());
 	for (const auto& Pair : Interest.Geometry)
 	{
@@ -3932,6 +3938,17 @@ FVoxelTerrainReadinessSnapshot FVoxelViewManager::CaptureTerrainReadiness() cons
 				Target.bMeshReady &= bPrepared || bPresented;
 				Target.bPublishing |= bPrepared && !bPresented;
 				const bool bNativeReady = bPresented && Actual->bDrawMetricsAvailable;
+				bool bAlreadyCounted = false;
+				CountedFineSections.Add(Section, &bAlreadyCounted);
+				if (!bAlreadyCounted)
+				{
+					++Snapshot.FineUniqueTargetAtoms;
+					if (bNativeReady)
+					{
+						++Snapshot.FineUniqueNativeClassifiedAtoms;
+						Snapshot.FineUniqueNativeNonemptyAtoms += Actual->DrawTriangles > 0 ? 1 : 0;
+					}
+				}
 				Target.bKnownEmpty &= bNativeReady && Actual->DrawTriangles == 0;
 				Target.bNativeGeometryReady &= bNativeReady;
 				if (bNativeReady) Target.NativeTriangles += Actual->DrawTriangles;
@@ -4388,7 +4405,7 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 {
 	const bool bInitialData = bDataOnly && GetInputRoot().bInitialLayout;
 	if (GetInputRoot().bInitialLayout && !GetInputRoot().ProxyWanted.Contains(InKey)) return false;
-	if (!bDataOnly && GetInputRoot().bInitialLayout) return false;
+	if (!bDataOnly && GetInputRoot().bInitialLayout && VoxelSeamPolicy::IsEnabled()) return false;
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewRequestProxy);
 	const auto* DesiredGeometry = GetViewInterest().FindGeometry(InKey);
 	if (!DesiredGeometry)
@@ -6291,6 +6308,7 @@ bool FVoxelViewManager::IsCriticalDependency(const FVoxelViewAdmission& InAdmiss
 
 FVoxelGameThreadContinuation FVoxelViewManager::RebuildHeightfieldTransitionSteps(const FCoveragePassSnapshot& CoverageSnapshot)
 {
+	if (!VoxelSeamPolicy::IsEnabled()) co_return;
 	TArray<FVoxelHeightfieldTileView> Views;
 	TArray<FHeightfieldTransitionTileSource> ViewPins;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> CandidateLease;
@@ -6828,6 +6846,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::RebuildHeightfieldTransitionStep
 
 FVoxelGameThreadContinuation FVoxelViewManager::RebuildVolumeTransitionSteps(const TSet<FVoxelViewKey>& InTargetNodes)
 {
+	if (!VoxelSeamPolicy::IsEnabled()) co_return;
 #if !UE_BUILD_SHIPPING
 	const bool bRecordGuardDiagnostics = CVarVoxelDebugRepresentation.GetValueOnGameThread() == 2;
 	const uint64 GuardDiagnosticEpoch = WorldEpoch;

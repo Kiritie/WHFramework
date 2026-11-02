@@ -103,6 +103,9 @@ struct WHFRAMEWORK_API FVoxelTerrainReadinessSnapshot
 	uint64 WorldEpoch = 0;
 	uint64 PublicationRevision = 0;
 	uint64 FineLayoutRevision = 0;
+	int32 FineUniqueTargetAtoms = 0;
+	int32 FineUniqueNativeClassifiedAtoms = 0;
+	int32 FineUniqueNativeNonemptyAtoms = 0;
 	bool bAdoptingInputs = false;
 	bool bInitialLayout = false;
 	TMap<FGuid, FVoxelStreamingSource> Sources;
@@ -263,6 +266,8 @@ public:
 	bool IsFinePresented(const FIntVector& InSection) const;
 	bool IsLatestFinePresented(const FIntVector& InSection) const;
 	bool IsFinePresentationCurrent(const FVoxelFineOwnerEvidence& InEvidence) const;
+	TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> FindFineCollisionGeometry(
+		const FIntVector& InSection, bool& bOutExpected) const;
 	bool IsTerrainGeometryPresented(const FVoxelTerrainGeometry& InGeometry) const;
 	bool RequiresSectionData(const FIntVector& InKey) const;
 	FVoxelPrimaryFineReadiness GetPrimaryFineReadiness(

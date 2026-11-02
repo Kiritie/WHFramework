@@ -106,7 +106,8 @@ public:
 	FVoxelGenerationDependencyStatus Ensure(
 		TConstArrayView<FVoxelGenerationPlanDependency> InDependencies,
 		EVoxelWorkClass InWorkClass, const FVoxelTerrainServicePriority& InPriority,
-		const FVoxelGenerationConsumerKey& InConsumer);
+		const FVoxelGenerationConsumerKey& InConsumer,
+		const FVoxelGenerationCacheRetentionLease* InRetainedDependencies = nullptr);
 	FVoxelGenerationDependencyStatus Ensure(
 		TConstArrayView<FVoxelGenerationPlanDependency> InDependencies,
 		EVoxelWorkClass InWorkClass,

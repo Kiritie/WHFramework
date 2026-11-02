@@ -45,10 +45,7 @@ bool FVoxelViewManager::NeedsInitialPublication(const FVoxelPublishGroupKey& InK
 FVoxelGameThreadContinuation FVoxelViewManager::PublishInitialSourcesSteps(FPublicationLayout& InLayout, FPublicationSources& InSources)
 {
 	check(GetInputRoot().bInitialLayout);
-	const auto Column = [](const FVoxelCoverageRect& Bounds)
-	{
-		return FBox(FVector(Bounds.Min.X, Bounds.Min.Y, -1.e12), FVector(Bounds.Max.X, Bounds.Max.Y, 1.e12));
-	};
+	// 初始阶段临时测试策略：不生成或应用发布裁切盒，仍通过发布器提交源网格并取得回执。
 	TerrainCandidateCount = InLayout.TerrainSourceCandidates.Num();
 	for (const auto& Key : InLayout.TerrainSourceCandidates)
 	{
@@ -59,19 +56,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishInitialSourcesSteps(FPubl
 		if (!Source || !NeedsInitialPublication(GroupKey, Source, bVisible)) continue;
 		const auto Group = BeginPublishGroup(GroupKey);
 		if (bVisible)
-		{
-			TArray<FBox> Exclusions = *InSources.FineBoxes;
-			for (const auto& Other : GetInputRoot().ProxyWanted)
-			{
-				co_await FVoxelGameThreadContinuation::Yield();
-				if (Other.Level > 0 && Other.Level < Key.Level)
-				{
-					const auto Bounds = VoxelProxyCoverageBox(Other);
-					Exclusions.Add(FBox(FVector(Bounds.Min), FVector(Bounds.Max)));
-				}
-			}
-			co_await UpdatePublicationCoverageSteps(InSources, Group, Source, MoveTemp(Exclusions));
-		}
+			co_await UpdatePublicationCoverageSteps(InSources, Group, Source, {});
 		Publisher->SetHidden(Group, Source, !bVisible);
 		if (const auto Boundary = VolumeBoundarySources.FindRef(Key)) Publisher->SetHidden(Group, Boundary, !bVisible);
 	}
@@ -88,22 +73,14 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishInitialSourcesSteps(FPubl
 		const auto Group = BeginPublishGroup(GroupKey);
 		if (bBlocked)
 		{
-			if (Publisher->HasPresentation(Source))
-				co_await UpdatePublicationCoverageSteps(InSources, Group, Source, {}, InSources.HeightfieldBoxes, true);
-			else Publisher->SetHidden(Group, Source, true);
-			if (Water) co_await UpdatePublicationCoverageSteps(InSources, Group, Water, {}, InSources.HeightfieldBoxes, true);
+			// 未就绪时保留已经呈现的正文；不能提前提交待替换的源。
+			if (!Publisher->HasPresentation(Source)) Publisher->SetHidden(Group, Source, true);
 			continue;
 		}
 		const auto Rect = SurfaceCoverageRect(Key);
-		TArray<FBox> Exclusions;
-		for (const auto& Other : GetInputRoot().SurfaceWanted)
-		{
-			co_await FVoxelGameThreadContinuation::Yield();
-			if (Other.Level < Key.Level && Rect.Intersects(SurfaceCoverageRect(Other))) Exclusions.Add(Column(SurfaceCoverageRect(Other)));
-		}
 		if (!Publisher->IsCommitted(Source)) InSources.RecheckCoverageRects.Add(Rect);
-		co_await UpdatePublicationCoverageSteps(InSources, Group, Source, Exclusions, InSources.HeightfieldBoxes);
-		if (Water) co_await UpdatePublicationCoverageSteps(InSources, Group, Water, MoveTemp(Exclusions), InSources.HeightfieldBoxes);
+		co_await UpdatePublicationCoverageSteps(InSources, Group, Source, {});
+		if (Water) co_await UpdatePublicationCoverageSteps(InSources, Group, Water, {});
 		Publisher->SetHidden(Group, Source, false);
 		if (Water) Publisher->SetHidden(Group, Water, false);
 	}
@@ -118,25 +95,12 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishInitialSourcesSteps(FPubl
 		const auto Group = BeginPublishGroup(GroupKey);
 		if (bBlocked)
 		{
-			if (Publisher->HasPresentation(Source))
-				co_await UpdatePublicationCoverageSteps(InSources, Group, Source, {}, InSources.HeightfieldBoxes, true);
-			else Publisher->SetHidden(Group, Source, true);
+			if (!Publisher->HasPresentation(Source)) Publisher->SetHidden(Group, Source, true);
 			continue;
 		}
 		const auto Rect = MacroCoverageRect(Key);
-		TArray<FBox> Exclusions;
-		for (const auto& Other : GetInputRoot().SurfaceWanted)
-		{
-			co_await FVoxelGameThreadContinuation::Yield();
-			if (Rect.Intersects(SurfaceCoverageRect(Other))) Exclusions.Add(Column(SurfaceCoverageRect(Other)));
-		}
-		for (const auto& Other : GetInputRoot().MacroWanted)
-		{
-			co_await FVoxelGameThreadContinuation::Yield();
-			if (Other.Level < Key.Level && Rect.Intersects(MacroCoverageRect(Other))) Exclusions.Add(Column(MacroCoverageRect(Other)));
-		}
 		if (!Publisher->IsCommitted(Source)) InSources.RecheckCoverageRects.Add(Rect);
-		co_await UpdatePublicationCoverageSteps(InSources, Group, Source, MoveTemp(Exclusions), InSources.HeightfieldBoxes);
+		co_await UpdatePublicationCoverageSteps(InSources, Group, Source, {});
 		Publisher->SetHidden(Group, Source, false);
 	}
 	for (const auto& Key : InSources.HeightfieldOwners)
@@ -152,8 +116,11 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishInitialSourcesSteps(FPubl
 		const FVoxelPublishGroupKey GroupKey{static_cast<uint8>(Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 4 : 5), Key.Coordinate, Key.Level};
 		if (!Source || !NeedsInitialPublication(GroupKey, Source, bVisible)) continue;
 		const auto Group = BeginPublishGroup(GroupKey);
-		co_await UpdatePublicationCoverageSteps(InSources, Group, Source, {}, InSources.TransitionBoxes, bRetain);
-		if (!bRetain) Publisher->SetHidden(Group, Source, !bVisible);
+		if (!bRetain)
+		{
+			if (bVisible) co_await UpdatePublicationCoverageSteps(InSources, Group, Source, {});
+			Publisher->SetHidden(Group, Source, !bVisible);
+		}
 	}
 }
 
@@ -170,8 +137,6 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveInitialLayoutSteps()
 			bHeightfieldTopologyDirty = true;
 		}
 	};
-	co_await PrepareInitialLayoutMasksSteps();
-	if (bCoverageRetryRequested) co_return;
 	FPublicationLayout Layout;
 	Layout.PlanningStartedSeconds = FPlatformTime::Seconds();
 	bool bCaptured = false;
@@ -191,6 +156,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::ResolveInitialLayoutSteps()
 	co_await PublishTerrainLayoutSteps(MoveTemp(Layout));
 }
 
+// 暂时不从初始发布路径调用，保留原实现以便后续恢复。
 FVoxelGameThreadContinuation FVoxelViewManager::PrepareInitialLayoutMasksSteps()
 {
 	auto& Root = GetInputRoot();

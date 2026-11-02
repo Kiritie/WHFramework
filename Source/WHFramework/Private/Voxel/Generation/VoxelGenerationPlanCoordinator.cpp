@@ -1123,9 +1123,31 @@ bool FVoxelGenerationPlanCoordinator::Queue(
 				{
 				case EVoxelGenerationPlanKind::Hydrology:
 				{
+					TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanHydrologyImmediateBatch);
 					FVoxelHydrologyPlanPtr Plan;
-					Result.bSuccess = Query.EnsureHydrologyPlan(Dependency.HydrologyKey,
-						Plan, Result.Error, &Cancel);
+					// 同一次 Worker 调用只复用局部 Query 与读取授额；等待外部依赖时仍返回原调度路径。
+					constexpr int32 MaximumImmediateSteps = 32;
+					const double BatchDeadline = FPlatformTime::Seconds() + 0.002;
+					int32 Steps = 0;
+					do
+					{
+						Plan.Reset();
+						Result.Error.Reset();
+						Result.bSuccess = Query.EnsureHydrologyPlan(Dependency.HydrologyKey,
+							Plan, Result.Error, &Cancel);
+						++Steps;
+					} while (!Result.bSuccess && !Cancel.Load() && !ReadDependencies->bOverflow &&
+						ReadDependencies->Missing.IsEmpty() && Result.Error.StartsWith(TEXT("YieldedImmediate:")) &&
+						Steps < MaximumImmediateSteps && FPlatformTime::Seconds() < BatchDeadline);
+#if !UE_BUILD_SHIPPING
+					if (Steps > 1)
+					{
+						static TAtomic<uint64> Batches{0};
+						const uint64 Count = ++Batches;
+						if ((Count & (Count - 1)) == 0)
+							UE_LOG(LogTemp, Display, TEXT("Voxel hydrology immediate query batches: %llu lastSteps=%d"), Count, Steps);
+					}
+#endif
 					break;
 				}
 
@@ -1400,7 +1422,8 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 
 FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 	TConstArrayView<FVoxelGenerationPlanDependency> InDependencies, const EVoxelWorkClass InWorkClass,
-	const FVoxelTerrainServicePriority& Priority, const FVoxelGenerationConsumerKey& InConsumer)
+	const FVoxelTerrainServicePriority& Priority, const FVoxelGenerationConsumerKey& InConsumer,
+	const FVoxelGenerationCacheRetentionLease* InRetainedDependencies)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanNaturalEnsure);
 	check(IsInGameThread());
@@ -1414,6 +1437,103 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 	if (Storage)
 		if (const auto* Existing = Storage->Consumers.Find(InConsumer); Existing && Existing->bRetiring)
 			return {false, false, {}, true};
+
+	// Section 已持有原保留租约；仅在完整闭包都已缓存且尚无订阅时跳过临时图注册。
+	// 任一未知前置、缺失事实或版本变化都交回原 Ensure、订阅和唤醒路径。
+	bool bValidateReadyShortcut = false;
+#if !UE_BUILD_SHIPPING
+	static const bool bValidateShortcut = FParse::Param(FCommandLine::Get(), TEXT("ValidateVoxelPlanReadyShortcut"));
+	static bool bDisableShortcut = false;
+	static uint64 ShortcutCandidates = 0;
+	static uint64 ShortcutValidations = 0;
+#endif
+	if (InRetainedDependencies && InRetainedDependencies->GetResourceLease()->IsOwnedBy(Resources.Get()) &&
+		InConsumer.Kind == EVoxelGenerationConsumerKind::F0Section &&
+		Storage && Storage->Owner == this && !Storage->Consumers.Contains(InConsumer) &&
+		InDependencies.Num() > 0 && InDependencies.Num() <= 512
+#if !UE_BUILD_SHIPPING
+		&& !bDisableShortcut
+#endif
+		)
+	{
+		const auto IsCompleteAndCached = [&]()
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PlanRetainedReadyShortcut);
+			const uint64 Generation = Cache->GetHydrologyGeneration();
+			const uint64 Retirement = Cache->GetHydrologyRetirementRevision();
+			constexpr int32 MaximumBatch = FVoxelGenerationPlanCache::MaximumAvailabilityBatch;
+			FVoxelGenerationPlanAvailabilityQuery Queries[MaximumBatch];
+			for (int32 First = 0; First < InDependencies.Num();)
+			{
+				const int32 Count = FMath::Min(MaximumBatch, InDependencies.Num() - First);
+				for (int32 Index = 0; Index < Count; ++Index)
+				{
+					const auto& Dependency = InDependencies[First + Index];
+					Queries[Index].Kind = Dependency.Kind;
+					Queries[Index].Coordinate = Dependency.Coordinate();
+				}
+				Cache->HasPlans(MakeArrayView(Queries, Count));
+				for (int32 Index = 0; Index < Count; ++Index) if (!Queries[Index].bReady) return false;
+				First += Count;
+			}
+			constexpr uint32 SlotCount = 1024;
+			uint16 Slots[SlotCount] = {};
+			for (int32 Index = 0; Index < InDependencies.Num(); ++Index)
+			{
+				uint32 Slot = GetTypeHash(InDependencies[Index]) & (SlotCount - 1);
+				while (Slots[Slot] && !(InDependencies[Slots[Slot] - 1] == InDependencies[Index])) Slot = (Slot + 1) & (SlotCount - 1);
+				Slots[Slot] = uint16(Index + 1);
+			}
+			const auto Contains = [&](const FVoxelGenerationPlanDependency& InDependency)
+			{
+				uint32 Slot = GetTypeHash(InDependency) & (SlotCount - 1);
+				while (Slots[Slot])
+				{
+					if (InDependencies[Slots[Slot] - 1] == InDependency) return true;
+					Slot = (Slot + 1) & (SlotCount - 1);
+				}
+				return false;
+			};
+			for (const auto& Dependency : InDependencies)
+			{
+				if (const FState* State = Storage->States.Find(Dependency))
+				{
+					if (!State->PriorityNode.IsValid() || State->bRegistering || State->bRegistrationPending ||
+						State->State != EVoxelPlanDependencyState::Ready || State->bInFlight ||
+						State->bAttemptPendingAdmission || State->bAdmissionLinked || State->PendingRequest.IsSet()) return false;
+					for (const auto& Prerequisite : State->Prerequisites) if (!Contains(Prerequisite)) return false;
+				}
+				else if (Dependency.Kind != EVoxelGenerationPlanKind::Hydrology)
+				{
+					FIntPoint Min;
+					FIntPoint Max;
+					int32 Count = 0;
+					FString Error;
+					if (!GetPrerequisiteRange(Dependency, Min, Max, Count, Error)) return false;
+					if (Count)
+						for (int64 Y = Min.Y; Y <= Max.Y; ++Y)
+							for (int64 X = Min.X; X <= Max.X; ++X)
+								if (!Contains(MakeDependency(EVoxelGenerationPlanKind::Hydrology, FIntVector(int32(X), int32(Y), 0)))) return false;
+				}
+			}
+			return Generation == Cache->GetHydrologyGeneration() && Retirement == Cache->GetHydrologyRetirementRevision();
+		};
+		if (IsCompleteAndCached())
+		{
+#if !UE_BUILD_SHIPPING
+			++ShortcutCandidates;
+			bValidateReadyShortcut = bValidateShortcut && (ShortcutCandidates % 128) == 1;
+			if (!bValidateReadyShortcut)
+			{
+				if ((ShortcutCandidates & (ShortcutCandidates - 1)) == 0)
+					UE_LOG(LogTemp, Display, TEXT("Voxel retained plan ready shortcut: candidates=%llu validations=%llu"), ShortcutCandidates, ShortcutValidations);
+				return {true, false, {}};
+			}
+#else
+			return {true, false, {}};
+#endif
+		}
+	}
 	// 同一请求复用哈希，查找仍核对完整身份，不缓存事实就绪状态。
 	const uint32 ConsumerHash = GetTypeHash(InConsumer);
 	FString Error;
@@ -1782,6 +1902,23 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::Ensure(
 			(Status.bFailed || Status.bNeedsAdvance || !Status.Error.IsEmpty()))
 			Consumer->bHydrologyReadinessTracked = false;
 	}
+#if !UE_BUILD_SHIPPING
+	if (bValidateReadyShortcut)
+	{
+		if (!Status.bReady || Status.bFailed || Status.bNeedsAdvance || !Status.Error.IsEmpty())
+		{
+			bDisableShortcut = true;
+			UE_LOG(LogTemp, Error, TEXT("Voxel retained plan ready shortcut mismatch: ready=%d failed=%d needsAdvance=%d error=%s"),
+				Status.bReady, Status.bFailed, Status.bNeedsAdvance, *Status.Error);
+		}
+		else
+		{
+			++ShortcutValidations;
+			if ((ShortcutValidations & (ShortcutValidations - 1)) == 0)
+				UE_LOG(LogTemp, Display, TEXT("Voxel retained plan ready shortcut reference checks: %llu"), ShortcutValidations);
+		}
+	}
+#endif
 	return Status;
 }
 

@@ -7,6 +7,14 @@
 
 namespace
 {
+#if !UE_BUILD_SHIPPING
+	// 仅记录进程累计的诊断样本，不参与求解或持有图。
+	TAtomic<uint64> GHydrologyNetworkIndexFastSamples{0};
+	TAtomic<uint64> GHydrologyNetworkIndexFallbackSamples{0};
+	TAtomic<uint64> GHydrologyNetworkIndexMismatchSamples{0};
+	TAtomic<uint64> GHydrologyNetworkIndexNextMismatchLogMilliseconds{0};
+#endif
+
 	bool HydrologyNetworkCellLess(const FIntPoint& InFirst, const FIntPoint& InSecond)
 	{
 		return InFirst.X < InSecond.X || (InFirst.X == InSecond.X && InFirst.Y < InSecond.Y);
@@ -236,10 +244,55 @@ EVoxelHydrologyClosureRead FVoxelHydrologyNetworkSearch::ReadConnection(const in
 		OutConnection.FirstStep = OutConnection.bFromFirst ? Edge.FirstStep : Edge.LastStep;
 		OutConnection.BarrierZ = Edge.BarrierZ;
 		OutConnection.Steps = Edge.CellSteps;
-		OutConnection.LastBarrierDistance = Graph->GetLastBarrierDistance(OutConnection.Edge, OutConnection.bFromFirst);
-		if (const int32* Existing = ByCell.Find(Graph->Nodes[Other].Cell))
+		++RegionEdgeVisits;
+		const FIntPoint& OtherCell = Graph->Nodes[Other].Cell;
+		const int64 Candidate = int64(InNode) + int64(Other) - int64(Node.LocalIndex);
+		const bool bFastCandidate = Candidate >= 0 && Candidate < Nodes.Num() && Nodes[int32(Candidate)].Cell == OtherCell;
+		if (bFastCandidate)
+		{
+			OutConnection.Neighbor = int32(Candidate);
+		}
+		else if (const int32* Existing = ByCell.Find(OtherCell))
 		{
 			OutConnection.Neighbor = *Existing;
+		}
+#if !UE_BUILD_SHIPPING
+		// 每个线程独立采样，避免每条边访问进程级原子计数。
+		static thread_local uint32 EdgeSampleCounter = 0;
+		if ((++EdgeSampleCounter & 1023u) == 0u)
+		{
+			if (bFastCandidate)
+			{
+				GHydrologyNetworkIndexFastSamples.IncrementExchange();
+			}
+			else
+			{
+				GHydrologyNetworkIndexFallbackSamples.IncrementExchange();
+			}
+			const int32* Original = ByCell.Find(OtherCell);
+			const int32 OriginalNeighbor = Original ? *Original : INDEX_NONE;
+			if (OutConnection.Neighbor != OriginalNeighbor)
+			{
+				const int32 ObservedNeighbor = OutConnection.Neighbor;
+				OutConnection.Neighbor = OriginalNeighbor;
+				GHydrologyNetworkIndexMismatchSamples.IncrementExchange();
+				const uint64 Now = uint64(FPlatformTime::Seconds() * 1000.0);
+				uint64 Expected = GHydrologyNetworkIndexNextMismatchLogMilliseconds.Load();
+				if (Now >= Expected && GHydrologyNetworkIndexNextMismatchLogMilliseconds.CompareExchange(Expected, Now + 5000))
+				{
+					UE_LOG(LogTemp, Error, TEXT("Voxel hydrology network index sample mismatch: generation=%llu cell=(%d,%d) node=%d local=%d other=%d actual=%d expected=%d"),
+						Result.Generation, OtherCell.X, OtherCell.Y, InNode, Node.LocalIndex, Other, ObservedNeighbor, OriginalNeighbor);
+				}
+			}
+		}
+#endif
+		// 只有锚点阶段的下降邻边会读取该距离，其他情况无需计算。
+		if (Stage == EStage::Anchors && OutConnection.Neighbor != INDEX_NONE &&
+			OutConnection.BarrierZ <= Node.Potential.SpillZ &&
+			Nodes[OutConnection.Neighbor].Potential.SpillZ < Node.Potential.SpillZ)
+		{
+			++BarrierDistanceQueries;
+			OutConnection.LastBarrierDistance = Graph->GetLastBarrierDistance(OutConnection.Edge, OutConnection.bFromFirst);
 		}
 		return EVoxelHydrologyClosureRead::Ready;
 	}
@@ -403,8 +456,13 @@ EVoxelHydrologyNetworkStep FVoxelHydrologyNetworkSearch::Advance(const uint64 In
 	uint64 Expected = NextDiagnosticMilliseconds.Load();
 	if (Now >= Expected && NextDiagnosticMilliseconds.CompareExchange(Expected, Now + 5000))
 	{
-		UE_LOG(LogTemp, Display, TEXT("Voxel macro control progress: generation=%llu seed=(%d,%d) stage=%d lower=%d nodes=%d regions=%d cursor=%d frontier=%d directionExpansions=%d receiverExpansions=%d regionReadRequests=%llu sliceGraphHits=%llu"),
-			Result.Generation, Seed.X, Seed.Y, int32(Stage), bSolvingLower ? 1 : 0, Nodes.Num(), Regions.Num(), Cursor, Frontier.Num(), DirectionProofExpansions, ReceiverProofExpansions, RegionReadRequests, SliceGraphHits);
+		FString IndexSamples;
+#if !UE_BUILD_SHIPPING
+		IndexSamples = FString::Printf(TEXT(" processIndexFastSamples=%llu processIndexFallbackSamples=%llu processIndexMismatchSamples=%llu samplePeriodPerThread=1024"),
+			GHydrologyNetworkIndexFastSamples.Load(), GHydrologyNetworkIndexFallbackSamples.Load(), GHydrologyNetworkIndexMismatchSamples.Load());
+#endif
+		UE_LOG(LogTemp, Display, TEXT("Voxel macro control progress: generation=%llu seed=(%d,%d) stage=%d lower=%d nodes=%d regions=%d cursor=%d frontier=%d directionExpansions=%d receiverExpansions=%d regionReadRequests=%llu sliceGraphHits=%llu regionEdgeVisits=%llu barrierDistanceQueries=%llu%s"),
+			Result.Generation, Seed.X, Seed.Y, int32(Stage), bSolvingLower ? 1 : 0, Nodes.Num(), Regions.Num(), Cursor, Frontier.Num(), DirectionProofExpansions, ReceiverProofExpansions, RegionReadRequests, SliceGraphHits, RegionEdgeVisits, BarrierDistanceQueries, *IndexSamples);
 	}
 	OutError.Reset();
 	if (Stage == EStage::None || Stage == EStage::Taken || InGeneration != Result.Generation)

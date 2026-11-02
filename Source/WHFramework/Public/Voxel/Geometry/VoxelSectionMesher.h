@@ -12,6 +12,13 @@ struct FVoxelVoxelProxyData;
 struct FVoxelSurfaceTileData;
 struct FVoxelMacroTileData;
 struct FVoxelWaterSurfaceTileData;
+enum class EVoxelMeshCollisionMode : uint8
+{
+	None = 0,
+	Blocking,
+	WaterOverlap,
+	FoliageOverlap
+};
 struct WHFRAMEWORK_API FVoxelMeshBuffers
 {
     TArray<FVector> Vertices;
@@ -38,6 +45,7 @@ struct WHFRAMEWORK_API FVoxelRenderBatch
 	/** Optional purely visual variant within a material bank (zero is the base). */
 	uint8 MaterialVariant = 0;
 	FVoxelMeshBuffers Mesh;
+	EVoxelMeshCollisionMode CollisionMode = EVoxelMeshCollisionMode::None;
 };
 struct WHFRAMEWORK_API FVoxelSectionMeshResult
 {

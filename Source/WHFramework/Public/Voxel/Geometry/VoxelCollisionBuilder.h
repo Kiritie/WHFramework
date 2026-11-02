@@ -7,6 +7,8 @@
 #include "Voxel/Runtime/VoxelRegistry.h"
 #include "Voxel/Geometry/VoxelShapeRegistry.h"
 
+struct FVoxelFineShardGeometry;
+
 struct WHFRAMEWORK_API FVoxelSectionCollisionResult
 {
 	TSharedPtr<FVoxelTerrainWorkReceipt, ESPMode::ThreadSafe> WorkReceipt;
@@ -16,13 +18,20 @@ struct WHFRAMEWORK_API FVoxelSectionCollisionResult
 	FBox LocalBounds = FBox(ForceInit);
 	uint8 UnknownHaloMask = 0;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
+	TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> FineGeometry;
+	int32 FineVertexCount = 0;
+	int32 FineIndexCount = 0;
+
+	bool BindFineGeometry(TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> InGeometry, const FIntVector& InSection);
+	int32 GetVertexCount() const { return FineGeometry ? FineVertexCount : Vertices.Num(); }
+	int32 GetIndexCount() const { return FineGeometry ? FineIndexCount : Triangles.Num(); }
 
 	uint64 Bytes() const
 	{
 		return VoxelBoundedAllocation::WorkerSharedBytes<FVoxelSectionCollisionResult>() +
 			Vertices.GetAllocatedSize() + Triangles.GetAllocatedSize();
 	}
-	bool IsEmpty() const { return Triangles.IsEmpty(); }
+	bool IsEmpty() const { return GetIndexCount() == 0; }
 };
 
 class WHFRAMEWORK_API FVoxelCollisionBuilder

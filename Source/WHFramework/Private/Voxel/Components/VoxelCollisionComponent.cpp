@@ -15,6 +15,7 @@
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Collision/VoxelPhysicsRetirement.h"
 #include "Voxel/Geometry/VoxelCollisionBuilder.h"
+#include "Voxel/Rendering/VoxelFineShardBuild.h"
 #include "PhysicsProxy/SingleParticlePhysicsProxy.h"
 #include "PBDRigidsSolver.h"
 
@@ -91,43 +92,68 @@ namespace
 		bool BuildTriangleMesh() const
 		{
 			const auto& Input = Work->TriangleInput;
-			if (!Input || Input->Vertices.IsEmpty() || Input->Triangles.IsEmpty() || Input->Triangles.Num() % 3 != 0 ||
+			if (!Input || Input->GetVertexCount() <= 0 || Input->GetIndexCount() <= 0 || Input->GetIndexCount() % 3 != 0 ||
 				!FMath::IsFinite(Work->BlockSize) || Work->BlockSize <= 0.0) return false;
 			TMap<FVector3f, int32> Welded;
 			TArray<FVector3f> Vertices;
 			TArray<int32> Remap;
-			Welded.Reserve(Input->Vertices.Num());
-			Vertices.Reserve(Input->Vertices.Num());
-			Remap.SetNumUninitialized(Input->Vertices.Num());
-			for (int32 Index = 0; Index < Input->Vertices.Num(); ++Index)
+			TArray<Chaos::TVector<int32, 3>> Triangles;
+			Welded.Reserve(Input->GetVertexCount());
+			Vertices.Reserve(Input->GetVertexCount());
+			Triangles.Reserve(Input->GetIndexCount() / 3);
+			const auto AppendMesh = [&](const auto& InVertices, const TArray<int32>& InIndices,
+				const FVector& InOffset, const bool bReverseWinding)
 			{
-				if ((Index & 4095) == 0 && Work->bCanceled.Load()) return false;
-				const FVector3f Position = Input->Vertices[Index] * float(Work->BlockSize);
-				if (Position.ContainsNaN()) return false;
-				if (const int32* Existing = Welded.Find(Position)) Remap[Index] = *Existing;
-				else
+				Remap.SetNumUninitialized(InVertices.Num(), EAllowShrinking::No);
+				for (int32 Index = 0; Index < InVertices.Num(); ++Index)
 				{
-					const int32 Added = Vertices.Add(Position);
-					Welded.Add(Position, Added);
-					Remap[Index] = Added;
+					if ((Index & 4095) == 0 && Work->bCanceled.Load()) return false;
+					const FVector3f Position = (FVector3f(InVertices[Index]) + FVector3f(InOffset)) * float(Work->BlockSize);
+					if (Position.ContainsNaN()) return false;
+					if (const int32* Existing = Welded.Find(Position)) Remap[Index] = *Existing;
+					else
+					{
+						const int32 Added = Vertices.Add(Position);
+						Welded.Add(Position, Added);
+						Remap[Index] = Added;
+					}
+				}
+				for (int32 Index = 0; Index < InIndices.Num(); Index += 3)
+				{
+					if ((Index & 4095) == 0 && Work->bCanceled.Load()) return false;
+					const int32 A = InIndices[Index];
+					const int32 B = InIndices[Index + (bReverseWinding ? 2 : 1)];
+					const int32 C = InIndices[Index + (bReverseWinding ? 1 : 2)];
+					if (!Remap.IsValidIndex(A) || !Remap.IsValidIndex(B) || !Remap.IsValidIndex(C)) return false;
+					const int32 WA = Remap[A], WB = Remap[B], WC = Remap[C];
+					if (WA == WB || WB == WC || WC == WA ||
+						FVector3f::CrossProduct(Vertices[WB] - Vertices[WA], Vertices[WC] - Vertices[WA]).SizeSquared() <= UE_SMALL_NUMBER)
+						return false;
+					Triangles.Emplace(WA, WB, WC);
+				}
+				return true;
+			};
+			if (Input->FineGeometry)
+			{
+				const FIntVector SectionMin = Input->Stamp.Section * VoxelBlock::Size;
+				for (const FVoxelFineMeshPiece& Piece : Input->FineGeometry->Pieces)
+				{
+					const FIntVector Owner(int32(FVoxelFineSpatial::FloorDivide(Piece.Key.Min.X, VoxelBlock::Size)),
+						int32(FVoxelFineSpatial::FloorDivide(Piece.Key.Min.Y, VoxelBlock::Size)),
+						int32(FVoxelFineSpatial::FloorDivide(Piece.Key.Min.Z, VoxelBlock::Size)));
+					if (Owner != Input->Stamp.Section) continue;
+					for (const FVoxelRenderBatch& Batch : Piece.Mesh->Batches)
+					{
+						if (Batch.CollisionMode == EVoxelMeshCollisionMode::Blocking &&
+							!AppendMesh(Batch.Mesh.Vertices, Batch.Mesh.Triangles, FVector(Piece.Key.Min - SectionMin), true)) return false;
+					}
 				}
 			}
+			else if (!AppendMesh(Input->Vertices, Input->Triangles, FVector::ZeroVector, false)) return false;
+			if (Triangles.Num() != Input->GetIndexCount() / 3) return false;
 			Chaos::FTriangleMeshImplicitObject::ParticlesType Particles;
 			Particles.AddParticles(Vertices.Num());
 			for (int32 Index = 0; Index < Vertices.Num(); ++Index) Particles.SetX(Index, Vertices[Index]);
-			TArray<Chaos::TVector<int32, 3>> Triangles;
-			Triangles.Reserve(Input->Triangles.Num() / 3);
-			for (int32 Index = 0; Index < Input->Triangles.Num(); Index += 3)
-			{
-				if ((Index & 4095) == 0 && Work->bCanceled.Load()) return false;
-				const int32 A = Input->Triangles[Index], B = Input->Triangles[Index + 1], C = Input->Triangles[Index + 2];
-				if (!Remap.IsValidIndex(A) || !Remap.IsValidIndex(B) || !Remap.IsValidIndex(C)) return false;
-				const int32 WA = Remap[A], WB = Remap[B], WC = Remap[C];
-				if (WA == WB || WB == WC || WC == WA ||
-					FVector3f::CrossProduct(Vertices[WB] - Vertices[WA], Vertices[WC] - Vertices[WA]).SizeSquared() <= UE_SMALL_NUMBER)
-					return false;
-				Triangles.Emplace(WA, WB, WC);
-			}
 			TArray<uint16> MaterialIndices;
 			Chaos::FTriangleMeshImplicitObjectPtr Mesh(new Chaos::FTriangleMeshImplicitObject(
 				MoveTemp(Particles), MoveTemp(Triangles), MoveTemp(MaterialIndices)));
@@ -294,7 +320,7 @@ bool UVoxelCollisionComponent::BeginPrepareTriangles(
 {
 	check(IsInGameThread());
 	if (IsPhysicsStateCreated() || Cook || PendingCookTask.IsSet() || !InTriangles ||
-		InTriangles->Vertices.IsEmpty() || InTriangles->Triangles.IsEmpty() || InTriangles->Triangles.Num() % 3 != 0 ||
+		InTriangles->GetVertexCount() <= 0 || InTriangles->GetIndexCount() <= 0 || InTriangles->GetIndexCount() % 3 != 0 ||
 		!InTriangles->LocalBounds.IsValid || !FMath::IsFinite(InBlockSize) || InBlockSize <= 0.0) return false;
 	if (InPhysicalLease)
 	{
@@ -308,7 +334,7 @@ bool UVoxelCollisionComponent::BeginPrepareTriangles(
 	Setup->bDoubleSidedGeometry = true;
 	BlockSize = InBlockSize;
 	ExpectedBoxes = 0;
-	ExpectedTriangles = InTriangles->Triangles.Num() / 3;
+	ExpectedTriangles = InTriangles->GetIndexCount() / 3;
 	LocalBounds = FBox(InTriangles->LocalBounds.Min * BlockSize, InTriangles->LocalBounds.Max * BlockSize);
 	PreparedTriangleInput = MoveTemp(InTriangles);
 	bTriangleMode = true;

@@ -37,6 +37,7 @@
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/VoxelModule.h"
 #include "VoxelPersistentRootMerge.h"
+#include "VoxelSeamPolicy.h"
 
 namespace
 {

@@ -7,6 +7,26 @@
 #include "Voxel/Generation/VoxelGenerationOverlay.h"
 
 class FVoxelGenerationWorkspace;
+class FVoxelGenerationPipeline;
+class FVoxelFineShardSampler;
+
+// 单次 Fine 采样任务的自然列 scratch；不改变生成缓存或结果的生命周期。
+class WHFRAMEWORK_API FVoxelGenerationColumnScratch
+{
+	friend class FVoxelGenerationPipeline;
+	friend class FVoxelFineShardSampler;
+
+	const FVoxelGenerationPipeline* Owner = nullptr;
+	FVoxelGenerationConsumerKey Consumer;
+	FIntPoint Min = FIntPoint::ZeroValue;
+	int32 Side = 0;
+	uint64 HydrologyGeneration = 0;
+	bool bGenerationBound = false;
+	TArray<FVoxelColumnSample> Columns;
+	TArray<uint8> Valid;
+	uint64 Hits = 0;
+	uint64 Misses = 0;
+};
 
 // Map 与原 Working 授额一起移交；最后一个消费点先释放 backing，再退租。
 struct WHFRAMEWORK_API FVoxelCoarseOverlayCapture
@@ -80,7 +100,8 @@ public:
 		FString& OutError,
 		const TAtomic<bool>* InCancel = nullptr,
 		const FVoxelTerrainResourceLease* InOutputLease = nullptr,
-		bool bInAllowPartialOutput = false) const;
+		bool bInAllowPartialOutput = false,
+		FVoxelGenerationColumnScratch* InColumnScratch = nullptr) const;
 
 #if WITH_DEV_AUTOMATION_TESTS
 	// 只兼容无账本夹具；绑定原账本时拒绝隐式分配 caller 数组。

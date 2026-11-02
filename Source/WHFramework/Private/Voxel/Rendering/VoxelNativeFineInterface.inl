@@ -98,7 +98,8 @@ struct FPreparedFine
 		CellSize = InCellSize;
 		if (!Base || !Base->HasMatchingFineInputs())
 		{ OutError = TEXT("DependencyNotReady:NativeFineBoundary"); return false; }
-		for (uint8 Face = 0; Face < 6; ++Face)
+		// 即使不生成接缝，仍要为原网格建立绘制范围及 RT 三角形回执。
+		for (uint8 Face = 0; VoxelSeamPolicy::IsEnabled() && Face < 6; ++Face)
 		{
 			const FIntVector Section = Base->Section + VoxelCoord::Direction(Face);
 			NeighborFine[Face] = FindFineAtom(FineRoot, Section);
@@ -119,6 +120,7 @@ struct FPreparedFine
 	bool InputsMatch(const FAtomNodePtr& FineRoot, const FCoarseNodePtr& CoarseRoot, const FAtomPublication& Publication) const
 	{
 		if (!SameFineInput(Base, FineAfterPublication(FineRoot, Base->Section, Publication))) return false;
+		if (!VoxelSeamPolicy::IsEnabled()) return true;
 		for (uint8 Face = 0; Face < 6; ++Face)
 		{
 			const FIntVector Section = Base->Section + VoxelCoord::Direction(Face);
@@ -137,6 +139,7 @@ struct FPreparedFine
 		if (!Previous || !Base->bUseDrawRanges || Base->SuppressedFaceMask != SuppressedFaceMask ||
 			FindFineAtom(Previous->Root, Base->Section) != Base)
 			return false;
+		if (!VoxelSeamPolicy::IsEnabled()) return true;
 		for (uint8 Face = 0; Face < 6; ++Face)
 		{
 			const FIntVector Section = Base->Section + VoxelCoord::Direction(Face);
@@ -609,7 +612,7 @@ struct FPreparedFine
 			if (TriangleCursor == End) { ++ChunkCursor; TriangleCursor = 0; }
 			return EVoxelFineBuildProgress::Working;
 		}
-		if (FaceCursor == 6) { ReleaseSourceIndices(); return EVoxelFineBuildProgress::Complete; }
+		if (!VoxelSeamPolicy::IsEnabled() || FaceCursor == 6) { ReleaseSourceIndices(); return EVoxelFineBuildProgress::Complete; }
 		const uint8 Face = FaceCursor;
 		const auto OtherFine = NeighborFine[Face];
 		// 同精度界面由较小坐标一侧承载；两侧原面仍在同一个根事务中抑制。

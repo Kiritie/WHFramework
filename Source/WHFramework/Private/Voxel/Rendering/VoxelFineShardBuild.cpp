@@ -1,4 +1,5 @@
 #include "Voxel/Rendering/VoxelFineShardBuild.h"
+#include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Generation/VoxelGenerationPlanningRead.h"
 
@@ -342,10 +343,11 @@ bool FVoxelFineShardSampler::Initialize(const FVoxelFineBuildAttempt& InAttempt,
 	const int32 AxisCount = Side / 16 + 3;
 	const uint64 SampleBytes = WorkerSharedBytes<FVoxelFineShardSamples>() + ArrayBytes<uint32>(Side * Side * Side) +
 		6 * ArrayBytes<uint32>(Side * Side);
-	// The pipeline produces one temporary 16^3 section and a 16-symbol column.
-	// Its own generation/overlay workers retain their independent fact reservations.
+	// 管线临时使用一个 16³ 区块、一列 16 个符号及本任务核心 XY 范围的自然列缓存。
+	// 生成与覆盖工作项各自持有独立的事实预留。
 	const uint64 SamplingBytes = ArrayBytes<FIntVector>(AxisCount * AxisCount * AxisCount) +
-		InitialGrowBytes<FVoxelBlockState>(4096) + 2 * InitialGrowBytes<uint32>(16);
+		InitialGrowBytes<FVoxelBlockState>(4096) + 2 * InitialGrowBytes<uint32>(16) +
+		ArrayBytes<FVoxelColumnSample>(Side * Side) + ArrayBytes<uint8>(Side * Side);
 	uint64 BeforeAdmission = 0;
 	if (VoxelFineShardCapacity::TryReserve(Resources, Consumer, EVoxelTerrainResourcePool::Input,
 		SampleBytes, InputLease, OutError, BeforeAdmission, SamplingBytes, 0, 1) != EVoxelTerrainResourceAdmission::Granted ||
@@ -363,6 +365,14 @@ bool FVoxelFineShardSampler::Initialize(const FVoxelFineBuildAttempt& InAttempt,
 		SamplingLease.Reset();
 		return false;
 	}
+	ColumnScratch.Owner = &Generator.Get();
+	ColumnScratch.Consumer = Consumer;
+	ColumnScratch.Min = FIntPoint(InAttempt.Input.Shard.Min.X, InAttempt.Input.Shard.Min.Y);
+	ColumnScratch.Side = Side;
+	ColumnScratch.Columns.Reserve(Side * Side);
+	ColumnScratch.Columns.SetNumUninitialized(Side * Side);
+	ColumnScratch.Valid.Reserve(Side * Side);
+	ColumnScratch.Valid.Init(0, Side * Side);
 	Samples = MakeWorkerShared<FVoxelFineShardSamples>(InputLease);
 	Samples->RegistrationLease = RegistrationLease;
 	Samples->OverlayVersion = OverlayVersion;
@@ -387,11 +397,15 @@ bool FVoxelFineShardSampler::Initialize(const FVoxelFineBuildAttempt& InAttempt,
 	}
 	NextSection = 0;
 	bComplete = false;
-	if (Samples->AllocatedBytes() > SampleBytes || RequiredSections.GetAllocatedSize() > ArrayBytes<FIntVector>(AxisCount * AxisCount * AxisCount))
+	if (Samples->AllocatedBytes() > SampleBytes || RequiredSections.GetAllocatedSize() > ArrayBytes<FIntVector>(AxisCount * AxisCount * AxisCount) ||
+		ColumnScratch.Columns.GetAllocatedSize() > ArrayBytes<FVoxelColumnSample>(Side * Side) ||
+		ColumnScratch.Valid.GetAllocatedSize() > ArrayBytes<uint8>(Side * Side))
 	{
 		OutError = TEXT("EstimateMismatch: Fine sampling allocator capacity");
 		Samples.Reset();
 		RequiredSections.Empty();
+		ColumnScratch.Columns.Empty();
+		ColumnScratch.Valid.Empty();
 		InputLease.Reset();
 		SamplingLease.Reset();
 		return false;
@@ -423,6 +437,7 @@ void FVoxelFineShardSampler::CopySection(const FIntVector& InSection, const FVox
 	const int32 Side = Snapshot.GridSide;
 	const FIntVector SectionMin = InSection * 16;
 	const FIntVector ShardMin = Samples->Attempt.Input.Shard.Min;
+	const FVoxelOverlaySnapshot* SectionOverlay = Overlay->Find(InSection);
 	for (int32 CellZ = InWindow.Min.Z; CellZ < InWindow.Max.Z; ++CellZ)
 	{
 		for (int32 CellY = InWindow.Min.Y; CellY < InWindow.Max.Y; ++CellY)
@@ -434,7 +449,13 @@ void FVoxelFineShardSampler::CopySection(const FIntVector& InSection, const FVox
 				FVoxelBlockState State = InBlocks[InWindow.Index(FIntVector(CellX, CellY, CellZ))];
 				if (World.Z >= WorldMinZ && World.Z < WorldMaxZ)
 				{
-					Overlay->ApplyAt(World, State);
+					if (SectionOverlay)
+					{
+						if (const FVoxelBlockState* Edited = SectionOverlay->Blocks.Find(VoxelCoord::Linear(FIntVector(CellX, CellY, CellZ))))
+						{
+							State = *Edited;
+						}
+					}
 				}
 				else
 				{
@@ -495,7 +516,7 @@ EVoxelFineBuildProgress FVoxelFineShardSampler::Advance(const int32 InMaximumSec
 		if (SectionMinZ >= WorldMinZ && SectionMinZ + 16 <= WorldMaxZ)
 		{
 			// 本地栈候选仅成功后复制进快照，失败时允许直接丢弃。
-			if (!Generator->GenerateSectionWindow(Key, Window, MakeArrayView(Blocks), OutError, &InCancel, nullptr, true))
+			if (!Generator->GenerateSectionWindow(Key, Window, MakeArrayView(Blocks), OutError, &InCancel, nullptr, true, &ColumnScratch))
 			{
 				if (InCancel.Load())
 				{
@@ -540,8 +561,11 @@ EVoxelFineBuildProgress FVoxelFineShardSampler::Advance(const int32 InMaximumSec
 			if (int64(Section.Z) * 16 >= WorldMinZ && int64(Section.Z) * 16 + 16 <= WorldMaxZ) NaturalCells += Cells;
 		}
 		const FIntVector Min = Samples->Attempt.Input.Shard.Min;
-		UE_LOG(LogTemp, Display, TEXT("Fine section window sample: min=(%d,%d,%d) side=%d sections=%d outputCells=%llu naturalCells=%llu fullSectionCells=%llu directSpanBytes=%llu"),
-			Min.X, Min.Y, Min.Z, Samples->Snapshot.GridSide, RequiredSections.Num(), OutputCells, NaturalCells, uint64(RequiredSections.Num()) * 4096, NaturalCells * sizeof(FVoxelBlockState));
+		const uint64 ReferenceChecks = FParse::Param(FCommandLine::Get(), TEXT("ValidateVoxelColumnScratch")) && ColumnScratch.Hits > 0
+			? (ColumnScratch.Hits - 1) / 1024 + 1 : 0;
+		UE_LOG(LogTemp, Display, TEXT("Fine section window sample: min=(%d,%d,%d) side=%d sections=%d outputCells=%llu naturalCells=%llu fullSectionCells=%llu directSpanBytes=%llu coreColumnsComputed=%llu coreColumnsReused=%llu columnReferenceChecks=%llu"),
+			Min.X, Min.Y, Min.Z, Samples->Snapshot.GridSide, RequiredSections.Num(), OutputCells, NaturalCells, uint64(RequiredSections.Num()) * 4096,
+			NaturalCells * sizeof(FVoxelBlockState), ColumnScratch.Misses, ColumnScratch.Hits, ReferenceChecks);
 #endif
 	}
 	OutError.Reset();
@@ -558,6 +582,8 @@ TSharedPtr<const FVoxelFineShardSamples, ESPMode::ThreadSafe> FVoxelFineShardSam
 	bComplete = false;
 	Samples.Reset();
 	RequiredSections.Empty();
+	ColumnScratch.Columns.Empty();
+	ColumnScratch.Valid.Empty();
 	verify(InputLease->TryResize(Result->AllocatedBytes()) == EVoxelTerrainResourceAdmission::Granted);
 	InputLease.Reset();
 	SamplingLease.Reset();
@@ -566,7 +592,8 @@ TSharedPtr<const FVoxelFineShardSamples, ESPMode::ThreadSafe> FVoxelFineShardSam
 
 uint64 FVoxelFineShardSampler::AllocatedBytes() const
 {
-	return sizeof(*this) + RequiredSections.GetAllocatedSize() + Overlay->GetAllocatedBytes() +
+	return sizeof(*this) + RequiredSections.GetAllocatedSize() + ColumnScratch.Columns.GetAllocatedSize() +
+		ColumnScratch.Valid.GetAllocatedSize() + Overlay->GetAllocatedBytes() +
 		(Samples ? Samples->AllocatedBytes() : 0) + 4096ull * sizeof(FVoxelBlockState);
 }
 

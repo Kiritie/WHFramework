@@ -180,7 +180,9 @@ public:
 		const FIntPoint& InColumn,
 		int32 InMinZ,
 		TArrayView<uint32> OutValues,
-		FString& OutError) const;
+		FString& OutError,
+		const FVoxelColumnSample* InNaturalColumn = nullptr) const;
+	uint64 GetHydrologyGeneration() const { return CacheGeneration; }
 
 #if WITH_DEV_AUTOMATION_TESTS
 	// 仅兼容无账本夹具；绑定账本的 Query 必须使用调用者 span。

@@ -13,6 +13,7 @@
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationPlanCache.h"
+#include "VoxelSeamPolicy.h"
 
 void FVoxelViewManager::RestorePublicationGroups()
 {
@@ -42,6 +43,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishTerrainLayoutSteps(FPubli
 	const bool bInitialLayout = GetInputRoot().bInitialLayout;
 	const auto IsFinalVolumeReady = [this](const FVoxelViewKey& Key)
 	{
+		if (!VoxelSeamPolicy::IsEnabled()) return true;
 		const uint64* Desired = DesiredVolumeSignatures.Find(Key);
 		const auto Context = DesiredVolumeContexts.FindRef(Key);
 		return Desired && Context && AreBoundaryInputsCurrent(*Context) &&
@@ -294,15 +296,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishTerrainLayoutSteps(FPubli
 									 : MacroCoverageRect({Pair.Key.Coordinate, Pair.Key.Level}));
 	}
 	const double NormalizeStarted = FPlatformTime::Seconds();
-	if (bInitialLayout)
-	{
-		co_await PrepareInitialLayoutMasksSteps();
-		if (bCoverageRetryRequested) co_return;
-		FineBoxes = GetInputRoot().InitialFineExclusions;
-		CommonHeightfieldBoxes = GetInputRoot().InitialHeightfieldExclusions;
-		CommonTransitionBoxes = GetInputRoot().InitialTransitionExclusions;
-	}
-	else
+	if (!bInitialLayout)
 	{
 		const auto DynamicFine = MakeShared<TArray<FBox>, ESPMode::ThreadSafe>();
 		for (const FIntVector& Key : LocalFineKeys)
@@ -542,7 +536,8 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishTerrainLayoutSteps(FPubli
 		// boxes 总阶段还包含高度场拓扑及交接；单独计量，避免误判为排序耗时。
 		UE_LOG(LogTemp, Display, TEXT("Voxel layout masks elapsed ms: heightfieldPlan=%.3f masks=%.3f fine=%d heightfield=%d transition=%d initialLayout=%d fullMaskInputs=%d"),
 			HeightfieldPlanMilliseconds, NormalizeMilliseconds,
-			FineBoxes->Num(), CommonHeightfieldBoxes->Num(), CommonTransitionBoxes->Num(),
+			FineBoxes ? FineBoxes->Num() : 0, CommonHeightfieldBoxes ? CommonHeightfieldBoxes->Num() : 0,
+			CommonTransitionBoxes ? CommonTransitionBoxes->Num() : 0,
 			bInitialLayout, bActiveCoverageFull || bInitialLayout);
 		NextTimingLog = Now + 5.0;
 	}

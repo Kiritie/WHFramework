@@ -644,6 +644,7 @@ void FVoxelViewManager::ApplyF0FineShardResult(const FVoxelFineShardKey& InKey, 
 	const auto Geometry = InResult.bSuccess && bCurrent ? StaticCastSharedPtr<const FVoxelFineShardGeometry>(InResult.CustomPayload) : nullptr;
 	if (Current->Build.Complete(InAttempt, InResult.bCanceled || !bCurrent, Geometry, MoveTemp(InResult.Error)) !=
 		EVoxelFineAttemptDisposition::Accepted) return;
+	Module.NotifyFineCollisionGeometryReady(InKey);
 	OnPresentationReady(InKey);
 	const auto UpdateDerivedCoverage = [this, InKey, Section, InRevision, Input = InAttempt.Input]
 	{
@@ -1024,6 +1025,7 @@ void FVoxelViewManager::ApplyFineShardResult(const FVoxelFineShardKey& InKey, co
 	}
 	if (Disposition == EVoxelFineAttemptDisposition::Accepted)
 	{
+		Module.NotifyFineCollisionGeometryReady(InKey);
 		OnPresentationReady(InKey);
 	}
 }
@@ -1721,6 +1723,39 @@ void FVoxelViewManager::OnPresentationReady(const FIntVector& InSection)
 	IndexCoverage(Node);
 	MarkCoverageDirty(FineCoverageRect(InSection));
 	bTerrainBuildStageDirty = true;
+}
+
+TSharedPtr<const FVoxelFineShardGeometry, ESPMode::ThreadSafe> FVoxelViewManager::FindFineCollisionGeometry(
+	const FIntVector& InSection, bool& bOutExpected) const
+{
+	bOutExpected = false;
+	bool bStaleGeometry = false;
+	const auto& Interest = Module.GetCurrentInterest();
+	const auto* Exact = Interest.Exact.Find(InSection);
+	for (const int32 Side : {16, 32, 64})
+	{
+		FIntVector Min;
+		if (!FVoxelFineSpatial::TrySnap(InSection * 16, Side, Min)) continue;
+		const FVoxelFineShardKey Key{Min, Side};
+		const bool bWanted = Side == 16 ? Exact && Exact->bFineRender : Interest.FineShardDemands.Contains(Key);
+		if (!bWanted) continue;
+		bOutExpected = true;
+		const auto* Slot = FineShardSlots.Find(Key);
+		if (!Slot || !Slot->Build.IsMeshReady()) continue;
+		const auto Geometry = Slot->Build.GetPreparedGeometry();
+		if (Geometry && Geometry->bCoverageValidated && Module.IsOverlayVersionCurrent(Geometry->OverlayVersion) &&
+			Geometry->Attempt.Input.WorldEpoch == WorldEpoch &&
+			Geometry->Attempt.Input.GeneratorIdentity == Module.GetManifest().BaseSampleHash &&
+			Geometry->Attempt.Input.RegistryRevision == Module.GetRegistry()->Hash &&
+			Geometry->Attempt.Input.ShapeRevision == Module.GetShapes()->GetContentHash() &&
+			Geometry->Attempt.Input.DataRevision == Module.GetRuntime()->GetChangeHierarchy().GetFineShardRevision(Key))
+		{
+			return Geometry;
+		}
+		bStaleGeometry = true;
+	}
+	if (bStaleGeometry) bOutExpected = false;
+	return nullptr;
 }
 
 bool FVoxelViewManager::IsFineGeometryPrepared(const FIntVector& InSection) const

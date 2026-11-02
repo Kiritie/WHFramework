@@ -11,6 +11,8 @@ struct FVoxelSectionCollisionResult;
 struct FVoxelCollisionEvidenceNode;
 struct FVoxelSectionSnapshot;
 struct FVoxelSection;
+struct FVoxelFineOverlayVersionProof;
+struct FVoxelFineShardKey;
 
 struct WHFRAMEWORK_API FVoxelPhysicsReceipt
 {
@@ -50,9 +52,11 @@ public:
 	void InvalidateSection(const FIntVector& InSection);
 	void InvalidateNeighbors(const FIntVector& InSection);
 	void NotifySectionDataReady(const FIntVector& InSection);
+	void NotifyFineGeometryReady(const FVoxelFineShardKey& InKey);
 	bool EnsureNavigationDemand(
 		const FIntVector& InSection);
 	bool IsReady(const FIntVector& InSection) const;
+	bool IsReadyEmpty(const FIntVector& InSection) const;
 	bool CaptureCurrentReceipt(const FIntVector& InSection, FVoxelPhysicsReceipt& OutReceipt) const;
 	TSharedPtr<const FVoxelCollisionCoverageSnapshot, ESPMode::ThreadSafe> CaptureSnapshot() const;
 	void Reset();
@@ -79,6 +83,7 @@ private:
 		TStrongObjectPtr<UVoxelCollisionComponent> RetiringComponent;
 		TSharedPtr<FVoxelSectionCollisionResult, ESPMode::ThreadSafe> Prepared;
 		TSharedPtr<FVoxelSectionCollisionResult, ESPMode::ThreadSafe> SyncPrepared;
+		TSharedPtr<const FVoxelFineOverlayVersionProof, ESPMode::ThreadSafe> InstalledOverlayVersion;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InstalledLease;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> PreparingLease;
 		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RetiringLease;
@@ -114,12 +119,14 @@ private:
 		bool bCapacityBlocked = false;
 	};
 	FBodyRecord* FindBody(const FIntVector& InSection) const;
+	void QueueReadySection(const FIntVector& InSection);
 	FBodyRecord* FindOrAddBody(const FVoxelGenerationConsumerKey& InConsumer);
 	void RemoveBody(FBodyRecord& InBody);
 	void RequestCollision(const FIntVector& InSection, uint64 InRevision, const FVoxelExactDemand& InDemand);
 	FVoxelTaskStamp CaptureInputStamp(const FIntVector& InSection) const;
 	TSharedPtr<FPhysicsSync, ESPMode::ThreadSafe> PreparePhysicsSync(const FIntVector& InSection);
-	void AdvanceBody(const FIntVector& InSection, FBodyRecord& InBody);
+	void AdvanceBody(const FIntVector& InSection, FBodyRecord& InBody,
+		TSharedPtr<FPhysicsSync, ESPMode::ThreadSafe>& InOutEmptySync);
 	void InstallEvidence(const FIntVector& InSection, FBodyRecord& InBody, bool bInRetired);
 	bool IsDemanded(const FIntVector& InSection) const;
 	void BeginRetirement(FBodyRecord& InBody);
@@ -145,6 +152,7 @@ private:
 	double NextActiveDiagnostic = 0.0;
 	uint64 EmptyBuilds = 0;
 	uint64 NonemptyBuilds = 0;
+	uint64 SharedMeshBuilds = 0;
 	uint64 EmptyReceipts = 0;
 	uint64 NonemptyReceipts = 0;
 #endif

@@ -633,7 +633,8 @@ bool FVoxelGenerationPipeline::GenerateSectionWindow(
 	FString& OutError,
 	const TAtomic<bool>* InCancel,
 	const FVoxelTerrainResourceLease* InOutputLease,
-	const bool bInAllowPartialOutput) const
+	const bool bInAllowPartialOutput,
+	FVoxelGenerationColumnScratch* InColumnScratch) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_GenerateSection);
 	TRACE_CPUPROFILER_EVENT_SCOPE_CONDITIONAL(Voxel_GenerateSectionDirectSpan, bInAllowPartialOutput);
@@ -691,6 +692,26 @@ bool FVoxelGenerationPipeline::GenerateSectionWindow(
 	{
 		return false;
 	}
+	if (InColumnScratch)
+	{
+		const int64 Count = int64(InColumnScratch->Side) * InColumnScratch->Side;
+		if (InColumnScratch->Owner != this || !(InColumnScratch->Consumer == Consumer) ||
+			InColumnScratch->Side <= 0 || Count > MAX_int32 ||
+			InColumnScratch->Columns.Num() != Count || InColumnScratch->Valid.Num() != Count)
+		{
+			OutError = TEXT("InvalidResource: natural column scratch belongs to another sampling task");
+			return false;
+		}
+		const uint64 Generation = Query.GetHydrologyGeneration();
+		if (Generation != Cache->GetHydrologyGeneration() ||
+			(InColumnScratch->bGenerationBound && InColumnScratch->HydrologyGeneration != Generation))
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		InColumnScratch->HydrologyGeneration = Generation;
+		InColumnScratch->bGenerationBound = true;
+	}
 	uint64 RequiredInputBytes = Query.GetRequiredInputBytes();
 	int32 RequiredLeaseCount = Query.GetRequiredInputLeaseCount();
 	uint64 RequiredWorkingBytes = 0;
@@ -714,15 +735,69 @@ bool FVoxelGenerationPipeline::GenerateSectionWindow(
 
 	// 一列共享同一份自然采样，每格仍执行完整生成阶段，避免反复争用列缓存锁。
 	uint32 Symbols[SectionSide];
+#if !UE_BUILD_SHIPPING
+	static const bool bValidateColumnScratch = FParse::Param(FCommandLine::Get(), TEXT("ValidateVoxelColumnScratch"));
+#endif
 	for (int32 Y = InWindow.Min.Y; Y < InWindow.Max.Y; ++Y)
 	{
 		for (int32 X = InWindow.Min.X; X < InWindow.Max.X; ++X)
 		{
-			if (!Query.SampleColumnSymbols(FIntPoint(WorldMin.X + X, WorldMin.Y + Y), WorldMin.Z + InWindow.Min.Z,
-				MakeArrayView(Symbols, InWindow.Max.Z - InWindow.Min.Z), OutError))
+			const FIntPoint Position(WorldMin.X + X, WorldMin.Y + Y);
+			const FVoxelColumnSample* NaturalColumn = nullptr;
+#if !UE_BUILD_SHIPPING
+			bool bReusedColumn = false;
+#endif
+			if (InColumnScratch)
+			{
+				const int64 LocalX = int64(Position.X) - InColumnScratch->Min.X;
+				const int64 LocalY = int64(Position.Y) - InColumnScratch->Min.Y;
+				if (LocalX >= 0 && LocalX < InColumnScratch->Side && LocalY >= 0 && LocalY < InColumnScratch->Side)
+				{
+					const int32 Index = int32(LocalX + LocalY * InColumnScratch->Side);
+					if (!InColumnScratch->Valid[Index])
+					{
+						if (!Query.SampleEnvironmentColumn(Position.X, Position.Y, InColumnScratch->Columns[Index], OutError, InCancel))
+						{
+							return false;
+						}
+						InColumnScratch->Valid[Index] = 1;
+						++InColumnScratch->Misses;
+					}
+					else
+					{
+						++InColumnScratch->Hits;
+#if !UE_BUILD_SHIPPING
+						bReusedColumn = true;
+#endif
+					}
+					NaturalColumn = &InColumnScratch->Columns[Index];
+				}
+			}
+			if (!Query.SampleColumnSymbols(Position, WorldMin.Z + InWindow.Min.Z,
+				MakeArrayView(Symbols, InWindow.Max.Z - InWindow.Min.Z), OutError, NaturalColumn))
 			{
 				return false;
 			}
+#if !UE_BUILD_SHIPPING
+			if (bValidateColumnScratch && bReusedColumn && (InColumnScratch->Hits % 1024) == 1)
+			{
+				uint32 Reference[SectionSide];
+				const int32 Count = InWindow.Max.Z - InWindow.Min.Z;
+				if (!Query.SampleColumnSymbols(Position, WorldMin.Z + InWindow.Min.Z, MakeArrayView(Reference, Count), OutError))
+				{
+					return false;
+				}
+				for (int32 Index = 0; Index < Count; ++Index)
+				{
+					if (Symbols[Index] != Reference[Index])
+					{
+						OutError = FString::Printf(TEXT("Fine natural column scratch mismatch at (%d,%d,%d): cached=%u fresh=%u"),
+							Position.X, Position.Y, WorldMin.Z + InWindow.Min.Z + Index, Symbols[Index], Reference[Index]);
+						return false;
+					}
+				}
+			}
+#endif
 			for (int32 Z = InWindow.Min.Z; Z < InWindow.Max.Z; ++Z)
 			{
 				if (!Config->ToRuntime(Symbols[Z - InWindow.Min.Z], WindowBlocks[InWindow.Index(FIntVector(X, Y, Z))]))

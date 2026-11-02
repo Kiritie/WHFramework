@@ -62,6 +62,8 @@ struct WHFRAMEWORK_API FVoxelStreamingReadiness
 	int32 ReadyDataSections = 0;
 	int32 RequiredCollisionSections = 0;
 	int32 ReadyCollisionSections = 0;
+	int32 ReadyEmptyCollisionSections = 0;
+	int32 ReadyNonEmptyCollisionSections = 0;
 
 	bool IsDataReady() const
 	{

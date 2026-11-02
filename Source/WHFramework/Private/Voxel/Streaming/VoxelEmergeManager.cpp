@@ -293,8 +293,9 @@ struct FVoxelExactBaseGenerationWork
 		Result.OutputResourceLease = BaseLease;
 		Result.BaseBlocks.Reserve(4096);
 		Result.BaseBlocks.SetNumUninitialized(4096);
-		Result.bSuccess = Generator->GenerateSection(Section, MakeArrayView(Result.BaseBlocks),
-			Result.Error, &InCancel, BaseLease.Get());
+		// 结果尚未发布；失败或续算时由调度器丢弃，可直接写入原 Base 租约。
+		Result.bSuccess = Generator->GenerateSectionWindow(Section, FVoxelSectionWindow(), MakeArrayView(Result.BaseBlocks),
+			Result.Error, &InCancel, BaseLease.Get(), true);
 		Result.bCanceled = InCancel.Load();
 		if (!Result.bSuccess && !Result.bCanceled && Result.Error.StartsWith(TEXT("CapacityBlocked")))
 		{
@@ -2959,7 +2960,7 @@ bool FVoxelEmergeManager::RequestBase(
 	}
 	const FVoxelGenerationDependencyStatus PlanStatus = PlanCoordinator->Ensure(
 		Waiting->Dependencies.Values,
-		ResolveWorkClass(Demand), Demand.ServicePriority, Waiting->Consumer);
+		ResolveWorkClass(Demand), Demand.ServicePriority, Waiting->Consumer, Waiting->Retention.Get());
 	if (PlanStatus.bFailed)
 	{
 		CurrentSection->Status = EVoxelSectionStatus::Failed;

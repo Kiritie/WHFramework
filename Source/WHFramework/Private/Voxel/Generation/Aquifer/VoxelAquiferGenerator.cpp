@@ -29,6 +29,9 @@ FVoxelAquiferSample FVoxelAquiferGenerator::Sample(
         return Result;
     }
 
+    // 地下水面最高为 SurfaceZ - 8；高于此高度时，区域种子和局部水面不会改变结果。
+    if (int64(InCell.Z) > int64(InColumn.SurfaceZ) - 8) return Result;
+
     const int32 RegionX = VoxelGeneration::FloorDivide(
         InCell.X,
         Settings.AquiferSpacing);

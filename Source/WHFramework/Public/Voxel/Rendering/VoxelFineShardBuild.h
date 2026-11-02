@@ -70,6 +70,7 @@ private:
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> SamplingLease;
 	TSharedPtr<FVoxelFineShardSamples, ESPMode::ThreadSafe> Samples;
 	TArray<FIntVector> RequiredSections;
+	FVoxelGenerationColumnScratch ColumnScratch;
 	int32 NextSection = 0;
 	int32 WorldMinZ = 0;
 	int32 WorldMaxZ = 0;
@@ -96,6 +97,7 @@ struct WHFRAMEWORK_API FVoxelFineMeshPiece
 {
 	FVoxelFineShardKey Key;
 	TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe> Mesh;
+	bool bCollisionMeshCompatible = false;
 };
 
 // 网格释放完整体采样后，边界事务仍需读取同一内容版本的两侧精确样本。

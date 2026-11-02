@@ -562,7 +562,15 @@ void UVoxelModule::OnRefresh(
 		TerrainFrameContext.End(FPlatformTime::Seconds());
 		return false;
 	};
-	// 数据准入和可见发布轮流先执行，单次数据操作超时不能持续饿死已完成网格的提交。
+	// 碰撞、数据准入和可见发布轮流获得帧预算。
+	const bool bCollisionFirst = GFrameCounter % 3 == 0;
+	double EarlyCollisionMilliseconds = 0.0;
+	if (bCollisionFirst && CollisionPresenter)
+	{
+		const double CollisionStart = FPlatformTime::Seconds();
+		CollisionPresenter->Tick(CurrentInterest->Exact, InterestRevision);
+		EarlyCollisionMilliseconds = (FPlatformTime::Seconds() - CollisionStart) * 1000.0;
+	}
 	const bool bViewFirst = (GFrameCounter & 1) == 0;
 	if (bViewFirst && !TickView()) return;
 	const double EmergeStart = FPlatformTime::Seconds();
@@ -588,7 +596,7 @@ void UVoxelModule::OnRefresh(
 
 	const double AfterResidency = FPlatformTime::Seconds();
 
-	if (CollisionPresenter)
+	if (!bCollisionFirst && CollisionPresenter)
 	{
 		CollisionPresenter->Tick(CurrentInterest->Exact, InterestRevision);
 	}
@@ -639,7 +647,7 @@ void UVoxelModule::OnRefresh(
 			(AfterScheduler - VoxelTickStart) * 1000, (InterestStart - AfterScheduler) * 1000,
 			(AfterInterest - InterestStart) * 1000, (AfterInterestInputs - AfterInterest) * 1000,
 			LastEmergeAdmissionMilliseconds, (AfterResidency - AfterEmerge) * 1000,
-			(AfterCollision - AfterResidency) * 1000, (AfterNavigation - AfterCollision) * 1000, ViewMilliseconds,
+			EarlyCollisionMilliseconds + (AfterCollision - AfterResidency) * 1000, (AfterNavigation - AfterCollision) * 1000, ViewMilliseconds,
 			(AfterScenes - AfterView) * 1000, (FPlatformTime::Seconds() - AfterScenes) * 1000);
 	}
 	if (DiagnosticFrameTimes.Num() < 4096)
@@ -1446,6 +1454,12 @@ void UVoxelModule::NotifyCollisionChanged(const FIntVector& InSection)
 	WakeSimulationSection(InSection);
 }
 
+void UVoxelModule::NotifyFineCollisionGeometryReady(const FVoxelFineShardKey& InKey)
+{
+	check(IsInGameThread());
+	if (CollisionPresenter) CollisionPresenter->NotifyFineGeometryReady(InKey);
+}
+
 bool UVoxelModule::IsNavigationReady(const FIntVector& InSection) const
 {
 	return NavigationPresenter && IsSimulationResident(InSection) &&
@@ -2245,7 +2259,12 @@ FVoxelStreamingReadiness UVoxelModule::QueryStreamingReadiness(const FGuid& InId
 	}
 	for (const FIntVector& Key : Interest.CollisionSections)
 	{
-		Result.ReadyCollisionSections += IsCollisionReady(Key) ? 1 : 0;
+		if (IsCollisionReady(Key))
+		{
+			++Result.ReadyCollisionSections;
+			if (CollisionPresenter->IsReadyEmpty(Key)) ++Result.ReadyEmptyCollisionSections;
+			else ++Result.ReadyNonEmptyCollisionSections;
+		}
 	}
 	return Result;
 }
@@ -2278,7 +2297,12 @@ FVoxelStreamingReadiness UVoxelModule::QueryBoundsReadiness(const FVoxelGenerati
 				if (bInRequireCollision)
 				{
 					++Result.RequiredCollisionSections;
-					Result.ReadyCollisionSections += IsCollisionReady(Key) ? 1 : 0;
+					if (IsCollisionReady(Key))
+					{
+						++Result.ReadyCollisionSections;
+						if (CollisionPresenter->IsReadyEmpty(Key)) ++Result.ReadyEmptyCollisionSections;
+						else ++Result.ReadyNonEmptyCollisionSections;
+					}
 				}
 			}
 		}

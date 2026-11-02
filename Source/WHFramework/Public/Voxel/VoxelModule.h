@@ -135,6 +135,7 @@ public:
 	bool IsCollisionReady(const FIntVector& InSection) const;
 	bool CaptureCollisionReceipt(const FIntVector& InSection, FVoxelPhysicsReceipt& OutReceipt) const;
 	void NotifyCollisionChanged(const FIntVector& InSection);
+	void NotifyFineCollisionGeometryReady(const FVoxelFineShardKey& InKey);
 	bool IsNavigationReady(const FIntVector& InSection) const;
 	bool IsNavigationInputCurrent(const FVoxelNavigationInputVersion& InVersion) const;
 	bool IsNavigationResident(
@@ -221,6 +222,7 @@ public:
 	FVoxelMapTileCache* GetMapTileCache() const;
 	const FVoxelRegionStore& GetRegionStore() const;
 	const FVoxelInterestSet& GetCurrentInterest() const;
+	FVoxelViewManager* GetViewManager() const { return ViewManager.Get(); }
 	FVoxelTaskDiagnostics GetTaskDiagnostics() const;
 	TSharedPtr<const FVoxelTerrainStatistics, ESPMode::ThreadSafe> GetTerrainStatistics() const;
 	FVoxelPrimaryFineReadiness QueryFineReadiness(TConstArrayView<FIntVector> InKeys) const;

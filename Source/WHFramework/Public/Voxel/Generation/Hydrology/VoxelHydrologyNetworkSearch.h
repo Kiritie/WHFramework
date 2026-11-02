@@ -187,6 +187,8 @@ private:
 	int32 ReceiverProofExpansions = 0;
 	uint64 RegionReadRequests = 0;
 	uint64 SliceGraphHits = 0;
+	uint64 RegionEdgeVisits = 0;
+	uint64 BarrierDistanceQueries = 0;
 	bool bSolvingLower = true;
 	bool bEntireRegion = false;
 	int32 Cursor = 0;
