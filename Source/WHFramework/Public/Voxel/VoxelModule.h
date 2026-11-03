@@ -159,6 +159,10 @@ public:
 	const FVoxelWorldReadinessSnapshot& GetReadiness() const;
 	FVoxelRepresentationReadiness GetRepresentationReadiness() const;
 	FVoxelTerrainReadinessSnapshot CaptureTerrainReadiness() const;
+#if !UE_BUILD_SHIPPING
+	bool TryCountPublishedTerrainMeshes(int32& OutCount, uint64& OutSerial, uint64& OutScratchBytes,
+		double& OutMilliseconds, FString& OutError) const;
+#endif
 	FVoxelProxyPublicationState CaptureProxyPublicationState(const FVoxelViewKey& InKey, uint64 InExpectedEpoch) const;
 	double BlockSize() const;
 	const FVoxelWorldManifest& GetManifest() const;

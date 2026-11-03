@@ -64,7 +64,7 @@ bool FVoxelHydrologyComponentBuild::BuildGeometry(FString& OutError, const TAtom
         ++CertifiedGeometryNode;
     }
     if (CertifiedGeometryNode < Nodes.Num())
-    { OutError = TEXT("Yielded: macro river edges"); return false; }
+    { OutError = TEXT("YieldedImmediate: macro river edges"); return false; }
     // 每段只从宏观端点生成确定性曲线；不读取细地表，也不重求水位或河网。
     if (MacroGeometryIndex < Plan.Rivers.Num())
     {
@@ -84,7 +84,7 @@ bool FVoxelHydrologyComponentBuild::BuildGeometry(FString& OutError, const TAtom
         ++MacroGeometryIndex;
         ++MacroGeometryNode;
         if (MacroGeometryIndex < Plan.Rivers.Num())
-        { OutError = TEXT("Yielded: macro river curves"); return false; }
+        { OutError = TEXT("YieldedImmediate: macro river curves"); return false; }
     }
     UE_LOG(LogTemp, Display, TEXT("Voxel macro river graph ready: selectedNodes=%d ownedCoarseCells=%d rivers=%d rain=%llu received=%llu"),
         Nodes.Num(), Result.DrainageCells.Num(), Plan.Rivers.Num(), Result.TotalRainWeight, Result.ReceivedRainWeight);
@@ -228,5 +228,5 @@ bool FVoxelHydrologyComponentBuild::FinalizeProfileResult(FString& OutError,
         }
         else { bProfilesSolved = true; OutError.Reset(); return true; }
     }
-    OutError=TEXT("Yielded: certified river index and fingerprint"); return false;
+    OutError=TEXT("YieldedImmediate: certified river index and fingerprint"); return false;
 }

@@ -1872,6 +1872,19 @@ FVoxelTerrainReadinessSnapshot UVoxelModule::CaptureTerrainReadiness() const
 	return ViewManager ? ViewManager->CaptureTerrainReadiness() : FVoxelTerrainReadinessSnapshot{};
 }
 
+#if !UE_BUILD_SHIPPING
+bool UVoxelModule::TryCountPublishedTerrainMeshes(int32& OutCount, uint64& OutSerial, uint64& OutScratchBytes,
+	double& OutMilliseconds, FString& OutError) const
+{
+	if (ViewManager) return ViewManager->TryCountPublishedTerrainMeshes(OutCount, OutSerial, OutScratchBytes, OutMilliseconds, OutError);
+	OutCount = 0;
+	OutSerial = OutScratchBytes = 0;
+	OutMilliseconds = 0.0;
+	OutError = TEXT("Terrain view manager unavailable");
+	return false;
+}
+#endif
+
 FVoxelProxyPublicationState UVoxelModule::CaptureProxyPublicationState(const FVoxelViewKey& InKey, const uint64 InExpectedEpoch) const
 {
 	if (!IsInGameThread())

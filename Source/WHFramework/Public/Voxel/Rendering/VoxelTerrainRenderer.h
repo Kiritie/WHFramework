@@ -181,6 +181,11 @@ public:
 	const FVoxelFinePresentedAtom* FindPresentedAtom(const FIntVector& InSection) const;
 	const FVoxelTerrainRenderAtom* FindPresentedNativeAtom(const FIntVector& InSection) const;
 	bool GetPresentedCoarseTriangles(const FVoxelTaskStamp& InStamp, const FGuid& InSourceId, uint64& OutTriangles, bool& bOutFinalPartition) const;
+#if !UE_BUILD_SHIPPING
+	// 按需同步统计 RT 回执快照中的非水源网格；不保留快照、正文或租约。
+	bool TryCountPublishedTerrainMeshes(int32& OutCount, uint64& OutSerial, uint64& OutScratchBytes,
+		double& OutMilliseconds, FString& OutError) const;
+#endif
 	TSharedPtr<const IVoxelTerrainPresentedSnapshot, ESPMode::ThreadSafe> CapturePresentedSnapshot() const;
 	bool HasPresentedCoverage(const FBox& InCellBounds) const;
 	bool RequiresF0RuntimeData(const FIntVector& InSection,

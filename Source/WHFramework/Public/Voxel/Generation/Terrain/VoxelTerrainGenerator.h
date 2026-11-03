@@ -7,6 +7,12 @@
 class FVoxelClimateGenerator;
 struct FVoxelTerrainClimateSample;
 
+struct WHFRAMEWORK_API FVoxelTerrainHeightLandformSample
+{
+    int32 SurfaceZ = 0;
+    FVoxelLandformSample Landform;
+};
+
 class WHFRAMEWORK_API FVoxelTerrainGenerator
 {
 public:
@@ -16,12 +22,15 @@ public:
 
 public:
     int32 SampleSurfaceHeight(int32 InX, int32 InY) const;
+    FVoxelTerrainHeightLandformSample SampleHeightAndLandform(int32 InX, int32 InY) const;
     FVoxelMacroTerrainSample SampleMacro(int32 InX, int32 InY) const;
     FVoxelMacroTerrainSample SampleMacro(int32 InX, int32 InY, const FVoxelClimateSample& InClimate) const;
     FVoxelLandformSample SampleLandform(int32 InX, int32 InY) const;
     int32 SampleDensityQ16(const FIntVector& InCell, const FVoxelMacroTerrainSample& InMacro) const;
 
 private:
+    int32 SampleHeightAndLandformFromTerrainClimate(int32 InX, int32 InY,
+        const FVoxelTerrainClimateSample& InClimate, FVoxelLandformSample& OutLandform) const;
     FVoxelMacroTerrainSample SampleMacroFromTerrainClimate(int32 InX, int32 InY, const FVoxelTerrainClimateSample& InClimate) const;
     int32 SampleRawHeight(int32 InX, int32 InY, const FVoxelTerrainClimateSample& InClimate,
         const FVoxelLandformSample& InLandform) const;

@@ -3884,6 +3884,14 @@ FVoxelRepresentationReadiness FVoxelViewManager::GetRepresentationReadiness() co
 	return Result;
 }
 
+#if !UE_BUILD_SHIPPING
+bool FVoxelViewManager::TryCountPublishedTerrainMeshes(int32& OutCount, uint64& OutSerial, uint64& OutScratchBytes,
+	double& OutMilliseconds, FString& OutError) const
+{
+	return Publisher->GetTerrainRenderer().TryCountPublishedTerrainMeshes(OutCount, OutSerial, OutScratchBytes, OutMilliseconds, OutError);
+}
+#endif
+
 FVoxelTerrainReadinessSnapshot FVoxelViewManager::CaptureTerrainReadiness() const
 {
 	const FVoxelInterestSet& Interest = GetViewInterest();

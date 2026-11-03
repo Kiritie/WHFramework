@@ -951,6 +951,9 @@ struct FVoxelGenerationPlanCache::FHydrologyRegionOwner
 	TMap<FVoxelHydrologyRegionKey, FTopologyRead> Tiles;
 	uint64 TopologyAttempts = 0;
 	uint64 TopologyHits = 0;
+#if !UE_BUILD_SHIPPING
+	uint64 TopologyBorrowReads = 0;
+#endif
 	double LastDiagnosticSeconds = 0.0;
 	FVoxelHydrologyPlan Plan;
 	int32 MissingIndex = 0;
@@ -3097,9 +3100,10 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyComponent(const FVoxelHydrologyR
             InError = TEXT("YieldedImmediate: hydrology component requires topology input");
             return EVoxelHydrologyRegionStep::NeedInput;
         case EVoxelHydrologyComponentStep::Yielded:
-            InError = InError.StartsWith(TEXT("DependencyNotReady")) ?
-                TEXT("Yielded: hydrology component waits for shared fine water: ") + InError :
-                TEXT("YieldedImmediate: hydrology component closure");
+            if (InError.StartsWith(TEXT("DependencyNotReady")))
+                InError = TEXT("Yielded: hydrology component waits for shared fine water: ") + InError;
+            else if (InError.IsEmpty())
+                InError = TEXT("Yielded: hydrology component without proven progress");
             return EVoxelHydrologyRegionStep::Yielded;
         case EVoxelHydrologyComponentStep::CapacityBlocked:
             return EVoxelHydrologyRegionStep::CapacityBlocked;
@@ -3353,7 +3357,24 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyPlan(const FVoxelHydrologyRegion
 			UE_LOG(LogTemp, Display, TEXT("Voxel macro input progress: coverage=%s retainedTiles=%d topologyAttempts=%llu topologyHits=%llu seed=%d/%d error=%s"),
 				*Owner->Plan.Key.Coordinate.ToString(), Owner->Tiles.Num(), Owner->TopologyAttempts, Owner->TopologyHits,
 				Owner->SeedIndex, Owner->Seeds.Num(), *OutError);
+#if !UE_BUILD_SHIPPING
+			if (Owner->TopologyBorrowReads)
+				UE_LOG(LogTemp, Display, TEXT("Voxel macro topology borrow: coverage=%s ownerBorrowReads=%llu"),
+					*Owner->Plan.Key.Coordinate.ToString(), Owner->TopologyBorrowReads);
+#endif
 		}
+#if !UE_BUILD_SHIPPING
+		if ((bPublished || bTerminal) && Owner->TopologyBorrowReads)
+		{
+			static TAtomic<uint64> RetiredOwners{0};
+			static TAtomic<uint64> RetiredBorrowReads{0};
+			RetiredBorrowReads.AddExchange(Owner->TopologyBorrowReads);
+			const uint64 Count = ++RetiredOwners;
+			if ((Count & (Count - 1)) == 0)
+				UE_LOG(LogTemp, Display, TEXT("Voxel macro topology borrow retired: processOwnersWithBorrow=%llu processBorrowReads=%llu"),
+					Count, RetiredBorrowReads.Load());
+		}
+#endif
         if (bPublished || (bTerminal && OutError != TEXT("Canceled")))
             RecordPlanBuild(EVoxelGenerationPlanKind::Hydrology, Owner->BuildMilliseconds, !bPublished);
 		FWriteScopeLock Scope(Shard.Lock);
@@ -3418,10 +3439,29 @@ bool FVoxelGenerationPlanCache::AdvanceHydrologyPlan(const FVoxelHydrologyRegion
 		}
 		const auto Lookup = [&](const FVoxelHydrologyRegionKey& InTile) -> const FVoxelHydrologyPlan*
 		{
-			auto* Found = Owner->Tiles.Find(InTile);
-			if (!Found) return nullptr;
-			Found->bRead = true;
-			return Found->Plan.Get();
+			if (auto* Found = Owner->Tiles.Find(InTile))
+			{
+				Found->bRead = true;
+				return Found->Plan.Get();
+			}
+			// 覆盖拓扑按 Y、X 顺序保存；仅借用同键正文，其他情况沿原缺失路径请求。
+			const auto& Topologies = Owner->Plan.TopologyPlans;
+			if (Topologies.IsEmpty() || !Topologies[0] || !Topologies.Last()) return nullptr;
+			const FIntPoint First = Topologies[0]->Key.Coordinate;
+			const FIntPoint Last = Topologies.Last()->Key.Coordinate;
+			const int64 Width = int64(Last.X) - First.X + 1;
+			const int64 OffsetX = int64(InTile.Coordinate.X) - First.X;
+			const int64 OffsetY = int64(InTile.Coordinate.Y) - First.Y;
+			if (Width <= 0 || Width > Topologies.Num() || OffsetX < 0 || OffsetX >= Width ||
+				OffsetY < 0 || OffsetY > (int64(Topologies.Num()) - 1) / Width) return nullptr;
+			const int64 Index = OffsetY * Width + OffsetX;
+			if (Index >= Topologies.Num()) return nullptr;
+			const FVoxelHydrologyPlan* Topology = Topologies[int32(Index)].Get();
+			if (!Topology || !(Topology->Key == InTile)) return nullptr;
+#if !UE_BUILD_SHIPPING
+			++Owner->TopologyBorrowReads;
+#endif
+			return Topology;
 		};
 		if (!Owner->bTopologyReady)
 		{

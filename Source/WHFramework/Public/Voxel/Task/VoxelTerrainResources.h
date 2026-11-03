@@ -154,9 +154,10 @@ private:
 	struct FEntry
 	{
 		FVoxelGenerationConsumerKey Attempt;
-		EVoxelTerrainResourcePool Pool = EVoxelTerrainResourcePool::Input;
+		// 账本可能同时持有大量租约；按对齐顺序排列，减少每项的 Input 元数据。
 		uint64 Bytes = 0;
 		int32 ReservedSplits = 0;
+		EVoxelTerrainResourcePool Pool = EVoxelTerrainResourcePool::Input;
 		bool bPublished = false;
 	};
 	struct FEntrySlot

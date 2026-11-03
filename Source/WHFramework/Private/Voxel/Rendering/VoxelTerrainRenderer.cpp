@@ -4334,6 +4334,193 @@ bool FVoxelTerrainRenderer::GetPresentedCoarseTriangles(const FVoxelTaskStamp& I
 	return true;
 }
 
+#if !UE_BUILD_SHIPPING
+bool FVoxelTerrainRenderer::TryCountPublishedTerrainMeshes(int32& OutCount, uint64& OutSerial, uint64& OutScratchBytes,
+	double& OutMilliseconds, FString& OutError) const
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_CountPublishedTerrainMeshes);
+	const double Started = FPlatformTime::Seconds();
+	constexpr double MaximumSeconds = 0.1;
+	constexpr uint64 MaximumSteps = 2000000;
+	constexpr int32 MaximumMeshes = 131072;
+	OutCount = 0;
+	OutSerial = OutScratchBytes = 0;
+	OutMilliseconds = 0.0;
+	OutError.Reset();
+	TSet<const FVoxelSectionMeshResult*> Meshes;
+	ON_SCOPE_EXIT
+	{
+		OutScratchBytes = Meshes.GetAllocatedSize();
+		Meshes.Empty();
+		OutMilliseconds = (FPlatformTime::Seconds() - Started) * 1000.0;
+	};
+	if (!IsInGameThread() || !State || !State->PresentedSnapshot ||
+		State->PresentedSnapshot->WorldEpoch != State->Epoch)
+	{
+		OutError = TEXT("Presented terrain snapshot unavailable on the game thread");
+		return false;
+	}
+	// 仅同步借用当前根；不复制 TSharedPtr，避免诊断延迟正文及租约的释放。
+	const FPresentedSnapshot* const Snapshot = State->PresentedSnapshot.Get();
+	OutSerial = Snapshot->PresentationSerial;
+	uint64 Steps = 0;
+	const auto CheckWork = [&]() -> bool
+	{
+		if (!OutError.IsEmpty()) return false;
+		if (++Steps > MaximumSteps || ((Steps & 63) == 0 && FPlatformTime::Seconds() - Started >= MaximumSeconds))
+		{
+			OutError = TEXT("Published terrain mesh count exceeded its work limit");
+			return false;
+		}
+		return true;
+	};
+	const auto VisitChunk = [&](const FVoxelTerrainRenderChunk* Chunk, const int32 First, const int32 Count,
+		const FVoxelSectionMeshResult* ExpectedSource, const int32 ExpectedBatch) -> bool
+	{
+		if (!CheckWork()) return false;
+		if (Count == 0) return true;
+		if (!Chunk || Count < 0 || First < 0 || int64(First) + Count > Chunk->SourceTriangleCount ||
+			!Chunk->bReady.Load() || !Chunk->Source || !Chunk->Source->Batches.IsValidIndex(Chunk->SourceBatch) ||
+			(ExpectedSource && (Chunk->Source.Get() != ExpectedSource || Chunk->SourceBatch != ExpectedBatch)))
+		{
+			OutError = TEXT("A drawn terrain range has no valid retained source or batch");
+			return false;
+		}
+		if (Chunk->Source->Batches[Chunk->SourceBatch].Group == EVoxelRenderGroup::Water) return true;
+		const FVoxelSectionMeshResult* const Source = Chunk->Source.Get();
+		if (!Meshes.Contains(Source))
+		{
+			if (Meshes.Num() >= MaximumMeshes)
+			{
+				OutError = TEXT("Published terrain mesh count exceeded its memory limit");
+				return false;
+			}
+			Meshes.Add(Source);
+		}
+		return true;
+	};
+	const auto VisitFine = [&](auto&& Self, const FAtomTreeNode* Node, const int32 Depth) -> bool
+	{
+		if (!Node) return true;
+		if (!CheckWork()) return false;
+		if (Depth > 64) { OutError = TEXT("Invalid Fine snapshot tree"); return false; }
+		if (const FVoxelTerrainRenderAtom* Atom = Node->Atom.Get())
+		{
+			if (!Atom->bDrawMetricsAvailable) { OutError = TEXT("Fine draw metrics unavailable"); return false; }
+			if (Atom->bUseDrawRanges)
+			{
+				for (const auto& Range : Atom->DrawRanges)
+					if (!VisitChunk(Range.Chunk.Get(), Range.FirstTriangle, Range.TriangleCount, nullptr, INDEX_NONE)) return false;
+			}
+			else for (const auto& Chunk : Atom->Chunks)
+			{
+				if (!Chunk) { OutError = TEXT("Fine draw chunk unavailable"); return false; }
+				if (!VisitChunk(Chunk.Get(), 0, Chunk->SourceTriangleCount, nullptr, INDEX_NONE)) return false;
+			}
+			return true;
+		}
+		for (const auto& Child : Node->Children) if (!Self(Self, Child.Get(), Depth + 1)) return false;
+		return true;
+	};
+	const auto VisitCoarse = [&](auto&& Self, const FCoarseTreeNode* Node, const int32 Depth) -> bool
+	{
+		if (!Node) return true;
+		if (!CheckWork()) return false;
+		if (Depth > 128) { OutError = TEXT("Invalid coarse snapshot tree"); return false; }
+		const FVoxelTerrainRenderCoarse* Item = Node->Item.Get();
+		if (!Item)
+		{
+			for (const auto& Child : Node->Children) if (!Self(Self, Child.Get(), Depth + 1)) return false;
+			return true;
+		}
+		if (!Item->bDrawMetricsAvailable || !Item->Geometry || !Item->Geometry->Source ||
+			Item->DrawRoots.Num() != Item->Geometry->Roots.Num())
+		{
+			OutError = TEXT("Coarse draw geometry unavailable");
+			return false;
+		}
+		const FVoxelTerrainCoarseMesh& Geometry = *Item->Geometry;
+		const auto VisitRange = [&](auto&& RangeSelf, const int32 RangeIndex, const FVoxelTerrainCoarseDrawNode* Patch,
+			const FVoxelTerrainRenderChunk*& SourceCursor, const int32 RangeDepth) -> bool
+		{
+			if (!CheckWork()) return false;
+			if (RangeDepth > 64 || !Geometry.Ranges.IsValidIndex(RangeIndex))
+			{
+				OutError = TEXT("Invalid coarse draw range");
+				return false;
+			}
+			const auto& Range = Geometry.Ranges[RangeIndex];
+			if (!Geometry.Source->Batches.IsValidIndex(Range.Batch) || Range.FirstTriangle < 0 || Range.TriangleCount < 0 ||
+				int64(Range.FirstTriangle) + Range.TriangleCount > Geometry.Source->Batches[Range.Batch].Mesh.Triangles.Num() / 3)
+			{
+				OutError = TEXT("Invalid coarse source batch or triangle range");
+				return false;
+			}
+			if (!Patch)
+			{
+				const int64 End = int64(Range.FirstTriangle) + Range.TriangleCount;
+				while (SourceCursor && int64(SourceCursor->FirstSourceTriangle) + SourceCursor->SourceTriangleCount <= Range.FirstTriangle)
+				{
+					if (!CheckWork()) return false;
+					SourceCursor = SourceCursor->NextSourceChunk.Get();
+				}
+				int64 Covered = Range.FirstTriangle;
+				for (const FVoxelTerrainRenderChunk* Chunk = SourceCursor; Chunk && Chunk->FirstSourceTriangle < End;
+					Chunk = Chunk->NextSourceChunk.Get())
+				{
+					SourceCursor = Chunk;
+					const int64 First = FMath::Max<int64>(Range.FirstTriangle, Chunk->FirstSourceTriangle);
+					const int64 Last = FMath::Min<int64>(End, int64(Chunk->FirstSourceTriangle) + Chunk->SourceTriangleCount);
+					if (Last <= First || First != Covered || !VisitChunk(Chunk, int32(First - Chunk->FirstSourceTriangle),
+						int32(Last - First), Geometry.Source.Get(), Range.Batch))
+					{
+						if (OutError.IsEmpty()) OutError = TEXT("Coarse source chunks do not cover a drawn range");
+						return false;
+					}
+					Covered = Last;
+				}
+				if (Covered != End) { OutError = TEXT("Coarse source chunks do not cover a drawn range"); return false; }
+				return true;
+			}
+			if (!Range.IsLeaf())
+				return RangeSelf(RangeSelf, Range.Children[0], Patch->Children[0].Get(), SourceCursor, RangeDepth + 1) &&
+					RangeSelf(RangeSelf, Range.Children[1], Patch->Children[1].Get(), SourceCursor, RangeDepth + 1);
+			for (const FVoxelTerrainCoarseDrawPiece* Piece = Patch->FirstPiece.Get(); Piece; Piece = Piece->Next.Get())
+			{
+				if (!Piece->Chunk || !VisitChunk(Piece->Chunk.Get(), 0, Piece->Chunk->SourceTriangleCount, nullptr, INDEX_NONE))
+				{
+					if (OutError.IsEmpty()) OutError = TEXT("Coarse patch draw source unavailable");
+					return false;
+				}
+			}
+			return true;
+		};
+		for (int32 Root = 0; Root < Geometry.Roots.Num(); ++Root)
+		{
+			if (!Geometry.Ranges.IsValidIndex(Geometry.Roots[Root])) { OutError = TEXT("Invalid coarse root"); return false; }
+			const auto& Range = Geometry.Ranges[Geometry.Roots[Root]];
+			if (!Item->SourceChunks.IsValidIndex(Range.Batch)) { OutError = TEXT("Coarse source batch unavailable"); return false; }
+			const FVoxelTerrainRenderChunk* Cursor = Item->SourceChunks[Range.Batch].Get();
+			if (!VisitRange(VisitRange, Geometry.Roots[Root], Item->DrawRoots[Root].Get(), Cursor, 0)) return false;
+		}
+		return true;
+	};
+	if (!VisitFine(VisitFine, Snapshot->Root.Get(), 0) || !VisitCoarse(VisitCoarse, Snapshot->CoarseRoot.Get(), 0)) return false;
+	if (!State || State->PresentedSnapshot.Get() != Snapshot || Snapshot->PresentationSerial != OutSerial)
+	{
+		OutError = TEXT("Presented terrain snapshot changed during capture");
+		return false;
+	}
+	if (FPlatformTime::Seconds() - Started >= MaximumSeconds)
+	{
+		OutError = TEXT("Published terrain mesh count exceeded its work limit");
+		return false;
+	}
+	OutCount = Meshes.Num();
+	return true;
+}
+#endif
+
 bool FVoxelTerrainRenderer::HasPresentedCoverage(const FBox& InCellBounds) const
 {
 	if (!State || !State->PresentedSnapshot || !InCellBounds.IsValid ||

@@ -1,6 +1,8 @@
 #include "Voxel/Task/VoxelTerrainResources.h"
 
 #include "Misc/ScopeLock.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
 
@@ -38,6 +40,14 @@ bool FVoxelTerrainResources::Create(const FVoxelTerrainResourceLimits& InLimits,
 	const FVoxelGenerationConsumerKey& InControlConsumer,
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe>& OutResources, FString& OutError)
 {
+#if !UE_BUILD_SHIPPING
+	if (FParse::Param(FCommandLine::Get(), TEXT("ValidateVoxelResourceLayout")))
+	{
+		UE_LOG(LogTemp, Display, TEXT("Voxel resource layout: consumer=%llu entry=%llu slot=%llu page=%llu pageAllocated=%llu"),
+			uint64(sizeof(FVoxelGenerationConsumerKey)), uint64(sizeof(FEntry)), uint64(sizeof(FEntrySlot)),
+			uint64(sizeof(FEntryPage)), uint64(FMemory::QuantizeSize(sizeof(FEntryPage), alignof(FEntryPage))));
+	}
+#endif
 	if (!InLimits.IsValid())
 	{
 		OutError = TEXT("InvalidResource: resource ledger bootstrap limits");
@@ -361,7 +371,7 @@ EVoxelTerrainResourceAdmission FVoxelTerrainResources::TryAcquire(const FVoxelGe
 	{
 		return EVoxelTerrainResourceAdmission::CapacityBlocked;
 	}
-	const uint64 Serial = AddEntry({InAttempt, InPool, InBytes, InReservedSplits});
+	const uint64 Serial = AddEntry({InAttempt, InBytes, InReservedSplits, InPool});
 	State.Used[static_cast<int32>(InPool)] += InBytes;
 	State.Used[static_cast<int32>(EVoxelTerrainResourcePool::Input)] += Handles;
 	State.LeaseHandleBytes += Handles;

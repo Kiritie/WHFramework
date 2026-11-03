@@ -94,7 +94,7 @@ EVoxelHydrologyComponentStep FVoxelHydrologyComponentBuild::Advance(FTileLookup 
         const auto Step = LocalBuild->Advance(*Graph, *Runoff, ReadCell, InWorkBudget, OutError, InCancel);
         if (Step != EVoxelHydrologyRegionStep::Ready)
         {
-            if (Step == EVoxelHydrologyRegionStep::Yielded && OutError.IsEmpty()) OutError = TEXT("Yielded: local macro runoff");
+            if (Step == EVoxelHydrologyRegionStep::Yielded && OutError.IsEmpty()) OutError = TEXT("YieldedImmediate: local macro runoff");
             return Failure();
         }
         Local = LocalBuild->TakeResult();
@@ -452,7 +452,7 @@ bool FVoxelHydrologyComponentBuild::PrepareRiverNodes(FTileLookup InLookup, FVox
         }
         else { OutError.Reset(); return true; }
     }
-    OutError = TEXT("Yielded: regional source and channel geometry preparation");
+    OutError = TEXT("YieldedImmediate: regional source and channel geometry preparation");
     return false;
 }
 
