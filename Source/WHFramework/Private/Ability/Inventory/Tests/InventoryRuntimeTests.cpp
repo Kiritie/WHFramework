@@ -11,10 +11,12 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/FileManager.h"
+#include "HAL/PlatformFileManager.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/Crc.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Misc/ScopeExit.h"
 #include "NativeGameplayTags.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
@@ -22,6 +24,15 @@
 #include "Voxel/Network/VoxelOverlayReplica.h"
 #include "Voxel/Save/InventoryVoxelEntityCodec.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
+
+#if PLATFORM_WINDOWS
+#include "Windows/WindowsHWrapper.h"
+#elif PLATFORM_LINUX
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 UE_DEFINE_GAMEPLAY_TAG_STATIC(TAG_InventoryRuntimeTest_Storage, "Inventory.Test.RuntimeStorage");
 
@@ -31,12 +42,205 @@ namespace InventoryRuntimeTests
 
     struct FTemporaryDirectory
     {
-        FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation/Inventory") / FGuid::NewGuid().ToString(EGuidFormats::Digits));
+        const FGuid Id = FGuid::NewGuid();
+        const FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation/Inventory") / Id.ToString(EGuidFormats::Digits));
+        const bool bWasAbsent = !IFileManager::Get().DirectoryExists(*Path) && !IFileManager::Get().FileExists(*Path);
+
+        bool IsOwnedTarget(const FString& InPath) const
+        {
+            FString Root = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation/Inventory"));
+            FString Target = FPaths::ConvertRelativePathToFull(InPath);
+            FPaths::NormalizeDirectoryName(Root);
+            FPaths::NormalizeDirectoryName(Target);
+            return Id.IsValid() && !InPath.IsEmpty() && !FPaths::IsRelative(Target) &&
+                FPaths::CollapseRelativeDirectories(Root) && FPaths::CollapseRelativeDirectories(Target) &&
+                FPaths::IsUnderDirectory(Target, Root) && FPaths::IsSamePath(FPaths::GetPath(Target), Root) &&
+                FPaths::GetCleanFilename(Target) == Id.ToString(EGuidFormats::Digits) && FPaths::IsSamePath(Target, Path);
+        }
 
         ~FTemporaryDirectory()
         {
-            IFileManager::Get().DeleteDirectory(*Path, false, true);
+            if(!bWasAbsent || !IsOwnedTarget(Path)) return;
+            IPlatformFile& Platform = FPlatformFileManager::Get().GetPlatformFile();
+            if(!Platform.DirectoryExists(*Path)) return;
+            const FString Saved = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
+            const FString Automation = Saved / TEXT("Automation");
+            const FString Inventory = Automation / TEXT("Inventory");
+            for(const FString& Directory : {Saved, Automation, Inventory, Path})
+            {
+                if(Platform.IsSymlink(*Directory) != ESymlinkResult::NonSymlink) return;
+            }
+            TArray<FString> Entries;
+            IFileManager::Get().FindFiles(Entries, *(Path / TEXT("*")), true, true);
+            TArray<FString> Files;
+            for(const FString& Entry : Entries)
+            {
+                const FString File = FPaths::ConvertRelativePathToFull(Path / Entry);
+                if(!FPaths::IsSamePath(FPaths::GetPath(File), Path) || Platform.DirectoryExists(*File) ||
+                    Platform.IsSymlink(*File) != ESymlinkResult::NonSymlink) return;
+                Files.Add(File);
+            }
+            // 只移除已核验的直接文件；出现子目录、链接或新文件时保留目录，不递归删除。
+            for(const FString& File : Files)
+            {
+                if(Platform.IsSymlink(*File) != ESymlinkResult::NonSymlink || !Platform.DeleteFile(*File)) return;
+            }
+            Platform.DeleteDirectory(*Path);
         }
+    };
+
+    // PrepareFork may remove its newly created target on failure. Keep its existing
+    // ancestors open while it runs and fail closed when their identity is uncertain.
+    struct FForkTargetSafetyGuard
+    {
+        FForkTargetSafetyGuard() = default;
+        FForkTargetSafetyGuard(const FForkTargetSafetyGuard&) = delete;
+        FForkTargetSafetyGuard& operator=(const FForkTargetSafetyGuard&) = delete;
+
+        ~FForkTargetSafetyGuard()
+        {
+#if PLATFORM_WINDOWS
+            for(HANDLE Handle : Ancestors) ::CloseHandle(Handle);
+#elif PLATFORM_LINUX
+            for(int Handle : Ancestors) ::close(Handle);
+#endif
+        }
+
+        bool Validate(const FTemporaryDirectory& InTarget, FString& OutError)
+        {
+            if(!InTarget.bWasAbsent || !InTarget.IsOwnedTarget(InTarget.Path))
+            {
+                OutError = TEXT("Fork target must be this test's initially absent GUID directory");
+                return false;
+            }
+            FString Target = FPaths::ConvertRelativePathToFull(InTarget.Path);
+            FPaths::NormalizeDirectoryName(Target);
+            if(!FPaths::CollapseRelativeDirectories(Target))
+            {
+                OutError = TEXT("Fork target could not be normalized");
+                return false;
+            }
+#if PLATFORM_WINDOWS
+            // Drive-relative and UNC paths are not accepted by this test guard.
+            if(Target.Len() < 4 || !FChar::IsAlpha(Target[0]) || Target[1] != TEXT(':') || Target[2] != TEXT('/'))
+            {
+                OutError = TEXT("Fork target is not a fully qualified local path");
+                return false;
+            }
+#elif PLATFORM_LINUX
+            if(!Target.StartsWith(TEXT("/")) || Target.StartsWith(TEXT("//")))
+            {
+                OutError = TEXT("Fork target is not a fully qualified local path");
+                return false;
+            }
+#else
+            OutError = TEXT("Fork target safety verification is unavailable on this platform");
+            return false;
+#endif
+
+#if PLATFORM_WINDOWS || PLATFORM_LINUX
+            FString Directory = FPaths::GetPath(Target);
+            TArray<FString> AncestorPaths;
+            for(;;)
+            {
+#if PLATFORM_WINDOWS
+                const bool bAtRoot = Directory.Len() == 2 && FChar::IsAlpha(Directory[0]) && Directory[1] == TEXT(':');
+#else
+                const bool bAtRoot = Directory == TEXT("/");
+#endif
+                AncestorPaths.Add(Directory);
+                if(bAtRoot) break;
+                FString Parent = FPaths::GetPath(Directory);
+#if PLATFORM_LINUX
+                if(Parent.IsEmpty() && Directory.StartsWith(TEXT("/"))) Parent = TEXT("/");
+#endif
+                if(Parent.IsEmpty() || Parent == Directory)
+                {
+                    OutError = TEXT("Cannot verify every fork target ancestor");
+                    return false;
+                }
+                Directory = MoveTemp(Parent);
+            }
+
+            // Open from the root down, so the parent is already guarded before
+            // checking each next component on platforms that support it.
+            for(int32 Index = AncestorPaths.Num() - 1; Index >= 0; --Index)
+            {
+                Directory = AncestorPaths[Index];
+#if PLATFORM_WINDOWS
+                const bool bAtRoot = Directory.Len() == 2 && FChar::IsAlpha(Directory[0]) && Directory[1] == TEXT(':');
+                const FString OpenDirectory = bAtRoot ? Directory + TEXT("/") : Directory;
+                // Denying delete sharing also prevents the checked ancestor from being
+                // replaced while PrepareFork resolves the target path.
+                HANDLE Handle = ::CreateFileW(*OpenDirectory, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+                    FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+                BY_HANDLE_FILE_INFORMATION Info = {};
+                if(Handle == INVALID_HANDLE_VALUE)
+                {
+                    OutError = TEXT("Cannot open fork target ancestor for inspection: ") + OpenDirectory;
+                    return false;
+                }
+                Ancestors.Add(Handle);
+                if(!::GetFileInformationByHandle(Handle, &Info) ||
+                    !(Info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) || (Info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT))
+                {
+                    OutError = TEXT("Fork target ancestor is not a verified ordinary directory: ") + OpenDirectory;
+                    return false;
+                }
+#else
+                FTCHARToUTF8 Utf8Directory(*Directory);
+                const int Handle = ::open(Utf8Directory.Get(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+                struct stat Info = {};
+                if(Handle < 0)
+                {
+                    OutError = TEXT("Cannot open fork target ancestor for inspection: ") + Directory;
+                    return false;
+                }
+                Ancestors.Add(Handle);
+                if(::fstat(Handle, &Info) != 0 || !S_ISDIR(Info.st_mode))
+                {
+                    OutError = TEXT("Fork target ancestor is not a verified ordinary directory: ") + Directory;
+                    return false;
+                }
+#endif
+            }
+
+#if PLATFORM_WINDOWS
+            WIN32_FIND_DATAW Existing = {};
+            HANDLE Search = ::FindFirstFileW(*Target, &Existing);
+            if(Search != INVALID_HANDLE_VALUE)
+            {
+                ::FindClose(Search);
+                OutError = TEXT("Fork target already exists");
+                return false;
+            }
+            if(::GetLastError() != ERROR_FILE_NOT_FOUND)
+            {
+                OutError = TEXT("Cannot verify that the fork target is absent");
+                return false;
+            }
+#else
+            const FString LeafName = FPaths::GetCleanFilename(Target);
+            FTCHARToUTF8 Leaf(*LeafName);
+            struct stat Existing = {};
+            if(::fstatat(Ancestors.Last(), Leaf.Get(), &Existing, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT)
+            {
+                OutError = TEXT("Fork target exists or its absence cannot be verified");
+                return false;
+            }
+#endif
+            OutError.Reset();
+            return true;
+#endif
+        }
+
+    private:
+#if PLATFORM_WINDOWS
+        TArray<HANDLE> Ancestors;
+#elif PLATFORM_LINUX
+        TArray<int> Ancestors;
+#endif
     };
 
     struct FData
@@ -294,7 +498,7 @@ namespace InventoryRuntimeTests
             }
         }
 
-        bool Start(bool bInCreateNew, TSharedPtr<IInventoryDomainAdapter> InAdapter = nullptr)
+        bool Start(bool bInCreateNew, TSharedPtr<IInventoryDomainAdapter> InAdapter = nullptr, bool bInTransient = false)
         {
             UWorld::InitializationValues Values;
             Values.AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false);
@@ -312,7 +516,8 @@ namespace InventoryRuntimeTests
             {
                 return false;
             }
-            return Store->OpenStore(Data.WorldId, Data.StoreId, Directory.Path, bInCreateNew, Error);
+            return bInTransient ? Store->OpenTransientStore(Data.WorldId, Data.StoreId, Error) :
+                Store->OpenStore(Data.WorldId, Data.StoreId, Directory.Path, bInCreateNew, Error);
         }
 
         FInventoryCommandResult Execute(const FInventoryBatchRequest& InRequest) const
@@ -384,7 +589,266 @@ bool FInventorySnapshotIntegrityTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInventoryTransientJournalTest, "WHFramework.Inventory.Runtime.TransientJournal", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryTransientJournalTest::RunTest(const FString& Parameters)
+{
+    InventoryRuntimeTests::FTemporaryDirectory Directory;
+    TestTrue(TEXT("仅允许当前 GUID 的隔离目录"), Directory.IsOwnedTarget(Directory.Path));
+    TestFalse(TEXT("禁止把父目录当测试目录"), Directory.IsOwnedTarget(FPaths::GetPath(Directory.Path)));
+    TestFalse(TEXT("禁止清理同级其他 GUID"), Directory.IsOwnedTarget(FPaths::GetPath(Directory.Path) / FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+    const FGuid WorldId = FGuid::NewGuid();
+    const FGuid StoreId = FGuid::NewGuid();
+    const FGuid EntityId = FGuid::NewGuid();
+    FInventoryJournal Journal;
+    FInventoryCheckpoint Checkpoint;
+    TArray<FInventoryJournalRecord> Records;
+    FString Error;
+    if(!TestTrue(TEXT("内存日志创建不需要目录"), Journal.OpenTransient(WorldId, StoreId, Checkpoint, Records, Error))) return false;
+    TestTrue(TEXT("初始身份正确且没有恢复记录"), Journal.IsHealthy() && Journal.IsTransient() && Journal.GetStoreId() == StoreId &&
+        Checkpoint.WorldId == WorldId && Checkpoint.Sequence == 0 && Checkpoint.Inventories.IsEmpty() && Checkpoint.Domains.IsEmpty() && Records.IsEmpty());
+    FInventoryJournalRecord Record;
+    Record.WorldId = WorldId;
+    Record.TransactionId = FGuid::NewGuid();
+    Record.Domains.Add(InventoryRuntimeTests::CounterRedo(EntityId, 0, 1));
+    if(!TestTrue(TEXT("有效领域记录通过原有编码校验"), Journal.Append(Record, Error))) return false;
+    TestEqual(TEXT("提交序号递增"), Journal.GetSequence(), uint64(1));
+    FInventoryJournalRecord Invalid = Record;
+    Invalid.TransactionId = FGuid::NewGuid();
+    const FInventoryDomainRedo Duplicate = Invalid.Domains[0];
+    Invalid.Domains.Add(Duplicate);
+    TestFalse(TEXT("重复领域记录拒绝"), Journal.Append(Invalid, Error));
+    TestEqual(TEXT("拒绝的记录不推进序号"), Journal.GetSequence(), uint64(1));
+    Checkpoint.Sequence = Journal.GetSequence();
+    TestFalse(TEXT("内存日志不能生成持久检查点"), Journal.Checkpoint(Checkpoint, Error));
+    TestEqual(TEXT("检查点拒绝原因"), Error, FString(TEXT("Inventory.TransientArchiveUnsupported")));
+    TestTrue(TEXT("拒绝检查点不隔离日志"), Journal.IsHealthy() && !Journal.NeedsCheckpoint());
+    Journal.Close();
+    TestFalse(TEXT("关闭后内存日志无效"), Journal.IsHealthy() || Journal.IsTransient());
+    if(!TestTrue(TEXT("独立新日志从空状态开始"), Journal.OpenTransient(WorldId, StoreId, Checkpoint, Records, Error))) return false;
+    TestTrue(TEXT("新日志序号和记录为空"), Journal.GetSequence() == 0 && Checkpoint.Sequence == 0 && Checkpoint.Domains.IsEmpty() && Records.IsEmpty());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInventoryTransientWorldTest, "WHFramework.Inventory.Runtime.TransientWorldSession", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryTransientWorldTest::RunTest(const FString& Parameters)
+{
+    InventoryRuntimeTests::FWorldFixture Fixture;
+    const TSharedRef<InventoryRuntimeTests::FCounterAdapter> Adapter = MakeShared<InventoryRuntimeTests::FCounterAdapter>();
+    if(!TestTrue(TEXT("内存库存定义初始化"), Fixture.Data.Initialize()) ||
+       !TestTrue(TEXT("真实世界子系统打开临时会话"), Fixture.Start(true, Adapter, true)))
+    {
+        AddError(Fixture.Error);
+        return false;
+    }
+    TestTrue(TEXT("临时会话已就绪"), Fixture.Store->IsReady() && Fixture.Store->IsTransientStore());
+    TestFalse(TEXT("内存会话没有创建存储目录"), IFileManager::Get().DirectoryExists(*Fixture.Directory.Path));
+    const FGuid Epoch = Fixture.Store->GetWorldEpoch();
+    const FInventoryAuthorityContext PreviousAuthority = Fixture.Store->MakeServerAuthority(Fixture.Data.OwnerId, TEXT("Automation"));
+    const FInventorySnapshot Original = Fixture.Data.State(51);
+    const FGuid CounterId(71, 72, 73, 74);
+    const FGuid InstanceId(81, 82, 83, 84);
+    int32 InventoryEvents = 0;
+    int32 DomainEvents = 0;
+    const FDelegateHandle InventoryHandle = Fixture.Store->OnCommitted.AddLambda([&InventoryEvents](const FInventoryChangeSet&) { ++InventoryEvents; });
+    const FDelegateHandle DomainHandle = Fixture.Store->OnRecordsCommitted.AddLambda([&DomainEvents](const TArray<FInventoryDomainRecord>&) { ++DomainEvents; });
+    FInventoryOperation Unique;
+    Unique.Type = EInventoryOperationType::Add;
+    Unique.TargetInventoryId = Original.InventoryId;
+    Unique.Item = FAbilityItem(Fixture.Data.SwordId);
+    Unique.Item.InstanceId = InstanceId;
+    Unique.Requested = 1;
+    FInventoryBatchRequest Create;
+    Create.CreateInventories.Add(Original);
+    Create.Operations = { Fixture.Data.Add(Original.InventoryId, 3), Unique };
+    Create.DomainChanges.Add(InventoryRuntimeTests::CounterRedo(CounterId, 0, 1));
+    if(!TestTrue(TEXT("库存和领域同事务提交"), Fixture.Execute(Create).IsSuccess())) return false;
+    const FInventorySnapshot Before = Fixture.Read(Original.InventoryId);
+    const FInventoryDomainRecord* BeforeDomain = Fixture.Store->GetRecords().Find(InventoryRuntimeTests::CounterDomain, CounterId);
+    if(!TestTrue(TEXT("事务应用相同版本和领域投影"), Before.Revision == 1 && BeforeDomain && BeforeDomain->Revision == 1 &&
+        Adapter->State.Contains(CounterId) && Adapter->PublishCount == 1 && InventoryEvents == 1 && DomainEvents == 1)) return false;
+    APlayerController* Controller = Fixture.World->SpawnActor<APlayerController>();
+    APawn* Pawn = Fixture.World->SpawnActor<APawn>();
+    if(!TestNotNull(TEXT("临时会话访问控制器创建"), Controller) || !TestNotNull(TEXT("临时会话访问 Pawn 创建"), Pawn)) return false;
+    Controller->Possess(Pawn);
+    FInventoryAccessBinding Binding;
+    Binding.InventoryId = Original.InventoryId;
+    Binding.LifetimeOwner = Pawn;
+    Binding.bDistanceLimited = false;
+    Binding.Validator = [](APlayerController*, const FGuid&, bool bInWrite)
+    {
+        return bInWrite ? EInventoryResultCode::Unauthorized : EInventoryResultCode::Success;
+    };
+    if(!TestTrue(TEXT("临时会话访问绑定"), Fixture.Store->SetAccessBinding(MoveTemp(Binding)))) return false;
+    TestTrue(TEXT("访问策略仍可允许只读"), Fixture.Store->ValidateAccess(Controller, Fixture.Data.OwnerId, Original.InventoryId, false) == EInventoryResultCode::Success);
+    TestTrue(TEXT("访问策略仍拒绝写入"), Fixture.Store->ValidateAccess(Controller, Fixture.Data.OwnerId, Original.InventoryId, true) == EInventoryResultCode::Unauthorized);
+    FInventoryBatchRequest Stale;
+    Stale.Operations.Add(Fixture.Data.Add(Original.InventoryId, 1));
+    Stale.ExpectedRevisions.Add({Original.InventoryId, 0, Before.Generation});
+    Stale.DomainChanges.Add(InventoryRuntimeTests::CounterRedo(CounterId, 1, 2));
+    TestTrue(TEXT("过期版本整笔拒绝"), Fixture.Execute(Stale).Code == EInventoryResultCode::RevisionStale);
+    TestTrue(TEXT("无权限上下文无法提交"), Fixture.Store->ExecuteAuthorizedBatch(Stale, FInventoryAuthorityContext()).Code == EInventoryResultCode::GenerationChanged);
+    const FInventoryDomainRecord* AfterStale = Fixture.Store->GetRecords().Find(InventoryRuntimeTests::CounterDomain, CounterId);
+    TestTrue(TEXT("拒绝后库存与领域不变且不发布"), Fixture.Read(Original.InventoryId) == Before &&
+        AfterStale && AfterStale->Revision == 1 && InventoryEvents == 1 && DomainEvents == 1);
+    Adapter->bRejectPrepare = true;
+    Stale.ExpectedRevisions.Reset();
+    TestTrue(TEXT("领域准备失败保留原事务隔离"), Fixture.Execute(Stale).Code == EInventoryResultCode::SourcePreparationFailed);
+    Adapter->bRejectPrepare = false;
+    const FInventoryDomainRecord* AfterPrepare = Fixture.Store->GetRecords().Find(InventoryRuntimeTests::CounterDomain, CounterId);
+    TestTrue(TEXT("失败准备被取消，已提交状态与通知不变"), Adapter->CancelCount == 1 && Fixture.Read(Original.InventoryId) == Before &&
+        AfterPrepare && AfterPrepare->Revision == 1 && InventoryEvents == 1 && DomainEvents == 1);
+    FInventoryArchiveSnapshot Archive;
+    Archive.WorldId = FGuid::NewGuid();
+    const TArray<uint8> SentinelBytes = { 1, 2, 3 };
+    Archive.CheckpointBytes = SentinelBytes;
+    const FGuid SentinelWorld = Archive.WorldId;
+    TestFalse(TEXT("临时会话拒绝检查点"), Fixture.Store->SaveCheckpoint(Fixture.Error));
+    TestEqual(TEXT("检查点拒绝原因"), Fixture.Error, FString(TEXT("Inventory.TransientArchiveUnsupported")));
+    TestFalse(TEXT("临时会话拒绝捕获归档"), Fixture.Store->CaptureArchiveSnapshot(Archive, Fixture.Error));
+    TestTrue(TEXT("拒绝归档不覆盖输出"), Archive.WorldId == SentinelWorld && Archive.CheckpointBytes == SentinelBytes);
+    TestFalse(TEXT("临时会话拒绝冻结归档"), Fixture.Store->FreezeArchive(FGuid::NewGuid(), Archive, Fixture.Error));
+    TestFalse(TEXT("临时会话拒绝释放归档"), Fixture.Store->ReleaseArchive(FGuid::NewGuid(), Fixture.Error));
+    TestTrue(TEXT("被拒绝的归档不冻结或隔离会话"), Fixture.Store->IsReady() && !Fixture.Store->IsArchiveFrozen());
+    TestFalse(TEXT("显式要求保存的关闭被拒绝"), Fixture.Store->CloseStore(true, Fixture.Error));
+    TestTrue(TEXT("拒绝保存关闭不改变会话"), Fixture.Store->IsReady() && Fixture.Read(Original.InventoryId) == Before);
+    const FInventorySnapshot Empty = Fixture.Data.State(52);
+    FInventoryBatchRequest CreateEmpty;
+    CreateEmpty.CreateInventories.Add(Empty);
+    TestTrue(TEXT("建立待删除库存"), Fixture.Execute(CreateEmpty).IsSuccess());
+    FInventoryBatchRequest DeleteEmpty;
+    DeleteEmpty.DeleteInventories.Add(Empty.InventoryId);
+    TestTrue(TEXT("建立会话内墓碑"), Fixture.Execute(DeleteEmpty).IsSuccess());
+    int32 Cancelled = 0;
+    EInventoryResultCode CancelResult = EInventoryResultCode::Success;
+    Fixture.Store->EnqueueAuthorizedBatch(Stale, PreviousAuthority, [&Cancelled, &CancelResult](const FInventoryCommandResult& Result)
+    {
+        ++Cancelled;
+        CancelResult = Result.Code;
+    });
+    Fixture.Store->OnCommitted.Remove(InventoryHandle);
+    Fixture.Store->OnRecordsCommitted.Remove(DomainHandle);
+    if(!TestTrue(TEXT("关闭时丢弃内存状态"), Fixture.Store->CloseStore(false, Fixture.Error))) return false;
+    TestTrue(TEXT("待处理事务收到世界关闭回执"), Cancelled == 1 && CancelResult == EInventoryResultCode::WorldNotReady);
+    TestFalse(TEXT("同一世界不能再次打开临时会话"), Fixture.Store->OpenTransientStore(Fixture.Data.WorldId, Fixture.Data.StoreId, Fixture.Error));
+    TestEqual(TEXT("同世界重开原因"), Fixture.Error, FString(TEXT("Inventory.TransientSessionOneShot")));
+    TestFalse(TEXT("同一世界不能改为打开持久存储"), Fixture.Store->OpenStore(Fixture.Data.WorldId, Fixture.Data.StoreId, Fixture.Directory.Path, true, Fixture.Error));
+    TestFalse(TEXT("整个内存会话没有创建持久目录"), IFileManager::Get().DirectoryExists(*Fixture.Directory.Path));
+    Fixture.Shutdown();
+    const TSharedRef<InventoryRuntimeTests::FCounterAdapter> NewAdapter = MakeShared<InventoryRuntimeTests::FCounterAdapter>();
+    if(!TestTrue(TEXT("新世界创建新的空内存会话"), Fixture.Start(true, NewAdapter, true))) return false;
+    TestTrue(TEXT("新世界有新 epoch 和空领域投影"), Fixture.Store->GetWorldEpoch().IsValid() && Fixture.Store->GetWorldEpoch() != Epoch &&
+        !Fixture.Store->GetRecords().Find(InventoryRuntimeTests::CounterDomain, CounterId) && NewAdapter->State.IsEmpty());
+    FInventorySnapshot Missing;
+    TestFalse(TEXT("旧世界库存未恢复"), Fixture.Store->GetSnapshot(Original.InventoryId, Missing, Fixture.Error));
+    TestTrue(TEXT("旧世界权限上下文不能写入新会话"), Fixture.Store->ExecuteAuthorizedBatch(Create, PreviousAuthority).Code == EInventoryResultCode::GenerationChanged);
+    TestTrue(TEXT("新会话可复用旧库存和唯一实例身份"), Fixture.Execute(Create).IsSuccess());
+    TestTrue(TEXT("新会话可复用旧墓碑身份"), Fixture.Execute(CreateEmpty).IsSuccess());
+    TestFalse(TEXT("新世界仍未创建持久目录"), IFileManager::Get().DirectoryExists(*Fixture.Directory.Path));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInventoryTransientFailureTest, "WHFramework.Inventory.Runtime.TransientCommitFailureIsolation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryTransientFailureTest::RunTest(const FString& Parameters)
+{
+    InventoryRuntimeTests::FWorldFixture Fixture;
+    const TSharedRef<InventoryRuntimeTests::FCounterAdapter> Adapter = MakeShared<InventoryRuntimeTests::FCounterAdapter>();
+    if(!TestTrue(TEXT("临时故障定义初始化"), Fixture.Data.Initialize()) ||
+       !TestTrue(TEXT("临时故障会话打开"), Fixture.Start(true, Adapter, true))) return false;
+    const FInventorySnapshot Original = Fixture.Data.State(61);
+    const FGuid CounterId(91, 92, 93, 94);
+    FInventoryBatchRequest Request;
+    Request.CreateInventories.Add(Original);
+    Request.Operations.Add(Fixture.Data.Add(Original.InventoryId, 1));
+    Request.DomainChanges.Add(InventoryRuntimeTests::CounterRedo(CounterId, 0, 1));
+    Adapter->bRejectApply = true;
+    AddExpectedError(TEXT("Inventory world quarantined: Inventory.TestApplyFailure"), EAutomationExpectedErrorFlags::Contains, 1);
+    const FInventoryCommandResult Result = Fixture.Execute(Request);
+    TestTrue(TEXT("提交边界后的投影失败不作为可安全重试的普通失败"), Result.Code == EInventoryResultCode::ConfirmationPending);
+    TestTrue(TEXT("投影失败隔离当前世界"), Fixture.Store->IsQuarantined() && !Fixture.Store->IsReady());
+    TestEqual(TEXT("失败后没有成功发布"), Adapter->PublishCount, 0);
+    TestFalse(TEXT("隔离后拒绝后续事务"), Fixture.Execute(Request).IsSuccess());
+    TestFalse(TEXT("隔离会话不创建持久目录"), IFileManager::Get().DirectoryExists(*Fixture.Directory.Path));
+    TestTrue(TEXT("隔离的内存会话仍可丢弃关闭"), Fixture.Store->CloseStore(false, Fixture.Error));
+    TestFalse(TEXT("隔离会话关闭后同世界不能重开"), Fixture.Store->OpenTransientStore(Fixture.Data.WorldId, Fixture.Data.StoreId, Fixture.Error));
+    Fixture.Shutdown();
+    const TSharedRef<InventoryRuntimeTests::FCounterAdapter> NewAdapter = MakeShared<InventoryRuntimeTests::FCounterAdapter>();
+    if(!TestTrue(TEXT("新世界可创建独立空会话"), Fixture.Start(true, NewAdapter, true))) return false;
+    FInventorySnapshot Missing;
+    TestFalse(TEXT("隔离会话的库存不会恢复"), Fixture.Store->GetSnapshot(Original.InventoryId, Missing, Fixture.Error));
+    TestNull(TEXT("隔离会话的领域记录不会恢复"), Fixture.Store->GetRecords().Find(InventoryRuntimeTests::CounterDomain, CounterId));
+    TestTrue(TEXT("新世界可重新执行有效事务"), Fixture.Execute(Request).IsSuccess());
+    return true;
+}
+
 #if PLATFORM_WINDOWS || PLATFORM_LINUX
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInventoryPersistentThenTransientTest, "WHFramework.Inventory.Runtime.TransientCannotFollowPersistent", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryPersistentThenTransientTest::RunTest(const FString& Parameters)
+{
+    InventoryRuntimeTests::FWorldFixture Fixture;
+    if(!TestTrue(TEXT("持久定义初始化"), Fixture.Data.Initialize()) || !TestTrue(TEXT("持久会话创建"), Fixture.Start(true))) return false;
+    if(!TestTrue(TEXT("持久会话正常关闭"), Fixture.Store->CloseStore(false, Fixture.Error))) return false;
+    TestFalse(TEXT("同一世界曾打开持久存储后不能改为临时会话"), Fixture.Store->OpenTransientStore(Fixture.Data.WorldId, Fixture.Data.StoreId, Fixture.Error));
+    TestEqual(TEXT("转换拒绝原因"), Fixture.Error, FString(TEXT("Inventory.TransientSessionOneShot")));
+    TestTrue(TEXT("既有持久重开行为保持可用"), Fixture.Store->OpenStore(Fixture.Data.WorldId, Fixture.Data.StoreId, Fixture.Directory.Path, false, Fixture.Error));
+    TestTrue(TEXT("重开的持久会话非临时"), Fixture.Store->IsReady() && !Fixture.Store->IsTransientStore());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInventoryTransientRejectAdoptionTest, "WHFramework.Inventory.Runtime.TransientRejectsPersistentAdoption", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryTransientRejectAdoptionTest::RunTest(const FString& Parameters)
+{
+    InventoryRuntimeTests::FTemporaryDirectory Target;
+    InventoryRuntimeTests::FWorldFixture Persistent;
+    InventoryRuntimeTests::FWorldFixture Transient;
+    if(!TestTrue(TEXT("持久源定义初始化"), Persistent.Data.Initialize()) ||
+       !TestTrue(TEXT("持久源打开"), Persistent.Start(true)) ||
+       !TestTrue(TEXT("临时目标定义初始化"), Transient.Data.Initialize()) ||
+       !TestTrue(TEXT("临时目标打开"), Transient.Start(true, nullptr, true))) return false;
+    const FGuid OperationId = FGuid::NewGuid();
+    FInventoryArchiveSnapshot Snapshot;
+    TSharedPtr<FInventoryPreparedStore, ESPMode::ThreadSafe> Prepared;
+    if(!TestTrue(TEXT("持久源冻结"), Persistent.Store->FreezeArchive(OperationId, Snapshot, Persistent.Error))) return false;
+    bool bReleaseFrozenSource = true;
+    ON_SCOPE_EXIT
+    {
+        if(bReleaseFrozenSource)
+        {
+            FString ReleaseError;
+            if(!Persistent.Store->ReleaseArchive(OperationId, ReleaseError)) AddError(ReleaseError);
+        }
+    };
+    if(!TestFalse(TEXT("不能以父目录作为分支目标"), Target.IsOwnedTarget(FPaths::GetPath(Target.Path))) ||
+       !TestFalse(TEXT("不能以其他 GUID 作为分支目标"), Target.IsOwnedTarget(Persistent.Directory.Path))) return false;
+    {
+        InventoryRuntimeTests::FForkTargetSafetyGuard ExistingGuard;
+        FString ExistingError;
+        if(!TestFalse(TEXT("已存在的本次测试目录不能作为新分支目标"), ExistingGuard.Validate(Persistent.Directory, ExistingError))) return false;
+    }
+    InventoryRuntimeTests::FForkTargetSafetyGuard TargetGuard;
+    FString SafetyError;
+    if(!TestTrue(TEXT("目标为本次 GUID 直接子目录，且不存在并通过全部祖先检查"), TargetGuard.Validate(Target, SafetyError)))
+    {
+        AddError(SafetyError);
+        return false;
+    }
+    if(!TestTrue(TEXT("从独立持久源准备目标分支"), FInventoryJournal::PrepareFork(Snapshot, Target.Path, FGuid::NewGuid(), OperationId, Prepared, Persistent.Error)) ||
+       !TestTrue(TEXT("目标分支持久准备完成"), Prepared->MarkCommitted(Persistent.Error))) return false;
+    const FGuid Epoch = Transient.Store->GetWorldEpoch();
+    TestFalse(TEXT("临时会话拒绝采用持久分支"), Transient.Store->AdoptArchive(OperationId, *Prepared, Transient.Error));
+    TestEqual(TEXT("采用拒绝原因"), Transient.Error, FString(TEXT("Inventory.TransientArchiveUnsupported")));
+    TestTrue(TEXT("拒绝采用没有更换临时世界身份或隔离"), Transient.Store->IsReady() && Transient.Store->IsTransientStore() &&
+        Transient.Store->GetWorldEpoch() == Epoch && Transient.Store->GetStoreId() == Transient.Data.StoreId && !Prepared->IsAdopted());
+    TestFalse(TEXT("临时会话没有创建自身目录"), IFileManager::Get().DirectoryExists(*Transient.Directory.Path));
+    bReleaseFrozenSource = false;
+    TestTrue(TEXT("释放持久源冻结"), Persistent.Store->ReleaseArchive(OperationId, Persistent.Error));
+    return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInventoryJournalRecoveryTest, "WHFramework.Inventory.Runtime.JournalCheckpointRecovery", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -850,21 +1314,26 @@ bool FInventoryUnboundStoreCleanupTest::RunTest(const FString& Parameters)
 {
     const FGuid WorldId = FGuid::NewGuid();
     const FGuid StoreId = FGuid::NewGuid();
-    InventoryRuntimeTests::FTemporaryDirectory Directory;
-    Directory.Path = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Inventory"), TEXT("Unbound"), StoreId.ToString(EGuidFormats::Digits)));
+    const FString Directory = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Inventory"), TEXT("Unbound"), StoreId.ToString(EGuidFormats::Digits)));
     FInventoryJournal Journal;
+    ON_SCOPE_EXIT
+    {
+        Journal.Close();
+        FString CleanupError;
+        FInventoryJournal::DiscardUnbound(Directory, WorldId, StoreId, CleanupError);
+    };
     FInventoryCheckpoint Checkpoint;
     TArray<FInventoryJournalRecord> Records;
     FString Error;
-    if(!TestTrue(TEXT("首存之前的独立Unbound存储"), Journal.Open(Directory.Path, WorldId, StoreId, true, Checkpoint, Records, Error))) return false;
-    TestFalse(TEXT("仍持有源日志时禁止清理"), FInventoryJournal::DiscardUnbound(Directory.Path, WorldId, StoreId, Error));
+    if(!TestTrue(TEXT("首存之前的独立Unbound存储"), Journal.Open(Directory, WorldId, StoreId, true, Checkpoint, Records, Error))) return false;
+    TestFalse(TEXT("仍持有源日志时禁止清理"), FInventoryJournal::DiscardUnbound(Directory, WorldId, StoreId, Error));
     TestTrue(TEXT("清理失败保持活动源可用"), Journal.IsHealthy());
     Journal.Close();
-    TestFalse(TEXT("清理必须精确匹配逻辑身份"), FInventoryJournal::DiscardUnbound(Directory.Path, FGuid::NewGuid(), StoreId, Error));
-    TestFalse(TEXT("不能把普通槽或任意目录当Unbound删除"), FInventoryJournal::DiscardUnbound(FPaths::GetPath(Directory.Path), WorldId, StoreId, Error));
-    TestTrue(TEXT("采用完成释放句柄后可退休原Unbound目录"), FInventoryJournal::DiscardUnbound(Directory.Path, WorldId, StoreId, Error));
-    TestFalse(TEXT("原Unbound目录已清理"), IFileManager::Get().DirectoryExists(*Directory.Path));
-    TestTrue(TEXT("重复清理不存在的源目录幂等"), FInventoryJournal::DiscardUnbound(Directory.Path, WorldId, StoreId, Error));
+    TestFalse(TEXT("清理必须精确匹配逻辑身份"), FInventoryJournal::DiscardUnbound(Directory, FGuid::NewGuid(), StoreId, Error));
+    TestFalse(TEXT("不能把普通槽或任意目录当Unbound删除"), FInventoryJournal::DiscardUnbound(FPaths::GetPath(Directory), WorldId, StoreId, Error));
+    TestTrue(TEXT("采用完成释放句柄后可退休原Unbound目录"), FInventoryJournal::DiscardUnbound(Directory, WorldId, StoreId, Error));
+    TestFalse(TEXT("原Unbound目录已清理"), IFileManager::Get().DirectoryExists(*Directory));
+    TestTrue(TEXT("重复清理不存在的源目录幂等"), FInventoryJournal::DiscardUnbound(Directory, WorldId, StoreId, Error));
     return true;
 }
 

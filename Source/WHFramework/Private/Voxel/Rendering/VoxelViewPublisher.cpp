@@ -241,6 +241,8 @@ bool FVoxelViewPublisher::CaptureCoverageSource(const FVoxelViewSourceId InSourc
 	const FEntry* Entry = Entries.Find(InSourceId);
 	if (!Entry) return false;
 	const FUpdate* Projected = FindProjectedUpdate(InSourceId);
+	// 投影源可能已经退出目标且尚未呈现，不能代替实际保留的覆盖。
+	if (bInRetainPresented && Projected && !IsNativeUpdateCurrent(*Projected)) Projected = nullptr;
 	OutSource.SourceId = InSourceId;
 	OutSource.bRetainSource = bInRetainPresented;
 	if (bInRetainPresented && Projected)
@@ -286,6 +288,16 @@ FVoxelGameThreadContinuation FVoxelViewPublisher::SetCoverageSteps(
 	FUpdate Source;
 	OutSuccess = false;
 	if (!CaptureCoverageSource(InSourceId, false, Source)) co_return;
+	co_await SetCoverageSourceSteps(InGroup, InSourceId, MoveTemp(Source), MoveTemp(InWorldCellBoxes), MoveTemp(InCommonBoxes), OutSuccess);
+}
+
+FVoxelGameThreadContinuation FVoxelViewPublisher::SetRetainedCoverageSteps(
+	const FGuid& InGroup, FVoxelViewSourceId InSourceId, TArray<FBox> InWorldCellBoxes,
+	TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess)
+{
+	FUpdate Source;
+	OutSuccess = false;
+	if (!CaptureCoverageSource(InSourceId, true, Source)) co_return;
 	co_await SetCoverageSourceSteps(InGroup, InSourceId, MoveTemp(Source), MoveTemp(InWorldCellBoxes), MoveTemp(InCommonBoxes), OutSuccess);
 }
 
@@ -451,12 +463,14 @@ void FVoxelViewPublisher::SetCommitCallbacks(TFunction<void()> InOnCommitted,
 		TFunction<void()> Finished;
 		~FBatch()
 		{
-			if (Lifetime && *Lifetime) Finish();
+			// 任何被丢弃的 owner 都保留在 Remaining；失败批次不能伪造完成回调。
+			if (Lifetime && *Lifetime && Remaining.IsEmpty()) Finish();
 		}
 		void Finish()
 		{
+			if (!Remaining.IsEmpty()) return;
 			TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherBatchFinish);
-			Remaining.Empty(); Group = {};
+			Group = {};
 			if (Finished)
 			{
 				TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherBatchFinishedCallback);
@@ -1118,9 +1132,12 @@ void FVoxelViewPublisher::AdvancePreparedPlan(const FPublicationRef& Publication
 			const bool bVisibilityChange = Hidden && Entry && PreviousHidden != *Hidden;
 			const bool bMeshChange = Update && !(**Update).bUnchanged;
 			const bool bClippingChange = bInPreparedCoverage && bMeshChange && !(**Update).bSourceDirty;
+			const ENativeUpdateWork NativeWork = Update ? GetNativeUpdateWork(Publication.Get(), **Update) : ENativeUpdateWork::None;
+			const bool bSparseClipping = bClippingChange && NativeWork == ENativeUpdateWork::Upload &&
+				HasPresentedClippingGeometry(**Update);
 			const bool bPhysicalChange = !bInPreparedCoverage || bVisibilityChange ||
 				(bMeshChange && (**Update).bSourceDirty) ||
-				(Update && GetNativeUpdateWork(Publication.Get(), **Update) != ENativeUpdateWork::None);
+				(NativeWork != ENativeUpdateWork::None && !bSparseClipping);
 			const bool bLogicalChange = !bInPreparedCoverage || Publication->OwnershipChanges.Contains(Entry->GroupKey);
 			Footprint.bTransition = Entry->bTransition && (bPhysicalChange || bLogicalChange || bClippingChange);
 			const FBox Bounds = Update ? (**Update).Bounds : Entry->Bounds;
@@ -1300,9 +1317,12 @@ void FVoxelViewPublisher::BuildGroups(const FPublicationRef& Publication, const 
 			const bool bVisibilityChange = Hidden && Entry && PreviousHidden != *Hidden;
 			const bool bMeshChange = Update && !(**Update).bUnchanged;
 			const bool bClippingChange = bInPreparedCoverage && bMeshChange && !(**Update).bSourceDirty;
+			const ENativeUpdateWork NativeWork = Update ? GetNativeUpdateWork(Publication.Get(), **Update) : ENativeUpdateWork::None;
+			const bool bSparseClipping = bClippingChange && NativeWork == ENativeUpdateWork::Upload &&
+				HasPresentedClippingGeometry(**Update);
 			const bool bPhysicalChange = !bInPreparedCoverage || bVisibilityChange ||
 				(bMeshChange && (**Update).bSourceDirty) ||
-				(Update && GetNativeUpdateWork(Publication.Get(), **Update) != ENativeUpdateWork::None);
+				(NativeWork != ENativeUpdateWork::None && !bSparseClipping);
 			const bool bLogicalChange = !bInPreparedCoverage || Publication->OwnershipChanges.Contains(Entry->GroupKey);
 			Footprint.bTransition = Entry->bTransition && (bPhysicalChange || bLogicalChange || bClippingChange);
 			const FBox Bounds = Update ? (**Update).Bounds : Entry->Bounds;
@@ -2045,8 +2065,14 @@ bool FVoxelViewPublisher::CommitReadyGroups(const FPublicationRef& Publication, 
 		});
 		if (!bCurrent)
 		{
-			DiscardGroup(Publication, Group, TEXT("CommitValidation"));
-			bAdvanced = true;
+			// RT 已回执的根不能当作未发生：先对齐实际呈现，再丢弃过期规划及其所有权回调。
+			if (Group.bNativeSubmitted || Group.bPresentationCommitted)
+				bAdvanced |= CommitReadyGroup(Publication, Group, true);
+			else
+			{
+				DiscardGroup(Publication, Group, TEXT("CommitValidation"));
+				bAdvanced = true;
+			}
 			continue;
 		}
 
@@ -2141,8 +2167,10 @@ void FVoxelViewPublisher::DiscardGroup(const FPublicationRef& InPublication, FGr
 	}
 }
 
-bool FVoxelViewPublisher::CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup)
+bool FVoxelViewPublisher::CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup, const bool bInDiscardAfterPresentation)
 {
+	// 已结束或已取消的组不能重新占用原生准入槽，也不能再次处理回执。
+	if (Publication->bCanceled || InGroup.bCommitted) return false;
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewCommit);
 	bool bAdvanced = false;
 	const double CommitStart = FPlatformTime::Seconds();
@@ -2161,7 +2189,11 @@ bool FVoxelViewPublisher::CommitReadyGroup(const FPublicationRef& Publication, F
 				Entry->PresentedSource == Update.Source && Entry->PresentedNativeStamp == Update.NativeStamp &&
 				Entry->NativeMesh->WorldCellOrigin == Update.Location / Module.BlockSize() &&
 				Entry->NativeMesh->CellScale == Update.Scale / Module.BlockSize();
-			if (GetNativeUpdateWork(Publication.Get(), Update) != ENativeUpdateWork::Upload || bRetainedGeometry)
+			const bool bUploaded = InGroup.bNativeSubmitted ? InGroup.NativeChanges.ContainsByPredicate([&Update](const auto& Change)
+			{
+				return !Change.bRemove && Change.Item && Change.Item->SourceId == Update.SourceId.Value;
+			}) : GetNativeUpdateWork(Publication.Get(), Update) == ENativeUpdateWork::Upload;
+			if (!bUploaded || bRetainedGeometry)
 			{
 				Entry->Exclusions = MoveTemp(Update.Exclusions);
 				Entry->bDirty = !Entry->NativeMesh || Entry->Source != Entry->PresentedSource ||
@@ -2209,6 +2241,11 @@ bool FVoxelViewPublisher::CommitReadyGroup(const FPublicationRef& Publication, F
 			Publication->Updates[Index].Source.Reset();
 			Publication->Updates[Index].NativeMesh.Reset();
 		}
+	}
+	if (bInDiscardAfterPresentation)
+	{
+		DiscardGroup(Publication, InGroup, TEXT("CommitValidationAfterPresentation"));
+		return true;
 	}
 	if (InGroup.bIndependentInitial && CommitGate && InGroup.Keys.ContainsByPredicate(
 		[this](const auto& Key) { return !CommitGate(Key); })) return bAdvanced;
@@ -2508,6 +2545,21 @@ bool FVoxelViewPublisher::HasPresentation(FVoxelViewSourceId InSourceId) const
 {
 	const FEntry* Entry = Entries.Find(FVoxelViewSourceId(InSourceId));
 	return Entry && Entry->bPresented;
+}
+
+bool FVoxelViewPublisher::HasUnsettledPresentation(FVoxelViewSourceId InSourceId) const
+{
+	const FEntry* Entry = Entries.Find(InSourceId);
+	return Entry && Entry->NativeStamp.bHasGeometryIdentity && TerrainRenderer &&
+		TerrainRenderer->HasCoarseSourceInFlightOrSealed(InSourceId.Value, Entry->NativeStamp.GeometryIdentity.Key);
+}
+
+EVoxelCoverageSourceDisposition FVoxelViewPublisher::ClassifyCoverageSource(FVoxelViewSourceId InSourceId, const bool bInWanted) const
+{
+	const FEntry* Entry = Entries.Find(InSourceId);
+	if (bInWanted || (Entry && Entry->bPresented && !Entry->bHidden)) return EVoxelCoverageSourceDisposition::Include;
+	return HasUnsettledPresentation(InSourceId) ? EVoxelCoverageSourceDisposition::WaitForPresentation :
+		EVoxelCoverageSourceDisposition::SuppressUnpresented;
 }
 
 void FVoxelViewPublisher::IndexPublicationUpdate(const FPublicationRef& Publication, const int32 InIndex)
@@ -2821,7 +2873,7 @@ int32 FVoxelViewPublisher::SelectReadyGroup(TConstArrayView<FReadyGroup> InReady
 			const int32 UpdateIndex = Group.UpdateIndices[Group.PreparedUpdates];
 			const auto& Update = Ready.Publication->Updates[UpdateIndex];
 			if (Update.bNativeMeshPending) continue;
-			if (Update.bNativeAdmissionWaiting && IsNativeGeometryCurrent(Update.NativeStamp))
+			if (Update.bNativeAdmissionWaiting && IsNativeUpdateCurrent(Update))
 			{
 				const auto Consumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, NativeOwnerId,
 					Ready.Publication->Serial, FIntVector(MIN_int32, 7, UpdateIndex), Update.NativeStamp.Token);

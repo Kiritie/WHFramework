@@ -1,4 +1,5 @@
 #include "Voxel/WorldObject/VoxelWorldObjectRegistry.h"
+#include "Voxel/Voxels/Data/VoxelData.h"
 
 #include "Misc/SecureHash.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
@@ -74,6 +75,55 @@ void FVoxelWorldObjectRegistry::Reset()
 	Definitions.Reset();
 	TypeDefinitions.Reset();
 	MaxMaterializationRadius = 0.;
+}
+
+bool FVoxelWorldObjectRegistry::ValidatePlaceableObjectItems(const TArray<UVoxelData*>& InBlocks,
+	const TArray<UVoxelWorldObjectDefinition*>& InDefinitions, FString& OutError)
+{
+	TMap<FName, FName> Roots;
+	TMap<FName, FName> Owners;
+	TSet<FName> DefinitionIds;
+	for (const UVoxelWorldObjectDefinition* Definition : InDefinitions)
+	{
+		if (!Definition || Definition->DefinitionId.IsNone() || DefinitionIds.Contains(Definition->DefinitionId) ||
+			Definition->Footprint.IsEmpty() || Definition->Footprint[0].Offset != FIntVector::ZeroValue ||
+			Definition->Footprint[0].BlockName.IsNone())
+		{
+			OutError = TEXT("Invalid world object identity or anchor in placeable item catalog");
+			return false;
+		}
+		DefinitionIds.Add(Definition->DefinitionId);
+		const FName Root = Definition->Footprint[0].BlockName;
+		if (Roots.Contains(Root))
+		{
+			OutError = TEXT("World object anchor is shared by multiple definitions: ") + Root.ToString();
+			return false;
+		}
+		Roots.Add(Root, Definition->DefinitionId);
+		for (const FVoxelWorldObjectPart& Part : Definition->Footprint)
+		{
+			const FName* Previous = Owners.Find(Part.BlockName);
+			if (Part.BlockName.IsNone() || (Previous && *Previous != Definition->DefinitionId))
+			{
+				OutError = TEXT("World object block is missing or shared by definitions: ") + Part.BlockName.ToString();
+				return false;
+			}
+			Owners.FindOrAdd(Part.BlockName) = Definition->DefinitionId;
+		}
+	}
+	for (const UVoxelData* Block : InBlocks)
+	{
+		if (!Block || Block->UsePolicy != EInventoryUsePolicy::PlaceVoxel || Block->Shape != EVoxelShapeKind::ObjectPart) continue;
+		const FName* RootOwner = Roots.Find(Block->BlockName);
+		const FName* PartOwner = Owners.Find(Block->BlockName);
+		if (!Block->bRegisterBlock || !RootOwner || !PartOwner || *RootOwner != *PartOwner)
+		{
+			OutError = TEXT("Placeable object item is not a registered object anchor: ") + Block->GetPathName();
+			return false;
+		}
+	}
+	OutError.Reset();
+	return true;
 }
 
 bool FVoxelWorldObjectRegistry::Build(const FVoxelRegistrySnapshot& InBlocks, const TArray<UVoxelWorldObjectDefinition*>& InDefinitions, FString& OutError)

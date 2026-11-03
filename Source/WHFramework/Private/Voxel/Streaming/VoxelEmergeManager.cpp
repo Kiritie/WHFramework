@@ -1730,6 +1730,10 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureEnvironmentSamples(
 	{
 		return {false, true, TEXT("InvalidRequest: map sample batch outside original consumer")};
 	}
+	if (Generator->GetRuntimeConfig()->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		return {true, false, {}};
+	}
 	const FVoxelGenerationBounds Bounds{FIntVector(InOrigin.X, InOrigin.Y, InConsumer.Min.Z),
 		FIntVector(int32(MaxX), int32(MaxY), InConsumer.Max.Z)};
 	FExternalFactConsumer* Consumer = ExternalFactConsumers.Find(InConsumer);
@@ -1980,6 +1984,10 @@ FVoxelGenerationDependencyStatus FVoxelEmergeManager::EnsureGenerationFacts(
 	if (!InConsumer.IsValid() || InConsumer.WorldEpoch != Runtime.Epoch() || !InBounds.IsValid())
 	{
 		return {false, true, TEXT("外部事实消费者缺少完整身份或范围")};
+	}
+	if (Generator->GetRuntimeConfig()->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		return {true, false, {}};
 	}
 	FExternalFactConsumer* Consumer = ExternalFactConsumers.Find(InConsumer);
 	if (Consumer && (Consumer->Bounds.Min != InBounds.Min || Consumer->Bounds.Max != InBounds.Max))
@@ -2910,6 +2918,18 @@ bool FVoxelEmergeManager::RequestBase(
 		Waiting->AdmissionCapacityVersion) return false;
 	Waiting->bWaitingTaskCapacity = false;
 	if (Waiting->PendingRequest) return SubmitExactRequest(*Runtime.FindSection(InKey), InKey, *Waiting, Demand);
+	if (Generator->GetRuntimeConfig()->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		Waiting->bPlanReady = true;
+		Waiting->bOverlayReady = true;
+		Waiting->PendingRequest.Emplace();
+		FVoxelTaskRequest& Request = Waiting->PendingRequest.GetValue();
+		Request.Kind = EVoxelTaskKind::GenerateExactBase;
+		Request.Stamp = TaskStamp;
+		Request.GenerationConsumer = Waiting->Consumer;
+		Request.bResumable = true;
+		return SubmitExactRequest(*CurrentSection, InKey, *Waiting, Demand);
+	}
 	const auto FactResources = Scheduler.GetRuntimeResources();
 	if (Waiting->bWaitingCapacity && FactResources->ReleaseVersionExcludingOwner(Waiting->Consumer) <= Waiting->CapacityVersion) return false;
 	Waiting->bWaitingCapacity = false;

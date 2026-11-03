@@ -50,6 +50,10 @@ public:
     bool RegisterDomainAdapter(TSharedRef<IInventoryDomainAdapter> InAdapter, FString& OutError);
     bool RegisterSnapshotProjector(FName InName, FInventorySnapshotProjector InProjector, FString& OutError);
     bool OpenStore(const FGuid& InWorldId, const FGuid& InStoreId, const FString& InDirectory, bool bInCreateNew, FString& OutError);
+    // A transient store is the only store in this UWorld's lifetime. Stop external domain services before
+    // closing it, then destroy the world rather than attempting to reuse its adapters or projections.
+    bool OpenTransientStore(const FGuid& InWorldId, const FGuid& InStoreId, FString& OutError);
+    bool IsTransientStore() const;
     bool CaptureArchiveSnapshot(FInventoryArchiveSnapshot& OutSnapshot, FString& OutError) const;
     bool FreezeArchive(const FGuid& InOperationId, FInventoryArchiveSnapshot& OutSnapshot, FString& OutError);
     bool ReleaseArchive(const FGuid& InOperationId, FString& OutError);
@@ -93,6 +97,13 @@ public:
     FSimpleMulticastDelegate OnStoreAdopted;
 
 private:
+    enum class EStoreSessionHistory : uint8
+    {
+        None,
+        PersistentOpened,
+        TransientOpened
+    };
+
     UPROPERTY(Transient)
     TMap<FGuid, TObjectPtr<UAbilityInventoryBase>> Active;
 
@@ -121,6 +132,7 @@ private:
     TArray<FQueuedRequest> Queue;
     TUniquePtr<FInventoryTransactionService> Transactions;
     FInventoryJournal Journal;
+    EStoreSessionHistory StoreSessionHistory = EStoreSessionHistory::None;
     FGuid WorldId;
     FGuid StoreId;
     FGuid WorldEpoch;
@@ -141,6 +153,8 @@ private:
     bool ValidateInstances(TConstArrayView<FInventorySnapshot> InBefore, TConstArrayView<FInventorySnapshot> InAfter, FString& OutError) const;
     bool RebuildInstanceIndex(FString& OutError);
     bool CaptureCheckpoint(FInventoryCheckpoint& OutCheckpoint, FString& OutError) const;
+    bool OpenStoreInternal(const FGuid& InWorldId, const FGuid& InStoreId, const FString& InDirectory,
+        bool bInCreateNew, bool bInTransient, FString& OutError);
     void Quarantine(const FString& InReason);
 
     friend class FInventoryTransactionService;

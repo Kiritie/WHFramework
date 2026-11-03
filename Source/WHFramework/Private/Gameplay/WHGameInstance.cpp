@@ -15,16 +15,7 @@ UWHGameInstance::UWHGameInstance()
 void UWHGameInstance::Init()
 {
 	Super::Init();
-	FString RequestedNamespace;
-	FParse::Value(FCommandLine::Get(), TEXT("LocalDataId="), RequestedNamespace);
-	auto Context = MakeShared<FSaveGameLocalContext, ESPMode::ThreadSafe>();
-	if (Context->Acquire(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames")), RequestedNamespace, LocalSaveContextError))
-	{
-		LocalSaveContext = MoveTemp(Context);
-		UE_LOG(LogTemp, Display, TEXT("Local save instance acquired: namespace=%s root=%s"),
-			*LocalSaveContext->GetNamespace(), *LocalSaveContext->GetStorageRoot());
-	}
-	else UE_LOG(LogTemp, Error, TEXT("Local save instance rejected: %s"), *LocalSaveContextError);
+	FParse::Value(FCommandLine::Get(), TEXT("LocalDataId="), RequestedLocalDataNamespace);
 	if (GEngine)
 	{
 		SaveLoadTravelFailureHandle = GEngine->OnTravelFailure().AddUObject(this, &ThisClass::OnSaveLoadTravelFailure);
@@ -40,6 +31,22 @@ void UWHGameInstance::Init()
 			int32 A = 0;
 		}
 	}
+}
+
+bool UWHGameInstance::EnsureLocalSaveContext()
+{
+	check(IsInGameThread());
+	if (LocalSaveContext) return true;
+	auto Context = MakeShared<FSaveGameLocalContext, ESPMode::ThreadSafe>();
+	if (Context->Acquire(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames")), RequestedLocalDataNamespace, LocalSaveContextError))
+	{
+		LocalSaveContext = MoveTemp(Context);
+		UE_LOG(LogTemp, Display, TEXT("Local save instance acquired: namespace=%s root=%s"),
+			*LocalSaveContext->GetNamespace(), *LocalSaveContext->GetStorageRoot());
+		return true;
+	}
+	UE_LOG(LogTemp, Error, TEXT("Local save instance rejected: %s"), *LocalSaveContextError);
+	return false;
 }
 
 void UWHGameInstance::Shutdown()

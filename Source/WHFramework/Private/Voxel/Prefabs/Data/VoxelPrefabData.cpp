@@ -2,6 +2,7 @@
 #include "Voxel/Chunks/VoxelSectionKey.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
 #include "Voxel/Voxels/VoxelItemBridge.h"
+#include <cmath>
 
 namespace
 {
@@ -34,6 +35,18 @@ namespace
         }
         return Result;
     }
+
+    bool OffsetPrefabCell(const FIntVector& Source, const FIntVector& Offset, FIntVector& Out)
+    {
+        if (!VoxelCoord::IsValid(Source)) return false;
+        for (int32 Axis = 0; Axis < 3; ++Axis)
+        {
+            const int64 Value = int64(Source[Axis]) + Offset[Axis];
+            if (Value < -int64(VoxelBlock::MaxAbsCoordinate) || Value >= VoxelBlock::MaxAbsCoordinate) return false;
+            Out[Axis] = static_cast<int32>(Value);
+        }
+        return true;
+    }
 }
 
 UVoxelPrefabData::UVoxelPrefabData()
@@ -45,6 +58,9 @@ UVoxelPrefabData::UVoxelPrefabData()
 FBox UVoxelPrefabData::GetVoxelBounds() const
 {
     FBox Bounds(ForceInit);
+    FIntVector Offset;
+    FString Error;
+    if (!GetPlacementOffset(Offset, Error)) return Bounds;
     if (!PackedCells.IsEmpty())
     {
         if (PackedCells.Num() < 4 ||
@@ -57,19 +73,22 @@ FBox UVoxelPrefabData::GetVoxelBounds() const
         for (uint32 Index = 0; Index < Count; ++Index)
         {
             const uint8* Source = PackedCells.GetData() + 4 + Index * 16;
-            const FVector Position(static_cast<int32>(ReadU32(Source)),
+            const FIntVector Raw(static_cast<int32>(ReadU32(Source)),
                 static_cast<int32>(ReadU32(Source + 4)),
                 static_cast<int32>(ReadU32(Source + 8)));
-            Bounds += Position;
-            Bounds += Position + FVector(1.0);
+            FIntVector Position;
+            if (!OffsetPrefabCell(Raw, Offset, Position)) return FBox(ForceInit);
+            Bounds += FVector(Position);
+            Bounds += FVector(Position) + FVector(1.0);
         }
         return Bounds;
     }
     for (const FVoxelPrefabCell& Cell : Data.Cells)
     {
-        const FVector Min(Cell.Offset);
-        Bounds += Min;
-        Bounds += Min + FVector(1.0);
+        FIntVector Position;
+        if (!OffsetPrefabCell(Cell.Offset, Offset, Position)) return FBox(ForceInit);
+        Bounds += FVector(Position);
+        Bounds += FVector(Position) + FVector(1.0);
     }
     return Bounds;
 }
@@ -77,7 +96,45 @@ FBox UVoxelPrefabData::GetVoxelBounds() const
 bool UVoxelPrefabData::Validate(const FVoxelRegistrySnapshot& Registry, FString& Error) const
 {
     FVoxelPrefabSaveData Cells;
-    return DecodeCells(Cells, Error) && ValidateCells(Cells, Registry, Error);
+    return DecodePlacementCells(Cells, Error) && ValidateCells(Cells, Registry, Error);
+}
+
+bool UVoxelPrefabData::GetPlacementOffset(FIntVector& OutOffset, FString& Error) const
+{
+    FIntVector Offset;
+    for (int32 Axis = 0; Axis < 3; ++Axis)
+    {
+        const double Value = CenterOffset[Axis];
+        if (!FMath::IsFinite(Value) || Value != std::floor(Value) || Value < MIN_int32 || Value > MAX_int32)
+        {
+            Error = TEXT("Prefab center offset must contain finite integer cell coordinates");
+            return false;
+        }
+        Offset[Axis] = static_cast<int32>(Value);
+    }
+    OutOffset = Offset;
+    Error.Reset();
+    return true;
+}
+
+bool UVoxelPrefabData::DecodePlacementCells(FVoxelPrefabSaveData& OutData, FString& Error) const
+{
+    FIntVector Offset;
+    FVoxelPrefabSaveData Result;
+    if (!GetPlacementOffset(Offset, Error) || !DecodeCells(Result, Error)) return false;
+    for (FVoxelPrefabCell& Cell : Result.Cells)
+    {
+        FIntVector Position;
+        if (!OffsetPrefabCell(Cell.Offset, Offset, Position))
+        {
+            Error = FString::Printf(TEXT("Prefab offset exceeds voxel coordinate bounds at %s"), *Cell.Offset.ToString());
+            return false;
+        }
+        Cell.Offset = Position;
+    }
+    OutData = MoveTemp(Result);
+    Error.Reset();
+    return true;
 }
 
 bool UVoxelPrefabData::SetPackedData(const FVoxelPrefabSaveData& Value, FString& Error)

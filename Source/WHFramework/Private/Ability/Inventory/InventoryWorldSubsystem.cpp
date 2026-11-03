@@ -26,7 +26,7 @@ void UInventoryWorldSubsystem::Deinitialize()
     ArchiveSequence = 0;
     ArchiveCheckpointCrc = 0;
     FString Error;
-    if(bOpen && !CloseStore(true, Error))
+    if(bOpen && !CloseStore(!Journal.IsTransient(), Error))
     {
         UE_LOG(LogTemp, Error, TEXT("Inventory close: %s"), *Error);
     }
@@ -188,9 +188,31 @@ bool UInventoryWorldSubsystem::RegisterSnapshotProjector(FName InName, FInventor
 
 bool UInventoryWorldSubsystem::OpenStore(const FGuid& InWorldId, const FGuid& InStoreId, const FString& InDirectory, bool bInCreateNew, FString& OutError)
 {
+    return OpenStoreInternal(InWorldId, InStoreId, InDirectory, bInCreateNew, false, OutError);
+}
+
+bool UInventoryWorldSubsystem::OpenTransientStore(const FGuid& InWorldId, const FGuid& InStoreId, FString& OutError)
+{
+    return OpenStoreInternal(InWorldId, InStoreId, FString(), true, true, OutError);
+}
+
+bool UInventoryWorldSubsystem::IsTransientStore() const
+{
+    return bOpen && Journal.IsTransient();
+}
+
+bool UInventoryWorldSubsystem::OpenStoreInternal(const FGuid& InWorldId, const FGuid& InStoreId, const FString& InDirectory,
+    bool bInCreateNew, bool bInTransient, FString& OutError)
+{
     if(!IsInGameThread() || !bConfigured || bOpen || !GetWorld() || GetWorld()->GetNetMode() == NM_Client)
     {
         OutError = TEXT("Inventory.OpenStoreInvalid");
+        return false;
+    }
+    if(StoreSessionHistory == EStoreSessionHistory::TransientOpened ||
+        (bInTransient && StoreSessionHistory != EStoreSessionHistory::None))
+    {
+        OutError = TEXT("Inventory.TransientSessionOneShot");
         return false;
     }
     bQuarantined = false;
@@ -198,11 +220,15 @@ bool UInventoryWorldSubsystem::OpenStore(const FGuid& InWorldId, const FGuid& In
     FailureReason.Reset();
     FInventoryCheckpoint Checkpoint;
     TArray<FInventoryJournalRecord> JournalRecords;
-    if(!Journal.Open(InDirectory, InWorldId, InStoreId, bInCreateNew, Checkpoint, JournalRecords, OutError))
+    const bool bJournalOpened = bInTransient
+        ? Journal.OpenTransient(InWorldId, InStoreId, Checkpoint, JournalRecords, OutError)
+        : Journal.Open(InDirectory, InWorldId, InStoreId, bInCreateNew, Checkpoint, JournalRecords, OutError);
+    if(!bJournalOpened)
     {
         Quarantine(OutError);
         return false;
     }
+    StoreSessionHistory = bInTransient ? EStoreSessionHistory::TransientOpened : EStoreSessionHistory::PersistentOpened;
     WorldId = InWorldId;
     StoreId = InStoreId;
     WorldEpoch = FGuid::NewGuid();
@@ -266,6 +292,11 @@ bool UInventoryWorldSubsystem::CaptureCheckpoint(FInventoryCheckpoint& OutCheckp
 
 bool UInventoryWorldSubsystem::SaveCheckpoint(FString& OutError)
 {
+    if(IsInGameThread() && Journal.IsTransient())
+    {
+        OutError = TEXT("Inventory.TransientArchiveUnsupported");
+        return false;
+    }
     if(!IsInGameThread() || !IsReady() || bCommitting || bPublishing || IsArchiveFrozen())
     {
         OutError = TEXT("Inventory.CheckpointNotReady");
@@ -282,6 +313,11 @@ bool UInventoryWorldSubsystem::SaveCheckpoint(FString& OutError)
 
 bool UInventoryWorldSubsystem::CaptureArchiveSnapshot(FInventoryArchiveSnapshot& OutSnapshot, FString& OutError) const
 {
+    if(IsInGameThread() && Journal.IsTransient())
+    {
+        OutError = TEXT("Inventory.TransientArchiveUnsupported");
+        return false;
+    }
     if(!IsInGameThread() || !IsReady() || bCommitting || bPublishing)
     {
         OutError = TEXT("Inventory.ArchiveCaptureNotReady");
@@ -299,6 +335,11 @@ bool UInventoryWorldSubsystem::CaptureArchiveSnapshot(FInventoryArchiveSnapshot&
 
 bool UInventoryWorldSubsystem::FreezeArchive(const FGuid& InOperationId, FInventoryArchiveSnapshot& OutSnapshot, FString& OutError)
 {
+    if(IsInGameThread() && Journal.IsTransient())
+    {
+        OutError = TEXT("Inventory.TransientArchiveUnsupported");
+        return false;
+    }
     if(!IsInGameThread() || !InOperationId.IsValid() || IsArchiveFrozen() || !IsReady() || bCommitting || bPublishing)
     {
         OutError = TEXT("Inventory.ArchiveFreezeNotReady");
@@ -321,6 +362,11 @@ bool UInventoryWorldSubsystem::FreezeArchive(const FGuid& InOperationId, FInvent
 
 bool UInventoryWorldSubsystem::ReleaseArchive(const FGuid& InOperationId, FString& OutError)
 {
+    if(IsInGameThread() && Journal.IsTransient())
+    {
+        OutError = TEXT("Inventory.TransientArchiveUnsupported");
+        return false;
+    }
     if(!IsInGameThread() || !InOperationId.IsValid() || ArchiveOperationId != InOperationId || ArchiveWorldEpoch != WorldEpoch)
     {
         OutError = TEXT("Inventory.ArchiveFreezeOwnerMismatch");
@@ -335,6 +381,11 @@ bool UInventoryWorldSubsystem::ReleaseArchive(const FGuid& InOperationId, FStrin
 
 bool UInventoryWorldSubsystem::AdoptArchive(const FGuid& InOperationId, FInventoryPreparedStore& InPrepared, FString& OutError)
 {
+    if(IsInGameThread() && Journal.IsTransient())
+    {
+        OutError = TEXT("Inventory.TransientArchiveUnsupported");
+        return false;
+    }
     if(!IsInGameThread() || !IsReady() || bCommitting || bPublishing || !InOperationId.IsValid() || ArchiveOperationId != InOperationId ||
        ArchiveWorldEpoch != WorldEpoch || ArchiveSequence != Journal.GetSequence() || !InPrepared.IsReady() || !InPrepared.bCommitted ||
        InPrepared.OperationId != InOperationId || InPrepared.WorldId != WorldId || InPrepared.SourceStoreId != StoreId ||
@@ -377,6 +428,11 @@ bool UInventoryWorldSubsystem::CloseStore(bool bInCheckpoint, FString& OutError)
     if(!IsInGameThread() || bCommitting || bPublishing || IsArchiveFrozen())
     {
         OutError = TEXT("Inventory.CloseHasActiveCommit");
+        return false;
+    }
+    if(bInCheckpoint && bOpen && Journal.IsTransient())
+    {
+        OutError = TEXT("Inventory.TransientArchiveUnsupported");
         return false;
     }
     bClosing = true;

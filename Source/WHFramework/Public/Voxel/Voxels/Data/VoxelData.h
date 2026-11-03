@@ -40,6 +40,7 @@ public:
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel") bool bRegisterBlock=true;
     virtual void OnInitialize_Implementation()override;
     virtual void OnReset_Implementation()override;
+    virtual FInventoryItemDefinition BuildInventoryDefinition() const override;
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel") FName BlockName;
     UPROPERTY(EditAnywhere,BlueprintReadOnly,Category="Voxel") EVoxelShapeKind Shape=EVoxelShapeKind::FullCube;
     UPROPERTY(EditAnywhere)

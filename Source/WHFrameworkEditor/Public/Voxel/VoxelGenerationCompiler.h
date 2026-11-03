@@ -20,6 +20,9 @@ public:
 		FVoxelGenerationRecipe& OutRecipe, FString& OutError);
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FVoxelPrefabCompilerTestAccess;
+#endif
 	static bool GatherBlockNames(const UVoxelWorldGenerationProfile& InProfile, const FVoxelRegistrySnapshot& InRegistry,
 		TArray<FName>& OutBlockNames, FString& OutError);
 	static bool CompilePalette(const UVoxelWorldGenerationProfile& InProfile, const FVoxelRegistrySnapshot& InRegistry,

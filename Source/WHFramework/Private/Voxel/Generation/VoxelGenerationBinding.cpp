@@ -178,6 +178,7 @@ bool FVoxelGenerationBinding::Freeze(const FVoxelGenerationRuntimeConfig& InSour
 	Config->InputLease = Lease;
 	Config->RecipeInputLease = RecipeLease;
 	Config->Recipe = MoveTemp(Recipe);
+	Config->TerrainType = InSource.TerrainType;
 	Config->RegistryHash = InSource.RegistryHash;
 	CopyFrozenGenerationArray(InSource.SymbolToRuntime, Config->SymbolToRuntime);
 	CopyFrozenGenerationArray(InSource.RuntimeToSymbol, Config->RuntimeToSymbol);
@@ -206,7 +207,21 @@ bool FVoxelGenerationBinding::Freeze(const FVoxelGenerationRuntimeConfig& InSour
 
 bool FVoxelGenerationRuntimeConfig::IsValid() const
 {
-	return Recipe.IsValid() && !SymbolToRuntime.IsEmpty() && !RuntimeToSymbol.IsEmpty();
+	return Recipe.IsValid() && !SymbolToRuntime.IsEmpty() && !RuntimeToSymbol.IsEmpty() &&
+		(TerrainType == EVoxelTerrainType::Default || TerrainType == EVoxelTerrainType::Superflat);
+}
+
+FVoxelColumnSample FVoxelGenerationRuntimeConfig::MakeSuperflatColumn() const
+{
+	check(Recipe && TerrainType == EVoxelTerrainType::Superflat);
+	FVoxelColumnSample Column;
+	Column.SurfaceZ = VoxelGeneration::SuperflatSurfaceZ;
+	Column.DensityHeight = VoxelGeneration::SuperflatSurfaceZ;
+	Column.SurfaceMaterial = Recipe->Palette.Grass;
+	Column.BiomeIndex = Recipe->Biomes.IsEmpty() ? MAX_uint16 : 0;
+	Column.Landform.Dominant = EVoxelLandformKind::Plain;
+	Column.Landform.PlainQ15 = 32767;
+	return Column;
 }
 
 bool FVoxelGenerationRuntimeConfig::ToRuntime(uint32 InPackedSymbol, FVoxelBlockState& OutState) const

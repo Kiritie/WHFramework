@@ -350,10 +350,19 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 				for (const auto& Pair : Ready->Visibility) Publisher.SourceVisibilityGenerations.FindOrAdd(Pair.Key).Add({Ready, Pair.Value});
 				for (const auto& Group : Ready->Groups)
 					for (const auto& Key : Group.Keys) Publisher.SetOwnerActive(Key, Ready->Serial, true);
-				Publisher.bPrioritiesDirty = true;
+				// 手工注入/修改 publication 也要像生产冻结路径一样推进优先级修订。
+				Publisher.InvalidatePriorities();
 				for (int32 Index = 0; Index < Ready->Groups.Num(); ++Index) Publisher.QueueReadyGroup(Ready, Index);
 				Publisher.bFirstOwnersDirty = true;
 				Publisher.bActiveBusyKeysDirty = true;
+			};
+			const auto ResolveFixturePriorities = [InTest](FVoxelViewPublisher& InPublisher)
+			{
+				int32 Steps = 0;
+				while ((InPublisher.bPrioritiesDirty || InPublisher.PriorityPlan) && Steps++ < 4096)
+					InPublisher.AdvancePriorities();
+				return InTest->TestTrue(TEXT("The frozen candidate cohort completes its actual priority continuation"),
+					!InPublisher.bPrioritiesDirty && !InPublisher.PriorityPlan);
 			};
 			const FVoxelPublishGroupKey Slow{0, {0, 0}, 0}, Distant{0, {1000, 0}, 0};
 			int32 OldCallbacks = 0, NewCallbacks = 0;
@@ -416,13 +425,29 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			const FVoxelTerrainGeometry FixtureGeometry{{EVoxelTerrainRepresentation::VoxelProxy, FIntVector::ZeroValue, 1},
 				2, Module->Manifest.Settings.MinZ, Module->Manifest.Settings.MaxZ, Module->Manifest.BaseSampleHash, Module->GetRegistry()->Hash};
 			const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest()).Geometry.Add(FixtureGeometry.Key, FixtureGeometry);
+			struct FFixtureOwnerState
+			{
+				FGuid Id = FGuid::NewGuid();
+				uint64 LatestToken = 0;
+				bool bActive = true;
+			};
+			const auto OwnerState = MakeShared<FFixtureOwnerState>();
+			Publisher.SetGeometryValidator([OwnerState](const FVoxelTaskStamp& Stamp)
+			{
+				return OwnerState->bActive && Stamp.OwnerId == OwnerState->Id && Stamp.OwnerIncarnation == 1 &&
+					Stamp.Token == OwnerState->LatestToken;
+			});
+			Publisher.SetRetainedGeometryOwnerValidator([OwnerState](const FVoxelTaskStamp& Stamp)
+			{
+				return OwnerState->bActive && Stamp.OwnerId == OwnerState->Id && Stamp.OwnerIncarnation == 1;
+			});
 			const auto MakeNativeSource = [&, InTest](FVoxelViewPublisher& InPublisher, FVoxelTaskScheduler& InScheduler,
-				const FVoxelTerrainGeometry* InGeometry = nullptr)
+				const FVoxelTerrainGeometry* InGeometry = nullptr, const FGuid* InOwnerId = nullptr)
 				-> TSharedPtr<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>
 			{
 				FVoxelTaskStamp Stamp;
 				Stamp.WorldEpoch = 1;
-				Stamp.OwnerId = InPublisher.NativeOwnerId;
+				Stamp.OwnerId = InOwnerId ? *InOwnerId : InPublisher.NativeOwnerId;
 				Stamp.OwnerIncarnation = 1;
 				Stamp.Token = ++FixtureSourceToken;
 				Stamp.bHasGeometryIdentity = true;
@@ -479,13 +504,51 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 				InTest->AddError(TEXT("Native fixture failed to complete its funded index tree"));
 				return TSharedPtr<const FVoxelTerrainCoarseMesh, ESPMode::ThreadSafe>();
 			};
+			// 已暂存但从未进入呈现根的旧源不能拖住相邻目标，也不能被重新上传。
+			FVoxelViewSourceId ObsoleteSourceId;
+			const auto ObsoleteSource = MakeNativeSource(Publisher, Scheduler);
+			if (!ObsoleteSource) co_return;
+			const FGuid ObsoleteGroup = Publisher.BeginGroup(Surface);
+			if (!InTest->TestTrue(TEXT("The obsolete candidate is staged before its interest changes"),
+				Publisher.StageImmutable(ObsoleteGroup, ObsoleteSourceId, FVector::ZeroVector, Module->BlockSize(), ObsoleteSource, 2) &&
+				Publisher.SetCoverage(ObsoleteGroup, ObsoleteSourceId, {}))) co_return;
+			auto& CurrentGeometry = const_cast<FVoxelInterestSet&>(Module->GetCurrentInterest()).Geometry;
+			InTest->TestTrue(TEXT("A wanted unpresented source remains eligible"), Publisher.ClassifyCoverageSource(ObsoleteSourceId, true) ==
+				EVoxelCoverageSourceDisposition::Include);
+			CurrentGeometry.Remove(FixtureGeometry.Key);
+			InTest->TestTrue(TEXT("An obsolete source without a render transaction is suppressed"), Publisher.ClassifyCoverageSource(ObsoleteSourceId, false) ==
+				EVoxelCoverageSourceDisposition::SuppressUnpresented);
+			const FVoxelPublishGroupKey ObsoleteNeighbor{0, FIntVector::ZeroValue, 0};
+			const FGuid ObsoleteNeighborGroup = Publisher.BeginGroup(ObsoleteNeighbor);
+			bool bObsoleteGroupCommitted = false;
+			const TArray<FGuid> ObsoleteGroups{ObsoleteGroup, ObsoleteNeighborGroup};
+			Publisher.SetCommitCallbacks({}, [&bObsoleteGroupCommitted, Surface, ObsoleteNeighbor](TConstArrayView<FVoxelPublishGroupKey> Keys)
+			{
+				bObsoleteGroupCommitted |= Keys.Contains(Surface) && Keys.Contains(ObsoleteNeighbor);
+			}, ObsoleteGroups);
+			if (!InTest->TestTrue(TEXT("The obsolete source is hidden in the same transaction as the wanted neighbor"),
+				Publisher.SetHidden(ObsoleteGroup, ObsoleteSourceId, true) && Publisher.CommitGroup(ObsoleteGroup) &&
+				Publisher.CommitGroup(ObsoleteNeighborGroup))) co_return;
+			const double ObsoleteDeadline = FPlatformTime::Seconds() + 10.0;
+			while (Publisher.IsBusy() && FPlatformTime::Seconds() < ObsoleteDeadline)
+			{
+				Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+				TickPublisherFrame(Publisher, *Module, Capture);
+				co_await FVoxelGameThreadContinuation::Yield();
+			}
+			if (!InTest->TestFalse(TEXT("The obsolete source does not block its wanted neighbor"), Publisher.IsBusy())) co_return;
+			InTest->TestTrue(TEXT("The neighbor and obsolete owner settle together without presenting old geometry"),
+				bObsoleteGroupCommitted && Publisher.IsHidden(ObsoleteSourceId) && !Publisher.HasPresentation(ObsoleteSourceId) &&
+				!Publisher.HasUnsettledPresentation(ObsoleteSourceId));
+			CurrentGeometry.Add(FixtureGeometry.Key, FixtureGeometry);
 			auto& Entry = Publisher.Entries.Add(SourceId);
 			Entry.GroupKey = Surface;
 			Entry.Scale = Module->BlockSize();
 			Entry.Bounds = FBox(FVector::ZeroVector, FVector(32.0));
 			Entry.PresentedWorldBounds = FBox(FVector::ZeroVector, FVector(32.0) * Entry.Scale);
-			const auto CommittedSource = MakeNativeSource(Publisher, Scheduler);
+			auto CommittedSource = MakeNativeSource(Publisher, Scheduler, nullptr, &OwnerState->Id);
 			if (!CommittedSource) co_return;
+			OwnerState->LatestToken = CommittedSource->Stamp.Token;
 			Entry.NativeStamp = Entry.PresentedNativeStamp = CommittedSource->Stamp;
 			Entry.NativeMesh = BuildNativeGeometry(Scheduler, CommittedSource);
 			if (!Entry.NativeMesh) co_return;
@@ -520,12 +583,174 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			if (!InTest->TestTrue(TEXT("Initial source reaches a real view-bound native presented mirror"),
 				!Publisher.IsBusy() && Entry.PresentedSource == CommittedSource &&
 				Publisher.GetTerrainRenderer().HasPresentedCoverage(FBox(FVector::ZeroVector, FVector(32))))) co_return;
+			Entry.bPresented = false;
+			InTest->TestTrue(TEXT("A sealed source with a delayed publisher receipt waits instead of being discarded"),
+				Publisher.ClassifyCoverageSource(SourceId, false) == EVoxelCoverageSourceDisposition::WaitForPresentation);
+			Entry.bPresented = true;
+			InTest->TestTrue(TEXT("Actually visible old coverage remains eligible for handoff"),
+				Publisher.ClassifyCoverageSource(SourceId, false) == EVoxelCoverageSourceDisposition::Include);
 			InTest->TestEqual(TEXT("从后台索引、原生粗事务到真实呈现的全链不消耗已满 Staged"),
 				PublicationResources->Snapshot().Used[int32(EVoxelTerrainResourcePool::Staged)], BeforeStagedPressure.Limits.StagedBytes);
 			InTest->TestTrue(TEXT("实际呈现后的索引和正文保持原生产 Resident 账本"), Entry.NativeMesh &&
 				Entry.NativeMesh->MetadataLease->GetPool() == EVoxelTerrainResourcePool::Resident &&
 				CommittedSource->ResourceLease->GetPool() == EVoxelTerrainResourcePool::Resident);
 			PublicationStagedBlocker.Reset();
+			// 当前目标切换后，已呈现的旧正文仍需在同一事务中裁切，直到新 owner 接管。
+			CurrentGeometry.Remove(FixtureGeometry.Key);
+			ON_SCOPE_EXIT { CurrentGeometry.Add(FixtureGeometry.Key, FixtureGeometry); };
+			FVoxelViewPublisher::FUpdate RetainedUpdate;
+			if (!InTest->TestTrue(TEXT("The actual presented source can be captured for a handoff"),
+				Publisher.CaptureCoverageSource(SourceId, false, RetainedUpdate))) co_return;
+			InTest->TestFalse(TEXT("The old source is no longer a current target"), Publisher.IsNativeGeometryCurrent(RetainedUpdate.NativeStamp));
+			InTest->TestTrue(TEXT("The exact presented source remains valid for an atomic coverage handoff"),
+				Publisher.IsNativeUpdateCurrent(RetainedUpdate));
+			auto InvalidUpdate = RetainedUpdate;
+			++InvalidUpdate.NativeStamp.Token;
+			InTest->TestFalse(TEXT("A different attempt cannot inherit presented coverage"), Publisher.IsNativeUpdateCurrent(InvalidUpdate));
+			InvalidUpdate = RetainedUpdate;
+			InvalidUpdate.Location.X += Module->BlockSize();
+			InTest->TestFalse(TEXT("A moved source cannot inherit the presented geometry"), Publisher.IsNativeUpdateCurrent(InvalidUpdate));
+			InvalidUpdate = RetainedUpdate;
+			InvalidUpdate.SourceId = FVoxelViewSourceId::NewId();
+			InTest->TestFalse(TEXT("An unpresented source cannot inherit another owner's coverage"), Publisher.IsNativeUpdateCurrent(InvalidUpdate));
+			const auto PresentedMesh = Entry.NativeMesh;
+			const auto UnpresentedMesh = BuildNativeGeometry(Scheduler, CommittedSource);
+			if (!UnpresentedMesh) co_return;
+			InvalidUpdate = RetainedUpdate;
+			InvalidUpdate.NativeMesh = UnpresentedMesh;
+			InTest->TestFalse(TEXT("A different projected native body cannot borrow the presented source identity"),
+				Publisher.IsNativeUpdateCurrent(InvalidUpdate));
+			Entry.NativeMesh = UnpresentedMesh;
+			InTest->TestFalse(TEXT("A different native mesh with the same source and stamp has no presented receipt"),
+				Publisher.IsNativeUpdateCurrent(RetainedUpdate));
+			Entry.NativeMesh = PresentedMesh;
+			Entry.bHidden = true;
+			InTest->TestFalse(TEXT("A hidden source cannot be revived through retained coverage"), Publisher.IsNativeUpdateCurrent(RetainedUpdate));
+			Entry.bHidden = false;
+			auto ReplacementGeometry = FixtureGeometry;
+			ReplacementGeometry.SampleStepCells *= 2;
+			CurrentGeometry.Add(FixtureGeometry.Key, ReplacementGeometry);
+			++OwnerState->LatestToken;
+			InTest->TestFalse(TEXT("The previous attempt is not the current same-key target"), Publisher.IsNativeGeometryCurrent(RetainedUpdate.NativeStamp));
+			InTest->TestTrue(TEXT("A new same-key sampling attempt retains the exact actual old coverage"),
+				Publisher.IsNativeUpdateCurrent(RetainedUpdate));
+			InvalidUpdate = RetainedUpdate;
+			InvalidUpdate.NativeStamp.Token += 100;
+			InvalidUpdate.NativeMesh.Reset();
+			Publisher.PendingUpdateIndices.Add(SourceId, Publisher.PendingUpdates.Num());
+			Publisher.PendingUpdates.Add(InvalidUpdate);
+			FVoxelViewPublisher::FUpdate SafeRetainedUpdate;
+			InTest->TestTrue(TEXT("A stale projected attempt is skipped in favor of the actual presented source"),
+				Publisher.CaptureCoverageSource(SourceId, true, SafeRetainedUpdate) &&
+				SafeRetainedUpdate.Source == CommittedSource && SafeRetainedUpdate.NativeStamp == CommittedSource->Stamp &&
+				SafeRetainedUpdate.NativeMesh == Entry.NativeMesh);
+			Publisher.PendingUpdateIndices.Remove(SourceId);
+			Publisher.PendingUpdates.Pop();
+			OwnerState->bActive = false;
+			InTest->TestFalse(TEXT("A retired manager incarnation cannot retain old coverage"), Publisher.IsNativeUpdateCurrent(RetainedUpdate));
+			OwnerState->bActive = true;
+			auto& Hierarchy = Module->GetRuntime()->GetChangeHierarchy();
+			const FVoxelViewKey FixtureKey{FixtureGeometry.Key.Coordinate, FixtureGeometry.Key.Level};
+			if (!InTest->TestTrue(TEXT("The fixture can advance the world content revision"),
+				Hierarchy.SetVoxelProxyRevision(FixtureKey, RetainedUpdate.NativeStamp.Revision + 1, FixtureError))) co_return;
+			InTest->TestFalse(TEXT("Changed world content invalidates retained coverage"), Publisher.IsNativeUpdateCurrent(RetainedUpdate));
+			if (!InTest->TestTrue(TEXT("The fixture restores its original content revision"),
+				Hierarchy.SetVoxelProxyRevision(FixtureKey, RetainedUpdate.NativeStamp.Revision, FixtureError))) co_return;
+			const FGuid RetainedGroup = Publisher.BeginGroup(Surface);
+			const FVoxelPublishGroupKey ReplacementOwner{0, FIntVector::ZeroValue, 0};
+			const FGuid ReplacementGroup = Publisher.BeginGroup(ReplacementOwner);
+			TArray<FVoxelPublishGroupKey> RetainedCommitted;
+			bool bOwnersCommittedTogether = false;
+			const TArray<FGuid> RetainedGroups{RetainedGroup, ReplacementGroup};
+			Publisher.SetCommitCallbacks({}, [&RetainedCommitted, &bOwnersCommittedTogether, Surface, ReplacementOwner](TConstArrayView<FVoxelPublishGroupKey> Keys)
+			{
+				for (const auto& Key : Keys) RetainedCommitted.AddUnique(Key);
+				bOwnersCommittedTogether |= Keys.Contains(Surface) && Keys.Contains(ReplacementOwner);
+			}, RetainedGroups);
+			const TArray<FBox> ReplacementMask{FBox(FVector(20, -2, -100), FVector(24, 2, 100))};
+			if (!InTest->TestTrue(TEXT("The retained owner stages its new coverage mask"),
+				Publisher.SetCoverage(RetainedGroup, SourceId, ReplacementMask) && Publisher.CommitGroup(RetainedGroup) &&
+				Publisher.CommitGroup(ReplacementGroup))) co_return;
+			const double RetainedDeadline = FPlatformTime::Seconds() + 10.0;
+			while (Publisher.IsBusy() && FPlatformTime::Seconds() < RetainedDeadline)
+			{
+				Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+				TickPublisherFrame(Publisher, *Module, Capture);
+				co_await FVoxelGameThreadContinuation::Yield();
+			}
+			if (!InTest->TestFalse(TEXT("The presented old source does not deadlock its new owner"), Publisher.IsBusy())) co_return;
+			InTest->TestTrue(TEXT("The old and replacement owners commit together"),
+				bOwnersCommittedTogether && RetainedCommitted.Contains(Surface) && RetainedCommitted.Contains(ReplacementOwner));
+			InTest->TestTrue(TEXT("The handoff keeps the exact presented source"), Entry.PresentedSource == CommittedSource && Entry.NativeMesh);
+			const auto ReplacementSource = MakeNativeSource(Publisher, Scheduler, &ReplacementGeometry, &OwnerState->Id);
+			if (!ReplacementSource) co_return;
+			OwnerState->LatestToken = ReplacementSource->Stamp.Token;
+			const FGuid SameKeyGroup = Publisher.BeginGroup(Surface);
+			bool bValidationCurrent = true;
+			int32 StaleOwnershipCallbacks = 0, StaleFinishedCallbacks = 0;
+			Publisher.SetValidation(SameKeyGroup, [&bValidationCurrent] { return bValidationCurrent; });
+			Publisher.SetCommitCallbacks([&StaleFinishedCallbacks] { ++StaleFinishedCallbacks; },
+				[&StaleOwnershipCallbacks](TConstArrayView<FVoxelPublishGroupKey>) { ++StaleOwnershipCallbacks; },
+				MakeArrayView(&SameKeyGroup, 1));
+			if (!InTest->TestTrue(TEXT("The new same-key attempt is staged through the normal current-target path"),
+				Publisher.StageImmutable(SameKeyGroup, SourceId, FVector::ZeroVector, Module->BlockSize(), ReplacementSource, 2) &&
+				Publisher.SetCoverage(SameKeyGroup, SourceId, ReplacementMask) && Publisher.CommitGroup(SameKeyGroup))) co_return;
+			bool bInvalidatedAfterReceipt = false;
+			const auto InvalidateAfterReceipt = [&]
+			{
+				for (const auto& PendingPublication : Publisher.Publications)
+					for (const auto& PendingGroup : PendingPublication->Groups)
+						if (PendingGroup.bNativeSubmitted && !PendingGroup.bPresentationCommitted && PendingGroup.Keys.Contains(Surface))
+						{
+							bValidationCurrent = false;
+							bInvalidatedAfterReceipt = true;
+						}
+			};
+			const double SameKeyDeadline = FPlatformTime::Seconds() + 10.0;
+			while (Publisher.IsBusy() && FPlatformTime::Seconds() < SameKeyDeadline)
+			{
+				Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+				auto& Frame = Module->GetTerrainFrameContext();
+				Frame.Begin(1, GFrameCounter, FPlatformTime::Seconds(), {});
+				Publisher.GetTerrainRenderer().AdvanceFramePublication();
+				FlushRenderingCommands();
+				Publisher.GetTerrainRenderer().PollRenderReceipts();
+				InvalidateAfterReceipt();
+				Publisher.Tick(Frame.GetPublishBudget());
+				Frame.End(FPlatformTime::Seconds());
+				Capture->GetWorld()->SendAllEndOfFrameUpdates();
+				Capture->CaptureScene();
+				FlushRenderingCommands();
+				Publisher.GetTerrainRenderer().PollRenderReceipts();
+				InvalidateAfterReceipt();
+				co_await FVoxelGameThreadContinuation::Yield();
+			}
+			if (!InTest->TestFalse(TEXT("The new same-key target completes its render transaction"), Publisher.IsBusy())) co_return;
+			InTest->TestTrue(TEXT("The old plan becomes invalid only after its actual render receipt"), bInvalidatedAfterReceipt);
+			InTest->TestTrue(TEXT("The already presented sampling identity is recorded despite stale planning"), Entry.PresentedSource == ReplacementSource);
+			InTest->TestEqual(TEXT("A stale plan never fires its ownership callback"), StaleOwnershipCallbacks, 0);
+			InTest->TestEqual(TEXT("A stale plan never fires its batch completion callback"), StaleFinishedCallbacks, 0);
+			InTest->TestTrue(TEXT("The stale owner is scheduled for replanning"), Publisher.TakeRetryOwners().Contains(Surface));
+			InTest->TestFalse(TEXT("An old source cannot revive after the new same-key target is presented"),
+				Publisher.IsNativeUpdateCurrent(RetainedUpdate));
+			CurrentGeometry.Add(FixtureGeometry.Key, FixtureGeometry);
+			const auto LaterSource = MakeNativeSource(Publisher, Scheduler, &FixtureGeometry, &OwnerState->Id);
+			if (!LaterSource) co_return;
+			OwnerState->LatestToken = LaterSource->Stamp.Token;
+			const FGuid LaterGeometryGroup = Publisher.BeginGroup(Surface);
+			if (!InTest->TestTrue(TEXT("A later attempt stages a newer current geometry after replanning"),
+				Publisher.StageImmutable(LaterGeometryGroup, SourceId, FVector::ZeroVector, Module->BlockSize(), LaterSource, 2) &&
+				Publisher.SetCoverage(LaterGeometryGroup, SourceId, ReplacementMask) && Publisher.CommitGroup(LaterGeometryGroup))) co_return;
+			const double RestoreDeadline = FPlatformTime::Seconds() + 10.0;
+			while (Publisher.IsBusy() && FPlatformTime::Seconds() < RestoreDeadline)
+			{
+				Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+				TickPublisherFrame(Publisher, *Module, Capture);
+				co_await FVoxelGameThreadContinuation::Yield();
+			}
+			if (!InTest->TestFalse(TEXT("The newer current geometry reaches the presented root"), Publisher.IsBusy())) co_return;
+			if (!InTest->TestTrue(TEXT("The later attempt, not the stale plan, owns the source"), Entry.PresentedSource == LaterSource)) co_return;
+			CommittedSource = LaterSource;
 			Entry.Source = MakeNativeSource(Publisher, Scheduler);
 			Entry.NativeStamp = Entry.Source->Stamp;
 			Entry.bDirty = true;
@@ -536,6 +761,8 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			Entry.Scale = Module->BlockSize() * 2.0;
 			const auto Shared = MakeShared<TArray<FBox>, ESPMode::ThreadSafe>();
 			Shared->Add(FBox(FVector(8, 8, -100), FVector(12, 12, 100)));
+			InTest->TestFalse(TEXT("The new Fine exclusion is not already in the presented coverage"),
+				Entry.Exclusions.Contains((*Shared)[0]));
 			const FGuid SharedGroup = Publisher.BeginGroup(Surface);
 			InTest->TestTrue(TEXT("Fine can clip a committed coarse owner while its replacement topology is pending"),
 				Publisher.SetSharedCoverage(SharedGroup, SourceId, Shared));
@@ -574,9 +801,18 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			InTest->TestEqual(TEXT("Both coarse and Fine exclusions reach the committed coverage"), Entry.Exclusions.Num(), 2);
 			InTest->TestTrue(TEXT("The pending coarse source remains dirty after retained-source clipping"), Entry.bDirty);
 			InTest->TestTrue(TEXT("Retained-source clipping keeps the previous committed source"), Entry.PresentedSource == CommittedSource);
-			InTest->TestTrue(TEXT("Retained coverage preserves the same native body and render root without reupload"),
+			InTest->TestTrue(TEXT("Changed coverage retains the same native geometry body"), Entry.NativeMesh == InitialNativeMesh);
+			const uint64 ChangedCoverageSerial = Publisher.GetTerrainRenderer().CapturePresentedSnapshot()->GetSerial();
+			InTest->TestTrue(TEXT("A changed visible exclusion reaches a new render root"), ChangedCoverageSerial > InitialPresentedSerial);
+			const FGuid SameCoverageGroup = Publisher.BeginGroup(Surface);
+			InTest->TestTrue(TEXT("The identical retained coverage request is accepted"),
+				Publisher.SetSharedCoverage(SameCoverageGroup, SourceId, Shared));
+			InTest->TestTrue(TEXT("An identical retained exclusion does not queue another update"), Publisher.PendingUpdates.IsEmpty());
+			Publisher.SetOwnershipChanged(SameCoverageGroup, false);
+			InTest->TestTrue(TEXT("The unchanged owner is removed without a publication"), Publisher.DiscardUnchangedGroup(SameCoverageGroup));
+			InTest->TestTrue(TEXT("Unchanged retained coverage keeps the native body and render root"),
 				Entry.NativeMesh == InitialNativeMesh &&
-				Publisher.GetTerrainRenderer().CapturePresentedSnapshot()->GetSerial() == InitialPresentedSerial);
+				Publisher.GetTerrainRenderer().CapturePresentedSnapshot()->GetSerial() == ChangedCoverageSerial);
 			const FGuid RetryGroup = Publisher.BeginGroup(Surface);
 			const auto ChangedShared = MakeShared<TArray<FBox>, ESPMode::ThreadSafe>();
 			ChangedShared->Add(FBox(FVector(16, 16, -100), FVector(20, 20, 100)));
@@ -865,14 +1101,61 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			ClippedOwner->OwnershipChanges = {Slow, Edge};
 			Publisher.BuildGroups(ClippedOwner, true);
 			InTest->TestEqual(TEXT("Disjoint clipping changes remain one atomic owner group"), ClippedOwner->Groups.Num(), 1);
+			FVoxelViewPublisher::FGroup MiddleProbe;
+			MiddleProbe.Bounds = FVoxelPublishGroupPlanner::OwnershipBounds(Middle, Module->BlockSize());
+			if (!InTest->TestTrue(TEXT("The sparse fixture produced one group"), ClippedOwner->Groups.Num() == 1)) co_return;
+			InTest->TestFalse(TEXT("The exact presented body's two changed ranges exclude the independent middle owner"),
+				Publisher.GroupsInteract(ClippedOwner->Groups[0], MiddleProbe));
+			const auto DifferentMesh = BuildNativeGeometry(Scheduler, ClippedSource);
+			if (!InTest->TestTrue(TEXT("The replacement proof uses a different native body"), DifferentMesh && DifferentMesh != ClippedNativeMesh)) co_return;
+			const auto BuildFootprintProbe = [&](const bool bIncremental, const bool bDifferentBody, const bool bHide)
+			{
+				const auto Probe = MakeShared<FVoxelViewPublisher::FPublication>();
+				Probe->bCoveragePrepared = true;
+				Probe->CoverageIndex = 1;
+				Probe->Updates.Add(ClipUpdate);
+				if (bDifferentBody) Probe->Updates[0].NativeMesh = DifferentMesh;
+				if (bHide) Probe->Visibility.Add(ClippedSourceId, true);
+				Probe->Callbacks.Add(ClippedKey, {});
+				Probe->Callbacks.Add(Slow, {});
+				Probe->Callbacks.Add(Edge, {});
+				Probe->OwnershipChanges = {Slow, Edge};
+				if (bIncremental)
+				{
+					for (int32 Step = 0; Step < 2048 && Probe->Groups.IsEmpty(); ++Step)
+						Publisher.AdvancePreparedPlan(Probe);
+					Probe->Plan.Reset();
+				}
+				else Publisher.BuildGroups(Probe, true);
+				return Probe;
+			};
+			for (const bool bIncremental : {false, true})
+			{
+				const auto SameBodyProbe = BuildFootprintProbe(bIncremental, false, false);
+				const auto DifferentBodyProbe = BuildFootprintProbe(bIncremental, true, false);
+				const auto HiddenProbe = BuildFootprintProbe(bIncremental, false, true);
+				if (!InTest->TestTrue(TEXT("Both planners finish each sparse/full footprint probe"),
+					SameBodyProbe->Groups.Num() == 1 && DifferentBodyProbe->Groups.Num() == 1 && HiddenProbe->Groups.Num() == 1)) co_return;
+				InTest->TestFalse(TEXT("Both planners retain disjoint changed ranges for the exact presented body"),
+					Publisher.GroupsInteract(SameBodyProbe->Groups[0], MiddleProbe));
+				InTest->TestTrue(TEXT("A different native body keeps its complete ownership footprint"),
+					Publisher.GroupsInteract(DifferentBodyProbe->Groups[0], MiddleProbe));
+				InTest->TestTrue(TEXT("A visibility removal keeps its complete ownership footprint"),
+					Publisher.GroupsInteract(HiddenProbe->Groups[0], MiddleProbe));
+			}
 			Publisher.Publications.Add(ClippedOwner);
 			SignalFixtureReady(ClippedOwner);
 			const FGuid MiddleGroup = Publisher.BeginGroup(Middle);
 			Publisher.CommitGroup(MiddleGroup);
-			TickPublisherFrame(Publisher, *Module, Capture);
-			co_await FVoxelGameThreadContinuation::Yield();
+			const double SparseIndependentDeadline = FPlatformTime::Seconds() + 10.0;
+			while (Publisher.IsGroupBusy(Middle) && FPlatformTime::Seconds() < SparseIndependentDeadline)
+			{
+				TickPublisherFrame(Publisher, *Module, Capture);
+				Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+				co_await FVoxelGameThreadContinuation::Yield();
+			}
 			InTest->TestTrue(TEXT("An unprepared clipped owner and its affected Fine edges remain pending"), Publisher.IsGroupBusy(ClippedKey));
-			InTest->TestFalse(TEXT("Fine between disjoint clipping changes commits without waiting on their aggregate bounds"),
+			const bool bMiddleFinished = InTest->TestFalse(TEXT("Fine between disjoint clipping changes commits without waiting on their aggregate bounds"),
 				Publisher.IsGroupBusy(Middle));
 			if (Publisher.IsGroupBusy(Middle))
 			{
@@ -881,16 +1164,17 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 					Publisher.PriorityPlan ? Publisher.PriorityPlan->Cursor : -1, Publisher.bCommitOrderDirty,
 					Publisher.bCommitSelectionComplete, Publisher.ReadyCommitGroups.Num()));
 			}
+			if (!bMiddleFinished) co_return;
 			ClipUpdate.bNativeMeshPending = false;
 			SignalFixtureReady(ClippedOwner);
-			TickPublisherFrame(Publisher, *Module, Capture);
-			co_await FVoxelGameThreadContinuation::Yield();
-			for (int32 FrameIndex = 0; FrameIndex < 8 && Publisher.IsGroupBusy(ClippedKey); ++FrameIndex)
+			const double SparseHandoffDeadline = FPlatformTime::Seconds() + 10.0;
+			while (Publisher.IsGroupBusy(ClippedKey) && FPlatformTime::Seconds() < SparseHandoffDeadline)
 			{
 				TickPublisherFrame(Publisher, *Module, Capture);
+				Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
 				co_await FVoxelGameThreadContinuation::Yield();
 			}
-			InTest->TestFalse(TEXT("Affected edges release together after their clipped owner is ready"), Publisher.IsGroupBusy(ClippedKey));
+			if (!InTest->TestFalse(TEXT("Affected edges release together after their clipped owner is ready"), Publisher.IsGroupBusy(ClippedKey))) co_return;
 			InTest->TestTrue(TEXT("Sparse metadata commits without cancellation or native body reconstruction"),
 				!ClippedOwner->bCanceled && ClippedEntry.NativeMesh == ClippedNativeMesh && ClippedEntry.Exclusions.Num() == 2);
 			TArray<FVoxelViewPublisher::FPublicationRef> SlowGenerations;
@@ -931,20 +1215,27 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 				Publisher.PendingGroupIds.Contains(Parent));
 			SlowGenerations[0]->Updates[0].Source = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
 			SignalFixtureReady(SlowGenerations[0]);
-			TickPublisherFrame(Publisher, *Module, Capture);
-			co_await FVoxelGameThreadContinuation::Yield();
-			TickPublisherFrame(Publisher, *Module, Capture);
-			co_await FVoxelGameThreadContinuation::Yield();
-			InTest->TestFalse(TEXT("The deferred group is admitted once one owner generation finishes"), Publisher.PendingGroupIds.Contains(Slow));
+			const double DeferredOwnerDeadline = FPlatformTime::Seconds() + 10.0;
+			while (Publisher.PendingGroupIds.Contains(Slow) && FPlatformTime::Seconds() < DeferredOwnerDeadline)
+			{
+				TickPublisherFrame(Publisher, *Module, Capture);
+				Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
+				co_await FVoxelGameThreadContinuation::Yield();
+			}
+			if (!InTest->TestFalse(TEXT("The deferred group is admitted once one owner generation finishes"), Publisher.PendingGroupIds.Contains(Slow))) co_return;
+			InTest->TestTrue(TEXT("The first owner really finished while the second still waits for its source"),
+				SlowGenerations[0]->Groups[0].bCommitted && !SlowGenerations[1]->Groups[0].bCommitted);
 			InTest->TestTrue(TEXT("The admitted parent still waits for its older child generation"), Publisher.IsGroupBusy(Parent));
 			SlowGenerations[1]->Updates[0].Source = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
 			SignalFixtureReady(SlowGenerations[1]);
-			for (int32 Tick = 0; Tick < 4 && Publisher.IsBusy(); ++Tick)
+			const double ConnectedOwnersDeadline = FPlatformTime::Seconds() + 10.0;
+			while (Publisher.IsBusy() && FPlatformTime::Seconds() < ConnectedOwnersDeadline)
 			{
 				TickPublisherFrame(Publisher, *Module, Capture);
+				Scheduler.Tick([](FVoxelTaskResult&&) {}, 8.0);
 				co_await FVoxelGameThreadContinuation::Yield();
 			}
-			InTest->TestFalse(TEXT("All connected owner generations complete in order"), Publisher.IsBusy());
+			if (!InTest->TestFalse(TEXT("All connected owner generations complete in order"), Publisher.IsBusy())) co_return;
 			FVoxelTaskBudget BlockedBudget;
 			BlockedBudget.MaxConcurrentTasks = 1;
 			BlockedBudget.MaxPendingTasks = 1;
@@ -1078,18 +1369,46 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			UnchangedUpdate.bSourceDirty = false;
 			UnchangedUpdate.Location = StableEntry.Location;
 			UnchangedUpdate.Scale = StableEntry.Scale;
+			UnchangedUpdate.Exclusions = StableEntry.Exclusions;
 			UnchangedUpdate.bUnchanged = true;
 			StableEntry.PresentedSource = StableEntry.Source;
 			StableEntry.PresentedNativeStamp = StableEntry.NativeStamp;
 			StableEntry.NativeMesh = BuildNativeGeometry(Scheduler, StableEntry.Source);
 			if (!StableEntry.NativeMesh) co_return;
+			StableEntry.bPresented = true;
+			const auto FrozenUnchangedUpdate = UnchangedUpdate;
 			auto& UnchangedGroup = UnchangedPublication->Groups.AddDefaulted_GetRef();
 			UnchangedGroup.UpdateIndices.Add(0);
-			Publisher.CommitReadyGroup(UnchangedPublication, UnchangedGroup);
+			InTest->TestTrue(TEXT("The unchanged metadata-only group completes without native upload"),
+				Publisher.CommitReadyGroup(UnchangedPublication, UnchangedGroup));
 			InTest->TestFalse(TEXT("An unchanged committed generation clears its dirty state"), StableEntry.bDirty);
 			StableEntry.Source = MakeShared<const FVoxelSectionMeshResult, ESPMode::ThreadSafe>();
-			Publisher.CommitReadyGroup(UnchangedPublication, UnchangedGroup);
+			const auto OlderPublication = MakeShared<FVoxelViewPublisher::FPublication>();
+			OlderPublication->Updates.Add(FrozenUnchangedUpdate);
+			auto& OlderGroup = OlderPublication->Groups.AddDefaulted_GetRef();
+			OlderGroup.UpdateIndices.Add(0);
+			InTest->TestTrue(TEXT("A distinct older metadata-only group commits its own frozen update"),
+				Publisher.CommitReadyGroup(OlderPublication, OlderGroup));
 			InTest->TestTrue(TEXT("An older unchanged commit retains a newer source as dirty"), StableEntry.bDirty);
+			const auto DiscardedPublication = MakeShared<FVoxelViewPublisher::FPublication>();
+			DiscardedPublication->Updates.Add(FrozenUnchangedUpdate);
+			DiscardedPublication->Updates[0].bUnchanged = false;
+			auto& DiscardedGroup = DiscardedPublication->Groups.AddDefaulted_GetRef();
+			DiscardedGroup.UpdateIndices.Add(0);
+			InTest->TestTrue(TEXT("The terminal-admission fixture requires native work"),
+				Publisher.HasNativeGroupWork(DiscardedPublication.Get(), DiscardedGroup));
+			const int32 BeforeDiscardedRetry = Publisher.ActiveNativeGroups;
+			if (!InTest->TestTrue(TEXT("The terminal-admission fixture acquires a native slot"),
+				Publisher.AdmitNativeGroup(DiscardedGroup))) co_return;
+			InTest->TestEqual(TEXT("Admission counts exactly one active native group"),
+				Publisher.ActiveNativeGroups, BeforeDiscardedRetry + 1);
+			Publisher.DiscardGroup(DiscardedPublication, DiscardedGroup, TEXT("FixtureTerminalAdmission"), false);
+			InTest->TestTrue(TEXT("A terminal admission marks its group completed"), DiscardedGroup.bCommitted);
+			InTest->TestEqual(TEXT("A terminal admission releases its native slot"), Publisher.ActiveNativeGroups, BeforeDiscardedRetry);
+			InTest->TestFalse(TEXT("A discarded group cannot be admitted or committed again"),
+				Publisher.CommitReadyGroup(DiscardedPublication, DiscardedGroup));
+			InTest->TestEqual(TEXT("A discarded group cannot leak a native admission slot"),
+				Publisher.ActiveNativeGroups, BeforeDiscardedRetry);
 			Publisher.Reset();
 			TUniquePtr<FVoxelTaskScheduler> BatchSchedulerOwner;
 			if (!CreateNativeScheduler(BatchSchedulerOwner)) co_return;
@@ -1203,6 +1522,10 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			MovingSource.Capabilities = EVoxelStreamingCapability::FineVisual | EVoxelStreamingCapability::WorldVisual;
 			MovingSource.Center = FIntVector(16000, 0, 0);
 			Publisher.SetObservers(MovedObservers);
+			if (!ResolveFixturePriorities(Publisher)) co_return;
+			if (!InTest->TestTrue(TEXT("Both moved-observer candidates are ready with the new near-first priority"),
+				MovingPublication->Groups[0].bPriorityReady && MovingPublication->Groups[1].bPriorityReady &&
+				MovingPublication->Groups[1].Priority.ObserverDistance < MovingPublication->Groups[0].Priority.ObserverDistance)) co_return;
 			TickPublisherFrame(Publisher, *Module, Capture);
 			co_await FVoxelGameThreadContinuation::Yield();
 			InTest->TestTrue(TEXT("A ready group near the moved observer commits within the unchanged one-group frame limit"),
@@ -1250,20 +1573,24 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			InheritedSource.Capabilities = EVoxelStreamingCapability::FineVisual | EVoxelStreamingCapability::WorldVisual;
 			InheritedSource.Center = FIntVector(16, 0, 0);
 			InheritedSource.SchedulingPriority = 9;
-			const auto RemoteDependency = ReadyPublication({Surface},
-				FBox(FVector(1000, 0, 0) * BlockSize, FVector(1016, 16, 1) * BlockSize));
-			const auto NearbyDependent = ReadyPublication({Surface, Slow},
-				FBox(FVector::ZeroVector, FVector(16, 16, 1) * BlockSize));
-			const auto NearbyIndependent = ReadyPublication({{0, {1, 0}, 0}},
-				FBox(FVector(16, 0, 0) * BlockSize, FVector(32, 16, 1) * BlockSize));
 			const TArray<FVector> BoundaryObservers{FVector(16 * BlockSize, 0, 0)};
 			Publisher.SetObservers(BoundaryObservers);
+			const auto RemoteDependency = ReadyPublication({Surface},
+				FBox(FVector(1000, 0, 0) * BlockSize, FVector(1016, 16, 1) * BlockSize));
 			const int32 InheritedGroupIndex = 0;
 			FVoxelTaskRequest BeforeInheritance;
 			BeforeInheritance.WorkClass = EVoxelWorkClass::Visible;
 			Publisher.SetPublicationPriority(BeforeInheritance, *RemoteDependency, MakeArrayView(&InheritedGroupIndex, 1));
 			InTest->TestEqual(TEXT("A remote dependency starts in the Visible worker lane before nearby demand"),
 				BeforeInheritance.WorkClass, EVoxelWorkClass::Visible);
+			const auto NearbyDependent = ReadyPublication({Surface, Slow},
+				FBox(FVector::ZeroVector, FVector(16, 16, 1) * BlockSize));
+			const auto NearbyIndependent = ReadyPublication({{0, {1, 0}, 0}},
+				FBox(FVector(16, 0, 0) * BlockSize, FVector(32, 16, 1) * BlockSize));
+			if (!ResolveFixturePriorities(Publisher)) co_return;
+			if (!InTest->TestTrue(TEXT("Every owner-priority candidate is ready before the one-group decision"),
+				RemoteDependency->Groups[0].bPriorityReady && NearbyDependent->Groups[0].bPriorityReady &&
+				NearbyIndependent->Groups[0].bPriorityReady)) co_return;
 			TickPublisherFrame(Publisher, *Module, Capture);
 			co_await FVoxelGameThreadContinuation::Yield();
 			InTest->TestTrue(TEXT("A distant earlier owner inherits nearby handoff priority and completes within one-group budget"),
@@ -1297,6 +1624,10 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 				Publisher.GroupsInteract(SparseDependent->Groups[0], SpatialDependency->Groups[0]));
 			InTest->TestFalse(TEXT("Empty middle space inside sparse aggregate bounds is not a spatial dependency"),
 				Publisher.GroupsInteract(SparseDependent->Groups[0], MiddleIndependent->Groups[0]));
+			if (!ResolveFixturePriorities(Publisher)) co_return;
+			if (!InTest->TestTrue(TEXT("Every sparse-priority candidate is ready before the one-group decision"),
+				SpatialDependency->Groups[0].bPriorityReady && SparseDependent->Groups[0].bPriorityReady &&
+				MiddleIndependent->Groups[0].bPriorityReady)) co_return;
 			TickPublisherFrame(Publisher, *Module, Capture);
 			co_await FVoxelGameThreadContinuation::Yield();
 			InTest->TestTrue(TEXT("A distant spatial dependency inherits nearby urgency without shared owner keys"),
@@ -1571,7 +1902,10 @@ bool FVoxelConcurrentPublishCommitTest::RunTest(const FString& InParameters)
 			}
 			AdmissionPublisher.RefreshGroupOrder(AdmissionPublication);
 			AdmissionPublisher.Publications.Add(AdmissionPublication);
-			AdmissionPublisher.UpdateGroupPriorities({});
+			AdmissionPublisher.InvalidatePriorities();
+			if (!ResolveFixturePriorities(AdmissionPublisher)) co_return;
+			if (!InTest->TestTrue(TEXT("The admission candidates are priority-ready"),
+				AdmissionPublication->Groups[0].bPriorityReady && AdmissionPublication->Groups[1].bPriorityReady)) co_return;
 			auto& AdmissionFrame = Module->GetTerrainFrameContext();
 			AdmissionFrame.Begin(1, AdmissionFrame.GetFrameCounter() + 1, FPlatformTime::Seconds(), {});
 			for (int32 GroupIndex = 0; GroupIndex < AdmissionPublication->Groups.Num(); ++GroupIndex)

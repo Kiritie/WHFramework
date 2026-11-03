@@ -653,6 +653,7 @@ FVoxelGenerationDependencyStatus FVoxelGenerationPlanCoordinator::EnsureEnvironm
 	check(IsInGameThread());
 	if (!InBounds.IsValid() || !Config->Recipe)
 		return { false, true, TEXT("Environment preflight received invalid bounds or recipe") };
+	if (Config->TerrainType == EVoxelTerrainType::Superflat) return {true, false, {}};
 
 	const auto& Settings = Config->Recipe->Settings;
 	const FIntPoint Min = FVoxelGenerationQuery::HydrologyKeyForVoxel(

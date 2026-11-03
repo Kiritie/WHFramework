@@ -279,7 +279,8 @@ bool FVoxelVoxelProxyBuilder::ApplyTreeSilhouettes(
 		}
 	}
 	const FVoxelTreeGenerationSettings& Trees = Config->Recipe->Settings.Ecology.Tree;
-	if (!Trees.bEnabled || Trees.ChancePermille <= 0 || Trees.DensityPermille <= 0)
+	if (Config->TerrainType == EVoxelTerrainType::Superflat ||
+		!Trees.bEnabled || Trees.ChancePermille <= 0 || Trees.DensityPermille <= 0)
 	{
 		return true;
 	}
@@ -732,7 +733,7 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 						return false;
 					}
 				}
-				else
+				else if (Config->TerrainType != EVoxelTerrainType::Superflat)
 				{
 					State =
 						Config->
@@ -766,7 +767,8 @@ bool FVoxelVoxelProxyBuilder::BuildNatural(
 	Data.LocalMinCells = InShard ? InShard->LocalMinCells : FIntVector::ZeroValue;
 	Data.GridSide = GridSide;
 
-	Data.Cells.InitializeColumns(GridSide, Config->Stone);
+	Data.Cells.InitializeColumns(GridSide,
+		Config->TerrainType == EVoxelTerrainType::Superflat ? Config->Air : Config->Stone);
 	for (int32 Y = 0; Y < GridSide; ++Y)
 	{
 		if (InCancel && InCancel->Load()) { OutError = TEXT("Canceled"); return false; }

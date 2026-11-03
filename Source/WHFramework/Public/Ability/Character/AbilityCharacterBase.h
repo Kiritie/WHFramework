@@ -241,6 +241,8 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UAbilityControlComponent> Control;
 	const FGuid BaseStatsSource = FGuid(0x74FD8520, 0xB13E40AF, 0x9A9EFD04, 0xD49EE5D2);
+	// Asset identity can arrive before the authoritative level during pooled spawn.
+	bool bHasAuthoritativeLevel = false;
 	bool bBaseAttributeSourceReady = false;
 
 public:

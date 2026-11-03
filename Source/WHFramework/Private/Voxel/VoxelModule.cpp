@@ -72,6 +72,28 @@
 namespace
 {
 	constexpr int32 InterestErrorCapacity = 1024;
+	bool NormalizeVoxelWorldSettings(FVoxelGenerationSettings& InOutSettings, const EVoxelTerrainType InTerrainType, FString& OutError)
+	{
+		if (InTerrainType != EVoxelTerrainType::Default && InTerrainType != EVoxelTerrainType::Superflat)
+		{
+			OutError = TEXT("Voxel terrain type is invalid");
+			return false;
+		}
+		if (InTerrainType == EVoxelTerrainType::Superflat)
+		{
+			if (InOutSettings.MaxZ <= 0)
+			{
+				OutError = TEXT("Superflat world bounds must contain its ground and open space");
+				return false;
+			}
+			InOutSettings.MinZ = VoxelGeneration::SuperflatMinZ;
+			InOutSettings.SeaLevel = FMath::Clamp(InOutSettings.SeaLevel, InOutSettings.MinZ, InOutSettings.MaxZ - 1);
+			InOutSettings.BaseHeight = FMath::Clamp(InOutSettings.BaseHeight, InOutSettings.MinZ, InOutSettings.MaxZ - 1);
+			InOutSettings.LavaCeiling = FMath::Clamp(InOutSettings.LavaCeiling, InOutSettings.MinZ, InOutSettings.MaxZ - 1);
+		}
+		return InOutSettings.Validate(OutError);
+	}
+
 	bool IsTerminalInterestBuildError(const FString& InError)
 	{
 		return InError.StartsWith(TEXT("Oversized")) || InError.StartsWith(TEXT("CapacityUnachievable")) ||
@@ -223,6 +245,9 @@ UVoxelModule::UVoxelModule()
 		FName(TEXT("SceneModule"))
 	};
 
+	DefaultData.GenerationProfile = TSoftObjectPtr<UVoxelWorldGenerationProfile>(
+		FSoftObjectPath(TEXT("/WHFramework/Voxel/Generation/DA_VoxelWorldGenerationProfile_Default.DA_VoxelWorldGenerationProfile_Default")));
+
 	WorldData =
 		MakeUnique<
 			FVoxelModuleSaveData>();
@@ -248,8 +273,14 @@ bool UVoxelModule::CreateGenerationOverlay(
 	return true;
 }
 
-uint64 UVoxelModule::GetGenerationIdentitySalt() const
+TSoftObjectPtr<UVoxelMaterialSet> UVoxelModule::ResolveMaterialSetAsset() const
 {
+	return MaterialSetAsset;
+}
+
+uint64 UVoxelModule::GetGenerationIdentitySalt(const EVoxelTerrainType InTerrainType) const
+{
+	(void)InTerrainType;
 	return 0;
 }
 
@@ -294,7 +325,7 @@ void UVoxelModule::OnInitialize()
 	Shapes = NewShapes;
 	if (bRendering)
 	{
-		MaterialSet = MaterialSetAsset.LoadSynchronous();
+		MaterialSet = ResolveMaterialSetAsset().LoadSynchronous();
 		if (!MaterialSet || !MaterialSet->Validate(Error))
 		{
 			WorldState = EVoxelWorldState::Failed;
@@ -302,7 +333,8 @@ void UVoxelModule::OnInitialize()
 			return;
 		}
 	}
-	WorldGenerationProfile = WorldGenerationProfileAsset.LoadSynchronous();
+	ActiveGenerationProfileAsset = DefaultData.GenerationProfile;
+	WorldGenerationProfile = ActiveGenerationProfileAsset.LoadSynchronous();
 	if (!WorldGenerationProfile)
 	{
 		WorldState = EVoxelWorldState::Failed;
@@ -316,7 +348,7 @@ void UVoxelModule::OnPreparatory(const EPhase InPhase)
 	if (bAutoGenerate && IsAuthority() && !Runtime && WorldState != EVoxelWorldState::Failed)
 	{
 		FString Error;
-		if (!CreateWorldFromProfile(ResolveDefaultWorldSeed(), Error))
+		if (!CreateWorldFromProfile(ResolveDefaultWorldSeed(), Error, DefaultData.TerrainType))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Voxel auto world creation: %s"), *Error);
 		}
@@ -739,7 +771,7 @@ void UVoxelModule::OnTermination(const EPhase InPhase)
 	Super::OnTermination(InPhase);
 }
 
-bool UVoxelModule::CreateWorldFromProfile(const int32 InSeed, FString& OutError)
+bool UVoxelModule::CreateWorldFromProfile(const int32 InSeed, FString& OutError, const EVoxelTerrainType InTerrainType)
 {
 	if (!WorldGenerationProfile)
 	{
@@ -748,13 +780,14 @@ bool UVoxelModule::CreateWorldFromProfile(const int32 InSeed, FString& OutError)
 	}
 	FVoxelGenerationSettings Settings = WorldGenerationProfile->Defaults;
 	Settings.Seed = InSeed;
-	return CreateWorld(Settings, WorldGenerationProfile->TargetCellCentimeters, OutError);
+	return CreateWorld(Settings, WorldGenerationProfile->TargetCellCentimeters, OutError, InTerrainType);
 }
 
 bool UVoxelModule::CreateWorld(
 	const FVoxelGenerationSettings& InSettings,
 	const int32 InBlockSizeCentimeters,
-	FString& OutError)
+	FString& OutError,
+	const EVoxelTerrainType InTerrainType)
 {
 	if (!IsAuthority() ||
 		!Registry.GetSnapshot() ||
@@ -766,13 +799,15 @@ bool UVoxelModule::CreateWorld(
 
 		return false;
 	}
+	FVoxelGenerationSettings Settings = InSettings;
+	if (!NormalizeVoxelWorldSettings(Settings, InTerrainType, OutError)) return false;
 
 	FVoxelGenerationRuntimeConfig Config;
 
 	if (!FVoxelGenerationBinding::Build(
 		*WorldGenerationProfile,
 		*Registry.GetSnapshot(),
-		InSettings,
+		Settings,
 		InBlockSizeCentimeters,
 		Config,
 		OutError))
@@ -794,7 +829,8 @@ bool UVoxelModule::CreateWorld(
 		FGuid::NewGuid();
 
 	NewManifest.Settings =
-		InSettings;
+		Settings;
+	NewManifest.TerrainType = InTerrainType;
 
 	NewManifest.BlockSizeCentimeters =
 		InBlockSizeCentimeters;
@@ -808,7 +844,7 @@ bool UVoxelModule::CreateWorld(
 	NewManifest.BaseSampleHash =
 		BuildGenerationSignature(
 			NewManifest,
-			GetGenerationIdentitySalt());
+			GetGenerationIdentitySalt(NewManifest.TerrainType));
 
 	if (NewManifest.BaseSampleHash == 0)
 	{
@@ -870,6 +906,13 @@ bool UVoxelModule::StartWorld(
 		FailInitialization();
 		return false;
 	}
+	if (Manifest.TerrainType == EVoxelTerrainType::Superflat &&
+		(Manifest.Settings.MinZ != VoxelGeneration::SuperflatMinZ || Manifest.Settings.MaxZ <= 0))
+	{
+		OutError = TEXT("Superflat manifest has an invalid world height");
+		FailInitialization();
+		return false;
+	}
 	FVoxelGenerationRuntimeConfig Config;
 	if (!FVoxelGenerationBinding::Build(
 		*WorldGenerationProfile,
@@ -889,12 +932,14 @@ bool UVoxelModule::StartWorld(
 		}
 		return false;
 	}
+	Config.TerrainType = Manifest.TerrainType;
 
-	if ((Config.Recipe->Settings.Ecology.Tree.bEnabled &&
+	if (Config.TerrainType != EVoxelTerrainType::Superflat &&
+		((Config.Recipe->Settings.Ecology.Tree.bEnabled &&
 			(Config.Recipe->Ecology.TreeTrunk == MAX_uint16 ||
 			 Config.Recipe->Ecology.TreeLeaves == MAX_uint16)) ||
 		(Config.Recipe->Settings.Ecology.Grass.bEnabled &&
-		 Config.Recipe->Ecology.GrassPlant == MAX_uint16))
+		 Config.Recipe->Ecology.GrassPlant == MAX_uint16)))
 	{
 		OutError = TEXT("Enabled voxel ecology symbols are not bound");
 		FailInitialization();
@@ -948,7 +993,7 @@ bool UVoxelModule::StartWorld(
 	const uint64 ExpectedGenerationSignature =
 		BuildGenerationSignature(
 			Manifest,
-			GetGenerationIdentitySalt());
+			GetGenerationIdentitySalt(Manifest.TerrainType));
 	if (ExpectedGenerationSignature == 0 ||
 		Manifest.BaseSampleHash != ExpectedGenerationSignature ||
 		Epoch == MAX_uint64)
@@ -1080,7 +1125,8 @@ bool UVoxelModule::StartWorld(
 	NaturalGenerator->MarkPublished();
 	Generator->MarkPublished();
 	Runtime->GetChangeHierarchy().SetTopology(ViewSettings.Lod);
-	if (GenerationConfig->Recipe->Settings.Ecology.Tree.bEnabled)
+	if (GenerationConfig->TerrainType != EVoxelTerrainType::Superflat &&
+		GenerationConfig->Recipe->Settings.Ecology.Tree.bEnabled)
 	{
 		const FVoxelTreeGenerationSettings& Tree =
 			GenerationConfig->Recipe->Settings.Ecology.Tree;
@@ -1175,13 +1221,16 @@ bool UVoxelModule::StartWorld(
 	{
 		NavigationPresenter = MakeUnique<FVoxelNavigationPresenter>(*this, *Scheduler);
 	}
-	DetailView = MakeUnique<FVoxelDetailView>(*this, *Scheduler, Epoch);
-	if (!DetailView->Initialize(OutError))
+	if (Manifest.TerrainType != EVoxelTerrainType::Superflat)
 	{
-		FString StopError;
-		StopWorld(true, StopError);
-		WorldState = EVoxelWorldState::Failed;
-		return false;
+		DetailView = MakeUnique<FVoxelDetailView>(*this, *Scheduler, Epoch);
+		if (!DetailView->Initialize(OutError))
+		{
+			FString StopError;
+			StopWorld(true, StopError);
+			WorldState = EVoxelWorldState::Failed;
+			return false;
+		}
 	}
 
 	SessionId = IsAuthority() ? FGuid::NewGuid() : FGuid();
@@ -1205,9 +1254,10 @@ bool UVoxelModule::StartWorld(
 		WorldData = NewWorldData();
 	}
 	WorldData->GenerationProfile =
-		WorldGenerationProfileAsset;
+		ActiveGenerationProfileAsset;
 	WorldData->Seed =
 		Manifest.Settings.Seed;
+	WorldData->TerrainType = Manifest.TerrainType;
 	FVoxelManifestCodec::Encode(Manifest, WorldData->ManifestBytes);
 	// 远端客户端没有 GameMode 的模块启动阶段；握手建立运行时后启用自身刷新。
 	if (bInRemote && GetModuleState() == EModuleState::None && IsModuleAutoRun()) Run();
@@ -2050,18 +2100,18 @@ bool UVoxelModule::IsPersistenceEnabled() const
 
 TSoftObjectPtr<UVoxelWorldGenerationProfile> UVoxelModule::GetWorldGenerationProfileAsset() const
 {
-	return WorldGenerationProfileAsset;
+	return ActiveGenerationProfileAsset.IsNull() ? DefaultData.GenerationProfile : ActiveGenerationProfileAsset;
 }
 
 int32 UVoxelModule::GetDefaultWorldSeed() const
 {
-	return DefaultWorldSeed;
+	return DefaultData.Seed;
 }
 
 int32 UVoxelModule::ResolveDefaultWorldSeed() const
 {
-	return DefaultWorldSeed == 0 ?
-		FMath::Max(1, static_cast<int32>(FGuid::NewGuid().A & 0x7fffffffu)) : DefaultWorldSeed;
+	return DefaultData.Seed == 0 ?
+		FMath::Max(1, static_cast<int32>(FGuid::NewGuid().A & 0x7fffffffu)) : DefaultData.Seed;
 }
 
 FIntPoint UVoxelModule::GetLocalFineRadiusLimits() const
@@ -3307,6 +3357,14 @@ FVoxelEditReply UVoxelModule::ExecuteIntent(
 		Reply.Code = EVoxelEditCode::Stale;
 		return Reply;
 	}
+	if (Manifest.TerrainType == EVoxelTerrainType::Superflat &&
+		Hit.Index.Z == VoxelGeneration::SuperflatSurfaceZ &&
+		(InIntent.Action == EVoxelEditAction::BreakBegin || InIntent.Action == EVoxelEditAction::BreakPulse))
+	{
+		Breaking.Remove(InSource);
+		Reply.Reason = TEXT("Voxel.SuperflatFoundationUnbreakable");
+		return Reply;
+	}
 
 	const double Now = FPlatformTime::Seconds();
 	if (InIntent.Action == EVoxelEditAction::BreakBegin)
@@ -3499,6 +3557,17 @@ bool UVoxelModule::ApplyPrefab(
 	const FIntVector& InOrigin,
 	FString& OutError)
 {
+	FInventoryCommandResult Result;
+	return ApplyPrefab(InPrefab, InOrigin, Result, OutError);
+}
+
+bool UVoxelModule::ApplyPrefab(
+	const FVoxelPrefabSaveData& InPrefab,
+	const FIntVector& InOrigin,
+	FInventoryCommandResult& OutResult,
+	FString& OutError)
+{
+	OutResult = FInventoryCommandResult();
 	if (!IsAuthority() || !IsReady() || IsWorldSaveSuspended() || bMutating || InPrefab.Cells.IsEmpty())
 	{
 		OutError = TEXT("Invalid prefab operation");
@@ -3559,8 +3628,7 @@ bool UVoxelModule::ApplyPrefab(
         return false;
     }
     FInventoryBatchRequest Request;
-    FInventoryCommandResult Result;
-    return ExecuteInventoryWorldEdit(Plan, nullptr, Request, System->MakeServerAuthority(System->GetWorldId(), TEXT("World.ApplyPrefab")), Result, OutError);
+    return ExecuteInventoryWorldEdit(Plan, nullptr, Request, System->MakeServerAuthority(System->GetWorldId(), TEXT("World.ApplyPrefab")), OutResult, OutError);
 }
 
 
@@ -3667,7 +3735,7 @@ bool UVoxelModule::ApplyGenerationProfileFromSave(
 	if (ProfileAsset.IsNull())
 	{
 		ProfileAsset =
-			WorldGenerationProfileAsset;
+			DefaultData.GenerationProfile;
 	}
 
 	UVoxelWorldGenerationProfile* Profile =
@@ -3687,7 +3755,7 @@ bool UVoxelModule::ApplyGenerationProfileFromSave(
 		return false;
 	}
 
-	WorldGenerationProfileAsset =
+	ActiveGenerationProfileAsset =
 		ProfileAsset;
 
 	WorldGenerationProfile =
@@ -3705,11 +3773,7 @@ UVoxelModule::NewWorldData(
 		MakeUnique<
 			FVoxelModuleSaveData>();
 
-	Result->GenerationProfile =
-		WorldGenerationProfileAsset;
-
-	Result->Seed =
-		DefaultWorldSeed;
+	static_cast<FVoxelWorldSaveData&>(*Result) = DefaultData;
 
 	if (const FVoxelWorldSaveData* Source =
 		InBasic.
@@ -3733,8 +3797,13 @@ bool UVoxelModule::ValidateNewWorldData(const FParameter& InData, FString& OutEr
 		OutError = TEXT("New voxel world validation requires unsaved data without a manifest");
 		return false;
 	}
+	if (Data->TerrainType != EVoxelTerrainType::Default && Data->TerrainType != EVoxelTerrainType::Superflat)
+	{
+		OutError = TEXT("New voxel world has an invalid terrain type");
+		return false;
+	}
 	const TSoftObjectPtr<UVoxelWorldGenerationProfile> ProfileAsset =
-		Data->GenerationProfile.IsNull() ? WorldGenerationProfileAsset : Data->GenerationProfile;
+		Data->GenerationProfile.IsNull() ? DefaultData.GenerationProfile : Data->GenerationProfile;
 	const UVoxelWorldGenerationProfile* Profile = ProfileAsset.LoadSynchronous();
 	const TSharedPtr<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> RegistrySnapshot = Registry.GetSnapshot();
 	if (!IsAuthority() || !RegistrySnapshot || !Profile)
@@ -3744,6 +3813,7 @@ bool UVoxelModule::ValidateNewWorldData(const FParameter& InData, FString& OutEr
 	}
 	FVoxelGenerationSettings Settings = Profile->Defaults;
 	Settings.Seed = Data->Seed;
+	if (!NormalizeVoxelWorldSettings(Settings, Data->TerrainType, OutError)) return false;
 	FVoxelGenerationRuntimeConfig Config;
 	if (!FVoxelGenerationBinding::Build(*Profile, *RegistrySnapshot, Settings,
 		Profile->TargetCellCentimeters, Config, OutError))
@@ -3772,6 +3842,11 @@ bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError
 	if (!FVoxelManifestCodec::Decode(Data->ManifestBytes, SavedManifest))
 	{
 		OutError = TEXT("Voxel save manifest is invalid or uses an unsupported generation identity protocol");
+		return false;
+	}
+	if (Data->TerrainType != SavedManifest.TerrainType)
+	{
+		OutError = TEXT("Voxel terrain type differs from its saved world manifest");
 		return false;
 	}
 	if (!FVoxelGenerationRecipe::IsSupportedAlgorithmVersion(SavedManifest.GeneratorVersion))
@@ -3805,7 +3880,7 @@ bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError
 		return false;
 	}
 	const uint64 ExpectedGenerationSignature =
-		BuildGenerationSignature(SavedManifest, GetGenerationIdentitySalt());
+		BuildGenerationSignature(SavedManifest, GetGenerationIdentitySalt(SavedManifest.TerrainType));
 	if (ExpectedGenerationSignature == 0 ||
 		ExpectedGenerationSignature != SavedManifest.BaseSampleHash)
 	{
@@ -3927,7 +4002,8 @@ void UVoxelModule::LoadData(
 
 		if (!CreateWorldFromProfile(
 				Data->Seed,
-				Error))
+				Error,
+				Data->TerrainType))
 		{
 			bWorldLoadRejected =
 				true;
@@ -4023,11 +4099,12 @@ FParameter UVoxelModule::ToData()
 				*WorldData;
 
 	Data.GenerationProfile =
-		WorldGenerationProfileAsset;
+		ActiveGenerationProfileAsset;
 
 	Data.Seed =
 		Manifest.
 			Settings.Seed;
+	Data.TerrainType = Manifest.TerrainType;
 
 	if (!FVoxelManifestCodec::Encode(
 			Manifest,
@@ -4766,7 +4843,20 @@ bool UVoxelModule::ExecuteInventoryWorldEdit(FVoxelInteractionPlan& InOutPlan, A
     }
     TGuardValue<bool> Guard(bMutating, true);
     if(!InventoryContribution(InOutPlan, InSource, InOutRequest, OutError) ||
-        !ValidateInteractionPlan(InOutPlan, OutError) || PlacementOverlapsActors(InOutPlan) ||
+        !ValidateInteractionPlan(InOutPlan, OutError))
+    {
+        return false;
+    }
+	if (Manifest.TerrainType == EVoxelTerrainType::Superflat && InOutPlan.Cells.ContainsByPredicate(
+		[](const FVoxelCellEdit& InEdit)
+		{
+			return InEdit.Position.Z == VoxelGeneration::SuperflatSurfaceZ && !InEdit.Expected.IsAir() && InEdit.Value.IsAir();
+		}))
+	{
+		OutError = TEXT("Voxel.SuperflatFoundationUnbreakable");
+		return false;
+	}
+    if(PlacementOverlapsActors(InOutPlan) ||
         !InventoryBridge->AppendEdit(InOutPlan.Cells, InOutPlan.Entities, InOutRequest.DomainChanges, OutError))
     {
         if(OutError.IsEmpty()) OutError = TEXT("Inventory.WorldEditOverlapsActor");

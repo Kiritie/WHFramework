@@ -693,7 +693,14 @@ bool FVoxelInterestRuntime::UpdateSnapshot(TConstArrayView<FVoxelStreamingSource
 		else
 		{
 			LastPlanningError = Next.PlanningError;
-			UE_LOG(LogTemp, Error, TEXT("Terrain plan failed; preserving committed interest: %s"), *Next.PlanningError);
+			if (Next.PlanningError.StartsWith(TEXT("CapacityBlocked")))
+			{
+				UE_LOG(LogTemp, Verbose, TEXT("Terrain plan waiting for capacity; preserving committed interest: %s"), *Next.PlanningError);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("Terrain plan failed; preserving committed interest: %s"), *Next.PlanningError);
+			}
 		}
 		OutInterest.Reset();
 		return false;

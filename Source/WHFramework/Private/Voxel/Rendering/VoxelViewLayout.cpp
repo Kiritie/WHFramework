@@ -120,6 +120,9 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishTerrainLayoutSteps(FPubli
 		if (!Prepared)
 			continue;
 		const TPair<FVoxelHeightfieldNodeKey, uint64> Pair(LocalOwner, *Prepared);
+		const FVoxelPublishGroupKey TerrainOwner{static_cast<uint8>(Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 2 : 3),
+			Pair.Key.Coordinate, Pair.Key.Level};
+		if (!bInitialLayout && !IsRetirementWanted(TerrainOwner)) continue;
 		const uint64* Desired = DesiredTransitionSignatures.Find(Pair.Key);
 		const auto Mesh = PreparedTransitionMeshes.FindRef(Pair.Key);
 		const FVoxelCoverageRect Rect = Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface
@@ -215,6 +218,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishTerrainLayoutSteps(FPubli
 		if (!Prepared)
 			continue;
 		const TPair<FVoxelViewKey, uint64> Pair(LocalOwner, *Prepared);
+		if (!bInitialLayout && !IsRetirementWanted({1, Pair.Key.Coordinate, Pair.Key.Level})) continue;
 		const uint64* Desired = DesiredVolumeSignatures.Find(Pair.Key);
 		const auto Mesh = PreparedVolumeMeshes.FindRef(Pair.Key);
 		if (!Desired || *Desired != Pair.Value || !Mesh || !TargetTerrainNodes.Contains(Pair.Key) ||
@@ -581,28 +585,43 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishDynamicSourcesSteps(FPubl
 		FVoxelViewSourceId SourceId = VoxelProxySources.FindRef(Key);
 		if (!SourceId || !CoverageAffects(VoxelProxyCoverageRect(Key)))
 			continue;
-		const bool bVisible = TargetTerrainNodes.Contains(Key);
 		const FVoxelPublishGroupKey GroupKey{1, Key.Coordinate, Key.Level};
-		if (!bVisible && Publisher->IsHidden(SourceId) && Publisher->IsCommitted(SourceId) && !Publisher->IsGroupBusy(GroupKey))
+		const FVoxelViewSourceId Boundary = VolumeBoundarySources.FindRef(Key);
+		const bool bWanted = IsRetirementWanted(GroupKey);
+		const auto SourceDisposition = Publisher->ClassifyCoverageSource(SourceId, bWanted);
+		const auto BoundaryDisposition = Boundary ? Publisher->ClassifyCoverageSource(Boundary, bWanted) : EVoxelCoverageSourceDisposition::Include;
+		if (SourceDisposition == EVoxelCoverageSourceDisposition::WaitForPresentation ||
+			BoundaryDisposition == EVoxelCoverageSourceDisposition::WaitForPresentation)
+		{
+			MarkPublishGroupCoverageDirty(GroupKey);
+			continue;
+		}
+		const bool bDiscardSource = SourceDisposition == EVoxelCoverageSourceDisposition::SuppressUnpresented;
+		const bool bDiscardBoundary = BoundaryDisposition == EVoxelCoverageSourceDisposition::SuppressUnpresented;
+		const bool bVisible = TargetTerrainNodes.Contains(Key);
+		if (!bVisible && Publisher->IsHidden(SourceId) && Publisher->IsCommitted(SourceId) &&
+			(!Boundary || Publisher->IsHidden(Boundary)) && !Publisher->IsGroupBusy(GroupKey))
 			continue;
 		const FGuid Group = BeginPublishGroup(GroupKey);
 		if (VoxelCoverage::IntersectsAny3D(VoxelProxyCoverageBox(Key), PendingVolumeHandoffBoxes))
 		{
-			if (!Publisher->HasPresentation(SourceId))
+			if (bDiscardSource || !Publisher->HasPresentation(SourceId))
 				Publisher->SetHidden(Group, SourceId, true);
+			if (Boundary && bDiscardBoundary)
+				Publisher->SetHidden(Group, Boundary, true);
 			continue;
 		}
-		if (bVisible)
+		if (bVisible && !bDiscardSource)
 		{
 			TArray<FBox> Exclusions = *FineBoxes;
 			for (const auto& Other : ProxyExclusionKeys)
 				if (Other.Level > 0 && Other.Level < Key.Level)
 					Exclusions.Add(Box(VoxelProxyCoverageBox(Other)));
-			co_await UpdatePublicationCoverageSteps(InSources, Group, SourceId, MoveTemp(Exclusions));
+			co_await UpdatePublicationCoverageSteps(InSources, Group, SourceId, MoveTemp(Exclusions), nullptr, !bWanted, false);
 		}
-		Publisher->SetHidden(Group, SourceId, !bVisible);
-		if (FVoxelViewSourceId Boundary = VolumeBoundarySources.FindRef(Key))
-			Publisher->SetHidden(Group, Boundary, !bVisible);
+		Publisher->SetHidden(Group, SourceId, !bVisible || bDiscardSource);
+		if (Boundary)
+			Publisher->SetHidden(Group, Boundary, !bVisible || bDiscardBoundary);
 	}
 	for (const FVoxelSurfaceTileKey& LocalKey : LocalSurfaceKeys)
 	{
@@ -612,18 +631,40 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishDynamicSourcesSteps(FPubl
 			continue;
 		if (!CoverageAffects(SurfaceCoverageRect(Pair.Key)))
 			continue;
-		const FGuid Group = BeginPublishGroup({2, Pair.Key.Coordinate, Pair.Key.Level});
+		const FVoxelPublishGroupKey GroupKey{2, Pair.Key.Coordinate, Pair.Key.Level};
+		const FVoxelViewSourceId Water = WaterSources.FindRef(Pair.Key);
+		const bool bOwnerWanted = IsRetirementWanted(GroupKey);
+		const auto SourceDisposition = Publisher->ClassifyCoverageSource(Pair.Value, bOwnerWanted);
+		const auto WaterDisposition = Water ? Publisher->ClassifyCoverageSource(Water, bOwnerWanted) : EVoxelCoverageSourceDisposition::Include;
+		if (SourceDisposition == EVoxelCoverageSourceDisposition::WaitForPresentation ||
+			WaterDisposition == EVoxelCoverageSourceDisposition::WaitForPresentation)
+		{
+			MarkPublishGroupCoverageDirty(GroupKey);
+			continue;
+		}
+		const bool bDiscardSource = SourceDisposition == EVoxelCoverageSourceDisposition::SuppressUnpresented;
+		const bool bDiscardWater = WaterDisposition == EVoxelCoverageSourceDisposition::SuppressUnpresented;
+		const FGuid Group = BeginPublishGroup(GroupKey);
+		if (bDiscardSource && (!Water || bDiscardWater))
+		{
+			Publisher->SetHidden(Group, Pair.Value, true);
+			if (Water) Publisher->SetHidden(Group, Water, true);
+			continue;
+		}
 		const bool bHasPreviousCoverage =
 			Publisher->HasPresentation(Pair.Value) || VoxelCoverage::IntersectsAny2D(SurfaceCoverageRect(Pair.Key), PresentedHeightfieldRects);
 		if (bHasPreviousCoverage && (BlockedHeightfieldNodes.Contains({EVoxelHeightfieldRepresentation::Surface, Pair.Key.Coordinate, Pair.Key.Level}) ||
 										(!GetInputRoot().SurfaceWanted.Contains(Pair.Key) && HandoffPending(SurfaceCoverageRect(Pair.Key)))))
 		{
-			if (!Publisher->HasPresentation(Pair.Value))
+			if (bDiscardSource || !Publisher->HasPresentation(Pair.Value))
 				Publisher->SetHidden(Group, Pair.Value, true);
 			else
 				co_await UpdatePublicationCoverageSteps(InSources, Group, Pair.Value, {}, CommonHeightfieldBoxes, true);
-			if (FVoxelViewSourceId Water = WaterSources.FindRef(Pair.Key))
-				co_await UpdatePublicationCoverageSteps(InSources, Group, Water, {}, CommonHeightfieldBoxes, true);
+			if (Water)
+			{
+				if (bDiscardWater) Publisher->SetHidden(Group, Water, true);
+				else co_await UpdatePublicationCoverageSteps(InSources, Group, Water, {}, CommonHeightfieldBoxes, true);
+			}
 			continue;
 		}
 		const bool bWanted = GetInputRoot().SurfaceWanted.Contains(Pair.Key);
@@ -635,9 +676,8 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishDynamicSourcesSteps(FPubl
 		const FVoxelCoverageRect SourceRect = SurfaceCoverageRect(Pair.Key);
 		if (!CoverageAffects(SourceRect))
 		{
-			Publisher->SetHidden(Group, Pair.Value, bHidden);
-			if (FVoxelViewSourceId Water = WaterSources.FindRef(Pair.Key))
-				Publisher->SetHidden(Group, Water, bHidden);
+			Publisher->SetHidden(Group, Pair.Value, bHidden || bDiscardSource);
+			if (Water) Publisher->SetHidden(Group, Water, bHidden || bDiscardWater);
 			continue;
 		}
 		TArray<FBox> Exclusions;
@@ -664,15 +704,15 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishDynamicSourcesSteps(FPubl
 		}
 		if (!bHidden)
 		{
-			if (!Publisher->IsCommitted(Pair.Value))
+			if (!bDiscardSource && !Publisher->IsCommitted(Pair.Value))
 				RecheckCoverageRects.Add(SourceRect);
-			co_await UpdatePublicationCoverageSteps(InSources, Group, Pair.Value, Exclusions, CommonHeightfieldBoxes);
-			if (FVoxelViewSourceId Water = WaterSources.FindRef(Pair.Key))
-				co_await UpdatePublicationCoverageSteps(InSources, Group, Water, MoveTemp(Exclusions), CommonHeightfieldBoxes);
+			if (!bDiscardSource)
+				co_await UpdatePublicationCoverageSteps(InSources, Group, Pair.Value, Exclusions, CommonHeightfieldBoxes, !bOwnerWanted, false);
+			if (Water && !bDiscardWater)
+				co_await UpdatePublicationCoverageSteps(InSources, Group, Water, MoveTemp(Exclusions), CommonHeightfieldBoxes, !bOwnerWanted, false);
 		}
-		Publisher->SetHidden(Group, Pair.Value, bHidden);
-		if (FVoxelViewSourceId Water = WaterSources.FindRef(Pair.Key))
-			Publisher->SetHidden(Group, Water, bHidden);
+		Publisher->SetHidden(Group, Pair.Value, bHidden || bDiscardSource);
+		if (Water) Publisher->SetHidden(Group, Water, bHidden || bDiscardWater);
 	}
 	for (const FVoxelMacroTileKey& LocalKey : LocalMacroKeys)
 	{
@@ -682,7 +722,20 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishDynamicSourcesSteps(FPubl
 			continue;
 		if (!CoverageAffects(MacroCoverageRect(Pair.Key)))
 			continue;
-		const FGuid Group = BeginPublishGroup({3, Pair.Key.Coordinate, Pair.Key.Level});
+		const FVoxelPublishGroupKey GroupKey{3, Pair.Key.Coordinate, Pair.Key.Level};
+		const bool bOwnerWanted = IsRetirementWanted(GroupKey);
+		const auto Disposition = Publisher->ClassifyCoverageSource(Pair.Value, bOwnerWanted);
+		if (Disposition == EVoxelCoverageSourceDisposition::WaitForPresentation)
+		{
+			MarkPublishGroupCoverageDirty(GroupKey);
+			continue;
+		}
+		const FGuid Group = BeginPublishGroup(GroupKey);
+		if (Disposition == EVoxelCoverageSourceDisposition::SuppressUnpresented)
+		{
+			Publisher->SetHidden(Group, Pair.Value, true);
+			continue;
+		}
 		const bool bHasPreviousCoverage =
 			Publisher->HasPresentation(Pair.Value) || VoxelCoverage::IntersectsAny2D(MacroCoverageRect(Pair.Key), PresentedHeightfieldRects);
 		if (bHasPreviousCoverage && (BlockedHeightfieldNodes.Contains({EVoxelHeightfieldRepresentation::Macro, Pair.Key.Coordinate, Pair.Key.Level}) ||
@@ -728,7 +781,7 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishDynamicSourcesSteps(FPubl
 		{
 			if (!Publisher->IsCommitted(Pair.Value))
 				RecheckCoverageRects.Add(SourceRect);
-			co_await UpdatePublicationCoverageSteps(InSources, Group, Pair.Value, MoveTemp(Exclusions), CommonHeightfieldBoxes);
+			co_await UpdatePublicationCoverageSteps(InSources, Group, Pair.Value, MoveTemp(Exclusions), CommonHeightfieldBoxes, !bOwnerWanted, false);
 		}
 		Publisher->SetHidden(Group, Pair.Value, bHidden);
 	}
@@ -743,8 +796,23 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishDynamicSourcesSteps(FPubl
 											: MacroCoverageRect({Pair.Key.Coordinate, Pair.Key.Level});
 		if (!CoverageAffects(Rect))
 			continue;
-		const FGuid Group = BeginPublishGroup(
-			{static_cast<uint8>(Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 4 : 5), Pair.Key.Coordinate, Pair.Key.Level});
+		const bool bSurface = Pair.Key.Representation == EVoxelHeightfieldRepresentation::Surface;
+		const FVoxelPublishGroupKey GroupKey{static_cast<uint8>(bSurface ? 4 : 5), Pair.Key.Coordinate, Pair.Key.Level};
+		const FVoxelPublishGroupKey TerrainOwner{static_cast<uint8>(bSurface ? 2 : 3), Pair.Key.Coordinate, Pair.Key.Level};
+		const bool bWanted = IsRetirementWanted(TerrainOwner) && DesiredTransitionSignatures.Contains(Pair.Key);
+		const auto Disposition = Publisher->ClassifyCoverageSource(Pair.Value, bWanted);
+		if (Disposition == EVoxelCoverageSourceDisposition::WaitForPresentation)
+		{
+			MarkPublishGroupCoverageDirty(GroupKey);
+			continue;
+		}
+		const FGuid Group = BeginPublishGroup(GroupKey);
+		if (Disposition == EVoxelCoverageSourceDisposition::SuppressUnpresented)
+		{
+			HeightfieldToCommit.Remove(Pair.Key);
+			Publisher->SetHidden(Group, Pair.Value, true);
+			continue;
+		}
 		const bool bBlocked = BlockedHeightfieldNodes.Contains(Pair.Key) || HandoffPending(Rect);
 		if (bBlocked)
 		{
@@ -761,13 +829,16 @@ FVoxelGameThreadContinuation FVoxelViewManager::PublishDynamicSourcesSteps(FPubl
 }
 
 FVoxelGameThreadContinuation FVoxelViewManager::UpdatePublicationCoverageSteps(const FPublicationSources& InSources, const FGuid& InGroup,
-	FVoxelViewSourceId InSource, TArray<FBox> InBoxes, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommon, const bool bInRetainPresented)
+	FVoxelViewSourceId InSource, TArray<FBox> InBoxes, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommon,
+	const bool bInRetainPresented, const bool bInKeepRetainedLocal)
 {
 	bool bSuccess = false;
 	if (InSources.bScoped)
 		co_await Publisher->SetScopedCoverageSteps(InGroup, InSource, MoveTemp(InBoxes), MoveTemp(InCommon), InSources.ScopeBoxes, bSuccess, bInRetainPresented);
-	else if (bInRetainPresented)
+	else if (bInRetainPresented && bInKeepRetainedLocal)
 		co_await Publisher->SetSharedCoverageSteps(InGroup, InSource, MoveTemp(InCommon), bSuccess);
+	else if (bInRetainPresented)
+		co_await Publisher->SetRetainedCoverageSteps(InGroup, InSource, MoveTemp(InBoxes), MoveTemp(InCommon), bSuccess);
 	else
 		co_await Publisher->SetCoverageSteps(InGroup, InSource, MoveTemp(InBoxes), MoveTemp(InCommon), bSuccess);
 	if (!bSuccess) MarkPublishGroupCoverageDirty(InGroup);

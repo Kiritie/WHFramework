@@ -21,6 +21,7 @@ class WHFRAMEWORK_API USaveGameModule : public UModuleBase
 
 #if WITH_DEV_AUTOMATION_TESTS
 	friend class FVoxelSaveCoordinatorTest;
+	friend class FSaveGameTransientSessionTest;
 #endif
 
 	GENERATED_MODULE(USaveGameModule)
@@ -35,6 +36,13 @@ public:
 	void UnregisterWorldStoreParticipant(FName InName);
 	FString GetStorageRoot() const;
 	FString GetUnboundInventoryRoot() const;
+
+	UFUNCTION(BlueprintPure, Category = "SaveGame|Session")
+	bool IsTransientSession() const
+	{
+		return (bSessionPolicyLocked ? RuntimeSessionPolicy : SessionPolicy) == ESaveSessionPolicy::Transient;
+	}
+
 	static bool IsStepTimeLimitEnforced();
 	~USaveGameModule();
 
@@ -89,7 +97,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
 	bool HasPendingSaveSlot() const
 	{
-		return bHasPendingSaveSlot;
+		return !IsTransientSession() && bHasPendingSaveSlot;
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
@@ -123,7 +131,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
 	bool HasActiveSave() const
 	{
-		return ActiveSaveId.IsValid();
+		return !IsTransientSession() && ActiveSaveId.IsValid();
 	}
 
 	bool IsSaveOperationRunning() const
@@ -134,7 +142,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
 	FGuid GetActiveSaveId() const
 	{
-		return ActiveSaveId;
+		return IsTransientSession() ? FGuid() : ActiveSaveId;
 	}
 
 	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
@@ -169,6 +177,8 @@ private:
 	void FinalizeAsyncSave();
 	void CompleteUserQuit(const FSaveOperationResult& InResult);
 	void RestoreLastActiveSave();
+	void LockSessionPolicy();
+	void AdoptPendingSaveLoad(FSaveGameLoadSnapshot InSnapshot);
 	FSaveOperationResult LoadModulesFromGeneration(const FGuid& SaveId, int32 Generation, EPhase InPhase);
 	FSaveOperationResult RestoreLoadSnapshot(EPhase InPhase);
 	TArray<UModuleBase*> GetSaveModules(
@@ -177,6 +187,14 @@ private:
 	void OnGameExited(UObject* InSender, const struct FEventGameExited& InEvent);
 
 private:
+	/** 临时会话不读写世界存档和设置 Profile；运行中更改此配置仅对下次创建的模块实例生效。 */
+	UPROPERTY(EditAnywhere, Category = "SaveGame|Session")
+	ESaveSessionPolicy SessionPolicy = ESaveSessionPolicy::Persistent;
+
+	// 非反射的运行态快照只属于该模块实例；配置修改不会改变在途存档的所有权。
+	ESaveSessionPolicy RuntimeSessionPolicy = ESaveSessionPolicy::Persistent;
+	bool bSessionPolicyLocked = false;
+
 	UPROPERTY(EditAnywhere, Category = "UserData")
 	int32 UserIndex;
 

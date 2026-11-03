@@ -5,7 +5,7 @@
 
 struct WHFRAMEWORK_API FVoxelWorldManifest
 {
-	static constexpr uint32 ProtocolVersion = 6;
+	static constexpr uint32 ProtocolVersion = 7;
 
 	FGuid WorldId;
 	uint32 GeneratorVersion =
@@ -13,6 +13,7 @@ struct WHFRAMEWORK_API FVoxelWorldManifest
 			CurrentAlgorithmVersion;
 
 	FVoxelGenerationSettings Settings;
+	EVoxelTerrainType TerrainType = EVoxelTerrainType::Default;
 
 	int32 BlockSizeCentimeters = 25;
 

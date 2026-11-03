@@ -62,6 +62,8 @@ bool FVoxelEditTransaction::Build(const FVoxelWorldRuntime&W,const FVoxelRegistr
     else if(Action==EVoxelEditAction::Place)
     {
         const auto*D=R.Find(PlaceType);if(!D||PlaceType==0){Error=TEXT("Unknown placeable block");return false;}
+        // Object parts may only be placed through their registered whole-object transaction.
+        if(D->Shape==EVoxelShapeKind::ObjectPart){Error=TEXT("World object parts require registered object placement");return false;}
         Target=HitDef->bReplaceable?H.Index:H.PlacementIndex;FVoxelBlockState State{PlaceType,0};
         bool MergeSlab=HitDef->Shape==EVoxelShapeKind::Slab&&D->Shape==EVoxelShapeKind::Slab&&PlaceType==H.State.TypeId&&
             !(H.State.State&0x800)&&((!(H.State.State&8)&&H.Normal.Z>.5)||((H.State.State&8)&&H.Normal.Z<-.5));

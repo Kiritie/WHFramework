@@ -41,19 +41,19 @@ struct WHFRAMEWORK_API FVoxelFineStreamingPolicy
 	int32 MaximumShardGeometryMegabytes = 64;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
-	int32 MaximumInputGeometryMegabytes = 64;
+	int32 MaximumInputGeometryMegabytes = 320;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
-	int32 MaximumWorkingGeometryMegabytes = 256;
+	int32 MaximumWorkingGeometryMegabytes = 512;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
-	int32 MaximumStagedGeometryMegabytes = 128;
+	int32 MaximumStagedGeometryMegabytes = 2048;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "64"))
-	int32 MaximumResidentGeometryMegabytes = 512;
+	int32 MaximumResidentGeometryMegabytes = 5120;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
-	int32 ResidentGeometryOverlapMegabytes = 128;
+	int32 ResidentGeometryOverlapMegabytes = 512;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "1"))
 	int32 ReservedNearWorkers = 4;

@@ -13,6 +13,18 @@ UVoxelData::UVoxelData()
 }
 void UVoxelData::OnInitialize_Implementation(){Super::OnInitialize_Implementation();}
 void UVoxelData::OnReset_Implementation(){Super::OnReset_Implementation();}
+FInventoryItemDefinition UVoxelData::BuildInventoryDefinition() const
+{
+    FInventoryItemDefinition Definition = Super::BuildInventoryDefinition();
+    // Registration describes generation, not permission to place an inventory item.
+    // An explicitly placeable voxel item targets its own registered voxel definition.
+    if(Definition.UsePolicy == EInventoryUsePolicy::PlaceVoxel && bRegisterBlock &&
+        !BlockName.IsNone() && BlockName != TEXT("core:air"))
+    {
+        Definition.PlaceableVoxelId = Definition.ItemId;
+    }
+    return Definition;
+}
 bool UVoxelData::ValidateDefinition(bool Render,FString&E)const
 {
     if(!bRegisterBlock){E.Reset();return true;}

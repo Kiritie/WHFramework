@@ -104,7 +104,7 @@ struct WHFRAMEWORK_API FVoxelStreamingSourceView
 		BlueprintReadWrite,
 		Category = "Voxel|Streaming",
 		meta = (ClampMin = "0"))
-	int32 FineRadiusCells = 256;
+	int32 FineRadiusCells = 128;
 
 	// Fine Representation 的 Z 半高；不是三维球半径。
 	UPROPERTY(
@@ -112,7 +112,7 @@ struct WHFRAMEWORK_API FVoxelStreamingSourceView
 		BlueprintReadWrite,
 		Category = "Voxel|Streaming",
 		meta = (ClampMin = "0"))
-	int32 FineVerticalHalfExtentCells = 256;
+	int32 FineVerticalHalfExtentCells = 128;
 
 	// 移动预测时间。只用于前向 Critical / Prefetch，不扩大 Fine 显示域。
 	UPROPERTY(
@@ -128,7 +128,7 @@ struct WHFRAMEWORK_API FVoxelStreamingSourceView
 		BlueprintReadWrite,
 		Category = "Voxel|View",
 		meta = (ClampMin = "0"))
-	int32 VoxelProxyRadiusCells = 1024;
+	int32 VoxelProxyRadiusCells = 341;
 
 	// VoxelProxy 独立 Z 半高；禁止继续借 FineVerticalHalfExtentCells。
 	UPROPERTY(
@@ -136,7 +136,7 @@ struct WHFRAMEWORK_API FVoxelStreamingSourceView
 		BlueprintReadWrite,
 		Category = "Voxel|View",
 		meta = (ClampMin = "0"))
-	int32 VoxelProxyVerticalHalfExtentCells = 128;
+	int32 VoxelProxyVerticalHalfExtentCells = 43;
 
 	// Surface 外半径。
 	UPROPERTY(
@@ -144,7 +144,7 @@ struct WHFRAMEWORK_API FVoxelStreamingSourceView
 		BlueprintReadWrite,
 		Category = "Voxel|View",
 		meta = (ClampMin = "0"))
-	int32 SurfaceRadiusCells = 3200;
+	int32 SurfaceRadiusCells = 1067;
 
 	// Macro 外半径。原先在 ViewProfile 外层，本轮移入 SourceView，使四层 Domain 统一。
 	UPROPERTY(
@@ -152,7 +152,7 @@ struct WHFRAMEWORK_API FVoxelStreamingSourceView
 		BlueprintReadWrite,
 		Category = "Voxel|View",
 		meta = (ClampMin = "0"))
-	int32 MacroRadiusCells = 16000;
+	int32 MacroRadiusCells = 5333;
 };
 
 struct WHFRAMEWORK_API FVoxelStreamingSource

@@ -31,6 +31,12 @@ namespace
 TAutoConsoleVariable<int32> CVarSaveStepTimeLimit(TEXT("wh.SaveGame.EnforceStepTimeLimit"), 1,
 	TEXT("Reject save steps that exceed the configured time limit. 0 records overruns without rejecting saves."), ECVF_Default);
 
+FSaveOperationResult TransientSessionUnsupported()
+{
+	return FSaveOperationResult::Failed(ESaveResultCode::Unsupported,
+		NSLOCTEXT("WH.SaveGame", "TransientSessionUnsupported", "当前关卡是临时会话，不读取或写入游戏存档。"));
+}
+
 struct FCreatedSlotCleanupTask
 {
 	TSharedPtr<const FSaveGenerationPlan, ESPMode::ThreadSafe> Plan;
@@ -132,11 +138,40 @@ void USaveGameModule::RestoreLastActiveSave()
 	}
 }
 
+void USaveGameModule::LockSessionPolicy()
+{
+	if (bSessionPolicyLocked) return;
+	RuntimeSessionPolicy = SessionPolicy;
+	bSessionPolicyLocked = true;
+}
+
 void USaveGameModule::OnInitialize()
 {
+	// 先固定配置再调用蓝图事件；重入/重复初始化不能重置已接纳的存档操作。
+	if (bSessionPolicyLocked) return;
+	LockSessionPolicy();
 	Super::OnInitialize();
-	if (const UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
+	UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr;
+	if (IsTransientSession())
 	{
+		ActiveSaveId.Invalidate();
+		bHasPendingSaveSlot = false;
+		PendingSaveSlotParams = FCreateSaveSlotParams();
+		LoadSnapshot = FSaveGameLoadSnapshot();
+		Storage.Reset();
+		LocalSaveContext.Reset();
+		// 拒绝跨图快照并保留同一操作身份；消费后立即释放文件代读取租约。
+		if (GameInstance) AdoptPendingSaveLoad(GameInstance->ConsumePendingSaveLoad());
+		UEventModuleStatics::SubscribeEvent<FEventGameExited>(this, &ThisClass::OnGameExited);
+		return;
+	}
+	if (GameInstance)
+	{
+		if (!GameInstance->EnsureLocalSaveContext())
+		{
+			UE_LOG(LogTemp, Error, TEXT("Local save module rejected: %s"), *GameInstance->GetLocalSaveContextError());
+			return;
+		}
 		LocalSaveContext = GameInstance->GetLocalSaveContext();
 		if (!LocalSaveContext)
 		{
@@ -151,15 +186,22 @@ void USaveGameModule::OnInitialize()
     for (const FString& Error : RecoveryErrors) UE_LOG(LogTemp, Warning, TEXT("世界分支恢复：%s"), *Error);
 	Storage->CleanupAllTempGenerations();
 	RestoreLastActiveSave();
-	if (UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
-	{
-		LoadSnapshot = GameInstance->ConsumePendingSaveLoad();
-		if (LoadSnapshot.IsValid())
-		{
-			LoadOperationResult = FSaveOperationResult::Accepted(LoadSnapshot.Context.OperationId);
-		}
-	}
+	if (GameInstance) AdoptPendingSaveLoad(GameInstance->ConsumePendingSaveLoad());
 	UEventModuleStatics::SubscribeEvent<FEventGameExited>(this, &ThisClass::OnGameExited);
+}
+
+void USaveGameModule::AdoptPendingSaveLoad(FSaveGameLoadSnapshot InSnapshot)
+{
+	if (!InSnapshot.IsValid()) return;
+	const FGuid OperationId = InSnapshot.Context.OperationId;
+	if (IsTransientSession())
+	{
+		LoadOperationResult = TransientSessionUnsupported();
+		LoadOperationResult.OperationId = OperationId;
+		return;
+	}
+	LoadSnapshot = MoveTemp(InSnapshot);
+	LoadOperationResult = FSaveOperationResult::Accepted(OperationId);
 }
 
 void USaveGameModule::OnPreparatory(EPhase InPhase)
@@ -249,6 +291,11 @@ void USaveGameModule::SetUserIndex(int32 InUserIndex)
 	{
 		return;
 	}
+	if (IsTransientSession())
+	{
+		UserIndex = InUserIndex;
+		return;
+	}
 	if (!LocalSaveContext && GetWorld() && Cast<UWHGameInstance>(GetWorld()->GetGameInstance())) return;
 	DetachActiveSave();
 	UserIndex = InUserIndex;
@@ -264,6 +311,7 @@ void USaveGameModule::SetUserIndex(int32 InUserIndex)
 FSaveOperationResult USaveGameModule::CreateSaveSlot(const FCreateSaveSlotParams& Params, FSaveSlotSummary& OutSummary)
 {
     OutSummary = {};
+	if (IsTransientSession()) return TransientSessionUnsupported();
     if (!Storage || IsSaveOperationRunning() || !GetWorld() || GetWorld()->GetNetMode() == NM_Client)
         return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("当前不能创建世界存档。")));
     FSaveManifest Manifest;
@@ -312,12 +360,14 @@ FSaveOperationResult USaveGameModule::SaveSlot(FGuid SaveId)
 
 FSaveOperationResult USaveGameModule::SaveActiveSlot()
 {
+	if (IsTransientSession()) return TransientSessionUnsupported();
 	return ActiveSaveId.IsValid() ? SaveSlot(ActiveSaveId) : FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("No active save")));
 }
 
 FSaveOperationResult USaveGameModule::SaveSlotAsync(FGuid SaveId)
 {
 	check(IsInGameThread());
+	if (IsTransientSession()) return TransientSessionUnsupported();
 	if (!Storage || IsSaveOperationRunning() || bApplyingSaveCallbacks || bSaveTerminationRunning ||
 		!SaveId.IsValid() || !GetWorld() || GetWorld()->GetNetMode() == NM_Client)
 	{
@@ -750,6 +800,7 @@ void USaveGameModule::FlushDeferredSaveTermination()
 
 FSaveOperationResult USaveGameModule::SaveActiveSlotAsync()
 {
+	if (IsTransientSession()) return TransientSessionUnsupported();
 	return ActiveSaveId.IsValid() ? SaveSlotAsync(ActiveSaveId)
 	                              : FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("No active save")));
 }
@@ -912,6 +963,19 @@ void USaveGameModule::FinalizeAsyncSave()
 bool USaveGameModule::RequestUserQuit(const uint8 InQuitPreference, const bool bInIgnorePlatformRestrictions)
 {
 	check(IsInGameThread());
+	if (IsTransientSession())
+	{
+		TWeakObjectPtr<UWorld> World = GetWorld();
+		if (!World.IsValid()) return false;
+		TWeakObjectPtr<APlayerController> Controller = UGameplayStatics::GetPlayerController(World.Get(), 0);
+		UEventModuleStatics::BroadcastEvent<FEventGameExited>(this, { false });
+		if (World.IsValid() && !World->bIsTearingDown)
+		{
+			UKismetSystemLibrary::QuitGame(World.Get(), Controller.Get(),
+				static_cast<EQuitPreference::Type>(InQuitPreference), bInIgnorePlatformRestrictions);
+		}
+		return true;
+	}
 	if (bPendingUserQuit) return true;
 	bPendingUserQuit = true;
 	bQuitNeedsFreshCapture = bSaveOperationRunning;
@@ -1001,6 +1065,7 @@ FSaveOperationResult USaveGameModule::GetWorldSaveResult(const FGuid& InOperatio
 
 void USaveGameModule::BeginPendingSaveSlot(const FCreateSaveSlotParams& Params)
 {
+	if (IsTransientSession()) return;
 	if (IsSaveOperationRunning()) return;
 	PendingSlotSaveId.Invalidate();
 	PendingSaveSlotParams = Params;
@@ -1018,6 +1083,7 @@ void USaveGameModule::CancelPendingSaveSlot()
 
 FSaveOperationResult USaveGameModule::SaveCurrentSlot()
 {
+	if (IsTransientSession()) return TransientSessionUnsupported();
 	if (bSaveOperationRunning) return FSaveOperationResult::Accepted(AsyncOperationId);
 	if (!AsyncCreatedSlotCleanup.IsCompleted())
 		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("The original failed slot is still being retired")));
@@ -1056,7 +1122,7 @@ void USaveGameModule::ClearActiveSave()
 {
 	if (IsSaveOperationRunning()) return;
 	DetachActiveSave();
-	if(Storage)
+	if(!IsTransientSession() && Storage)
 	{
 		Storage->ClearLastActiveSave();
 	}
@@ -1115,6 +1181,12 @@ FSaveOperationResult USaveGameModule::RequestLoadSlot(FGuid SaveId, EPhase InPha
 		Result.OperationId = InOperationId;
 		return Result;
 	};
+	if (IsTransientSession())
+	{
+		FSaveOperationResult Result = TransientSessionUnsupported();
+		Result.OperationId = InOperationId;
+		return Result;
+	}
 	if (LoadOperationResult.Code == ESaveResultCode::Accepted)
 	{
 		return Reject(ESaveResultCode::Busy, NSLOCTEXT("WH.SaveGame", "LoadAlreadyPending", "已有存档切图请求等待完成。"));
@@ -1351,6 +1423,7 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 
 FSaveOperationResult USaveGameModule::DeleteSaveSlot(FGuid SaveId)
 {
+	if (IsTransientSession()) return TransientSessionUnsupported();
 	if (IsSaveOperationRunning())
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save transaction is in progress")));
@@ -1413,6 +1486,7 @@ FSaveOperationResult USaveGameModule::DeleteSaveSlot(FGuid SaveId)
 
 FSaveOperationResult USaveGameModule::RenameSaveSlot(FGuid SaveId, const FString& NewName)
 {
+	if (IsTransientSession()) return TransientSessionUnsupported();
 	if (IsSaveOperationRunning())
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save transaction is in progress")));
@@ -1438,6 +1512,7 @@ FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, cons
 {
     check(IsInGameThread());
     OutSummary = {};
+	if (IsTransientSession()) return TransientSessionUnsupported();
     if (IsSaveOperationRunning() || !Storage || !GetWorld() || GetWorld()->GetNetMode() == NM_Client)
         return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("当前不能复制存档。")));
     if (!SourceSaveId.IsValid() || NewName.IsEmpty())
@@ -1601,6 +1676,7 @@ FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, cons
 
 FSaveSlotSummary USaveGameModule::GetSaveSlotSummary(FGuid SaveId) const
 {
+	if (IsTransientSession()) return FSaveSlotSummary();
 	FSaveManifest Manifest;
 	if (!Storage || Storage->HasPendingWorld(SaveId) || !Storage->ReadManifest(SaveId, Manifest) || Manifest.CurrentGeneration <= 0 ||
 	    !Storage->IsGenerationComplete(SaveId, Manifest.CurrentGeneration, Manifest))
@@ -1613,6 +1689,7 @@ FSaveSlotSummary USaveGameModule::GetSaveSlotSummary(FGuid SaveId) const
 TArray<FSaveSlotSummary> USaveGameModule::GetSaveSlotSummaries() const
 {
 	TArray<FSaveSlotSummary> Result;
+	if (IsTransientSession()) return Result;
 	TArray<FSaveManifest> Manifests;
 	if (Storage && Storage->EnumerateManifests(Manifests))
 	{
@@ -1634,6 +1711,7 @@ TArray<FSaveSlotSummary> USaveGameModule::GetSaveSlotSummaries() const
 
 FSaveOperationResult USaveGameModule::SaveProfile(FName ProfileName)
 {
+	if (IsTransientSession()) return TransientSessionUnsupported();
 	if (IsSaveOperationRunning())
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save transaction is in progress")));
@@ -1661,6 +1739,7 @@ FSaveOperationResult USaveGameModule::SaveProfile(FName ProfileName)
 
 FSaveOperationResult USaveGameModule::LoadProfile(FName ProfileName)
 {
+	if (IsTransientSession()) return TransientSessionUnsupported();
 	if (IsSaveOperationRunning())
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save transaction is in progress")));
@@ -1729,7 +1808,7 @@ TArray<UModuleBase*> USaveGameModule::GetSaveModules(
 
 void USaveGameModule::OnGameExited(UObject* InSender, const FEventGameExited& InEvent)
 {
-	if(InEvent.bIsSimulating || bQuitSaveCommitted)
+	if(IsTransientSession() || InEvent.bIsSimulating || bQuitSaveCommitted)
 	{
 		return;
 	}
@@ -1800,7 +1879,7 @@ void USaveGameModule::UnregisterWorldStoreParticipant(FName InName)
 
 FString USaveGameModule::GetStorageRoot() const
 {
-    return Storage ? Storage->GetRootDir() : FString();
+    return !IsTransientSession() && Storage ? Storage->GetRootDir() : FString();
 }
 
 bool USaveGameModule::IsStepTimeLimitEnforced()
@@ -1810,6 +1889,7 @@ bool USaveGameModule::IsStepTimeLimitEnforced()
 
 FString USaveGameModule::GetUnboundInventoryRoot() const
 {
+	if (IsTransientSession()) return FString();
 	return LocalSaveContext ? LocalSaveContext->GetUnboundInventoryRoot() :
 		FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Inventory"), TEXT("Unbound"));
 }

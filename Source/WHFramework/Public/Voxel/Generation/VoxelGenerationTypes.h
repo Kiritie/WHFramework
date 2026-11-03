@@ -4,6 +4,20 @@
 #include "VoxelGenerationTypes.generated.h"
 
 UENUM(BlueprintType)
+enum class EVoxelTerrainType : uint8
+{
+	None = 0 UMETA(Hidden),
+	Default,
+	Superflat
+};
+
+namespace VoxelGeneration
+{
+	constexpr int32 SuperflatSurfaceZ = -1;
+	constexpr int32 SuperflatMinZ = -16;
+}
+
+UENUM(BlueprintType)
 enum class EVoxelGenerationStage : uint8
 {
 	None = 0,

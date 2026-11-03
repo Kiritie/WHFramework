@@ -624,7 +624,8 @@ private:
 	FVoxelGameThreadContinuation PublishInitialSourcesSteps(FPublicationLayout& InLayout, FPublicationSources& InSources);
 	FVoxelGameThreadContinuation PublishDynamicSourcesSteps(FPublicationLayout& InLayout, FPublicationSources& InSources);
 	FVoxelGameThreadContinuation UpdatePublicationCoverageSteps(const FPublicationSources& InSources, const FGuid& InGroup, FVoxelViewSourceId InSource,
-		TArray<FBox> InBoxes, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommon = nullptr, bool bInRetainPresented = false);
+		TArray<FBox> InBoxes, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommon = nullptr, bool bInRetainPresented = false,
+		bool bInKeepRetainedLocal = true);
 	void ResolveTransitionVisibility();
 	FVoxelGameThreadContinuation ResolveInitialLayoutSteps();
 	FVoxelGameThreadContinuation PrepareInitialLayoutMasksSteps();

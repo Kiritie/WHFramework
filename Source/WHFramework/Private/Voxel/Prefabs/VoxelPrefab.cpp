@@ -28,7 +28,7 @@ bool AVoxelPrefab::SetPreviewAsset(UVoxelPrefabData* Asset, double Size, FString
         return false;
     }
     FVoxelPrefabSaveData Cells;
-    if (!Asset->DecodeCells(Cells, Error) || !SetPreviewData(Cells, Size, Error))
+    if (!Asset->DecodePlacementCells(Cells, Error) || !SetPreviewData(Cells, Size, Error))
     {
         return false;
     }

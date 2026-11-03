@@ -53,11 +53,14 @@ struct WHFRAMEWORK_API FVoxelWorldSaveData :
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ToolTip = "世界使用的共享地形生成配方。"))
 	TSoftObjectPtr<UVoxelWorldGenerationProfile> GenerationProfile;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ToolTip = "世界生成种子；自动生成世界时设为零会选择随机正种子。"))
 	int32 Seed = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ToolTip = "世界的地形类型；超平坦模式在零高度提供一层草地。"))
+	EVoxelTerrainType TerrainType = EVoxelTerrainType::Default;
 
 	UPROPERTY()
 	TArray<uint8> ManifestBytes;

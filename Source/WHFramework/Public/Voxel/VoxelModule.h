@@ -122,8 +122,9 @@ public:
 	virtual void OnTermination(EPhase InPhase) override;
 	virtual bool IsSaveEnabled() const override;
 
-	bool CreateWorld(const FVoxelGenerationSettings& InSettings, int32 InBlockSizeCentimeters, FString& OutError);
-	bool CreateWorldFromProfile(int32 InSeed, FString& OutError);
+	bool CreateWorld(const FVoxelGenerationSettings& InSettings, int32 InBlockSizeCentimeters, FString& OutError,
+		EVoxelTerrainType InTerrainType = EVoxelTerrainType::Default);
+	bool CreateWorldFromProfile(int32 InSeed, FString& OutError, EVoxelTerrainType InTerrainType = EVoxelTerrainType::Default);
 	bool StartWorld(const FVoxelWorldManifest& InManifest, bool bInRemote, FString& OutError);
 	bool StopWorld(bool bDiscardDirty, FString& OutError);
 	bool ValidateWorldData(const FParameter& InData, FString& OutError) const;
@@ -149,7 +150,7 @@ public:
 		const FIntVector& InSection,
 		const FVoxelRuntimeSectionPin& InPin);
 
-	UPROPERTY(EditAnywhere, Category = "Voxel|Navigation", meta = (ClampMin = "1.0"))
+	UPROPERTY(EditAnywhere, Category = "Voxel|Navigation", meta = (ClampMin = "1.0", ToolTip = "体素导航生成所需的垂直净空，单位为厘米。"))
 	double NavigationClearanceCentimeters = 180.0;
 	bool IsSimulationResident(const FIntVector& InSection) const;
 	TSet<FIntVector> GetSimulationSections() const;
@@ -242,6 +243,7 @@ public:
 	TSoftObjectPtr<UVoxelWorldGenerationProfile> GetWorldGenerationProfileAsset() const;
 	int32 GetDefaultWorldSeed() const;
 	int32 ResolveDefaultWorldSeed() const;
+	const FVoxelWorldSaveData& GetDefaultWorldData() const { return DefaultData; }
 
 	FGuid RegisterSource(UObject* InOwner, const FVoxelStreamingSource& InSource);
 	bool UpdateSource(const FGuid& InId, const FVoxelStreamingSource& InSource);
@@ -300,6 +302,8 @@ public:
 		const FVoxelEditIntent& InIntent,
 		bool bTrustedStandaloneCreative = false);
 	bool ApplyPrefab(const FVoxelPrefabSaveData& InPrefab, const FIntVector& InOrigin, FString& OutError);
+	bool ApplyPrefab(const FVoxelPrefabSaveData& InPrefab, const FIntVector& InOrigin,
+		FInventoryCommandResult& OutResult, FString& OutError);
 	bool ExportPrefab(
 		const FIntVector& InMin,
 		const FIntVector& InMax,
@@ -330,6 +334,7 @@ public:
 	FVoxelWorldInitialized OnWorldInitialized;
 
 protected:
+	virtual TSoftObjectPtr<UVoxelMaterialSet> ResolveMaterialSetAsset() const;
 	virtual uint64 GetSceneProjectCaptureRevision() const;
 	virtual void OnWorldStopping();
 	virtual void OnSimulationResidencyChanged(const FVoxelSimulationResidencyDelta& InDelta);
@@ -351,7 +356,7 @@ protected:
 
 
 	/** Project-specific authored content that changes the generated base world. */
-	virtual uint64 GetGenerationIdentitySalt() const;
+	virtual uint64 GetGenerationIdentitySalt(EVoxelTerrainType InTerrainType) const;
 
 	virtual bool CreateGenerationOverlay(
 		TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InNaturalGenerator,
@@ -364,34 +369,34 @@ protected:
 	virtual FParameter ToData() override;
 	virtual void UnloadData(EPhase InPhase) override;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "Voxel|Startup", meta = (ToolTip = "模块准备运行时，由权威端在尚未创建世界的情况下使用默认世界数据自动生成世界。"))
 	bool bAutoGenerate = false;
 
 	UPROPERTY(Transient)
 	EVoxelWorldState WorldState = EVoxelWorldState::None;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "VoxelMaterialSet", meta = (ToolTip = "基础体素模块使用的材质集合；派生模块可以从自身的视觉配置解析材质。"))
 	TSoftObjectPtr<UVoxelMaterialSet> MaterialSetAsset;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UVoxelMaterialSet> MaterialSet;
 
-	UPROPERTY(EditAnywhere, Category = "Voxel|Generation")
-	TSoftObjectPtr<UVoxelWorldGenerationProfile> WorldGenerationProfileAsset;
+	UPROPERTY(EditAnywhere, Category = "Voxel|Generation", meta = (ToolTip = "新建或自动生成世界时使用的默认配方、种子和地形类型。"))
+	FVoxelWorldSaveData DefaultData;
 
-	UPROPERTY(EditAnywhere, Category = "Voxel|Generation", meta = (ToolTip = "Zero chooses a random positive seed when creating an automatic world."))
-	int32 DefaultWorldSeed = 1;
+	UPROPERTY(Transient)
+	TSoftObjectPtr<UVoxelWorldGenerationProfile> ActiveGenerationProfileAsset;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UVoxelWorldGenerationProfile> WorldGenerationProfile;
 
-	UPROPERTY(EditAnywhere, Category = "Voxel|Project")
+	UPROPERTY(EditAnywhere, Category = "Voxel|Scene Simulation", meta = (ToolTip = "在权威端启用项目场景对象的驻留与模拟。"))
 	bool bEnableProjectSceneSimulation = false;
 
-	UPROPERTY(EditAnywhere, Category = "Voxel|Project")
+	UPROPERTY(EditAnywhere, Category = "Voxel|Scene Simulation", meta = (EditCondition = "bEnableProjectSceneSimulation", ToolTip = "启用场景模拟时使用的场景区域类型。"))
 	TSubclassOf<UVoxelSceneRegion> SceneRegionClass;
 
-	UPROPERTY(EditAnywhere, Category = "Voxel|Persistence", meta = (ClampMin = "0.01"))
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Voxel|Scene Persistence", meta = (ClampMin = "0.01", ToolTip = "场景保存捕获中单个不可拆步骤允许的最大耗时，单位为毫秒；超限时按保存模块配置报错或告警。"))
 	double MaximumSceneCaptureStepMilliseconds = 1.0;
 
 	UPROPERTY(Transient)

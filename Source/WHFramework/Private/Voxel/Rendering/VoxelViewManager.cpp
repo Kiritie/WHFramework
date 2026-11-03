@@ -438,6 +438,11 @@ FVoxelViewManager::FVoxelViewManager(
 	{
 		return IsRepresentationStampCurrent(Stamp);
 	});
+	Publisher->SetRetainedGeometryOwnerValidator([this](const FVoxelTaskStamp& Stamp)
+	{
+		return Stamp.WorldEpoch == WorldEpoch && Stamp.OwnerId == TaskOwnerId &&
+			Stamp.OwnerIncarnation == TaskOwnerIncarnation;
+	});
 	Publisher->SetMeshValidator([this](const FVoxelSectionMeshResult& Mesh)
 	{
 		return (!Mesh.FrozenBoundaryInputs || AreBoundaryInputsCurrent(*Mesh.FrozenBoundaryInputs)) &&
@@ -4584,18 +4589,19 @@ bool FVoxelViewManager::RequestVoxelProxy(const FVoxelViewKey& InKey, const int3
 			return false;
 		}
 	}
-	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("EnvironmentRetention"));
-	const auto EnvironmentRetention = bDataOnly ? RetainPreparedEnvironment(DataKey, *Generator, OverlayBounds) : nullptr;
-	if (bDataOnly && !EnvironmentRetention) return false;
-	if (bDataOnly)
+	const bool bRequiresNaturalPlanning = bDataOnly && Generator->GetRuntimeConfig()->TerrainType != EVoxelTerrainType::Superflat;
+	if (bRequiresNaturalPlanning) RecordDataAdmissionGate(Request.Stamp, TEXT("EnvironmentRetention"));
+	const auto EnvironmentRetention = bRequiresNaturalPlanning ? RetainPreparedEnvironment(DataKey, *Generator, OverlayBounds) : nullptr;
+	if (bRequiresNaturalPlanning && !EnvironmentRetention) return false;
+	if (bRequiresNaturalPlanning)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewProxyEnvironment);
 		RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
 		if (!CheckCoarsePreflight(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore), Request, TEXT("Natural")))
 			return false;
 	}
-	const auto EnvironmentInputs = bDataOnly ? Module.GetEnvironmentGeometryInputs(Request.GenerationConsumer, Geometry) : nullptr;
-	if (bDataOnly)
+	const auto EnvironmentInputs = bRequiresNaturalPlanning ? Module.GetEnvironmentGeometryInputs(Request.GenerationConsumer, Geometry) : nullptr;
+	if (bRequiresNaturalPlanning)
 	{
 		if (!EnvironmentInputs) return false;
 		PreparedEnvironmentRetentions.FindChecked(DataKey) = EnvironmentInputs->GetRetention();
@@ -5007,14 +5013,15 @@ bool FVoxelViewManager::RequestSurface(const FVoxelSurfaceTileKey& InKey, const 
 			return false;
 		}
 	}
-	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("EnvironmentRetention"));
-	const auto EnvironmentRetention = bDataOnly ? RetainPreparedEnvironment(DataKey, *Generator, OverlayBounds) : nullptr;
-	if (bDataOnly && !EnvironmentRetention) return false;
-	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
-	if (bDataOnly && !CheckCoarsePreflight(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore), Request, TEXT("Natural")))
+	const bool bRequiresNaturalPlanning = bDataOnly && Generator->GetRuntimeConfig()->TerrainType != EVoxelTerrainType::Superflat;
+	if (bRequiresNaturalPlanning) RecordDataAdmissionGate(Request.Stamp, TEXT("EnvironmentRetention"));
+	const auto EnvironmentRetention = bRequiresNaturalPlanning ? RetainPreparedEnvironment(DataKey, *Generator, OverlayBounds) : nullptr;
+	if (bRequiresNaturalPlanning && !EnvironmentRetention) return false;
+	if (bRequiresNaturalPlanning) RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
+	if (bRequiresNaturalPlanning && !CheckCoarsePreflight(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore), Request, TEXT("Natural")))
 		return false;
-	const auto EnvironmentInputs = bDataOnly ? Module.GetEnvironmentGeometryInputs(Request.GenerationConsumer, Geometry) : nullptr;
-	if (bDataOnly)
+	const auto EnvironmentInputs = bRequiresNaturalPlanning ? Module.GetEnvironmentGeometryInputs(Request.GenerationConsumer, Geometry) : nullptr;
+	if (bRequiresNaturalPlanning)
 	{
 		if (!EnvironmentInputs) return false;
 		PreparedEnvironmentRetentions.FindChecked(DataKey) = EnvironmentInputs->GetRetention();
@@ -5416,14 +5423,15 @@ bool FVoxelViewManager::RequestMacro(const FVoxelMacroTileKey& InKey, const int3
 			return false;
 		}
 	}
-	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("EnvironmentRetention"));
-	const auto EnvironmentRetention = bDataOnly ? RetainPreparedEnvironment(DataKey, *Generator, Bounds) : nullptr;
-	if (bDataOnly && !EnvironmentRetention) return false;
-	if (bDataOnly) RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
-	if (bDataOnly && !CheckCoarsePreflight(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore), Request, TEXT("Natural")))
+	const bool bRequiresNaturalPlanning = bDataOnly && Generator->GetRuntimeConfig()->TerrainType != EVoxelTerrainType::Superflat;
+	if (bRequiresNaturalPlanning) RecordDataAdmissionGate(Request.Stamp, TEXT("EnvironmentRetention"));
+	const auto EnvironmentRetention = bRequiresNaturalPlanning ? RetainPreparedEnvironment(DataKey, *Generator, Bounds) : nullptr;
+	if (bRequiresNaturalPlanning && !EnvironmentRetention) return false;
+	if (bRequiresNaturalPlanning) RecordDataAdmissionGate(Request.Stamp, TEXT("HydrologyPreflight"));
+	if (bRequiresNaturalPlanning && !CheckCoarsePreflight(Module.EnsureEnvironmentGeometry(Request.GenerationConsumer, Geometry, Request.WorkClass, InPriority, Request.DistanceScore, Request.ForwardScore), Request, TEXT("Natural")))
 		return false;
-	const auto EnvironmentInputs = bDataOnly ? Module.GetEnvironmentGeometryInputs(Request.GenerationConsumer, Geometry) : nullptr;
-	if (bDataOnly)
+	const auto EnvironmentInputs = bRequiresNaturalPlanning ? Module.GetEnvironmentGeometryInputs(Request.GenerationConsumer, Geometry) : nullptr;
+	if (bRequiresNaturalPlanning)
 	{
 		if (!EnvironmentInputs) return false;
 		PreparedEnvironmentRetentions.FindChecked(DataKey) = EnvironmentInputs->GetRetention();
@@ -7692,6 +7700,14 @@ FVoxelGameThreadContinuation FVoxelViewManager::RetirePublishedHeightfieldSteps(
 		const FVoxelCoverageRect Rect = Key.Representation == EVoxelHeightfieldRepresentation::Surface
 			? SurfaceCoverageRect({Key.Coordinate, Key.Level}) : MacroCoverageRect({Key.Coordinate, Key.Level});
 		if (VoxelCoverage::IntersectsAny2D(Rect, PendingHeightfieldHandoffRects)) continue;
+		const FVoxelPublishGroupKey GroupKey{static_cast<uint8>(Key.Representation == EVoxelHeightfieldRepresentation::Surface ? 4 : 5),
+			Key.Coordinate, Key.Level};
+		if (Publisher->IsGroupBusy(GroupKey))
+		{
+			// 旧批次的清理回调不能取消较晚批次或已封存但尚未回执的接缝源。
+			MarkCoverageDirty(Rect);
+			continue;
+		}
 		if (FVoxelViewSourceId SourceId = HeightfieldTransitionSources.FindRef(Key)) Publisher->Forget(SourceId);
 		HeightfieldTransitionSignatures.Remove(Key);
 		HeightfieldTransitionSources.Remove(Key);

@@ -391,7 +391,7 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 	const int32 FirstZ = VoxelGeneration::FloorDivide(
 		FMath::Max(Settings.MinZ, MinGround - 16), StructureStep) * StructureStep;
 	const int32 LastZ = FMath::Min(Settings.MaxZ - 1, MaxGround + 64);
-	for (int64 BaseZ = FirstZ; BaseZ <= LastZ;
+	for (int64 BaseZ = FirstZ; Config->TerrainType != EVoxelTerrainType::Superflat && BaseZ <= LastZ;
 		BaseZ += static_cast<int64>(StructureSide) * StructureStep)
 	{
 		if (InCancel && InCancel->Load())
@@ -437,7 +437,8 @@ bool FVoxelSurfaceProxyBuilder::BuildDistantCells(
 			InOutData.DistantCells.Add({Min, Max, State, SourceTreeId});
 		}
 	};
-	if (InOutData.Geometry.Key.Representation != EVoxelTerrainRepresentation::Macro &&
+	if (Config->TerrainType != EVoxelTerrainType::Superflat &&
+		InOutData.Geometry.Key.Representation != EVoxelTerrainRepresentation::Macro &&
 		Trees.bEnabled && FMath::Max(Trees.MaxHeight, Trees.CrownRadius * 2 + 1) >= Step)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_SurfaceDistantTrees);

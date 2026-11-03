@@ -197,6 +197,58 @@ bool FVoxelViewPublisher::IsNativeGeometryCurrent(const FVoxelTaskStamp& InStamp
 	return Revision == InStamp.Revision;
 }
 
+bool FVoxelViewPublisher::IsNativeUpdateCurrent(const FUpdate& InUpdate) const
+{
+	const FVoxelTaskStamp& Stamp = InUpdate.NativeStamp;
+	if (IsNativeGeometryCurrent(Stamp)) return true;
+	if (Stamp.WorldEpoch != WorldEpoch || !Stamp.OwnerId.IsValid() || Stamp.OwnerIncarnation == 0 || Stamp.Token == 0 ||
+		!Stamp.bHasGeometryIdentity || !InUpdate.Source) return false;
+	const auto CurrentInterest = Module.GetCurrentInterestSnapshot();
+	const auto* Runtime = Module.GetRuntime();
+	const auto Registry = Module.GetRegistry();
+	const auto Shapes = Module.GetShapes();
+	if (!CurrentInterest || !Runtime || !Registry || !Shapes ||
+		(Stamp.OwnerId != NativeOwnerId && (!RetainedGeometryOwnerValidator || !RetainedGeometryOwnerValidator(Stamp)))) return false;
+	const FEntry* Entry = Entries.Find(InUpdate.SourceId);
+	if (!Entry || !Entry->bPresented || Entry->bHidden || Entry->bRetiring || !Entry->NativeMesh ||
+		Entry->PresentedSource != InUpdate.Source || Entry->PresentedNativeStamp != Stamp ||
+		(InUpdate.NativeMesh && InUpdate.NativeMesh != Entry->NativeMesh) ||
+		Entry->NativeMesh->Source != InUpdate.Source || Entry->NativeMesh->Stamp != Stamp ||
+		Entry->NativeMesh->WorldCellOrigin != InUpdate.Location / Module.BlockSize() ||
+		Entry->NativeMesh->CellScale != InUpdate.Scale / Module.BlockSize()) return false;
+	const auto& Geometry = Stamp.GeometryIdentity;
+	const auto& Manifest = Module.GetManifest();
+	if (Geometry.GeneratorIdentity != Manifest.BaseSampleHash || Geometry.MaterialRevision != Registry->Hash ||
+		Geometry.WorldMinZ != Manifest.Settings.MinZ || Geometry.WorldMaxZ != Manifest.Settings.MaxZ) return false;
+	const auto& Key = Geometry.Key;
+	const auto& Hierarchy = Runtime->GetChangeHierarchy();
+	uint64 Revision = 0;
+	EVoxelFineOwnerKind Kind = EVoxelFineOwnerKind::None;
+	if (Key.Representation == EVoxelTerrainRepresentation::VoxelProxy)
+	{
+		Revision = Hierarchy.GetVoxelProxyRevision({Key.Coordinate, Key.Level});
+		Kind = EVoxelFineOwnerKind::Proxy;
+	}
+	else if (Key.Representation == EVoxelTerrainRepresentation::Surface)
+	{
+		Revision = Hierarchy.GetSurfaceRevision({FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level});
+		Kind = EVoxelFineOwnerKind::Surface;
+	}
+	else if (Key.Representation == EVoxelTerrainRepresentation::Macro)
+	{
+		Revision = Hierarchy.GetMacroRevision({FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level});
+		Kind = EVoxelFineOwnerKind::Macro;
+	}
+	else return false;
+	if (Revision != Stamp.Revision) return false;
+	const FVoxelFineOwner Owner{Kind, Stamp.OwnerId, Stamp.OwnerIncarnation};
+	const FVoxelFineContentIdentity Content{WorldEpoch, Manifest.BaseSampleHash, Manifest.RecipeHash, Registry->Hash,
+		Shapes->GetContentHash(), Stamp.Revision, Stamp.Revision, Stamp.Token, Entry->NativeMesh->GeometryIdentity,
+		Geometry.SampleStepCells};
+	// 只有 RT 回执中仍持有的同一正文可以继续调整遮罩；未呈现的投影源不能借用旧覆盖身份。
+	return TerrainRenderer->IsPresentedCoarseGeometry(InUpdate.SourceId.Value, *Entry->NativeMesh, Owner, Content);
+}
+
 bool FVoxelViewPublisher::IsCurrentAtomEvidence(const FIntVector& InSection, const FVoxelFineOwnerEvidence& InEvidence) const
 {
 	(void)InSection;
@@ -207,6 +259,22 @@ bool FVoxelViewPublisher::IsCurrentAtomEvidence(const FIntVector& InSection, con
 	const auto Geometry = StaticCastSharedPtr<const FVoxelTerrainCoarseMesh>(InEvidence.GeometryLease);
 	return Geometry && IsNativeGeometryCurrent(Geometry->Stamp) && Geometry->Source &&
 		(!MeshValidator || MeshValidator(*Geometry->Source));
+}
+
+bool FVoxelViewPublisher::HasPresentedClippingGeometry(const FUpdate& InUpdate) const
+{
+	if (InUpdate.bSourceDirty || InUpdate.bUnchanged || InUpdate.ChangedBounds.IsEmpty() ||
+		InUpdate.ChangedBounds.ContainsByPredicate([](const FBox& Box)
+		{
+			return !Box.IsValid || Box.Min.X >= Box.Max.X || Box.Min.Y >= Box.Max.Y;
+		})) return false;
+	const FEntry* Entry = Entries.Find(InUpdate.SourceId);
+	return Entry && Entry->bPresented && !Entry->bHidden && !Entry->bRetiring && Entry->NativeMesh &&
+		Entry->NativeMesh == InUpdate.NativeMesh && Entry->PresentedSource == InUpdate.Source &&
+		Entry->PresentedNativeStamp == InUpdate.NativeStamp && Entry->NativeMesh->Source == InUpdate.Source &&
+		Entry->NativeMesh->Stamp == InUpdate.NativeStamp &&
+		Entry->NativeMesh->WorldCellOrigin == InUpdate.Location / Module.BlockSize() &&
+		Entry->NativeMesh->CellScale == InUpdate.Scale / Module.BlockSize();
 }
 
 FVoxelViewPublisher::ENativeUpdateWork FVoxelViewPublisher::GetNativeUpdateWork(const FPublication& InPublication, const FUpdate& InUpdate) const
@@ -247,15 +315,60 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 	const ENativeUpdateWork Work = GetNativeUpdateWork(InPublication.Get(), Update);
 	if (Work == ENativeUpdateWork::Upload)
 	{
-		const bool bGeometryCurrent = IsNativeGeometryCurrent(Update.NativeStamp);
+		const bool bGeometryCurrent = IsNativeUpdateCurrent(Update);
 		const bool bSourceMatches = Update.Source && (!Update.Source->Stamp.bHasGeometryIdentity || Update.Source->Stamp == Update.NativeStamp);
 		const bool bInputsCurrent = Update.Source && (!MeshValidator || MeshValidator(*Update.Source));
 		if (!bGeometryCurrent || !bSourceMatches || !bInputsCurrent)
 		{
 			const auto& Key = Update.NativeStamp.GeometryIdentity.Key;
+#if !UE_BUILD_SHIPPING
+			const FVoxelTaskStamp& Stamp = Update.NativeStamp;
+			const bool bStampValid = Stamp.WorldEpoch == WorldEpoch && Stamp.OwnerId.IsValid() && Stamp.OwnerIncarnation != 0 &&
+				Stamp.Token != 0 && Stamp.bHasGeometryIdentity;
+			const bool bOwnerCurrent = bStampValid && (Stamp.OwnerId == NativeOwnerId || (GeometryValidator && GeometryValidator(Stamp)));
+			const auto CurrentInterest = Module.GetCurrentInterestSnapshot();
+			const auto* Wanted = Stamp.bHasGeometryIdentity && CurrentInterest ? CurrentInterest->Geometry.Find(Key) : nullptr;
+			const bool bWantedMatches = Wanted && *Wanted == Stamp.GeometryIdentity;
+			const auto* Runtime = Module.GetRuntime();
+			const bool bRevisionKnown = Runtime && (Key.Representation == EVoxelTerrainRepresentation::VoxelProxy ||
+				Key.Representation == EVoxelTerrainRepresentation::Surface || Key.Representation == EVoxelTerrainRepresentation::Macro);
+			uint64 Revision = 0;
+			if (bRevisionKnown)
+			{
+				const auto& Hierarchy = Runtime->GetChangeHierarchy();
+				Revision = Key.Representation == EVoxelTerrainRepresentation::VoxelProxy ?
+					Hierarchy.GetVoxelProxyRevision({Key.Coordinate, Key.Level}) : Key.Representation == EVoxelTerrainRepresentation::Surface ?
+					Hierarchy.GetSurfaceRevision({FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level}) :
+					Hierarchy.GetMacroRevision({FIntPoint(Key.Coordinate.X, Key.Coordinate.Y), Key.Level});
+			}
+			const FEntry* Entry = Entries.Find(Update.SourceId);
+			const bool bPresentedMatches = Entry && Entry->bPresented && Entry->PresentedSource == Update.Source &&
+				Entry->PresentedNativeStamp == Stamp;
+			int32 WantedGroupCount = 0;
+			FVoxelTerrainSpatialKey FirstWantedGroupKey;
+			if (InPublication->Groups.IsValidIndex(Update.GroupIndex))
+			{
+				for (const FVoxelPublishGroupKey& GroupKey : InPublication->Groups[Update.GroupIndex].Keys)
+				{
+					if (GroupKey.Representation < 1 || GroupKey.Representation > 3) continue;
+					const FVoxelTerrainSpatialKey Spatial{static_cast<EVoxelTerrainRepresentation>(GroupKey.Representation + 1),
+						GroupKey.Coordinate, GroupKey.Level};
+					if (!CurrentInterest || !CurrentInterest->Geometry.Contains(Spatial)) continue;
+					if (WantedGroupCount++ == 0) FirstWantedGroupKey = Spatial;
+				}
+			}
+			UE_LOG(LogTemp, Display, TEXT("Publisher rejected native source: serial=%llu group=%d update=%d representation=%d level=%d coordinate=(%d,%d,%d) geometryCurrent=%d sourceMatches=%d inputsCurrent=%d stampValid=%d ownerCurrent=%d wanted=%d wantedMatches=%d revisionKnown=%d revision=%llu currentRevision=%llu retained=%d entryPresented=%d entryHidden=%d presentedMatches=%d wantedGroupCount=%d firstWanted=(%d,%d,%d,%d,%d)"),
+				InPublication->Serial, Update.GroupIndex, InIndex, int32(Key.Representation), Key.Level,
+				Key.Coordinate.X, Key.Coordinate.Y, Key.Coordinate.Z, bGeometryCurrent, bSourceMatches, bInputsCurrent,
+				bStampValid, bOwnerCurrent, Wanted != nullptr, bWantedMatches, bRevisionKnown, Stamp.Revision, Revision,
+				Update.bRetainSource, Entry && Entry->bPresented, Entry && Entry->bHidden, bPresentedMatches, WantedGroupCount,
+				int32(FirstWantedGroupKey.Representation), FirstWantedGroupKey.Coordinate.X, FirstWantedGroupKey.Coordinate.Y,
+				FirstWantedGroupKey.Coordinate.Z, int32(FirstWantedGroupKey.Level));
+#else
 			UE_LOG(LogTemp, Display, TEXT("Publisher rejected native source: serial=%llu group=%d update=%d representation=%d level=%d coordinate=(%d,%d,%d) geometryCurrent=%d sourceMatches=%d inputsCurrent=%d"),
 				InPublication->Serial, Update.GroupIndex, InIndex, int32(Key.Representation), Key.Level,
 				Key.Coordinate.X, Key.Coordinate.Y, Key.Coordinate.Z, bGeometryCurrent, bSourceMatches, bInputsCurrent);
+#endif
 			return false;
 		}
 	}
@@ -329,7 +442,7 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 		FIntVector NextMin, NextMax;
 		if (!Next.Source || !Next.Source->bValidated || !Next.bSourceDirty ||
 			Next.bRetainSource || Next.NativeMesh || Next.bNativeMeshPending || Next.bNativeAdmissionWaiting ||
-			!IsNativeGeometryCurrent(Next.NativeStamp) || GetNativeUpdateWork(InPublication.Get(), Next) != ENativeUpdateWork::Upload ||
+			!IsNativeUpdateCurrent(Next) || GetNativeUpdateWork(InPublication.Get(), Next) != ENativeUpdateWork::Upload ||
 			(Next.Source->Stamp.bHasGeometryIdentity && Next.Source->Stamp != Next.NativeStamp) ||
 			(MeshValidator && !MeshValidator(*Next.Source)) ||
 			!Next.NativeStamp.GeometryIdentity.Key.TryBounds(Next.NativeStamp.GeometryIdentity.WorldMinZ,
@@ -445,7 +558,7 @@ bool FVoxelViewPublisher::PrepareUpdate(const FPublicationRef& InPublication, co
 			auto& Target = Publication->Updates[Input.UpdateIndex];
 			if (Target.NativeStamp != Input.Stamp) { bAllCurrent = false; continue; }
 			Target.bNativeMeshPending = false;
-			bAllCurrent &= IsNativeGeometryCurrent(Input.Stamp) && Target.Source &&
+			bAllCurrent &= IsNativeUpdateCurrent(Target) && Target.Source &&
 				(!MeshValidator || MeshValidator(*Target.Source));
 		}
 		if (InResult.bCanceled && bAllCurrent && !Scheduler.IsTerminal({InResult.Kind, InResult.Stamp}))
@@ -651,7 +764,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 					const auto& Update = Publication->Updates[Index];
 					if (!Entries.Contains(Update.SourceId)) return false;
 					const bool* Hidden = Publication->Visibility.Find(Update.SourceId);
-					if ((!Hidden || !*Hidden) && (!IsNativeGeometryCurrent(Update.NativeStamp) ||
+					if ((!Hidden || !*Hidden) && (!IsNativeUpdateCurrent(Update) ||
 						!Update.Source || (MeshValidator && !MeshValidator(*Update.Source)))) return false;
 				}
 				return true;

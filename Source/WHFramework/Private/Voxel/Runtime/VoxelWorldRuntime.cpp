@@ -9,6 +9,7 @@
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "VoxelRuntimeStorage.h"
+#include "HAL/PlatformTime.h"
 
 namespace VoxelWorldRuntimePrivate
 {
@@ -1876,6 +1877,9 @@ bool FVoxelWorldRuntime::CommitInventorySections(FVoxelPreparedInventoryCommit& 
         AdvanceOverlaySequences(InPrepared.Batch.Sections);
         ++AuthorityCommitCut;
     }
+#if WITH_EDITOR
+    InPrepared.Batch.DataAppliedMonotonicSeconds = FPlatformTime::Seconds();
+#endif
     OutBatch = MoveTemp(InPrepared.Batch);
     InPrepared.bPrepared = false;
     OutError.Reset();

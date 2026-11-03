@@ -1037,7 +1037,8 @@ bool FVoxelGenerationQuery::PrepareColumns(
 	Candidate.Cancel = InCancel;
 	Candidate.bColumnsPrepared = true;
 	FVoxelGenerationRequiredSourceScope Sources(Resources.Get(), this, EnumerateQueryRequiredSources);
-	if (!RetainHydrologyReads(InBounds, 0, Candidate.HydrologyRetention, OutError)) return false;
+	if (Config->TerrainType != EVoxelTerrainType::Superflat &&
+		!RetainHydrologyReads(InBounds, 0, Candidate.HydrologyRetention, OutError)) return false;
 	Prepared = MoveTemp(Candidate);
 
 	OutError.Reset();
@@ -1059,6 +1060,11 @@ bool FVoxelGenerationQuery::PrepareEnvironmentColumnRead(
 	{
 		OutError = TEXT("Invalid environment read outside world cell domain");
 		return false;
+	}
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		OutError.Reset();
+		return true;
 	}
 	// 原预检 reader 已持有完整自然闭包；仅冷操作随实际读取增长原保留范围。
 	if (!Resources || bRequireReadyHydrology || bRequireReadyPlans)
@@ -1105,6 +1111,22 @@ bool FVoxelGenerationQuery::Prepare(
 	if (!ValidateConsumer(OutError))
 	{
 		return false;
+	}
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		if (!InBounds.IsValid() || (InCancel && InCancel->Load()))
+		{
+			OutError = InBounds.IsValid() ? TEXT("Canceled") : TEXT("Voxel generation query bounds are invalid");
+			return false;
+		}
+		FPreparedState Candidate;
+		Candidate.Bounds = InBounds;
+		Candidate.Cancel = InCancel;
+		Candidate.bColumnsPrepared = true;
+		Candidate.bSymbolsPrepared = true;
+		Prepared = MoveTemp(Candidate);
+		OutError.Reset();
+		return true;
 	}
 	const FVoxelGenerationSettings& Settings = Config->Recipe->Settings;
 	FVoxelGenerationPlanKeyRanges Ranges;
@@ -1203,6 +1225,21 @@ bool FVoxelGenerationQuery::PrepareStructuresOnly(
 	if (!ValidateConsumer(OutError))
 	{
 		return false;
+	}
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		if (!InBounds.IsValid() || (InCancel && InCancel->Load()))
+		{
+			OutError = InBounds.IsValid() ? TEXT("Canceled") : TEXT("Voxel generation query bounds are invalid");
+			return false;
+		}
+		FPreparedState Candidate;
+		Candidate.Bounds = InBounds;
+		Candidate.Cancel = InCancel;
+		Candidate.bColumnsPrepared = true;
+		Prepared = MoveTemp(Candidate);
+		OutError.Reset();
+		return true;
 	}
 
 	FVoxelGenerationStructureKeyRange Range;
@@ -1330,6 +1367,11 @@ bool FVoxelGenerationQuery::ComputeBaseColumn(
 	FVoxelColumnSample& OutColumn) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ComputeBaseColumn);
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		OutColumn = Config->MakeSuperflatColumn();
+		return true;
+	}
 	FVoxelColumnSample Column;
 
 	Column.Climate =
@@ -1412,6 +1454,17 @@ bool FVoxelGenerationQuery::ComputeNaturalColumn(
 	const TAtomic<bool>* InCancel) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_NaturalColumn);
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		OutColumn = Config->MakeSuperflatColumn();
+		OutError.Reset();
+		return true;
+	}
 
 	FVoxelColumnSample Column;
 	if (!GetBaseColumn(InX, InY, Column, OutError, InCancel))
@@ -1499,6 +1552,17 @@ bool FVoxelGenerationQuery::SampleEnvironmentColumn(
 	{
 		OutError = TEXT("Invalid column outside world cell domain");
 		return false;
+	}
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		if (InCancel && InCancel->Load())
+		{
+			OutError = TEXT("Canceled");
+			return false;
+		}
+		OutColumn = Config->MakeSuperflatColumn();
+		OutError.Reset();
+		return true;
 	}
 	if (!bUseColumnCache)
 	{
@@ -1595,6 +1659,11 @@ bool FVoxelGenerationQuery::SampleColumn(
 		Prepared.Cancel))
 	{
 		return false;
+	}
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		OutError.Reset();
+		return true;
 	}
 
 	const FVoxelAquiferSample Sample =
@@ -1755,6 +1824,13 @@ bool FVoxelGenerationQuery::SampleColumnSymbols(const FIntPoint& InColumn, const
 bool FVoxelGenerationQuery::ResolveSymbol(const FIntVector& InPosition, FVoxelColumnSample Column,
 	uint32& OutValue, FString& OutError) const
 {
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		OutValue = InPosition.Z == VoxelGeneration::SuperflatSurfaceZ ?
+			Config->Recipe->Palette.Grass : Config->Recipe->Palette.Air;
+		OutError.Reset();
+		return true;
+	}
 	uint32 Value =
 		Config->Recipe->
 			Palette.Air;

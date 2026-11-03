@@ -539,10 +539,32 @@ bool FInventoryJournal::Open(const FString& InDirectory, const FGuid& InWorldId,
     return OpenInternal(InDirectory, InWorldId, InStoreId, bInCreateNew, true, OutCheckpoint, OutRecords, OutError);
 }
 
+bool FInventoryJournal::OpenTransient(const FGuid& InWorldId, const FGuid& InStoreId,
+    FInventoryCheckpoint& OutCheckpoint, TArray<FInventoryJournalRecord>& OutRecords, FString& OutError)
+{
+    if(bHealthy || bTransient || StoreLock != -1 || !InWorldId.IsValid() || !InStoreId.IsValid())
+    {
+        OutError = TEXT("Inventory.JournalOpenInvalid");
+        return false;
+    }
+    WorldId = InWorldId;
+    StoreId = InStoreId;
+    Sequence = 0;
+    SaveGeneration = 0;
+    JournalBytes = 0;
+    bTransient = true;
+    bHealthy = true;
+    FInventoryCheckpoint Initial;
+    Initial.WorldId = WorldId;
+    OutCheckpoint = MoveTemp(Initial);
+    OutRecords.Reset();
+    return true;
+}
+
 bool FInventoryJournal::OpenInternal(const FString& InDirectory, const FGuid& InWorldId, const FGuid& InStoreId, bool bInCreateNew,
     bool bInRepairTail, FInventoryCheckpoint& OutCheckpoint, TArray<FInventoryJournalRecord>& OutRecords, FString& OutError)
 {
-    if(bHealthy || StoreLock != -1 || !InWorldId.IsValid() || !InStoreId.IsValid() || InDirectory.IsEmpty())
+    if(bHealthy || bTransient || StoreLock != -1 || !InWorldId.IsValid() || !InStoreId.IsValid() || InDirectory.IsEmpty())
     {
         OutError = TEXT("Inventory.JournalOpenInvalid");
         return false;
@@ -736,6 +758,11 @@ bool FInventoryJournal::Append(FInventoryJournalRecord& InOutRecord, FString& Ou
     {
         return false;
     }
+    if(bTransient)
+    {
+        Sequence = InOutRecord.Sequence;
+        return true;
+    }
     if(JournalBytes + Bytes.Num() > MaximumCheckpointBytes)
     {
         OutError = TEXT("Inventory.CheckpointRequired");
@@ -753,6 +780,11 @@ bool FInventoryJournal::Append(FInventoryJournalRecord& InOutRecord, FString& Ou
 
 bool FInventoryJournal::Checkpoint(const FInventoryCheckpoint& InCheckpoint, FString& OutError)
 {
+    if(bTransient)
+    {
+        OutError = TEXT("Inventory.TransientArchiveUnsupported");
+        return false;
+    }
     if(!bHealthy || InCheckpoint.WorldId != WorldId || InCheckpoint.Sequence != Sequence || SaveGeneration == MAX_uint64)
     {
         OutError = TEXT("Inventory.CheckpointBoundaryInvalid");
@@ -816,6 +848,7 @@ void FInventoryJournal::Close()
 {
     ReleaseStoreLock();
     bHealthy = false;
+    bTransient = false;
     Directory.Reset();
     WorldId.Invalidate();
     StoreId.Invalidate();
@@ -829,6 +862,11 @@ bool FInventoryJournal::IsHealthy() const
     return bHealthy;
 }
 
+bool FInventoryJournal::IsTransient() const
+{
+    return bTransient;
+}
+
 uint64 FInventoryJournal::GetSequence() const
 {
     return Sequence;
@@ -836,7 +874,7 @@ uint64 FInventoryJournal::GetSequence() const
 
 bool FInventoryJournal::NeedsCheckpoint() const
 {
-    return JournalBytes >= 64 * 1024 * 1024;
+    return !bTransient && JournalBytes >= 64 * 1024 * 1024;
 }
 
 FGuid FInventoryJournal::GetStoreId() const
@@ -853,6 +891,7 @@ void FInventoryJournal::SwapState(FInventoryJournal& InOther)
     Swap(SaveGeneration, InOther.SaveGeneration);
     Swap(JournalBytes, InOther.JournalBytes);
     Swap(bHealthy, InOther.bHealthy);
+    Swap(bTransient, InOther.bTransient);
     Swap(StoreLock, InOther.StoreLock);
 }
 

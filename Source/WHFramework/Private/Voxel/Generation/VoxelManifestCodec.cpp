@@ -230,6 +230,7 @@ namespace
 	{
 		InWriter.U32(InManifest.GeneratorVersion);
 		InWriter.I32(InManifest.BlockSizeCentimeters);
+		InWriter.U8(static_cast<uint8>(InManifest.TerrainType));
 		WriteManifestSettings(InWriter, InManifest.Settings);
 	}
 }
@@ -249,6 +250,7 @@ bool FVoxelManifestCodec::Encode(
 	FString Error;
 	if (!InManifest.WorldId.IsValid() ||
 		InManifest.GeneratorVersion == 0 ||
+		(InManifest.TerrainType != EVoxelTerrainType::Default && InManifest.TerrainType != EVoxelTerrainType::Superflat) ||
 		InManifest.BlockSizeCentimeters <= 0 ||
 		InManifest.RegistryHash == 0 ||
 		InManifest.RecipeHash == 0 ||
@@ -288,6 +290,7 @@ bool FVoxelManifestCodec::Decode(
 	Manifest.WorldId = Reader.Guid();
 	Manifest.GeneratorVersion = Reader.U32();
 	Manifest.BlockSizeCentimeters = Reader.I32();
+	Manifest.TerrainType = static_cast<EVoxelTerrainType>(Reader.U8());
 	ReadSettings(Reader, Manifest.Settings);
 	Manifest.RegistryHash = Reader.U64();
 	Manifest.RecipeHash = Reader.U64();
@@ -296,6 +299,7 @@ bool FVoxelManifestCodec::Decode(
 	if (!Reader.End() ||
 		!Manifest.WorldId.IsValid() ||
 		Manifest.GeneratorVersion == 0 ||
+		(Manifest.TerrainType != EVoxelTerrainType::Default && Manifest.TerrainType != EVoxelTerrainType::Superflat) ||
 		Manifest.BlockSizeCentimeters <= 0 ||
 		Manifest.RegistryHash == 0 ||
 		Manifest.RecipeHash == 0 ||

@@ -124,19 +124,19 @@ struct WHFRAMEWORK_API FVoxelStreamingPerformanceBudget
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "128"))
-	int32 MaximumRuntimeFactsResidentMegabytes = 512;
+	int32 MaximumRuntimeFactsResidentMegabytes = 2048;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "32"))
-	int32 MaximumRuntimeFactsWorkingMegabytes = 256;
+	int32 MaximumRuntimeFactsWorkingMegabytes = 512;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "16"))
-	int32 MaximumRuntimeFactsInputMegabytes = 64;
+	int32 MaximumRuntimeFactsInputMegabytes = 1024;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "16"))
-	int32 MaximumRuntimeFactsStagedMegabytes = 128;
+	int32 MaximumRuntimeFactsStagedMegabytes = 512;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (ClampMin = "16"))
-	int32 RuntimeFactsOverlapMegabytes = 128;
+	int32 RuntimeFactsOverlapMegabytes = 256;
 
 	UPROPERTY(
 		EditAnywhere,
@@ -220,13 +220,13 @@ struct WHFRAMEWORK_API FVoxelStreamingPerformanceBudget
 		EditAnywhere,
 		BlueprintReadOnly,
 		meta = (ClampMin = "0.1"))
-	float AdmissionMilliseconds = 2.0f;
+	float AdmissionMilliseconds = 6.0f;
 
 	UPROPERTY(
 		EditAnywhere,
 		BlueprintReadOnly,
 		meta = (ClampMin = "0.1"))
-	float ResultApplyMilliseconds = 2.0f;
+	float ResultApplyMilliseconds = 6.0f;
 
 	UPROPERTY(
 		EditAnywhere,
@@ -238,13 +238,13 @@ struct WHFRAMEWORK_API FVoxelStreamingPerformanceBudget
 		EditAnywhere,
 		BlueprintReadOnly,
 		meta = (ClampMin = "1"))
-	int32 MaxPublishGroupsPerFrame = 2;
+	int32 MaxPublishGroupsPerFrame = 8;
 
 	UPROPERTY(
 		EditAnywhere,
 		BlueprintReadOnly,
 		meta = (ClampMin = "0.1"))
-	float TerrainPublishMilliseconds = 4.0f;
+	float TerrainPublishMilliseconds = 8.0f;
 
 
 	UPROPERTY(

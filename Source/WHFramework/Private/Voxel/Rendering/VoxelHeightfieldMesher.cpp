@@ -656,7 +656,8 @@ bool FVoxelHeightfieldMesher::BuildMacro(
 	}
 
 	TArray<FLinearColor> TopTints;
-	if (InConfig.Recipe->Settings.Ecology.Tree.bEnabled && !InMacro.ForestCoverage.IsEmpty())
+	if (InConfig.TerrainType != EVoxelTerrainType::Superflat &&
+		InConfig.Recipe->Settings.Ecology.Tree.bEnabled && !InMacro.ForestCoverage.IsEmpty())
 	{
 		FVoxelBlockState Leaves;
 		const FVoxelRuntimeDefinition* LeafDefinition =

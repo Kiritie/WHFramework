@@ -80,18 +80,19 @@ bool FVoxelMacroTerrainBuilder::Build(
 	Data.WaterHeight = MoveTemp(Surface.WaterZ);
 	Data.SurfaceStates = MoveTemp(Surface.SurfaceStates);
 
-	const FVoxelEcologyGenerator Ecology(Config->Recipe.ToSharedRef());
-	for (int32 Index = 0;
-		Index < Count;
-		++Index)
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
 	{
-		const FVoxelColumnSample& Column =
-			Columns[Index];
-
-		const FVoxelEcologySample EcologySample = Ecology.Sample(Column);
-
-		Data.ForestCoverage[Index] = static_cast<uint8>(
-			EcologySample.bTreeAllowed ? EcologySample.TreeDensity * 255 / 1000 : 0);
+		FMemory::Memzero(Data.ForestCoverage.GetData(), Count);
+	}
+	else
+	{
+		const FVoxelEcologyGenerator Ecology(Config->Recipe.ToSharedRef());
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const FVoxelEcologySample EcologySample = Ecology.Sample(Columns[Index]);
+			Data.ForestCoverage[Index] = static_cast<uint8>(
+				EcologySample.bTreeAllowed ? EcologySample.TreeDensity * 255 / 1000 : 0);
+		}
 	}
 	Data.DistantCells = MoveTemp(Surface.DistantCells);
 

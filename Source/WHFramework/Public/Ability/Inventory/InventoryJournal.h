@@ -49,10 +49,13 @@ public:
 
     bool Open(const FString& InDirectory, const FGuid& InWorldId, const FGuid& InStoreId, bool bInCreateNew,
         FInventoryCheckpoint& OutCheckpoint, TArray<FInventoryJournalRecord>& OutRecords, FString& OutError);
+    bool OpenTransient(const FGuid& InWorldId, const FGuid& InStoreId,
+        FInventoryCheckpoint& OutCheckpoint, TArray<FInventoryJournalRecord>& OutRecords, FString& OutError);
     bool Append(FInventoryJournalRecord& InOutRecord, FString& OutError);
     bool Checkpoint(const FInventoryCheckpoint& InCheckpoint, FString& OutError);
     void Close();
     bool IsHealthy() const;
+    bool IsTransient() const;
     uint64 GetSequence() const;
     bool NeedsCheckpoint() const;
     FGuid GetStoreId() const;
@@ -78,6 +81,7 @@ private:
     uint64 SaveGeneration = 0;
     int64 JournalBytes = 0;
     bool bHealthy = false;
+    bool bTransient = false;
     int64 StoreLock = -1;
 
     static bool EncodeRecord(const FInventoryJournalRecord& InRecord, TArray<uint8>& OutBytes, FString& OutError);

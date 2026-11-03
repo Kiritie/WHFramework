@@ -181,6 +181,10 @@ public:
 	const FVoxelFinePresentedAtom* FindPresentedAtom(const FIntVector& InSection) const;
 	const FVoxelTerrainRenderAtom* FindPresentedNativeAtom(const FIntVector& InSection) const;
 	bool GetPresentedCoarseTriangles(const FVoxelTaskStamp& InStamp, const FGuid& InSourceId, uint64& OutTriangles, bool& bOutFinalPartition) const;
+	bool IsPresentedCoarseGeometry(const FGuid& InSourceId, const FVoxelTerrainCoarseMesh& InGeometry,
+		const FVoxelFineOwner& InOwner, const FVoxelFineContentIdentity& InContent) const;
+	// 包含准备中和已封存未回执的事务，供规划方等待真实呈现状态稳定。
+	bool HasCoarseSourceInFlightOrSealed(const FGuid& InSourceId, const FVoxelTerrainSpatialKey& InKey) const;
 #if !UE_BUILD_SHIPPING
 	// 按需同步统计 RT 回执快照中的非水源网格；不保留快照、正文或租约。
 	bool TryCountPublishedTerrainMeshes(int32& OutCount, uint64& OutSerial, uint64& OutScratchBytes,

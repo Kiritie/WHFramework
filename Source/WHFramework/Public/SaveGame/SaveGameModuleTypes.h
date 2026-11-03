@@ -61,6 +61,14 @@ enum class ESaveScope : uint8
 	World
 };
 
+/** 每个关卡独立选择：临时会话不会打开或修改游戏存档与设置 Profile。 */
+UENUM(BlueprintType)
+enum class ESaveSessionPolicy : uint8
+{
+	Persistent,
+	Transient
+};
+
 UENUM(BlueprintType)
 enum class ESaveResultCode : uint8
 {

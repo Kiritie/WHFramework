@@ -15,6 +15,7 @@ struct WHFRAMEWORK_API FVoxelGenerationRuntimeConfig
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> InputLease;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> RecipeInputLease;
 	TSharedPtr<const FVoxelGenerationRecipe, ESPMode::ThreadSafe> Recipe;
+	EVoxelTerrainType TerrainType = EVoxelTerrainType::Default;
 	uint64 RegistryHash = 0;
 	TArray<uint16> SymbolToRuntime;
 	TArray<uint16> RuntimeToSymbol;
@@ -30,6 +31,7 @@ struct WHFRAMEWORK_API FVoxelGenerationRuntimeConfig
 	FVoxelBlockState Road;
 
 	bool IsValid() const;
+	FVoxelColumnSample MakeSuperflatColumn() const;
 	bool ToRuntime(uint32 InPackedSymbol, FVoxelBlockState& OutState) const;
 	bool ToSymbol(FVoxelBlockState InState, uint32& OutPackedSymbol) const;
 	uint64 GetRequiredInputBytes(const FVoxelTerrainResources& InResources) const;

@@ -18,6 +18,10 @@ class WHFRAMEWORK_API UWHGameInstance : public UGameInstance
 {
 	GENERATED_BODY()
 
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FSaveGameTransientSessionTest;
+#endif
+
 public:
 	UWHGameInstance();
 
@@ -48,8 +52,12 @@ public:
 	}
 
 private:
+	friend class USaveGameModule;
+	/** 由持久存档模块按需调用；同一 GameInstance 重用已取得的租约。 */
+	bool EnsureLocalSaveContext();
 	TSharedPtr<FSaveGameLocalContext, ESPMode::ThreadSafe> LocalSaveContext;
 	FString LocalSaveContextError;
+	FString RequestedLocalDataNamespace;
 	void OnSaveLoadTravelFailure(UWorld* InWorld, ETravelFailure::Type InType, const FString& InError);
 	FDelegateHandle SaveLoadTravelFailureHandle;
 	TWeakObjectPtr<USaveGameModule> PendingLoadSource;

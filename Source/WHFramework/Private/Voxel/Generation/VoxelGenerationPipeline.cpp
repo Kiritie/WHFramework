@@ -258,6 +258,11 @@ bool FVoxelGenerationPipeline::EnumerateCaveEntrances(
 		OutError = TEXT("Invalid cave entrance bounds");
 		return false;
 	}
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		OutError.Reset();
+		return true;
+	}
 	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
 	FVoxelGenerationQuery Query;
 	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
@@ -468,6 +473,11 @@ bool FVoxelGenerationPipeline::QueryReadyWaterfalls(
 		OutError = TEXT("Invalid waterfall query bounds");
 		return false;
 	}
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		OutError.Reset();
+		return true;
+	}
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
 	FVoxelGenerationConsumerKey Consumer;
 	if (!ResolveAllocation(Resources, Consumer, OutError))
@@ -665,6 +675,49 @@ bool FVoxelGenerationPipeline::GenerateSectionWindow(
 	};
 
 	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
+	if (Config->TerrainType == EVoxelTerrainType::Superflat && bInAllowPartialOutput && !Overlay)
+	{
+		TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+		FVoxelGenerationConsumerKey Consumer;
+		if (!ResolveAllocation(Resources, Consumer, OutError)) return false;
+		if (InColumnScratch)
+		{
+			const int64 Count = int64(InColumnScratch->Side) * InColumnScratch->Side;
+			if (InColumnScratch->Owner != this || !(InColumnScratch->Consumer == Consumer) ||
+				InColumnScratch->Side <= 0 || Count > MAX_int32 ||
+				InColumnScratch->Columns.Num() != Count || InColumnScratch->Valid.Num() != Count)
+			{
+				OutError = TEXT("InvalidResource: natural column scratch belongs to another sampling task");
+				return false;
+			}
+			const uint64 Generation = Cache->GetHydrologyGeneration();
+			if (InColumnScratch->bGenerationBound && InColumnScratch->HydrologyGeneration != Generation)
+			{
+				OutError = TEXT("Canceled");
+				return false;
+			}
+			InColumnScratch->HydrologyGeneration = Generation;
+			InColumnScratch->bGenerationBound = true;
+		}
+		uint64 RequiredInputBytes = GetRequiredInputBytes();
+		int32 RequiredLeaseCount = GetRequiredInputLeaseCount();
+		uint64 RequiredWorkingBytes = 0;
+		if (!AddOutputRequirements(InOutputLease, RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes, OutError)) return false;
+		for (int32 Z = InWindow.Min.Z; Z < InWindow.Max.Z; ++Z)
+		{
+			if (InCancel && InCancel->Load())
+			{
+				OutError = TEXT("Canceled");
+				return false;
+			}
+			const FVoxelBlockState State = WorldMin.Z + Z == VoxelGeneration::SuperflatSurfaceZ ? Config->Grass : Config->Air;
+			for (int32 Y = InWindow.Min.Y; Y < InWindow.Max.Y; ++Y)
+				for (int32 X = InWindow.Min.X; X < InWindow.Max.X; ++X)
+					OutBaseBlocks[InWindow.Index(FIntVector(X, Y, Z))] = State;
+		}
+		OutError.Reset();
+		return true;
+	}
 	FVoxelGenerationQuery Query;
 	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
 
@@ -885,6 +938,16 @@ bool FVoxelGenerationPipeline::EnumerateTrees(
 	FString& OutError,
 	const TAtomic<bool>* InCancel) const
 {
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		if (!InBounds.IsValid() || (InCancel && InCancel->Load()))
+		{
+			OutError = InBounds.IsValid() ? TEXT("Canceled") : TEXT("Invalid tree bounds");
+			return false;
+		}
+		OutError.Reset();
+		return true;
+	}
 	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
 	FVoxelGenerationQuery Query;
 	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
@@ -962,6 +1025,12 @@ bool FVoxelGenerationPipeline::SampleEnvironment(
 
 bool FVoxelGenerationPipeline::TrySampleEnvironment(const FIntPoint& InCell, FVoxelEnvironmentSample& OutSample) const
 {
+	if (Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		if (!VoxelGeneration::IsWorldCell(InCell.X) || !VoxelGeneration::IsWorldCell(InCell.Y)) return false;
+		OutSample.Column = Config->MakeSuperflatColumn();
+		return true;
+	}
 	FVoxelNaturalColumnEntryPtr Entry;
 	if (!Cache->FindNaturalColumn(InCell, Entry)) return false;
 	OutSample.Column = Entry->Column;
@@ -1153,6 +1222,28 @@ bool FVoxelGenerationPipeline::SampleColumnGrid(
 	}
 
 	FVoxelGenerationRequiredSourceScope RootSources(Cache->GetResources().Get(), this, EnumeratePipelineRootSources);
+	if (bInEnvironmentOnly && Config->TerrainType == EVoxelTerrainType::Superflat)
+	{
+		TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> Resources;
+		FVoxelGenerationConsumerKey Consumer;
+		if (!ResolveAllocation(Resources, Consumer, OutError)) return false;
+		uint64 RequiredInputBytes = GetRequiredInputBytes();
+		int32 RequiredLeaseCount = GetRequiredInputLeaseCount();
+		uint64 RequiredWorkingBytes = 0;
+		if (!AddOutputRequirements(InOutputLease, RequiredInputBytes, RequiredLeaseCount, RequiredWorkingBytes, OutError)) return false;
+		const FVoxelColumnSample Column = Config->MakeSuperflatColumn();
+		for (int32 Y = 0; Y < InHeight; ++Y)
+		{
+			if (InCancel && InCancel->Load())
+			{
+				OutError = TEXT("Canceled");
+				return false;
+			}
+			for (int32 X = 0; X < InWidth; ++X) OutColumns[X + Y * InWidth] = Column;
+		}
+		OutError.Reset();
+		return true;
+	}
 	FVoxelGenerationQuery Query;
 	FVoxelGenerationRequiredSourceScope QuerySources(Cache->GetResources().Get(), &Query, EnumeratePipelineQuerySources);
 

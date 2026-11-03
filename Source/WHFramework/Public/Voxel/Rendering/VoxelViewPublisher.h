@@ -24,6 +24,13 @@ struct WHFRAMEWORK_API FVoxelViewCoverageResult final : FVoxelTaskCustomPayload
 	virtual uint64 GetAllocatedBytes() const override;
 };
 
+enum class EVoxelCoverageSourceDisposition : uint8
+{
+	Include,
+	SuppressUnpresented,
+	WaitForPresentation
+};
+
 class WHFRAMEWORK_API FVoxelViewPublisher
 {
 public:
@@ -47,6 +54,8 @@ public:
 	bool SetSharedCoverage(const FGuid& InGroup, FVoxelViewSourceId InSourceId,
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes);
 	FVoxelGameThreadContinuation SetCoverageSteps(const FGuid& InGroup, FVoxelViewSourceId InSourceId, TArray<FBox> InWorldCellBoxes,
+		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
+	FVoxelGameThreadContinuation SetRetainedCoverageSteps(const FGuid& InGroup, FVoxelViewSourceId InSourceId, TArray<FBox> InWorldCellBoxes,
 		TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
 	FVoxelGameThreadContinuation SetSharedCoverageSteps(
 		const FGuid& InGroup, FVoxelViewSourceId InSourceId, TSharedPtr<const TArray<FBox>, ESPMode::ThreadSafe> InCommonBoxes, bool& OutSuccess);
@@ -94,6 +103,8 @@ public:
 	bool IsPresented(FVoxelViewSourceId InSourceId) const;
 	bool IsCommitted(FVoxelViewSourceId InSourceId) const;
 	bool HasPresentation(FVoxelViewSourceId InSourceId) const;
+	bool HasUnsettledPresentation(FVoxelViewSourceId InSourceId) const;
+	EVoxelCoverageSourceDisposition ClassifyCoverageSource(FVoxelViewSourceId InSourceId, bool bInWanted) const;
 	bool GetPresentedSourceMeshCost(FVoxelViewSourceId InSourceId, uint64& OutVertices, uint64& OutTriangles, uint64& OutBytes) const;
 	bool GetPresentedTriangles(FVoxelViewSourceId InSourceId, uint64& OutTriangles, bool& bOutFinalPartition) const;
 	FVoxelFrameTimings GetFrameTimings() const { return FrameTimings; }
@@ -102,6 +113,11 @@ public:
 	void SetGeometryValidator(TFunction<bool(const FVoxelTaskStamp&)> InValidator)
 	{
 		GeometryValidator = MoveTemp(InValidator);
+	}
+	// 已呈现旧源允许保留到新尝试接管，但其所属 manager 仍必须是同一实例。
+	void SetRetainedGeometryOwnerValidator(TFunction<bool(const FVoxelTaskStamp&)> InValidator)
+	{
+		RetainedGeometryOwnerValidator = MoveTemp(InValidator);
 	}
 	void SetMeshValidator(TFunction<bool(const FVoxelSectionMeshResult&)> InValidator)
 	{
@@ -420,11 +436,12 @@ private:
 		Remove
 	};
 	ENativeUpdateWork GetNativeUpdateWork(const FPublication& InPublication, const FUpdate& InUpdate) const;
+	bool HasPresentedClippingGeometry(const FUpdate& InUpdate) const;
 	bool HasNativeGroupWork(const FPublication& InPublication, const FGroup& InGroup) const;
 	bool PrepareUpdate(const FPublicationRef& Publication, int32 InIndex, double InDeadline, int32& InOutPreparedComponents, bool& bOutComplete);
 	bool CommitReadyGroups(const FPublicationRef& Publication, int32& InOutCommitted, double InDeadline,
 		const TMap<FVoxelPublishGroupKey, uint64>& InFirstOwners, int32 InGroupIndex = INDEX_NONE);
-	bool CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup);
+	bool CommitReadyGroup(const FPublicationRef& Publication, FGroup& InGroup, bool bInDiscardAfterPresentation = false);
 	void DiscardGroup(const FPublicationRef& InPublication, FGroup& InGroup, const TCHAR* InReason, bool bInAllowRetry = true);
 	bool AdvanceNativeGroup(const FPublicationRef& InPublication, FGroup& InGroup, bool& bOutAdvanced);
 	bool CanAdmitNativeGroup(const FGroup& InGroup) const;
@@ -432,6 +449,7 @@ private:
 	bool YieldNativePreparation(const FPublicationRef& InPublication, FGroup& InGroup);
 	void ReleaseNativeGroup(FGroup& InGroup);
 	bool IsNativeGeometryCurrent(const FVoxelTaskStamp& InStamp) const;
+	bool IsNativeUpdateCurrent(const FUpdate& InUpdate) const;
 	bool RunBudgetedPhase(FVoxelPublishBudget& InBudget, EVoxelPublishPhase InPhase, TFunctionRef<bool()> InOperation,
 		double InDeadlineSeconds = MAX_dbl);
 	double PhaseOperationEstimateMilliseconds[static_cast<uint8>(EVoxelPublishPhase::Count)] = {};
@@ -477,6 +495,7 @@ private:
 	const uint64* CommitGateStateRevision = nullptr;
 	uint64 CommitGateBindingRevision = 0;
 	TFunction<bool(const FVoxelTaskStamp&)> GeometryValidator;
+	TFunction<bool(const FVoxelTaskStamp&)> RetainedGeometryOwnerValidator;
 	TFunction<bool(const FVoxelSectionMeshResult&)> MeshValidator;
 	FGroupCallbackPtr CurrentGroupCallback;
 	TSharedPtr<bool> CommitCallbackLifetime;

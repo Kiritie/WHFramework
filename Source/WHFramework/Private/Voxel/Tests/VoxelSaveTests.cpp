@@ -14,6 +14,8 @@
 #include "Misc/Paths.h"
 #include "SaveGame/SaveDataSerializer.h"
 #include "SaveGame/SaveGameStorage.h"
+#include "SaveGame/Tests/SaveGameTestPathSafety.h"
+#include "UObject/UnrealType.h"
 #include "Voxel/Task/VoxelTaskScheduler.h"
 #include "Voxel/Generation/VoxelManifestCodec.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
@@ -1154,7 +1156,21 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FVoxelSaveCoordinatorTest::RunTest(const FString& InParameters)
 {
+	using SaveGameTestPathSafety::EFixturePathKind;
+	using SaveGameTestPathSafety::FixtureAbsolutePath;
+	using SaveGameTestPathSafety::ProbeFixturePath;
+	using SaveGameTestPathSafety::CreateExclusiveFixtureRoot;
+	using SaveGameTestPathSafety::ValidateFixtureTree;
+	using SaveGameTestPathSafety::FixtureDirectoryIsEmpty;
+
 	(void)InParameters;
+	const FString RunName = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	FString Root;
+	const bool bCreatedRoot = CreateExclusiveFixtureRoot(
+		FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation"), TEXT("VoxelSaveCoordinator")), RunName, Root);
+	AddInfo(FString::Printf(TEXT("Coordinator fixture candidate directory (never removed by this test): %s"), *Root));
+	if (!TestTrue(TEXT("Coordinator uses a newly created exclusive and link-free run root"),
+		bCreatedRoot && FixtureDirectoryIsEmpty(Root))) return false;
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
 	if (!TestNotNull(TEXT("Coordinator fixture creates a real world"), World)) return false;
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
@@ -1169,33 +1185,81 @@ bool FVoxelSaveCoordinatorTest::RunTest(const FString& InParameters)
 	Owner->GetModuleMap().Add(Producer->GetModuleName(), Producer);
 	Owner->GetModules().Add(OtherProducer);
 	Owner->GetModuleMap().Add(OtherProducer->GetModuleName(), OtherProducer);
-	const FString Root = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation"), TEXT("VoxelSaveCoordinator"));
 	FSaveGameStorage Storage(0, Root);
-	TArray<FGuid> Created;
 	ON_SCOPE_EXIT
 	{
 		Save->OnTermination(EPhase::All);
+		if (Save->bSaveOperationRunning)
+			AddWarning(TEXT("Coordinator worker is still retiring; its outcome and fixture files remain available for inspection."));
 		World->DestroyWorld(false);
 		Owner->GetModuleMap().Reset();
 		Owner->GetModules().Reset();
 		GEngine->DestroyWorldContext(World);
-		for (const FGuid& Id : Created) Storage.DeleteWorldDirectory(Id);
 	};
 	if (!TestEqual(TEXT("Coordinator uses its world MainModule singleton"), AMainModule::GetPtr(World, true), Owner)) return false;
+	if (!TestTrue(TEXT("Coordinator does not install a voxel owner or an external store participant"),
+		!UVoxelModule::GetPtr(World) && !Save->WorldStoreParticipant.Begin && !Save->PendingCreatedSaveId.IsValid())) return false;
 	auto Create = [&]()
 	{
 		const FGuid Id = FGuid::NewGuid();
+		const FString WorldPath = FixtureAbsolutePath(Storage.GetWorldDir(Id));
+		const FString WorldsPath = FixtureAbsolutePath(FPaths::Combine(Root, TEXT("Worlds")));
+		if (Save->bSaveOperationRunning || Save->PendingCreatedSaveId.IsValid() || Save->WorldStoreParticipant.Begin ||
+			!ValidateFixtureTree(Root) || WorldPath.IsEmpty() || WorldsPath.IsEmpty() ||
+			!FPaths::IsSamePath(FPaths::GetPath(WorldPath), WorldsPath) ||
+			!FPaths::IsUnderDirectory(WorldPath, Root) || ProbeFixturePath(WorldPath) != EFixturePathKind::Missing)
+			return FGuid();
 		FSaveManifest Manifest;
 		Manifest.SaveId = Id;
-		if (!Storage.CreateWorldDirectory(Id) || !Storage.WriteManifestAtomic(Id, Manifest)) return FGuid();
-		Created.Add(Id);
+		if (!Storage.CreateWorldDirectory(Id) || !Storage.WriteManifestAtomic(Id, Manifest) ||
+			Storage.HasPendingWorld(Id) || ProbeFixturePath(Storage.GetPendingWorldPath(Id)) != EFixturePathKind::Missing)
+			return FGuid();
 		Save->Storage = MakeUnique<FSaveGameStorage>(0, Root);
 		return Id;
 	};
+	auto ValidateAcceptedPlan = [&](const FGuid& Id, const FSaveOperationResult& Result)
+	{
+		const FSaveGenerationPlan* Plan = Save->AsyncPlan.Get();
+		if (Result.Code != ESaveResultCode::Accepted || !Result.OperationId.IsValid() || !Plan ||
+			Plan->SaveId != Id || Plan->OperationId != Result.OperationId || Plan->TransactionId != Result.OperationId ||
+			!FPaths::IsSamePath(Plan->StorageRoot, Root) || Plan->Manifest.SaveId != Id || Plan->Manifest.CurrentGeneration != 0 ||
+			Plan->bCreateSlotAtWrite || Plan->bDeleteCreatedSlotOnFailure || Plan->bResolveManifestOnWorker ||
+			Plan->ExternalOperation || Plan->Voxel.IsSet() || Save->AsyncExternalOperation || Save->AsyncVoxelOwner ||
+			Save->PendingCreatedSaveId.IsValid() || Save->bAsyncWorkerStarted || !ValidateFixtureTree(Root)) return false;
+		const FSaveGameStorage PlannedStorage(Plan->UserIndex, Plan->StorageRoot, Plan->TransactionId);
+		const FString Generations = FixtureAbsolutePath(PlannedStorage.GetGenerationsDir(Id));
+		const FString ExpectedWorld = FixtureAbsolutePath(FPaths::Combine(Root, TEXT("Worlds"), Id.ToString(EGuidFormats::Digits)));
+		const FString Temp = FixtureAbsolutePath(PlannedStorage.GetTempGenerationDir(Id, 1));
+		const FString Target = FixtureAbsolutePath(PlannedStorage.GetGenerationDir(Id, 1));
+		return !Generations.IsEmpty() && !ExpectedWorld.IsEmpty() && !Temp.IsEmpty() && !Target.IsEmpty() &&
+			FPaths::IsSamePath(FPaths::GetPath(Generations), ExpectedWorld) &&
+			FPaths::IsSamePath(FPaths::GetPath(Temp), Generations) && FPaths::IsSamePath(FPaths::GetPath(Target), Generations) &&
+			FPaths::IsUnderDirectory(Temp, Root) && FPaths::IsUnderDirectory(Target, Root) &&
+			FPaths::GetCleanFilename(Target) == TEXT("00000001") &&
+			FPaths::GetCleanFilename(Temp) == TEXT("00000001.") + Result.OperationId.ToString(EGuidFormats::Digits) + TEXT(".tmp") &&
+			ProbeFixturePath(Temp) == EFixturePathKind::Missing && ProbeFixturePath(Target) == EFixturePathKind::Missing &&
+			FixtureDirectoryIsEmpty(Generations);
+	};
 	const FGuid First = Create();
+	if (!TestTrue(TEXT("Coordinator creates an isolated first slot"), First.IsValid())) return false;
+	// 与 OnInitialize 使用同一锁定入口；本协调器夹具直接注入独立存储。
+	Save->LockSessionPolicy();
 	const FSaveOperationResult Accepted = Save->SaveSlotAsync(First);
 	if (!TestTrue(TEXT("World save returns a distinct accepted operation"),
 		Accepted.Code == ESaveResultCode::Accepted && Accepted.OperationId.IsValid())) return false;
+	if (!TestTrue(TEXT("First accepted worker has validated absolute generation paths and an empty generation directory"),
+		ValidateAcceptedPlan(First, Accepted))) return false;
+	FEnumProperty* SessionPolicy = FindFProperty<FEnumProperty>(USaveGameModule::StaticClass(), TEXT("SessionPolicy"));
+	if (!TestNotNull(TEXT("Session policy can be edited through reflection"), SessionPolicy)) return false;
+	const FSaveGenerationPlan* const OriginalPlan = Save->AsyncPlan.Get();
+	const FSaveGameStorage* const OriginalStorage = Save->Storage.Get();
+	SessionPolicy->GetUnderlyingProperty()->SetIntPropertyValue(SessionPolicy->ContainerPtrToValuePtr<void>(Save),
+		static_cast<uint64>(ESaveSessionPolicy::Transient));
+	TestFalse(TEXT("Changing config cannot relabel a running persistent save as transient"), Save->IsTransientSession());
+	Save->OnInitialize();
+	TestTrue(TEXT("Repeated initialization retains the accepted operation and its original owners"),
+		Save->AsyncPlan.Get() == OriginalPlan && Save->Storage.Get() == OriginalStorage &&
+		Save->GetWorldSaveResult(Accepted.OperationId).Code == ESaveResultCode::Accepted);
 	FSaveManifest Manifest;
 	TestTrue(TEXT("Accepted has not pretended to publish a generation"), Storage.ReadManifest(First, Manifest) && Manifest.CurrentGeneration == 0);
 	TestTrue(TEXT("Accepting a save does not run the entire batch of module callbacks"),
@@ -1261,6 +1325,7 @@ bool FVoxelSaveCoordinatorTest::RunTest(const FString& InParameters)
 	}
 	const auto Completed = Save->GetWorldSaveResult(Accepted.OperationId);
 	if (!TestTrue(TEXT("Actual original worker completion changes Accepted to Success"), Completed.Code == ESaveResultCode::Success)) return false;
+	TestFalse(TEXT("The accepted save remains persistent through actual completion"), Save->IsTransientSession());
 	TestEqual(TEXT("Capacity/file phases do not recapture the original module"), Producer->CaptureCount, 1);
 	TestTrue(TEXT("Actual file copy advances in bounded windows"), MaximumCopied > 0 && MaximumCopied <= 64 * 1024);
 	TestEqual(TEXT("Actual completion dispatches the module callback exactly once"), Producer->AfterCount, 1);
@@ -1276,28 +1341,37 @@ bool FVoxelSaveCoordinatorTest::RunTest(const FString& InParameters)
 	TestTrue(TEXT("Real persisted file preserves the originally frozen module data"), Decoded.GetPtr<FVoxelModuleSaveData>() && Decoded.GetPtr<FVoxelModuleSaveData>()->Seed == 71);
 	Producer->bTerminateAfter = true;
 	const FGuid AfterSlot = Create();
+	if (!TestTrue(TEXT("After-callback slot is isolated"), AfterSlot.IsValid())) return false;
 	const auto AfterAccepted = Save->SaveSlotAsync(AfterSlot);
+	if (!TestTrue(TEXT("After-callback worker has validated absolute generation paths"),
+		ValidateAcceptedPlan(AfterSlot, AfterAccepted))) return false;
 	const double AfterDeadline = FPlatformTime::Seconds() + 10.0;
 	while (Save->bSaveOperationRunning && FPlatformTime::Seconds() < AfterDeadline)
 	{
 		Save->OnRefresh(0.01f, false);
 		FPlatformProcess::SleepNoStats(0.001f);
 	}
-	TestTrue(TEXT("OnAfter termination applies after the original commit callback without recursive cleanup"),
+	if (!TestTrue(TEXT("OnAfter termination applies after the original commit callback without recursive cleanup"),
 		Save->GetWorldSaveResult(AfterAccepted.OperationId).Code == ESaveResultCode::Success &&
-		Producer->AfterCount == 2 && !Save->Storage && !Save->bSaveOperationRunning);
+		Producer->AfterCount == 2 && !Save->Storage && !Save->bSaveOperationRunning)) return false;
 	Producer->bTerminateAfter = false;
 	Producer->bTerminateBefore = true;
 	const FGuid BeforeSlot = Create();
+	if (!TestTrue(TEXT("Before-callback slot is isolated"), BeforeSlot.IsValid())) return false;
 	const auto BeforeResult = Save->SaveSlotAsync(BeforeSlot);
+	if (!TestTrue(TEXT("Before-callback request has validated absolute generation paths"),
+		ValidateAcceptedPlan(BeforeSlot, BeforeResult))) return false;
 	Save->OnRefresh(0.01f, false);
-	TestTrue(TEXT("OnBefore termination cancels the accepted capture once before file work"),
+	if (!TestTrue(TEXT("OnBefore termination cancels the accepted capture once before file work"),
 		BeforeResult.Code == ESaveResultCode::Accepted && Save->GetWorldSaveResult(BeforeResult.OperationId).Code != ESaveResultCode::Accepted &&
-		Producer->AfterCount == 3 && OtherProducer->AfterCount == 2 && !Producer->bAfterSucceeded && !Save->Storage);
+		Producer->AfterCount == 3 && OtherProducer->AfterCount == 2 && !Producer->bAfterSucceeded && !Save->Storage)) return false;
 	Producer->bTerminateBefore = false;
 	Producer->bTerminateCapture = true;
 	const FGuid CaptureSlot = Create();
+	if (!TestTrue(TEXT("Capture-callback slot is isolated"), CaptureSlot.IsValid())) return false;
 	const auto CaptureAccepted = Save->SaveSlotAsync(CaptureSlot);
+	if (!TestTrue(TEXT("Capture-callback request has validated absolute generation paths"),
+		ValidateAcceptedPlan(CaptureSlot, CaptureAccepted))) return false;
 	Save->OnRefresh(0.01f, false);
 	Save->OnRefresh(0.01f, false);
 	Save->OnRefresh(0.01f, false);

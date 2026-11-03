@@ -31,7 +31,7 @@ bool UVoxelModuleStatics::ImportVoxelPrefabAsset(const UObject* Context,
         return false;
     }
     FVoxelPrefabSaveData Cells;
-    return Prefab->DecodeCells(Cells, Error) && Module->ApplyPrefab(Cells, Origin, Error);
+    return Prefab->DecodePlacementCells(Cells, Error) && Module->ApplyPrefab(Cells, Origin, Error);
 }
 bool UVoxelModuleStatics::ExportVoxelPrefab(const UObject*C,FIntVector A,FIntVector B,FVoxelPrefabSaveData&O,FString&E)
 {auto*M=GetVoxelModule(C);if(!M){E=TEXT("No voxel module");return false;}return M->ExportPrefab(A,B,O,E);}

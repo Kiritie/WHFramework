@@ -5,6 +5,7 @@
 #include "Voxel/WorldObject/VoxelWorldObjectDefinition.h"
 
 class FVoxelWorldRuntime;
+class UVoxelData;
 struct FVoxelRegistrySnapshot;
 
 struct WHFRAMEWORK_API FVoxelWorldObjectInstance
@@ -39,6 +40,9 @@ public:
 	static constexpr int32 MaximumPartOffsetCells = 32;
 
 	bool Build(const FVoxelRegistrySnapshot& InBlocks, const TArray<UVoxelWorldObjectDefinition*>& InDefinitions, FString& OutError);
+	/** Verify explicitly placeable object-part items against the actual object anchor definitions. */
+	static bool ValidatePlaceableObjectItems(const TArray<UVoxelData*>& InBlocks,
+		const TArray<UVoxelWorldObjectDefinition*>& InDefinitions, FString& OutError);
 	void Reset();
 	double GetMaxMaterializationRadius() const { return MaxMaterializationRadius; }
 	const FVoxelWorldObjectDefinitionRuntime* Find(FName InId) const;

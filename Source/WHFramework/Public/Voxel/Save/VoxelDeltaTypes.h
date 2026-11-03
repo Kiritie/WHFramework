@@ -54,6 +54,10 @@ struct WHFRAMEWORK_API FVoxelEditBatch
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> ResourceLease;
 	FGuid TransactionId;
 	TArray<FVoxelSectionPatch> Sections;
+#if WITH_EDITOR
+	// 仅用于本进程诊断，不参与存档或网络编码。
+	double DataAppliedMonotonicSeconds = 0.0;
+#endif
 };
 
 struct WHFRAMEWORK_API FVoxelPersistentSection

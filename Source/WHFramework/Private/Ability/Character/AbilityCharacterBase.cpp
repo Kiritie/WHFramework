@@ -87,7 +87,8 @@ AAbilityCharacterBase::AAbilityCharacterBase(const FObjectInitializer& ObjectIni
 void AAbilityCharacterBase::InitializeAbilities(AActor* InOwnerActor, AActor* InAvatarActor)
 {
 	IAbilityActorInterface::InitializeAbilities(InOwnerActor, InAvatarActor);
-	if (HasAuthority() && AbilitySystem && AbilitySystem->GetAvatarActor() == this && AssetID.IsValid() && !bBaseAttributeSourceReady)
+	if (HasAuthority() && AbilitySystem && AbilitySystem->GetAvatarActor() == this && AssetID.IsValid() &&
+		bHasAuthoritativeLevel && !bBaseAttributeSourceReady)
 	{
 		AAbilityCharacterBase::SetLevelA(Level);
 	}
@@ -95,6 +96,7 @@ void AAbilityCharacterBase::InitializeAbilities(AActor* InOwnerActor, AActor* In
 
 void AAbilityCharacterBase::OnSpawn_Implementation(const FParameter& InParam)
 {
+	bHasAuthoritativeLevel = false;
 	bBaseAttributeSourceReady = false;
 	Super::OnSpawn_Implementation(InParam);
 	InitializeAbilities();
@@ -107,6 +109,7 @@ void AAbilityCharacterBase::OnSpawn_Implementation(const FParameter& InParam)
 
 void AAbilityCharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
+	bHasAuthoritativeLevel = false;
 	bBaseAttributeSourceReady = false;
 	UninitializeAbilities();
 	if (UCharacterMovementComponentBase* Movement = Cast<UCharacterMovementComponentBase>(GetCharacterMovement()))
@@ -187,6 +190,7 @@ void AAbilityCharacterBase::LoadData(const FParameter& InSaveData, EPhase InPhas
 	const FCharacterSaveData& SaveData = InSaveData.GetRef<FCharacterSaveData>();
 	if (PHASEC(InPhase, EPhase::Primary))
 	{
+		bHasAuthoritativeLevel = false;
 		bBaseAttributeSourceReady = false;
 		if (HasAuthority())
 		{
@@ -673,6 +677,8 @@ bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 	Level = NewLevel;
 	if (!AbilitySystem)
 	{
+		// A player may load its level before the PlayerState's ASC binds this avatar.
+		bHasAuthoritativeLevel = true;
 		bBaseAttributeSourceReady = false;
 		if (bChanged)
 		{
@@ -692,6 +698,7 @@ bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 		UE_LOG(LogTemp, Error, TEXT("角色基础属性来源建立失败: %s"), *AssetID.ToString());
 		return false;
 	}
+	bHasAuthoritativeLevel = true;
 	bBaseAttributeSourceReady = true;
 	if (bChanged)
 	{

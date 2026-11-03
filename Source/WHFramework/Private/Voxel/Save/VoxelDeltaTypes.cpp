@@ -17,5 +17,8 @@ FVoxelEditBatch& FVoxelEditBatch::operator=(FVoxelEditBatch&& InOther)
 	TransactionId = InOther.TransactionId;
 	Sections = MoveTemp(InOther.Sections);
 	ResourceLease = MoveTemp(InOther.ResourceLease);
+#if WITH_EDITOR
+	DataAppliedMonotonicSeconds = InOther.DataAppliedMonotonicSeconds;
+#endif
 	return *this;
 }

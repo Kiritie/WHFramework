@@ -79,21 +79,16 @@ namespace
 			});
 	}
 
-	FVoxelGenerationBounds GridBoxToBounds(
-		const FVoxelGridBox& InBox,
-		int32 InScale)
+	bool OffsetAndScaleStructurePosition(const FIntVector& InPosition, const FIntVector& InOffset,
+		int32 InScale, FIntVector& OutPosition)
 	{
-		FVoxelGenerationBounds Result;
-
-		Result.Min =
-			InBox.Min *
-			InScale;
-
-		Result.Max =
-			InBox.Max *
-			InScale;
-
-		return Result;
+		for (int32 Axis = 0; Axis < 3; ++Axis)
+		{
+			const int64 Value = (int64(InPosition[Axis]) + InOffset[Axis]) * InScale;
+			if (Value < MIN_int32 || Value > MAX_int32) return false;
+			OutPosition[Axis] = static_cast<int32>(Value);
+		}
+		return true;
 	}
 
 	FIntVector RotateCornerQuarterTurns(
@@ -525,9 +520,12 @@ bool FVoxelGenerationCompiler::GatherBlockNames(
 
 		if (Prefab)
 		{
+			FVoxelPrefabSaveData PrefabData;
+			if (!Prefab->DecodeCells(PrefabData, OutError)) return false;
 			for (const FVoxelPrefabCell& Cell :
-				Prefab->Data.Cells)
+				PrefabData.Cells)
 			{
+				if (Cell.bClear) continue;
 				FName BlockName;
 
 				if (!ResolveBlockName(
@@ -1545,53 +1543,47 @@ bool FVoxelGenerationCompiler::CompileStructurePiece(
 			Replacement->GetPrimaryAssetId());
 	}
 
+	FIntVector PrefabOffset;
+	FVoxelPrefabSaveData PrefabData;
+	if (!Prefab->GetPlacementOffset(PrefabOffset, OutError) ||
+		!Prefab->DecodePlacementCells(PrefabData, OutError))
+	{
+		return false;
+	}
+	if (PrefabData.Cells.IsEmpty())
+	{
+		OutError = TEXT("Structure source prefab is empty");
+		return false;
+	}
 	TArray<FCompiledCell> Cells;
+	TArray<FCompiledCell> ClearCells;
+	TSet<FIntVector> SeenSourceCells;
 
 	for (const FVoxelPrefabCell& SourceCell :
-		Prefab->Data.Cells)
+		PrefabData.Cells)
 	{
-		FPrimaryAssetId AssetId =
-			SourceCell.Item.VoxelAssetID;
-
-		if (const FPrimaryAssetId* Replacement =
-			ReplacementMap.Find(AssetId))
+		if (SeenSourceCells.Contains(SourceCell.Offset))
 		{
-			AssetId = *Replacement;
-		}
-
-		FName BlockName;
-
-		if (!ResolveBlockName(
-			AssetId,
-			InRegistry,
-			BlockName,
-			OutError))
-		{
+			OutError = FString::Printf(TEXT("Structure source prefab contains a duplicate cell at %s"), *SourceCell.Offset.ToString());
 			return false;
 		}
-
-		const uint16* Symbol =
-			InBlockSymbols.Find(
-				BlockName);
-
-		if (!Symbol)
+		SeenSourceCells.Add(SourceCell.Offset);
+		uint32 PackedValue = 0;
+		if (!SourceCell.bClear)
 		{
-			OutError = FString::Printf(
-				TEXT("Structure %s uses block %s that is missing from recipe block symbols"),
-				*InStructure.StableId.ToString(),
-				*BlockName.ToString());
-
-			return false;
+			FPrimaryAssetId AssetId = SourceCell.Item.VoxelAssetID;
+			if (const FPrimaryAssetId* Replacement = ReplacementMap.Find(AssetId)) AssetId = *Replacement;
+			FName BlockName;
+			if (!ResolveBlockName(AssetId, InRegistry, BlockName, OutError)) return false;
+			const uint16* Symbol = InBlockSymbols.Find(BlockName);
+			if (!Symbol)
+			{
+				OutError = FString::Printf(TEXT("Structure %s uses block %s that is missing from recipe block symbols"),
+					*InStructure.StableId.ToString(), *BlockName.ToString());
+				return false;
+			}
+			PackedValue = static_cast<uint32>(*Symbol) | (static_cast<uint32>(static_cast<uint16>(SourceCell.Item.State)) << 16);
 		}
-
-		const uint32 PackedValue =
-			static_cast<uint32>(*Symbol) |
-			(
-				static_cast<uint32>(
-					static_cast<uint16>(
-						SourceCell.Item.State)) <<
-				16
-			);
 
 		const FIntVector Base =
 			SourceCell.Offset *
@@ -1621,8 +1613,7 @@ bool FVoxelGenerationCompiler::CompileStructurePiece(
 					Cell.Value =
 						PackedValue;
 
-					Cells.Add(
-						MoveTemp(Cell));
+					(SourceCell.bClear ? ClearCells : Cells).Add(MoveTemp(Cell));
 				}
 			}
 		}
@@ -1636,26 +1627,31 @@ bool FVoxelGenerationCompiler::CompileStructurePiece(
 	Piece.SourceCellCentimeters =
 		InStructure.SourceCellCentimeters;
 
-	Piece.GroundZ =
-		InStructure.SourceGroundCellZ *
-		Scale;
-
-	Piece.Bounds =
-		GridBoxToBounds(
-			InStructure.SourceBounds,
-			Scale);
-
-	Piece.Entrance =
-		InStructure.SourceEntranceCorner *
-		Scale;
+	FIntVector Ground;
+	if (!OffsetAndScaleStructurePosition(FIntVector(0, 0, InStructure.SourceGroundCellZ),
+		FIntVector(0, 0, PrefabOffset.Z), Scale, Ground) ||
+		!OffsetAndScaleStructurePosition(InStructure.SourceBounds.Min, PrefabOffset, Scale, Piece.Bounds.Min) ||
+		!OffsetAndScaleStructurePosition(InStructure.SourceBounds.Max, PrefabOffset, Scale, Piece.Bounds.Max) ||
+		!OffsetAndScaleStructurePosition(InStructure.SourceEntranceCorner, FIntVector::ZeroValue, Scale, Piece.Entrance))
+	{
+		OutError = TEXT("Structure source coordinates exceed the supported range");
+		return false;
+	}
+	Piece.GroundZ = Ground.Z;
+	// Entrance is the unshifted placement reference subtracted by RasterizePiece.
+	// Shifting it as well would cancel the prefab's requested placement offset.
 
 	for (const FVoxelGridBox& ClearVolume :
 		InStructure.ClearVolumes)
 	{
-		Piece.ClearVolumes.Add(
-			GridBoxToBounds(
-				ClearVolume,
-				Scale));
+		FVoxelGenerationBounds Bounds;
+		if (!OffsetAndScaleStructurePosition(ClearVolume.Min, PrefabOffset, Scale, Bounds.Min) ||
+			!OffsetAndScaleStructurePosition(ClearVolume.Max, PrefabOffset, Scale, Bounds.Max))
+		{
+			OutError = TEXT("Structure clear volume exceeds the supported range");
+			return false;
+		}
+		Piece.ClearVolumes.Add(Bounds);
 	}
 
 	Piece.Connectors =
@@ -1664,8 +1660,13 @@ bool FVoxelGenerationCompiler::CompileStructurePiece(
 	for (FVoxelStructureConnectorData& Connector :
 		Piece.Connectors)
 	{
-		Connector.Position *=
-			Scale;
+		FIntVector Position;
+		if (!OffsetAndScaleStructurePosition(Connector.Position, PrefabOffset, Scale, Position))
+		{
+			OutError = TEXT("Structure connector exceeds the supported range");
+			return false;
+		}
+		Connector.Position = Position;
 	}
 
 	for (const FVoxelStructureDetailSocket& Detail :
@@ -1688,9 +1689,11 @@ bool FVoxelGenerationCompiler::CompileStructurePiece(
 		RuntimeDetail.DetailId =
 			DetailData->StableKey;
 
-		RuntimeDetail.SourceCorner =
-			Detail.SourceCorner *
-			Scale;
+		if (!OffsetAndScaleStructurePosition(Detail.SourceCorner, PrefabOffset, Scale, RuntimeDetail.SourceCorner))
+		{
+			OutError = TEXT("Structure detail exceeds the supported range");
+			return false;
+		}
 
 		RuntimeDetail.Yaw =
 			Detail.Yaw;
@@ -1705,6 +1708,12 @@ bool FVoxelGenerationCompiler::CompileStructurePiece(
 		OutError))
 	{
 		return false;
+	}
+	TArray<FVoxelStructureRun> ClearRuns;
+	if (!CompileCellsToRuns(ClearCells, ClearRuns, OutError)) return false;
+	for (const FVoxelStructureRun& Run : ClearRuns)
+	{
+		Piece.ClearVolumes.Add({Run.Start, Run.Start + FIntVector(Run.Length, 1, 1)});
 	}
 
 	if (!Piece.Validate(

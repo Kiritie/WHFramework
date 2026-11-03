@@ -4334,6 +4334,20 @@ bool FVoxelTerrainRenderer::GetPresentedCoarseTriangles(const FVoxelTaskStamp& I
 	return true;
 }
 
+bool FVoxelTerrainRenderer::IsPresentedCoarseGeometry(const FGuid& InSourceId, const FVoxelTerrainCoarseMesh& InGeometry,
+	const FVoxelFineOwner& InOwner, const FVoxelFineContentIdentity& InContent) const
+{
+	if (!State || !State->PresentedSnapshot || State->PresentedSnapshot->WorldEpoch != InContent.WorldEpoch) return false;
+	const auto Item = FindCoarseItem(State->PresentedSnapshot->CoarseRoot, InGeometry.Stamp.GeometryIdentity.Key, InSourceId);
+	return Item && Item->Geometry.Get() == &InGeometry && Item->Evidence.Owner == InOwner && Item->Evidence.Content == InContent;
+}
+
+bool FVoxelTerrainRenderer::HasCoarseSourceInFlightOrSealed(const FGuid& InSourceId, const FVoxelTerrainSpatialKey& InKey) const
+{
+	return State && (State->PendingCoarseSources.Contains(InSourceId) ||
+		(State->LastSealedSnapshot && FindCoarseItem(State->LastSealedSnapshot->CoarseRoot, InKey, InSourceId)));
+}
+
 #if !UE_BUILD_SHIPPING
 bool FVoxelTerrainRenderer::TryCountPublishedTerrainMeshes(int32& OutCount, uint64& OutSerial, uint64& OutScratchBytes,
 	double& OutMilliseconds, FString& OutError) const

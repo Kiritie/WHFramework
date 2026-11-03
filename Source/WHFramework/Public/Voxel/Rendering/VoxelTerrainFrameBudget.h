@@ -11,7 +11,7 @@ struct WHFRAMEWORK_API FVoxelTerrainFrameBudgetSettings
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	double TargetFramesPerSecond = 60.0;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	double MaximumTerrainMilliseconds = 4.0;
+	double MaximumTerrainMilliseconds = 12.0;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	double MinimumNearMilliseconds = 0.25;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)

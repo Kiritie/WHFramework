@@ -41,6 +41,8 @@ namespace
         FVoxelPrefabSaveData Data;
         FText DisplayName;
         bool bSetDisplayName = false;
+        bool bSetCenterOffset = false;
+        FIntVector CenterOffset = FIntVector::ZeroValue;
     };
 }
 
@@ -90,7 +92,7 @@ int32 UVoxelPrefabImportCommandlet::Main(const FString& Params)
         const auto Row = JsonRow && JsonRow->Type == EJson::Object ? JsonRow->AsObject() : nullptr;
         FString AssetPath, DisplayName;
         const TArray<TSharedPtr<FJsonValue>>* Cells = nullptr;
-        if (!Row || !OnlyKeys(*Row, {TEXT("Asset"), TEXT("DisplayName"), TEXT("Cells")}) ||
+        if (!Row || !OnlyKeys(*Row, {TEXT("Asset"), TEXT("DisplayName"), TEXT("CenterOffset"), TEXT("Cells")}) ||
             !Row->TryGetStringField(TEXT("Asset"), AssetPath) ||
             !Row->TryGetArrayField(TEXT("Cells"), Cells) || Cells->Num() > 4096 ||
             SeenAssets.Contains(AssetPath))
@@ -117,6 +119,21 @@ int32 UVoxelPrefabImportCommandlet::Main(const FString& Params)
             if (!Row->TryGetStringField(TEXT("DisplayName"), DisplayName)) return 8;
             Entry.bSetDisplayName = true;
             Entry.DisplayName = FText::FromString(DisplayName);
+        }
+        if (Row->HasField(TEXT("CenterOffset")))
+        {
+            const TArray<TSharedPtr<FJsonValue>>* Offset = nullptr;
+            if (!Row->TryGetArrayField(TEXT("CenterOffset"), Offset) || Offset->Num() != 3) return 8;
+            for (int32 Axis = 0; Axis < 3; ++Axis)
+            {
+                if (!ReadInteger((*Offset)[Axis], MIN_int32, MAX_int32, Entry.CenterOffset[Axis])) return 8;
+            }
+            Entry.bSetCenterOffset = true;
+        }
+        else if (!Entry.Asset->GetPlacementOffset(Entry.CenterOffset, Error))
+        {
+            UE_LOG(LogTemp, Error, TEXT("Prefab %s has an invalid center offset: %s"), *AssetPath, *Error);
+            return 8;
         }
         for (int32 CellIndex = 0; CellIndex < Cells->Num(); ++CellIndex)
         {
@@ -155,6 +172,18 @@ int32 UVoxelPrefabImportCommandlet::Main(const FString& Params)
             UE_LOG(LogTemp, Error, TEXT("Prefab %s: %s"), *AssetPath, *Error);
             return 12;
         }
+        for (const FVoxelPrefabCell& Cell : Entry.Data.Cells)
+        {
+            for (int32 Axis = 0; Axis < 3; ++Axis)
+            {
+                const int64 Position = int64(Cell.Offset[Axis]) + Entry.CenterOffset[Axis];
+                if (Position < -int64(VoxelBlock::MaxAbsCoordinate) || Position >= VoxelBlock::MaxAbsCoordinate)
+                {
+                    UE_LOG(LogTemp, Error, TEXT("Prefab %s has an out-of-bounds placement offset"), *AssetPath);
+                    return 12;
+                }
+            }
+        }
         Staged.Add(MoveTemp(Entry));
     }
     if (FParse::Param(*Params, TEXT("CheckOnly")))
@@ -167,6 +196,9 @@ int32 UVoxelPrefabImportCommandlet::Main(const FString& Params)
     {
         Entry.Asset->Modify();
         Entry.Asset->Data = MoveTemp(Entry.Data);
+        Entry.Asset->PackedPalette.Reset();
+        Entry.Asset->PackedCells.Reset();
+        if (Entry.bSetCenterOffset) Entry.Asset->CenterOffset = FVector(Entry.CenterOffset);
         if (Entry.bSetDisplayName) Entry.Asset->DisplayName = Entry.DisplayName;
         if (!FVoxelEditorAssetIO::Save(Entry.Asset.Get(), Error))
         {
