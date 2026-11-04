@@ -19,13 +19,13 @@ bool IntPosition(FVoxelByteWriter& W,const FVector3f& P)
     }
     return true;
 }
-}
-bool FVoxelDetailBaker::Bake(UVoxelDetailData& A,const FString& Root,FString& E)
+bool BakeImpl(UVoxelDetailData& A,const FString& Root,FString& E,UStaticMesh* ExistingOnly)
 {
     check(IsInGameThread());
     if(A.StableKey.IsNone()||!Root.StartsWith(TEXT("/Game/"))){E=TEXT("Detail key / output root invalid");return false;}
     UStaticMesh* Mesh=nullptr;
     const bool Native=!A.SourceVerticesCm.IsEmpty()||!A.SourceTriangles.IsEmpty();
+    if(ExistingOnly && !Native){E=TEXT("Existing in-memory rebuild requires native source geometry");return false;}
     if(Native)
     {
         if(A.SourceVerticesCm.Num()>65536||A.SourceTriangles.IsEmpty()||A.SourceTriangles.Num()>196608||A.SourceTriangles.Num()%3)
@@ -49,7 +49,7 @@ bool FVoxelDetailBaker::Bake(UVoxelDetailData& A,const FString& Root,FString& E)
             int32 J[3]={A.SourceTriangles[I],A.SourceTriangles[I+1],A.SourceTriangles[I+2]};
             for(int32 K:J)if(!V.IsValidIndex(K)){E=TEXT("Detail index out of range");return false;}
             FVector P0=A.SourceVerticesCm[J[0]],P1=A.SourceVerticesCm[J[1]],P2=A.SourceVerticesCm[J[2]];
-            FVector N=FVector::CrossProduct(P1-P0,P2-P0).GetSafeNormal();
+            FVector N=FVector::CrossProduct(P2-P0,P1-P0).GetSafeNormal();
             if(N.IsNearlyZero()){E=TEXT("Degenerate detail triangle");return false;}
             FVector T=(P1-P0).GetSafeNormal();TArray<FVertexInstanceID> Corners;
             for(int32 K=0;K<3;++K)
@@ -63,14 +63,22 @@ bool FVoxelDetailBaker::Bake(UVoxelDetailData& A,const FString& Root,FString& E)
         }
         // Generated asset only; source meshes and source prefabs are never overwritten.
         const FString Path=Root/TEXT("SM_")+A.GetName();
-        Mesh=Cast<UStaticMesh>(FVoxelEditorAssetIO::LoadOrCreate(UStaticMesh::StaticClass(),Path,E));
+        Mesh=ExistingOnly ? ExistingOnly : Cast<UStaticMesh>(FVoxelEditorAssetIO::LoadOrCreate(UStaticMesh::StaticClass(),Path,E));
         if(!Mesh)return false;
-        Mesh->Modify();Mesh->SetNumSourceModels(1);
-        Mesh->GetStaticMaterials().Reset();Mesh->GetStaticMaterials().Add(FStaticMaterial(Material,TEXT("Detail")));
+        if(ExistingOnly && (Mesh->GetOutermost()->GetName()!=Path || A.Mesh.Get()!=Mesh || Mesh->GetNumSourceModels()!=1 ||
+            Mesh->GetStaticMaterials().Num()!=1 || Mesh->GetStaticMaterials()[0].MaterialInterface!=Material ||
+            Mesh->GetStaticMaterials()[0].MaterialSlotName!=TEXT("Detail")))
+        {E=TEXT("Existing generated mesh identity, source models or material slot differs");return false;}
+        Mesh->Modify();
+        if(!ExistingOnly)
+        {
+            Mesh->SetNumSourceModels(1);
+            Mesh->GetStaticMaterials().Reset();Mesh->GetStaticMaterials().Add(FStaticMaterial(Material,TEXT("Detail")));
+        }
         Mesh->CreateMeshDescription(0,MoveTemp(Desc));Mesh->CommitMeshDescription(0);
         TArray<FText> BuildErrors;Mesh->Build(true,&BuildErrors);
         if(!BuildErrors.IsEmpty()){E=BuildErrors[0].ToString();return false;}
-        if(!FVoxelEditorAssetIO::Save(Mesh,E))return false;
+        if(!ExistingOnly && !FVoxelEditorAssetIO::Save(Mesh,E))return false;
     }
     else Mesh=A.Mesh.LoadSynchronous();
     if(!Mesh){E=TEXT("Missing detail mesh");return false;}
@@ -97,5 +105,23 @@ bool FVoxelDetailBaker::Bake(UVoxelDetailData& A,const FString& Root,FString& E)
     if(!W.Finish(Bytes)){E=TEXT("Detail hash exceeds budget");return false;}
     A.Modify();A.Mesh=Mesh;A.GeometryHash=VoxelBinary::Hash(Bytes);A.BakeVersion=1;A.MetadataHash=A.ComputeMetadataHash();
     if(!A.Validate(E))return false;
+    if(ExistingOnly)
+    {
+        Mesh->MarkPackageDirty();
+        A.MarkPackageDirty();
+        E.Reset();
+        return true;
+    }
     return FVoxelEditorAssetIO::Save(&A,E);
+}
+}
+
+bool FVoxelDetailBaker::Bake(UVoxelDetailData& A,const FString& Root,FString& E)
+{
+    return BakeImpl(A,Root,E,nullptr);
+}
+
+bool FVoxelDetailBaker::RebuildExistingInMemory(UVoxelDetailData& A,UStaticMesh& Mesh,const FString& Root,FString& E)
+{
+    return BakeImpl(A,Root,E,&Mesh);
 }

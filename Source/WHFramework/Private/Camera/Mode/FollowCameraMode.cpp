@@ -47,6 +47,13 @@ void UFollowCameraMode::Update(float DeltaTime, FCameraRigState& State)
 	State.PivotRotation = Rotation;
 	State.ArmLength = FMath::Clamp(Resolved.Distance + RuntimeDistanceOffset, Resolved.DistanceRange.X, Resolved.DistanceRange.Y);
 	State.SocketOffset = Resolved.SocketOffset;
+	if(!Resolved.bSocketOffsetOverridden)
+	{
+		if(const ICameraTrackableInterface* Trackable = Cast<ICameraTrackableInterface>(Actor))
+		{
+			State.SocketOffset = Trackable->ResolveFollowCameraSocketOffset(State.SocketOffset, State.ArmLength);
+		}
+	}
 	State.FOV = Resolved.FOV;
 	State.bEnableCollision = Resolved.bEnableCollision;
 }

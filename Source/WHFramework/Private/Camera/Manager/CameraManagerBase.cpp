@@ -301,6 +301,7 @@ FCameraResolvedConfig ACameraManagerBase::ResolveCameraConfig(const FCameraTarge
 		if(Override.bOverrideSocketOffset)
 		{
 			Result.SocketOffset = Override.SocketOffset;
+			Result.bSocketOffsetOverridden = true;
 		}
 		if(Override.bOverrideRotationOffset)
 		{

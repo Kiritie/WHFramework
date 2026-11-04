@@ -19,6 +19,24 @@ UAbilityBase::UAbilityBase()
 	EffectContainerMap = TMap<FGameplayTag, FGameplayEffectContainer>();
 }
 
+FGameplayEffectContextHandle UAbilityBase::MakeEffectContext(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	UAbilitySystemComponentBase* AbilitySystem = ActorInfo ? Cast<UAbilitySystemComponentBase>(ActorInfo->AbilitySystemComponent.Get()) : nullptr;
+	if (!AbilitySystem)
+	{
+		return Super::MakeEffectContext(Handle, ActorInfo);
+	}
+
+	FGameplayEffectContextHandle Context = AbilitySystem->MakeEffectContext();
+	Context.SetAbility(this);
+	Context.AddInstigator(ActorInfo->OwnerActor.Get(), ActorInfo->AvatarActor.Get());
+	if (const FGameplayAbilitySpec* Spec = AbilitySystem->FindAbilitySpecFromHandle(Handle))
+	{
+		Context.AddSourceObject(Spec->SourceObject.Get());
+	}
+	return Context;
+}
+
 void UAbilityBase::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)
 {
 	Super::OnGiveAbility(ActorInfo, Spec);

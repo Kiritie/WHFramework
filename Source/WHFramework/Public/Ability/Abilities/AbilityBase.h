@@ -16,6 +16,8 @@ class WHFRAMEWORK_API UAbilityBase : public UGameplayAbility
 public:
 	UAbilityBase();
 
+	virtual FGameplayEffectContextHandle MakeEffectContext(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const override;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FGameplayTag ActionTag;
 

@@ -24,4 +24,6 @@ class WHFRAMEWORK_API ICameraTrackableInterface
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	FCameraTargetParams GetCameraTargetParams() const;
+
+	virtual FVector ResolveFollowCameraSocketOffset(const FVector& InOffset, float InArmLength) const;
 };

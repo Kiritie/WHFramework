@@ -3,5 +3,7 @@
 
 UActorAbilityBase::UActorAbilityBase()
 {
-	
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
+	ActionTag = AbilityActionTags::ItemUse;
+	bActivateOnInput = false;
 }

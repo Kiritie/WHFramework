@@ -4,3 +4,8 @@
 #include "Camera/Interface/CameraTrackableInterface.h"
 
 // Add default functionality here for any ICameraTrackableInterface functions that are not pure virtual.
+
+FVector ICameraTrackableInterface::ResolveFollowCameraSocketOffset(const FVector& InOffset, float InArmLength) const
+{
+	return InOffset;
+}

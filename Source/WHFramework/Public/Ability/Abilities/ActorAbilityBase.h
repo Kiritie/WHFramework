@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ItemAbilityBase.h"
+#include "EffectAbilityBase.h"
 
 #include "ActorAbilityBase.generated.h"
 
@@ -8,7 +8,7 @@
  * ActorAbility基类
  */
 UCLASS()
-class WHFRAMEWORK_API UActorAbilityBase : public UItemAbilityBase
+class WHFRAMEWORK_API UActorAbilityBase : public UEffectAbilityBase
 {
 	GENERATED_BODY()
 

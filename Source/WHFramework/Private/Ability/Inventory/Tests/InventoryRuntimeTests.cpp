@@ -6,7 +6,10 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "Ability/Abilities/ItemAbilityBase.h"
+#include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
+#include "Ability/Inventory/InventoryAbilitySource.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -541,6 +544,71 @@ namespace InventoryRuntimeTests
             InOutBytes[InOutBytes.Num() - 4 + ByteIndex] = static_cast<uint8>(Checksum >> (ByteIndex * 8));
         }
     }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInventoryAbilitySourceAdmissionTest,
+    "WHFramework.Inventory.Runtime.AbilitySourceAdmission",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryAbilitySourceAdmissionTest::RunTest(const FString& Parameters)
+{
+    InventoryRuntimeTests::FWorldFixture Fixture;
+    if(!TestTrue(TEXT("库存定义初始化"), Fixture.Data.Initialize()) ||
+       !TestTrue(TEXT("启动临时库存"), Fixture.Start(true, nullptr, true)))
+    {
+        AddError(Fixture.Error);
+        return false;
+    }
+    const FInventorySnapshot Original = Fixture.Data.State(301);
+    FInventoryBatchRequest Create;
+    Create.CreateInventories.Add(Original);
+    Create.Operations.Add(Fixture.Data.Add(Original.InventoryId, 1));
+    if(!TestTrue(TEXT("创建真实库存物品"), Fixture.Execute(Create).IsSuccess())) return false;
+    const FInventorySnapshot Snapshot = Fixture.Read(Original.InventoryId);
+    const FInventorySlotState* Slot = Snapshot.Slots.FindByPredicate([](const FInventorySlotState& InSlot)
+    {
+        return !InSlot.Item.IsEmpty();
+    });
+    if(!TestNotNull(TEXT("物品所在格"), Slot)) return false;
+    AActor* Owner = Fixture.World->SpawnActor<AActor>();
+    AActor* Other = Fixture.World->SpawnActor<AActor>();
+    if(!TestNotNull(TEXT("能力拥有者"), Owner) || !TestNotNull(TEXT("其他角色"), Other)) return false;
+    UAbilitySystemComponentBase* ASC = NewObject<UAbilitySystemComponentBase>(Owner);
+    Owner->AddInstanceComponent(ASC);
+    ASC->RegisterComponent();
+    if(!TestTrue(TEXT("绑定真实 ASC"), ASC->BindOwnerAvatar(Owner, Owner))) return false;
+    UInventoryAbilitySource* Source = NewObject<UInventoryAbilitySource>(Owner);
+    Source->InventoryId = Original.InventoryId;
+    Source->SlotKey = Slot->Key;
+    Source->Signature = Slot->Item.Signature();
+    Source->Avatar = Owner;
+    FAbilityGrantDefinition Grant;
+    Grant.DefinitionId = FPrimaryAssetId(TEXT("TestItem"), TEXT("InventorySource"));
+    Grant.AbilityClass = UItemAbilityBase::StaticClass();
+    Grant.SourceObject = Source;
+    if(!TestTrue(TEXT("有效物品来源可授予"), ASC->SetGrantSource(FGuid(302, 303, 304, 305), {Grant}, {}, 1))) return false;
+    FGameplayAbilitySpecHandle Handle;
+    if(!TestTrue(TEXT("物品能力可按身份定位"), ASC->FindGrantedAbility(Grant.DefinitionId, AbilityActionTags::ItemUse, Handle))) return false;
+    const UItemAbilityBase* Ability = GetDefault<UItemAbilityBase>();
+    TestTrue(TEXT("有效角色和库存格允许物品能力"), Ability->CanActivateAbility(Handle, ASC->AbilityActorInfo.Get()));
+    Source->Avatar = Other;
+    TestFalse(TEXT("其他角色的来源不能使用"), Ability->CanActivateAbility(Handle, ASC->AbilityActorInfo.Get()));
+    Source->Avatar = Owner;
+    const FInventoryStackSignature OriginalSignature = Source->Signature;
+    Source->Signature = FInventoryStackSignature();
+    TestFalse(TEXT("不匹配的物品签名不能使用"), Ability->CanActivateAbility(Handle, ASC->AbilityActorInfo.Get()));
+    Source->Signature = OriginalSignature;
+    TestTrue(TEXT("恢复正确签名后仍可使用"), Ability->CanActivateAbility(Handle, ASC->AbilityActorInfo.Get()));
+    FInventoryOperation Remove;
+    Remove.Type = EInventoryOperationType::Remove;
+    Remove.SourceInventoryId = Original.InventoryId;
+    Remove.Filter.ItemId = Fixture.Data.OreId;
+    Remove.Requested = 1;
+    FInventoryBatchRequest Consume;
+    Consume.Operations.Add(Remove);
+    if(!TestTrue(TEXT("移除真实库存物品"), Fixture.Execute(Consume).IsSuccess())) return false;
+    TestFalse(TEXT("格内物品移除后来源失效"), Ability->CanActivateAbility(Handle, ASC->AbilityActorInfo.Get()));
+    return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FInventorySnapshotIntegrityTest, "WHFramework.Inventory.Runtime.SnapshotIntegrity", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

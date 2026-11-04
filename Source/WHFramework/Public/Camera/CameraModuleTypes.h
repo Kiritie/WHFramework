@@ -403,6 +403,8 @@ public:
 
 	FVector SocketOffset = FVector::ZeroVector;
 
+	bool bSocketOffsetOverridden = false;
+
 	FRotator RotationOffset = FRotator::ZeroRotator;
 
 	float Distance = 300.f;
