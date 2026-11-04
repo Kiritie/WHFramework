@@ -74,9 +74,6 @@ struct WHFRAMEWORK_API FAbilityActionRequest
 	FGameplayTag Variant;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 WeaponPart = 0;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 ComboIndex = INDEX_NONE;
 };
 

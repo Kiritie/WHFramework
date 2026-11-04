@@ -352,9 +352,14 @@ FInventoryCommandResult FInventoryTransactionService::ExecuteNew(const FInventor
     ProjectorNames.Sort(FNameLexicalLess());
     for(FName Name : ProjectorNames)
     {
-        if(!World.SnapshotProjectors.FindChecked(Name)(Plan, PreparedRequest.DomainChanges, Error))
+        const EInventoryResultCode ProjectionResult = World.SnapshotProjectors.FindChecked(Name)(
+            InAuthority, Plan, PreparedRequest.DomainChanges, Error);
+        if(ProjectionResult != EInventoryResultCode::Success)
         {
-            Result.Code = EInventoryResultCode::SourcePreparationFailed;
+            // A projector cannot report a successful or partially committed transaction.
+            Result.Code = ProjectionResult == EInventoryResultCode::None || ProjectionResult == EInventoryResultCode::Partial ||
+                ProjectionResult == EInventoryResultCode::NoChange || ProjectionResult == EInventoryResultCode::AlreadyCommitted ?
+                EInventoryResultCode::SourcePreparationFailed : ProjectionResult;
             return Result;
         }
     }

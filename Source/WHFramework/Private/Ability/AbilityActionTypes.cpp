@@ -55,7 +55,6 @@ bool FAbilityActionTargetData::NetSerialize(FArchive& Ar, UPackageMap* Map, bool
 	bOutSuccess &= bVectorSuccess;
 	Movement.NetSerialize(Ar, Map, bVectorSuccess);
 	bOutSuccess &= bVectorSuccess;
-	Ar << Request.WeaponPart;
 	Ar << Request.ComboIndex;
 	if (Ar.IsLoading())
 	{
@@ -68,7 +67,7 @@ bool FAbilityActionTargetData::NetSerialize(FArchive& Ar, UPackageMap* Map, bool
 	}
 	bOutSuccess &= !Ar.IsError() && ActivationId.IsValid() && Request.DefinitionId.IsValid() && Request.ActionTag.IsValid();
 	bOutSuccess &= !Request.TargetLocation.ContainsNaN() && !Request.AimDirection.ContainsNaN() && !Request.MovementDirection.ContainsNaN();
-	bOutSuccess &= Request.WeaponPart >= 0 && Request.WeaponPart <= 255 && Request.ComboIndex >= INDEX_NONE && Request.ComboIndex <= 255;
+	bOutSuccess &= Request.ComboIndex >= INDEX_NONE && Request.ComboIndex <= 255;
 	return bTargetMapped;
 }
 

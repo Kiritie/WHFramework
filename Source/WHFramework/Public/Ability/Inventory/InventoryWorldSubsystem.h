@@ -16,7 +16,10 @@ class FInventoryCommitCoordinator;
 
 using FInventoryAccessValidator = TFunction<EInventoryResultCode(APlayerController*, const FGuid&, bool)>;
 using FInventoryMutationValidator = TFunction<EInventoryResultCode(APlayerController*, const FGuid&, const FInventorySnapshot&, const FInventorySnapshot&)>;
-using FInventorySnapshotProjector = TFunction<bool(const FInventoryPlan&, TArray<FInventoryDomainRedo>&, FString&)>;
+// Projectors prepare domain records from the complete plan before validation and commit. They must not
+// publish state or perform other observable mutations; a failed transaction discards the prepared records.
+using FInventorySnapshotProjector = TFunction<EInventoryResultCode(const FInventoryAuthorityContext&, const FInventoryPlan&,
+    TArray<FInventoryDomainRedo>&, FString&)>;
 
 struct WHFRAMEWORK_API FInventoryAccessBinding
 {

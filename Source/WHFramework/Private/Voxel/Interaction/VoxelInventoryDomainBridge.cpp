@@ -199,10 +199,16 @@ bool FVoxelInventoryDomainBridge::Register(FString& OutError)
         }, OutError)
         && System.RegisterDomainAdapter(AsShared(), OutError)
         && System.RegisterSnapshotProjector(GetDomain(),
-        [Weak](const FInventoryPlan& Plan, TArray<FInventoryDomainRedo>& Changes, FString& Error)
+        [Weak](const FInventoryAuthorityContext&, const FInventoryPlan& Plan, TArray<FInventoryDomainRedo>& Changes, FString& Error)
         {
             const auto Bridge = Weak.Pin();
-            return Bridge && Bridge->ProjectInventories(Plan, Changes, Error);
+            if(!Bridge)
+            {
+                Error = TEXT("Inventory.VoxelBridgeUnavailable");
+                return EInventoryResultCode::SourcePreparationFailed;
+            }
+            return Bridge->ProjectInventories(Plan, Changes, Error) ?
+                EInventoryResultCode::Success : EInventoryResultCode::SourcePreparationFailed;
         }, OutError);
 }
 

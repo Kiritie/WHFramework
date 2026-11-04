@@ -22,6 +22,11 @@ FGuid FInventoryAuthorityContext::GetStoreId() const
     return StoreId;
 }
 
+FName FInventoryAuthorityContext::GetReason() const
+{
+    return Reason;
+}
+
 APlayerController* FInventoryAuthorityContext::GetController() const
 {
     return Controller.Get();

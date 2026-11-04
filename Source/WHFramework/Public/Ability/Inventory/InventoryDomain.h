@@ -15,6 +15,7 @@ public:
     FGuid GetConnectionId() const;
     FGuid GetWorldEpoch() const;
     FGuid GetStoreId() const;
+    FName GetReason() const;
     APlayerController* GetController() const;
     bool IsServerDomain() const;
 
