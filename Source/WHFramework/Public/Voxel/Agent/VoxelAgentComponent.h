@@ -48,7 +48,7 @@ public:
 	bool IsTravelObserverReady() const;
 	bool IsStreamingLocationAdmitted(const FIntVector& InCell, uint64 InEpoch) const;
 	bool BuildStreamingSource(bool bInLocalView, FVoxelStreamingSource& OutSource) const;
-	bool PrepareBirthSource(const FGuid& InSource);
+	EVoxelPlayerClaimPreparation PrepareBirthSource(const FGuid& InSource, const UObject* InExpectedOwner = nullptr);
 	bool TryCommitBirthSource();
 	bool IsBirthSourceCommitted() const;
 	const FVoxelPlayerClaimToken& GetBirthClaimToken() const { return BirthClaim; }

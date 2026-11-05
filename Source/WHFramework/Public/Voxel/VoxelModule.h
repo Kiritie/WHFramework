@@ -249,8 +249,10 @@ public:
 	FGuid RegisterSource(UObject* InOwner, const FVoxelStreamingSource& InSource);
 	bool UpdateSource(const FGuid& InId, const FVoxelStreamingSource& InSource);
 	void UnregisterSource(const FGuid& InId);
-	bool PreparePlayerClaim(const FGuid& InSource, UObject* InPawn, const FGuid& InPawnIncarnation,
-		const FIntVector& InCandidateCell, FVoxelPlayerClaimToken& OutToken);
+	EVoxelPlayerClaimPreparation PreparePlayerClaim(const FGuid& InSource, const UObject* InExpectedOwner,
+		UObject* InPawn, const FGuid& InPawnIncarnation, const FVoxelPlayerClaimToken& InPreviousToken,
+		const FVoxelStreamingSource& InDesiredSource, FVoxelPlayerClaimToken& OutToken);
+	bool RelinquishPlayerClaim(const FVoxelPlayerClaimToken& InToken, UObject* InPawn, const UObject* InExpectedOwner);
 	bool CommitPlayerClaim(const FVoxelPlayerClaimToken& InToken, UObject* InPawn);
 	void AbortPlayerClaim(const FVoxelPlayerClaimToken& InToken);
 	bool IsPlayerClaimCommitted(const FVoxelPlayerClaimToken& InToken, const UObject* InPawn) const;

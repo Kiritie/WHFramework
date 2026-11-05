@@ -788,37 +788,53 @@ void UVoxelAgentComponent::RefreshSource()
 	if (BirthClaim.IsValid() && !IsBirthSourceCommitted()) TryCommitBirthSource();
 }
 
-bool UVoxelAgentComponent::PrepareBirthSource(const FGuid& InSource)
+EVoxelPlayerClaimPreparation UVoxelAgentComponent::PrepareBirthSource(const FGuid& InSource, const UObject* InExpectedOwner)
 {
 	UVoxelModule* VoxelModule = Module.Get();
-	FIntVector Cell;
-	if (!VoxelModule || !VoxelModule->IsReady() || !GetOwner() ||
-		!VoxelCoord::FromWorld(GetOwner()->GetActorLocation(), VoxelModule->BlockSize(), Cell)) return false;
-	if (BirthClaim.IsValid() && BirthClaim.SourceId != InSource)
+	if (!VoxelModule || !VoxelModule->IsReady() || !GetOwner())
 	{
-		VoxelModule->AbortPlayerClaim(BirthClaim);
-		BirthClaim = {};
+		return EVoxelPlayerClaimPreparation::SourceUnavailable;
 	}
+	if (IsBirthSourceCommitted())
+	{
+		return BirthClaim.SourceId == InSource ? EVoxelPlayerClaimPreparation::Prepared : EVoxelPlayerClaimPreparation::ClaimConflict;
+	}
+	FVoxelStreamingSource Desired;
+	if (!BuildStreamingSource(BoundController.IsValid() && BoundController->IsLocalController(), Desired))
+	{
+		return EVoxelPlayerClaimPreparation::SourceUnavailable;
+	}
+	Desired.Purpose = EVoxelStreamingSourcePurpose::InitialSpawn;
+	Desired.Capabilities |= EVoxelStreamingCapability::Readiness;
+	Desired.Normalize();
 	FVoxelPlayerClaimToken Prepared;
-	if (!VoxelModule->PreparePlayerClaim(InSource, GetOwner(), BirthPawnIncarnation, Cell, Prepared)) return false;
+	const EVoxelPlayerClaimPreparation Result = VoxelModule->PreparePlayerClaim(InSource, InExpectedOwner, GetOwner(),
+		BirthPawnIncarnation, BirthClaim, Desired, Prepared);
+	if (Result != EVoxelPlayerClaimPreparation::Prepared) return Result;
 	const FGuid Previous = SourceId;
+	const FVoxelPlayerClaimToken PreviousClaim = BirthClaim;
 	BirthClaim = Prepared;
 	SourceId = InSource;
 	ObservedWorldEpoch = VoxelModule->GetWorldEpoch();
 	// Bootstrap 仍持有同一条记录；直到 Commit 成功都不能撤销它。
+	if (PreviousClaim.IsValid() && PreviousClaim.SourceId != InSource)
+	{
+		VoxelModule->AbortPlayerClaim(PreviousClaim);
+	}
 	if (Previous.IsValid() && Previous != SourceId &&
 		(VoxelModule->IsSourceOwnedBy(Previous, this) || VoxelModule->IsSourceOwnedBy(Previous, GetOwner())))
 		VoxelModule->UnregisterSource(Previous);
 	bEnableStreaming = true;
 	SetComponentTickEnabled(true);
-	return true;
+	return EVoxelPlayerClaimPreparation::Prepared;
 }
 
 bool UVoxelAgentComponent::TryCommitBirthSource()
 {
 	if (IsBirthSourceCommitted()) return true;
 	if (!bBirthCandidateCommitted) return false;
-	if (!SourceId.IsValid() || !PrepareBirthSource(SourceId) || !Module.IsValid()) return false;
+	if (!SourceId.IsValid() || !Module.IsValid() ||
+		PrepareBirthSource(SourceId) != EVoxelPlayerClaimPreparation::Prepared) return false;
 	return Module->CommitPlayerClaim(BirthClaim, GetOwner());
 }
 

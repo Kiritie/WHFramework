@@ -2,6 +2,14 @@
 
 #include "CoreMinimal.h"
 
+enum class EVoxelPlayerClaimPreparation : uint8
+{
+	Prepared,
+	SourceUnavailable,
+	ClaimConflict,
+	Rejected
+};
+
 // 令牌绑定一次角色生命期和一个最终候选，不能以相同坐标代替身份校验。
 struct WHFRAMEWORK_API FVoxelPlayerClaimToken
 {

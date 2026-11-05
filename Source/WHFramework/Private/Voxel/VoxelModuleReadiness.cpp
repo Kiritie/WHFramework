@@ -12,27 +12,80 @@ bool UVoxelModule::IsSourceOwnedBy(const FGuid& InSource, const UObject* InOwner
 	return Source && InOwner && Source->Owner.Get() == InOwner;
 }
 
-bool UVoxelModule::PreparePlayerClaim(const FGuid& InSource, UObject* InPawn,
-	const FGuid& InPawnIncarnation, const FIntVector& InCandidateCell, FVoxelPlayerClaimToken& OutToken)
+EVoxelPlayerClaimPreparation UVoxelModule::PreparePlayerClaim(const FGuid& InSource, const UObject* InExpectedOwner,
+	UObject* InPawn, const FGuid& InPawnIncarnation, const FVoxelPlayerClaimToken& InPreviousToken,
+	const FVoxelStreamingSource& InDesiredSource, FVoxelPlayerClaimToken& OutToken)
 {
 	check(IsInGameThread());
+	OutToken = {};
 	FSource* Source = Sources.Find(InSource);
 	const AActor* Actor = Cast<AActor>(InPawn);
-	OutToken = {};
-	if (!IsReady() || !Source || !Source->Owner.IsValid() || !Actor || Actor->GetWorld() != GetWorld() ||
-		Source->Value.Purpose != EVoxelStreamingSourcePurpose::InitialSpawn || Source->Value.Center != InCandidateCell) return false;
+	FIntVector CandidateCell;
+	if (!IsReady() || !Source || !Source->Owner.IsValid() || !::IsValid(Actor) || Actor->GetWorld() != GetWorld() ||
+		!InPawnIncarnation.IsValid() || Source->Value.Purpose != EVoxelStreamingSourcePurpose::InitialSpawn ||
+		InDesiredSource.Purpose != EVoxelStreamingSourcePurpose::InitialSpawn ||
+		!VoxelCoord::FromWorld(Actor->GetActorLocation(), BlockSize(), CandidateCell) || CandidateCell != InDesiredSource.Center)
+	{
+		return EVoxelPlayerClaimPreparation::SourceUnavailable;
+	}
+	if (InExpectedOwner ? Source->Owner.Get() != InExpectedOwner :
+		!ReadinessRuntime.IsCurrent(Source->PlayerClaim, InPreviousToken, InPawn))
+	{
+		return EVoxelPlayerClaimPreparation::SourceUnavailable;
+	}
+	const FVoxelPlayerClaimState& Existing = Source->PlayerClaim;
+	if (Existing.bPlayerOwned || (Existing.Token.IsValid() && Existing.Pawn.IsValid() &&
+		(Existing.Pawn.Get() != InPawn || Existing.Token.PawnIncarnation != InPawnIncarnation)))
+	{
+		return EVoxelPlayerClaimPreparation::ClaimConflict;
+	}
+	const bool bCandidateChanged = Source->Value.Center != CandidateCell;
+	if (bCandidateChanged && Source->CandidateRevision == MAX_uint64)
+	{
+		return EVoxelPlayerClaimPreparation::Rejected;
+	}
 	FVoxelPlayerClaimToken Identity;
 	Identity.WorldEpoch = Epoch;
 	Identity.SourceId = InSource;
 	Identity.SourceIncarnation = Source->Value.RegistrationOrder;
-	Identity.CandidateRevision = Source->CandidateRevision;
+	Identity.CandidateRevision = Source->CandidateRevision + (bCandidateChanged ? 1 : 0);
 	Identity.ControlRevision = Source->ControlRevision;
 	Identity.PawnIncarnation = InPawnIncarnation;
-	Identity.CandidateCell = InCandidateCell;
+	Identity.CandidateCell = CandidateCell;
 	const FVoxelPlayerClaimToken PreviousToken = Source->PlayerClaim.Token;
-	const bool bPrepared = ReadinessRuntime.PreparePlayerClaim(Source->PlayerClaim, Identity, InPawn, OutToken);
-	if (bPrepared && !(PreviousToken == OutToken)) Source->ClaimVerification.Reset();
-	return bPrepared;
+	FVoxelPlayerClaimState NextClaim = bCandidateChanged ? FVoxelPlayerClaimState() : Source->PlayerClaim;
+	FVoxelWorldReadinessRuntime NextReadiness = ReadinessRuntime;
+	FVoxelPlayerClaimToken Prepared;
+	if (!NextReadiness.PreparePlayerClaim(NextClaim, Identity, InPawn, Prepared) || !UpdateSource(InSource, InDesiredSource))
+	{
+		return EVoxelPlayerClaimPreparation::Rejected;
+	}
+	check(Source->CandidateRevision == Identity.CandidateRevision);
+	ReadinessRuntime = MoveTemp(NextReadiness);
+	Source->PlayerClaim = MoveTemp(NextClaim);
+	if (!(PreviousToken == Prepared)) Source->ClaimVerification.Reset();
+	OutToken = Prepared;
+	return EVoxelPlayerClaimPreparation::Prepared;
+}
+
+bool UVoxelModule::RelinquishPlayerClaim(const FVoxelPlayerClaimToken& InToken, UObject* InPawn, const UObject* InExpectedOwner)
+{
+	check(IsInGameThread());
+	FSource* Source = Sources.Find(InToken.SourceId);
+	const AActor* Actor = Cast<AActor>(InPawn);
+	if (!Source || !InExpectedOwner || Source->Owner.Get() != InExpectedOwner || !::IsValid(Actor) ||
+		Actor->GetWorld() != GetWorld() || InToken.WorldEpoch != Epoch ||
+		InToken.SourceIncarnation != Source->Value.RegistrationOrder || InToken.ControlRevision != Source->ControlRevision ||
+		Source->PlayerClaim.bPlayerOwned || !ReadinessRuntime.IsCurrent(Source->PlayerClaim, InToken, InPawn))
+	{
+		return false;
+	}
+	// 来源仍由同一角色的未提交凭证控制，转移托管不改变候选或覆盖合同。
+	Source->Owner = InPawn;
+	check(SourceRevision < MAX_uint64);
+	++SourceRevision;
+	bInterestDirty = true;
+	return true;
 }
 
 bool UVoxelModule::CommitPlayerClaim(const FVoxelPlayerClaimToken& InToken, UObject* InPawn)
