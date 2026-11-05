@@ -2434,6 +2434,49 @@ FVoxelStreamingReadiness UVoxelModule::QueryBoundsReadiness(const FVoxelGenerati
 	return Result;
 }
 
+bool UVoxelModule::FindSourceDataFailureInBounds(const FGuid& InSource, const UObject* InOwner, const uint64 InEpoch,
+	const FVoxelGenerationBounds& InBounds, FIntVector& OutSection, FString& OutLastError) const
+{
+	OutSection = FIntVector::ZeroValue;
+	OutLastError.Reset();
+	const FVoxelWorldRuntime* WorldRuntime = Runtime.Get();
+	if (!IsInGameThread() || !IsReady() || !WorldRuntime || InEpoch != Epoch || WorldRuntime->Epoch() != InEpoch ||
+		!IsSourceOwnedBy(InSource, InOwner) || !IsSourceAdmitted(InSource) ||
+		InBounds.Min.X >= InBounds.Max.X || InBounds.Min.Y >= InBounds.Max.Y || InBounds.Min.Z >= InBounds.Max.Z)
+	{
+		return false;
+	}
+	const FVoxelSourceInterest* Interest = CurrentInterest->Sources.Find(InSource);
+	if (!Interest) return false;
+	const FIntVector Min = VoxelModuleToSection(InBounds.Min);
+	const FIntVector Max = VoxelModuleToSection(InBounds.Max - FIntVector(1));
+	const FIntVector Size = Max - Min + FIntVector(1);
+	if (Size.X > 4096 || Size.Y > 4096 || Size.Z > 4096 || static_cast<int64>(Size.X) * Size.Y * Size.Z > 4096)
+	{
+		return false;
+	}
+	for (int32 Z = Min.Z; Z <= Max.Z; ++Z)
+	{
+		for (int32 Y = Min.Y; Y <= Max.Y; ++Y)
+		{
+			for (int32 X = Min.X; X <= Max.X; ++X)
+			{
+				const FIntVector Key(X, Y, Z);
+				if (!Interest->DataSections.Contains(Key) && !Interest->CollisionSections.Contains(Key)) continue;
+				const FVoxelSection* Section = WorldRuntime->FindSection(Key);
+				if (!Section || Section->Stamp.Epoch != InEpoch || Section->Status != EVoxelSectionStatus::Failed ||
+					Section->Retirement.State == EVoxelRuntimeRetirementState::Detaching ||
+					Section->Retirement.State == EVoxelRuntimeRetirementState::ReadyToFree ||
+					Section->Retirement.State == EVoxelRuntimeRetirementState::Freed) continue;
+				OutSection = Key;
+				OutLastError = Section->Error;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 bool UVoxelModule::SetRemoteChangeState(
 	const FIntVector& InSection,
 	const EVoxelSectionChangeState InState, FString& OutError)

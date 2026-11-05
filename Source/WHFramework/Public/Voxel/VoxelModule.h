@@ -265,6 +265,9 @@ public:
 	// 在游戏线程查询；可选输出只报告当前输入已确认的碰撞终态失败。
 	FVoxelStreamingReadiness QueryBoundsReadiness(const FVoxelGenerationBounds& InBounds, bool bInRequireCollision,
 		TOptional<FIntVector>* OutFailedCollisionSection = nullptr) const;
+	// 仅报告已准入来源所需区段的当前失败状态；错误为该实例最近一次记录，不保证对应最新输入。
+	bool FindSourceDataFailureInBounds(const FGuid& InSource, const UObject* InOwner, uint64 InEpoch,
+		const FVoxelGenerationBounds& InBounds, FIntVector& OutSection, FString& OutLastError) const;
 	void ForceVoxelStreamingRefresh();
 	bool SetRemoteChangeState(const FIntVector& InSection, EVoxelSectionChangeState InState, FString& OutError);
 	bool ApplyRemoteRepresentation(const FVoxelRepresentationReply& InReply, FString& OutError);
