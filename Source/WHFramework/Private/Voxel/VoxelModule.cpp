@@ -4890,7 +4890,7 @@ void UVoxelModule::NotifyTerrainSectionReplacement(const FIntVector& InSection, 
 		ResidencyManager->WakeRetirement(InSection, Section->Stamp, Section->Retirement.Serial);
 }
 
-bool UVoxelModule::IsTerrainSafeAt(const FGuid& InSource, const FBox& InWorldBounds) const
+bool UVoxelModule::IsTerrainSafeAt(const FGuid& InSource, const FBox& InWorldBounds, const bool bInRequireLocalVisual) const
 {
 	const auto* Source = CurrentInterest->Sources.Find(InSource);
 	const FSource* RegisteredSource = Sources.Find(InSource);
@@ -4901,6 +4901,10 @@ bool UVoxelModule::IsTerrainSafeAt(const FGuid& InSource, const FBox& InWorldBou
 		RegisteredSource->Value.bInheritWorldView != Source->Source.bInheritWorldView || !InWorldBounds.IsValid ||
 		InWorldBounds.Min.ContainsNaN() || InWorldBounds.Max.ContainsNaN()) return false;
 	const bool bRequiresVisual = Source->Source.Has(EVoxelStreamingCapability::FineVisual);
+	if (bInRequireLocalVisual && (!bRequiresVisual || !Source->Source.bLocalView || !RegisteredSource->Value.bLocalView))
+	{
+		return false;
+	}
 	// 来源位置或速度变化会使下一窗口暂未准入；实际移动仍以本次范围的最新物理和视觉回执为准。
 	if (bRequiresVisual && !ViewManager) return false;
 	const FVector Minimum = InWorldBounds.Min / BlockSize();

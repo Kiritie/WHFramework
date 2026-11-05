@@ -179,7 +179,7 @@ public:
 	void CommitTerrainInterest(TSharedPtr<const FVoxelInterestSet, ESPMode::ThreadSafe> InSnapshot);
 	void AbandonTerrainInterest(const FVoxelInterestSet& InSnapshot);
 	void NotifyTerrainSectionReplacement(const FIntVector& InSection, uint64 InWorldEpoch);
-	bool IsTerrainSafeAt(const FGuid& InSource, const FBox& InWorldBounds) const;
+	bool IsTerrainSafeAt(const FGuid& InSource, const FBox& InWorldBounds, bool bInRequireLocalVisual = false) const;
 	FVoxelWorldRuntime* GetRuntime();
 	const FVoxelWorldRuntime* GetRuntime() const;
 	bool CaptureFineOverlays(const FVoxelGenerationBounds& InBounds, FVoxelFineOverlayCapture& OutCapture, FString& OutError,

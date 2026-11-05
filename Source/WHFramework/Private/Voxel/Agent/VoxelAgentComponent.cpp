@@ -778,8 +778,11 @@ void UVoxelAgentComponent::RefreshSource()
 	else if (!VoxelModule->
 		UpdateSource(
 			SourceId,
-			Source))
+			Source) &&
+		!VoxelModule->IsSourceOwnedBy(SourceId, this) &&
+		!VoxelModule->IsSourceOwnedBy(SourceId, GetOwner()))
 	{
+		// 更新被拒绝时模块可能仍保留旧来源；只有不再持有时才能丢弃句柄。
 		SourceId.Invalidate();
 	}
 	if (BirthClaim.IsValid() && !IsBirthSourceCommitted()) TryCommitBirthSource();
@@ -885,7 +888,8 @@ bool UVoxelAgentComponent::IsCollisionReadyAt(
 		HalfHeight + 1.0);
 
 	return VoxelModule->IsTerrainSafeAt(SourceId,
-		FBox(InLocation - Extent, InLocation + Extent));
+		FBox(InLocation - Extent, InLocation + Extent),
+		InCharacter.IsPlayerControlled() && InCharacter.IsLocallyControlled());
 }
 
 
