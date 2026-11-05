@@ -2387,9 +2387,11 @@ FVoxelStreamingReadiness UVoxelModule::QueryStreamingReadiness(const FGuid& InId
 	return Result;
 }
 
-FVoxelStreamingReadiness UVoxelModule::QueryBoundsReadiness(const FVoxelGenerationBounds& InBounds, const bool bInRequireCollision) const
+FVoxelStreamingReadiness UVoxelModule::QueryBoundsReadiness(const FVoxelGenerationBounds& InBounds,
+	const bool bInRequireCollision, TOptional<FIntVector>* OutFailedCollisionSection) const
 {
 	FVoxelStreamingReadiness Result;
+	if (OutFailedCollisionSection) OutFailedCollisionSection->Reset();
 	if (!IsReady() || InBounds.Min.X >= InBounds.Max.X || InBounds.Min.Y >= InBounds.Max.Y || InBounds.Min.Z >= InBounds.Max.Z)
 	{
 		return Result;
@@ -2420,6 +2422,10 @@ FVoxelStreamingReadiness UVoxelModule::QueryBoundsReadiness(const FVoxelGenerati
 						++Result.ReadyCollisionSections;
 						if (CollisionPresenter->IsReadyEmpty(Key)) ++Result.ReadyEmptyCollisionSections;
 						else ++Result.ReadyNonEmptyCollisionSections;
+					}
+					else if (OutFailedCollisionSection && !OutFailedCollisionSection->IsSet() && HasCurrentCollisionFailure(Key))
+					{
+						OutFailedCollisionSection->Emplace(Key);
 					}
 				}
 			}

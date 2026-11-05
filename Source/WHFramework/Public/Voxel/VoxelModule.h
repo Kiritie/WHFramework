@@ -262,7 +262,9 @@ public:
 	FVoxelStreamingReadiness QueryStreamingReadiness(const FGuid& InId) const;
 	FVoxelFrameTimings GetFrameTimings() const;
 	FVoxelTerrainFrameContext& GetTerrainFrameContext();
-	FVoxelStreamingReadiness QueryBoundsReadiness(const FVoxelGenerationBounds& InBounds, bool bInRequireCollision) const;
+	// 在游戏线程查询；可选输出只报告当前输入已确认的碰撞终态失败。
+	FVoxelStreamingReadiness QueryBoundsReadiness(const FVoxelGenerationBounds& InBounds, bool bInRequireCollision,
+		TOptional<FIntVector>* OutFailedCollisionSection = nullptr) const;
 	void ForceVoxelStreamingRefresh();
 	bool SetRemoteChangeState(const FIntVector& InSection, EVoxelSectionChangeState InState, FString& OutError);
 	bool ApplyRemoteRepresentation(const FVoxelRepresentationReply& InReply, FString& OutError);
