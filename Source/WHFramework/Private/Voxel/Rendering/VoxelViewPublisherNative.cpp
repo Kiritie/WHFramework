@@ -668,11 +668,12 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 	};
 	const FNativeGroupSources SourceContext{*this, InPublication.Get(), InGroup, NativeResources.Get()};
 	const FVoxelGenerationRequiredSourceScope SourceScope(&NativeResources.Get(), &SourceContext, &FNativeGroupSources::Enumerate);
+	FString SourceMeasureError;
 	const auto MeasureSources = [&](FVoxelGenerationRequiredCapacity& OutRequired)
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherNativeGroupSources);
-		FString Error;
-		return FVoxelGenerationRequiredSourceScope::Collect(NativeResources.Get(), nullptr, OutRequired, Error);
+		SourceMeasureError.Reset();
+		return FVoxelGenerationRequiredSourceScope::Collect(NativeResources.Get(), nullptr, OutRequired, SourceMeasureError);
 	};
 	if (InGroup.bNativeControlWaiting)
 	{
@@ -684,7 +685,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		bOutAdvanced = true;
 	}
 	const auto RejectNativeAdmission = [&](const EVoxelTerrainResourceAdmission Admission,
-		const FVoxelGenerationConsumerKey& Consumer, const uint64 BeforeAdmission, const bool bBootstrap)
+		const FVoxelGenerationConsumerKey& Consumer, const uint64 BeforeAdmission, const bool bBootstrap, const TCHAR* InStage)
 	{
 		if (Admission == EVoxelTerrainResourceAdmission::CapacityBlocked)
 		{
@@ -698,8 +699,23 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		}
 		else
 		{
+			const bool bHasOwner = !InGroup.Keys.IsEmpty();
+			const FVoxelPublishGroupKey FirstOwner = bHasOwner ? InGroup.Keys[0] : FVoxelPublishGroupKey();
+			const int32 OwnerCount = InGroup.Keys.Num();
+			const int32 GroupIndex = int32(&InGroup - InPublication->Groups.GetData());
+			const uint64 PublicationSerial = InPublication->Serial;
+			const uint64 CurrentEpoch = WorldEpoch;
+			const TCHAR* AdmissionName = Admission == EVoxelTerrainResourceAdmission::CapacityUnachievable ? TEXT("CapacityUnachievable") :
+				Admission == EVoxelTerrainResourceAdmission::InvalidRequest ? TEXT("InvalidRequest") :
+				Admission == EVoxelTerrainResourceAdmission::Granted ? TEXT("Granted") :
+				Admission == EVoxelTerrainResourceAdmission::None ? TEXT("None") : TEXT("Unknown");
 			DiscardGroup(InPublication, InGroup, TEXT("NativeControlAdmission"), false);
 			bOutAdvanced = true;
+			UE_LOG(LogTemp, Warning, TEXT("Voxel native publication attempt discarded: epoch=%llu serial=%llu group=%d stage=%s admission=%s(%d) bootstrap=%d retry=0 owners=%d first=%d:(%d,%d,%d):%d publisherSourceError=%s"),
+				CurrentEpoch, PublicationSerial, GroupIndex, InStage, AdmissionName, int32(Admission), bBootstrap ? 1 : 0,
+				OwnerCount, bHasOwner ? int32(FirstOwner.Representation) : -1,
+				FirstOwner.Coordinate.X, FirstOwner.Coordinate.Y, FirstOwner.Coordinate.Z,
+				bHasOwner ? int32(FirstOwner.Level) : -1, *SourceMeasureError);
 		}
 	};
 	if (InGroup.NativeTransaction.IsValid())
@@ -728,7 +744,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		FVoxelGenerationRequiredCapacity Required;
 		if (!MeasureSources(Required))
 		{
-			RejectNativeAdmission(EVoxelTerrainResourceAdmission::CapacityUnachievable, Consumer, BeforeAdmission, false);
+			RejectNativeAdmission(EVoxelTerrainResourceAdmission::CapacityUnachievable, Consumer, BeforeAdmission, false, TEXT("GroupSources"));
 			return false;
 		}
 		const auto Admission = NativeResources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input,
@@ -736,7 +752,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 			0, Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
 		if (Admission != EVoxelTerrainResourceAdmission::Granted)
 		{
-			RejectNativeAdmission(Admission, Consumer, BeforeAdmission, false);
+			RejectNativeAdmission(Admission, Consumer, BeforeAdmission, false, TEXT("GroupLease"));
 			return false;
 		}
 		InGroup.NativeChanges.Reserve(InGroup.UpdateIndices.Num());
@@ -794,14 +810,14 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 			FVoxelGenerationRequiredCapacity Required;
 			if (!MeasureSources(Required))
 			{
-				RejectNativeAdmission(EVoxelTerrainResourceAdmission::CapacityUnachievable, Consumer, BeforeAdmission, false);
+				RejectNativeAdmission(EVoxelTerrainResourceAdmission::CapacityUnachievable, Consumer, BeforeAdmission, false, TEXT("CallbackSources"));
 				return false;
 			}
 			const auto CallbackAdmission = NativeResources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Input,
 				CallbackBytes, CallbackLease, 0, Required.Bytes[static_cast<int32>(EVoxelTerrainResourcePool::Input)], Required.LeaseCount);
 			if (CallbackAdmission != EVoxelTerrainResourceAdmission::Granted)
 			{
-				RejectNativeAdmission(CallbackAdmission, Consumer, BeforeAdmission, false);
+				RejectNativeAdmission(CallbackAdmission, Consumer, BeforeAdmission, false, TEXT("CallbackLease"));
 				return false;
 			}
 		}
@@ -814,7 +830,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 			bOutAdvanced = true;
 		}
 		else RejectNativeAdmission(Admission, Consumer, BeforeAdmission,
-			TerrainRenderer->GetNativeStateAdmission() == EVoxelTerrainResourceAdmission::CapacityBlocked);
+			TerrainRenderer->GetNativeStateAdmission() == EVoxelTerrainResourceAdmission::CapacityBlocked, TEXT("CoarseTransaction"));
 		return false;
 	}
 	const int32 UpdateIndex = InGroup.UpdateIndices[InGroup.NativeSourceCursor];
@@ -866,7 +882,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 	if (!RenderStamp.GeometryIdentity.Key.TryBounds(RenderStamp.GeometryIdentity.WorldMinZ,
 		RenderStamp.GeometryIdentity.WorldMaxZ, OwnershipMin, OwnershipMax))
 	{
-		RejectNativeAdmission(EVoxelTerrainResourceAdmission::InvalidRequest, Consumer, BeforeRetain, false);
+		RejectNativeAdmission(EVoxelTerrainResourceAdmission::InvalidRequest, Consumer, BeforeRetain, false, TEXT("OwnershipBounds"));
 		return false;
 	}
 	const FBox OwnershipBounds{FVector(OwnershipMin), FVector(OwnershipMax)};
@@ -876,7 +892,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		if (!Lease) return true;
 		if (!Lease->IsOwnedBy(Resources.Get()))
 		{
-			RejectNativeAdmission(EVoxelTerrainResourceAdmission::InvalidRequest, Consumer, BeforeRetain, false);
+			RejectNativeAdmission(EVoxelTerrainResourceAdmission::InvalidRequest, Consumer, BeforeRetain, false, TEXT("RetainLeaseOwner"));
 			return false;
 		}
 		const auto PreviousPool = Lease->GetPool();
@@ -890,7 +906,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		const bool bFitsPrimary = Lease->Bytes() <= Limits.ResidentBytes - Limits.OverlapBytes;
 		const bool bFitsOverlap = bAllowOverlap && Lease->Bytes() <= Limits.OverlapBytes;
 		RejectNativeAdmission(bFitsPrimary || bFitsOverlap ? EVoxelTerrainResourceAdmission::CapacityBlocked :
-			EVoxelTerrainResourceAdmission::CapacityUnachievable, Consumer, BeforeRetain, false);
+			EVoxelTerrainResourceAdmission::CapacityUnachievable, Consumer, BeforeRetain, false, TEXT("RetainLeaseCapacity"));
 		return false;
 	};
 	if (!InGroup.NativeCoarse)
@@ -910,7 +926,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		FVoxelGenerationRequiredCapacity Required;
 		if (!MeasureSources(Required))
 		{
-			RejectNativeAdmission(EVoxelTerrainResourceAdmission::CapacityUnachievable, Consumer, BeforeAdmission, false);
+			RejectNativeAdmission(EVoxelTerrainResourceAdmission::CapacityUnachievable, Consumer, BeforeAdmission, false, TEXT("CoarseSources"));
 			return false;
 		}
 		auto Admission = Resources->TryAcquire(Consumer, EVoxelTerrainResourcePool::Resident, Bytes, Lease, 0,
@@ -925,7 +941,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 		}
 		if (Admission != EVoxelTerrainResourceAdmission::Granted)
 		{
-			RejectNativeAdmission(Admission, Consumer, BeforeAdmission, false);
+			RejectNativeAdmission(Admission, Consumer, BeforeAdmission, false, TEXT("CoarseLease"));
 			return false;
 		}
 		auto Item = VoxelBoundedAllocation::MakeWorkerShared<FVoxelTerrainRenderCoarse>(Lease);
@@ -970,7 +986,7 @@ bool FVoxelViewPublisher::AdvanceNativeGroup(const FPublicationRef& InPublicatio
 			if (!Chunk)
 			{
 				RejectNativeAdmission(Admission, Consumer, BeforeAdmission,
-					TerrainRenderer->GetNativeStateAdmission() != EVoxelTerrainResourceAdmission::Granted);
+					TerrainRenderer->GetNativeStateAdmission() != EVoxelTerrainResourceAdmission::Granted, TEXT("PrepareChunk"));
 				return false;
 			}
 			TerrainRenderer->AppendSourceChunk(*InGroup.NativeCoarse, Batch, InGroup.NativeLastChunk, MoveTemp(Chunk));
