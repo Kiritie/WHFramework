@@ -284,6 +284,18 @@ uint64 UVoxelModule::GetGenerationIdentitySalt(const EVoxelTerrainType InTerrain
 	return 0;
 }
 
+bool UVoxelModule::ResolveGenerationIdentitySalt(const EVoxelTerrainType InTerrainType, uint64& OutSalt) const
+{
+	OutSalt = GetGenerationIdentitySalt(InTerrainType);
+	if (InTerrainType != EVoxelTerrainType::Superflat) return true;
+	const auto Snapshot = Registry.GetSnapshot();
+	if (!Snapshot || !Shapes) return false;
+	const uint64 SupportIdentity = VoxelBinary::Mix64(Snapshot->SuperflatSupportHash ^ Shapes->GetCollisionTopHash() ^ 0x53464C4F4F523031ull);
+	OutSalt = VoxelBinary::Mix64(VoxelBinary::Mix64(OutSalt) ^ SupportIdentity);
+	if (OutSalt == 0) OutSalt = 1;
+	return true;
+}
+
 #if WITH_EDITOR
 void UVoxelModule::OnDestroy()
 {
@@ -841,10 +853,16 @@ bool UVoxelModule::CreateWorld(
 	NewManifest.RecipeHash =
 		Config.Recipe->RecipeHash;
 
+	uint64 GenerationIdentitySalt = 0;
+	if (!ResolveGenerationIdentitySalt(NewManifest.TerrainType, GenerationIdentitySalt))
+	{
+		OutError = TEXT("Voxel generation identity requires the current registry and shapes");
+		return false;
+	}
 	NewManifest.BaseSampleHash =
 		BuildGenerationSignature(
 			NewManifest,
-			GetGenerationIdentitySalt(NewManifest.TerrainType));
+			GenerationIdentitySalt);
 
 	if (NewManifest.BaseSampleHash == 0)
 	{
@@ -990,10 +1008,17 @@ bool UVoxelModule::StartWorld(
 		}
 
 	}
+	uint64 GenerationIdentitySalt = 0;
+	if (!ResolveGenerationIdentitySalt(Manifest.TerrainType, GenerationIdentitySalt))
+	{
+		FailInitialization();
+		OutError = TEXT("Voxel generation identity requires the current registry and shapes");
+		return false;
+	}
 	const uint64 ExpectedGenerationSignature =
 		BuildGenerationSignature(
 			Manifest,
-			GetGenerationIdentitySalt(Manifest.TerrainType));
+			GenerationIdentitySalt);
 	if (ExpectedGenerationSignature == 0 ||
 		Manifest.BaseSampleHash != ExpectedGenerationSignature ||
 		Epoch == MAX_uint64)
@@ -1118,7 +1143,7 @@ bool UVoxelModule::StartWorld(
 		Epoch,
 		IsAuthority(),
 		Registry.GetSnapshot().ToSharedRef(),
-		Generator.ToSharedRef(), Scheduler->GetRuntimeResources());
+		Generator.ToSharedRef(), Scheduler->GetRuntimeResources(), Shapes.ToSharedRef());
 	GenerationConfig->InputLease->MarkPublished();
 	GenerationConfig->RecipeInputLease->MarkPublished();
 	GenerationCache->MarkPublished();
@@ -3879,8 +3904,14 @@ bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError
 		OutError = TEXT("Saved voxel RecipeHash differs from the current generation profile");
 		return false;
 	}
+	uint64 GenerationIdentitySalt = 0;
+	if (!ResolveGenerationIdentitySalt(SavedManifest.TerrainType, GenerationIdentitySalt))
+	{
+		OutError = TEXT("Voxel generation identity requires the current registry and shapes");
+		return false;
+	}
 	const uint64 ExpectedGenerationSignature =
-		BuildGenerationSignature(SavedManifest, GetGenerationIdentitySalt(SavedManifest.TerrainType));
+		BuildGenerationSignature(SavedManifest, GenerationIdentitySalt);
 	if (ExpectedGenerationSignature == 0 ||
 		ExpectedGenerationSignature != SavedManifest.BaseSampleHash)
 	{

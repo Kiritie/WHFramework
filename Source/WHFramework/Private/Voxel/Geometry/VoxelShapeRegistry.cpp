@@ -118,6 +118,50 @@ uint8 FVoxelShapeRegistry::RotateFace(uint8 F,uint8 Y)
     for(uint8 I=0;I<(Y&3);++I){int32 X=D.X;D.X=-D.Y;D.Y=X;}
     return D.X==1?0:D.X==-1?1:D.Y==1?2:3;
 }
+bool FVoxelShapeRegistry::HasFullCollisionTop(TConstArrayView<FBox> InBoxes)
+{
+	// 碰撞盒边界将顶面分成覆盖关系不变的竖条；逐条合并 Y 区间，不能用包围盒代替并集。
+	TArray<double, TInlineAllocator<16>> Edges;
+	Edges.Add(0.0);
+	Edges.Add(1.0);
+	bool bSingleBoxCoversTop = false;
+	for (const FBox& Box : InBoxes)
+	{
+		if (!Box.IsValid || Box.Min.ContainsNaN() || Box.Max.ContainsNaN() ||
+			Box.Min.X >= Box.Max.X || Box.Min.Y >= Box.Max.Y || Box.Min.Z >= Box.Max.Z) return false;
+		if (Box.Max.X <= 0.0 || Box.Min.X >= 1.0 || Box.Max.Y <= 0.0 || Box.Min.Y >= 1.0) continue;
+		if (Box.Max.Z > 1.0) return false;
+		if (Box.Min.Z >= 1.0 || Box.Max.Z != 1.0) continue;
+		bSingleBoxCoversTop |= Box.Min.X <= 0.0 && Box.Max.X >= 1.0 && Box.Min.Y <= 0.0 && Box.Max.Y >= 1.0;
+		Edges.AddUnique(FMath::Clamp(Box.Min.X, 0.0, 1.0));
+		Edges.AddUnique(FMath::Clamp(Box.Max.X, 0.0, 1.0));
+	}
+	if (bSingleBoxCoversTop) return true;
+	Edges.Sort();
+	for (int32 Index = 0; Index + 1 < Edges.Num(); ++Index)
+	{
+		TArray<FVector2D, TInlineAllocator<16>> Intervals;
+		for (const FBox& Box : InBoxes)
+		{
+			if (Box.Min.Z >= 1.0 || Box.Max.Z != 1.0 || Box.Min.X > Edges[Index] ||
+				Box.Max.X < Edges[Index + 1] || Box.Max.Y <= 0.0 || Box.Min.Y >= 1.0) continue;
+			Intervals.Emplace(FMath::Max(0.0, Box.Min.Y), FMath::Min(1.0, Box.Max.Y));
+		}
+		Intervals.Sort([](const FVector2D& A, const FVector2D& B)
+		{
+			return A.X != B.X ? A.X < B.X : A.Y < B.Y;
+		});
+		double Covered = 0.0;
+		for (const FVector2D& Interval : Intervals)
+		{
+			if (Interval.X > Covered) return false;
+			Covered = FMath::Max(Covered, Interval.Y);
+			if (Covered >= 1.0) break;
+		}
+		if (Covered < 1.0) return false;
+	}
+	return true;
+}
 FVoxelResolvedShape FVoxelShapeRegistry::Build(EVoxelShapeKind K,uint16 S)
 {
     FVoxelResolvedShape O;TArray<FBox>B;const double T=1.0/16;uint8 Y=uint8(S&7);
@@ -131,6 +175,7 @@ FVoxelResolvedShape FVoxelShapeRegistry::Build(EVoxelShapeKind K,uint16 S)
 			{
 				O.CollisionBoxes = O.SelectionBoxes;
 			}
+			O.bCollisionCoversTop = HasFullCollisionTop(O.CollisionBoxes);
 			return O;
 		}
         case EVoxelShapeKind::FullCube:Box(0,0,0,1,1,1);break;
@@ -168,6 +213,7 @@ FVoxelResolvedShape FVoxelShapeRegistry::Build(EVoxelShapeKind K,uint16 S)
     for(auto&Q:O.Quads){for(auto&P:Q.Vertices)P=RotatePoint(P,Y);Q.Face=RotateFace(Q.Face,Y);}
     for(auto&X:B)X=RotateBox(X,Y);O.SelectionBoxes=B;O.CollisionBoxes=B;
     if(K==EVoxelShapeKind::Ladder||K==EVoxelShapeKind::Torch||K==EVoxelShapeKind::Fluid)O.CollisionBoxes.Reset();
+	O.bCollisionCoversTop = HasFullCollisionTop(O.CollisionBoxes);
     FillCoverage(O);return O;
 }
 void FVoxelShapeRegistry::BuildDefaults()
@@ -181,6 +227,15 @@ void FVoxelShapeRegistry::BuildDefaults()
 	Templates.GetKeys(Keys);
 	Keys.Sort();
 	ContentHash = 1469598103934665603ull;
+	CollisionTopHash = 1469598103934665603ull;
+	const auto MixSupport = [this](uint64 Value)
+	{
+		for (int32 Byte = 0; Byte < 8; ++Byte)
+		{
+			CollisionTopHash ^= uint8(Value >> (Byte * 8));
+			CollisionTopHash *= 1099511628211ull;
+		}
+	};
 	const auto Mix = [this](const auto Value)
 	{
 		uint64 Bits = 0;
@@ -196,6 +251,8 @@ void FVoxelShapeRegistry::BuildDefaults()
 	{
 		Mix(TemplateKey);
 		const auto& Shape = Templates.FindChecked(TemplateKey);
+		MixSupport(TemplateKey);
+		MixSupport(Shape.bCollisionCoversTop ? 1 : 0);
 		Mix(Shape.Quads.Num());
 		for (const auto& Quad : Shape.Quads)
 		{
@@ -232,11 +289,16 @@ void FVoxelShapeRegistry::BuildDefaults()
 		for (int32 Face = 0; Face < 6; ++Face)
 			for (int32 Word = 0; Word < 4; ++Word) Mix(Shape.Coverage[Face][Word]);
 	}
+	if (CollisionTopHash == 0) CollisionTopHash = 1;
 }
 
 uint64 FVoxelShapeRegistry::GetContentHash() const
 {
 	return ContentHash;
+}
+uint64 FVoxelShapeRegistry::GetCollisionTopHash() const
+{
+	return CollisionTopHash;
 }
 const FVoxelResolvedShape* FVoxelShapeRegistry::Find(EVoxelShapeKind K,uint16 S)const
 {return Templates.Find(Key(K,K == EVoxelShapeKind::ObjectPart ? uint16(S & ~VoxelState::ObjectPartMask) : S));}

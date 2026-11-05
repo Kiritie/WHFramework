@@ -3944,6 +3944,7 @@ FVoxelTerrainReadinessSnapshot FVoxelViewManager::CaptureTerrainReadiness() cons
 				const auto* Actual = Publisher->GetTerrainRenderer().FindPresentedNativeAtom(Section);
 				const bool bPresented = Actual && IsFinePresentationCurrent(Actual->Evidence);
 				const bool bPrepared = IsFineGeometryPrepared(Section);
+				Target.bFailed |= IsFineReadinessTerminalFailure(Section, bPrepared, bPresented);
 				// F1+ 从独立采样生成，不创建 Runtime Section；当前版本几何证明其采样已完成。
 				const bool bShardDataReady = !GetInputRoot().FineWanted.Contains(Section) && (bPrepared || bPresented);
 				Target.ReadySections += (Data && Data->Status == EVoxelSectionStatus::DataReady) || bShardDataReady ? 1 : 0;
@@ -4268,12 +4269,7 @@ FVoxelPrimaryFineReadiness FVoxelViewManager::GetPrimaryFineReadiness(const TMap
 		Result.Presented += bPresented;
 		Result.Renderable += bPresented && Actual && !Actual->Evidence.bKnownEmpty;
 		Result.PublicationPending += Renderer.IsLocked(Pair.Key);
-		for (const int32 Side : {16, 32, 64})
-		{
-			FIntVector Min;
-			if (!FVoxelFineSpatial::TrySnap(Pair.Key * 16, Side, Min)) continue;
-			if (const auto* Slot = FineShardSlots.Find({Min, Side})) Result.bFailed |= !Slot->Build.GetFailure().IsEmpty();
-		}
+		Result.bFailed |= IsFineReadinessTerminalFailure(Pair.Key, bPrepared, bPresented);
 	}
 	return Result;
 }
@@ -4287,17 +4283,13 @@ FVoxelPrimaryFineReadiness FVoxelViewManager::GetFineRadiusReadiness(TConstArray
 		++Result.Required;
 		const bool bPresented = IsLatestFinePresented(Key);
 		const auto* Actual = Renderer.FindPresentedAtom(Key);
-		Result.Ready += IsFineGeometryPrepared(Key);
+		const bool bPrepared = IsFineGeometryPrepared(Key);
+		Result.Ready += bPrepared;
 		Result.Owned += bPresented;
 		Result.Presented += bPresented;
 		Result.Renderable += bPresented && Actual && !Actual->Evidence.bKnownEmpty;
 		Result.PublicationPending += Renderer.IsLocked(Key);
-		for (const int32 Side : {16, 32, 64})
-		{
-			FIntVector Min;
-			if (!FVoxelFineSpatial::TrySnap(Key * 16, Side, Min)) continue;
-			if (const auto* Slot = FineShardSlots.Find({Min, Side})) Result.bFailed |= !Slot->Build.GetFailure().IsEmpty();
-		}
+		Result.bFailed |= IsFineReadinessTerminalFailure(Key, bPrepared, bPresented);
 	}
 	return Result;
 }

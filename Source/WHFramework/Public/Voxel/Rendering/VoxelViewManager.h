@@ -436,6 +436,7 @@ private:
 	int32 StatisticsEvidenceCursor = 0;
 	uint64 StatisticsInputRevision = 0;
 	bool IsFineGeometryPrepared(const FIntVector& InSection) const;
+	bool IsFineReadinessTerminalFailure(const FIntVector& InSection, bool bInGeometryPrepared, bool bInPresented) const;
 	bool RequestFineShard(const FVoxelFineShardKey& InKey);
 	bool RequestF0Fine(const FIntVector& InSection, uint64 InRevision);
 	bool ReserveFineShardSlots(int32 InCount, FString& OutError, bool bExactCapacity = false);

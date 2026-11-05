@@ -24,6 +24,8 @@ bool FVoxelRegistry::Build(const TArray<UVoxelData*>&In,bool Render,FString&E)
     FVoxelRuntimeDefinition Air;Air.BlockName=TEXT("core:air");Air.bReplaceable=true;Air.bBreakable=false;Air.DropCount=0;
     R->Definitions.Add(Air);R->Names.Add(Air.BlockName,0);
     FVoxelByteWriter W(32*1024*1024);W.U32(3);W.U32(uint32(Sorted.Num()));
+    // RegistryHash 的盒坐标有 1e-6 量化；地基的精确支撑结果另建只供超平坦使用的身份。
+    uint64 SuperflatSupportHash = VoxelBinary::Mix64(0x53464C4F4F523031ull);
     for(UVoxelData*A:Sorted)
     {
         if(R->Names.Contains(A->BlockName)||R->Assets.Contains(A->GetPrimaryAssetId())){E=TEXT("Duplicate name or asset");return false;}
@@ -36,6 +38,7 @@ bool FVoxelRegistry::Build(const TArray<UVoxelData*>&In,bool Render,FString&E)
             FVoxelResolvedShape& Resolved = D.StateGeometry.Add(uint16(Geometry.State));
             Resolved.CollisionBoxes = Geometry.CollisionBoxes;
             Resolved.SelectionBoxes = Geometry.SelectionBoxes;
+            Resolved.bCollisionCoversTop = FVoxelShapeRegistry::HasFullCollisionTop(Resolved.CollisionBoxes);
             for (uint8 Face = 0; Face < 6; ++Face)
             {
                 const int32 Axis = Face / 2;
@@ -81,6 +84,8 @@ bool FVoxelRegistry::Build(const TArray<UVoxelData*>&In,bool Render,FString&E)
         {
             W.U16(State);
             const FVoxelResolvedShape& Geometry = D.StateGeometry.FindChecked(State);
+            const uint64 SupportKey = (uint64(D.TypeId) << 17) | (uint64(State) << 1) | uint64(Geometry.bCollisionCoversTop);
+            SuperflatSupportHash = VoxelBinary::Mix64(SuperflatSupportHash ^ VoxelBinary::Mix64(SupportKey));
             for (const TArray<FBox>* Boxes : {&Geometry.CollisionBoxes, &Geometry.SelectionBoxes})
             {
                 W.U32(uint32(Boxes->Num()));
@@ -97,5 +102,6 @@ bool FVoxelRegistry::Build(const TArray<UVoxelData*>&In,bool Render,FString&E)
     }
     for(const auto&D:R->Definitions)if(D.DropCount>0&&!R->Assets.Contains(D.DropAssetID)){E=TEXT("Voxel drops require a registered voxel asset");return false;}
     TArray<uint8>B;if(!W.Finish(B)){E=TEXT("Registry canonical size exceeded");return false;}R->Hash=VoxelBinary::Hash(B);
+    R->SuperflatSupportHash = SuperflatSupportHash == 0 ? 1 : SuperflatSupportHash;
     Published=R;E.Reset();return true;
 }

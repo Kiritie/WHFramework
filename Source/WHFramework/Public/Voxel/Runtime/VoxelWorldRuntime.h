@@ -13,6 +13,7 @@
 #include "Voxel/Save/VoxelDeltaTypes.h"
 
 class FVoxelTerrainFrameContext;
+class FVoxelShapeRegistry;
 
 enum class EVoxelRuntimeSectionEvent : uint8
 {
@@ -92,8 +93,13 @@ public:
 		bool bInAuthority,
 		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
 		TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
-		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources);
+		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+		TSharedRef<const FVoxelShapeRegistry, ESPMode::ThreadSafe> InShapes);
 #if WITH_DEV_AUTOMATION_TESTS
+	FVoxelWorldRuntime(uint64 InWorldEpoch, bool bInAuthority,
+		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
+		TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
+		TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources);
 	FVoxelWorldRuntime(uint64 InWorldEpoch, bool bInAuthority,
 		TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
 		TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator);
@@ -244,6 +250,7 @@ private:
 	bool bAuthority = false;
 	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> Registry;
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> Generator;
+	TSharedRef<const FVoxelShapeRegistry, ESPMode::ThreadSafe> Shapes;
 	TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe> StorageLease;
 	int32 StorageCapacity = 0;
 	TMap<FIntVector, TSharedPtr<FVoxelSection, ESPMode::ThreadSafe>> Sections;

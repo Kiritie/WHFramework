@@ -405,6 +405,7 @@ protected:
 	TUniquePtr<FVoxelWorldSaveData> WorldData;
 
 private:
+	bool ResolveGenerationIdentitySalt(EVoxelTerrainType InTerrainType, uint64& OutSalt) const;
 	struct FSource
 	{
 		TWeakObjectPtr<UObject> Owner;

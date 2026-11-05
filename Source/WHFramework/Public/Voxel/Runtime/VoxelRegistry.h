@@ -9,6 +9,7 @@ struct WHFRAMEWORK_API FVoxelRegistrySnapshot
     TMap<FName,uint16> Names;
     TMap<FPrimaryAssetId,uint16> Assets;
     uint64 Hash=0;
+    uint64 SuperflatSupportHash=0;
     const FVoxelRuntimeDefinition* Find(uint16 Type)const;
     const FVoxelRuntimeDefinition* Find(FName Name)const;
     const FVoxelRuntimeDefinition* Find(const FPrimaryAssetId& Asset)const;

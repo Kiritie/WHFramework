@@ -2,6 +2,7 @@
 
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Generation/VoxelGenerationAllocation.h"
+#include "Voxel/Geometry/VoxelShapeRegistry.h"
 #include "Voxel/Rendering/VoxelTerrainFrameContext.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
 #include "Voxel/Save/InventoryVoxelEntityCodec.h"
@@ -66,6 +67,19 @@ namespace VoxelWorldRuntimePrivate
 		const int32 Z = PositiveMod(InPosition.Z);
 		return X + Y * RuntimeSectionSide + Z * RuntimeSectionSide * RuntimeSectionSide;
 	}
+
+#if WITH_DEV_AUTOMATION_TESTS
+	TSharedRef<const FVoxelShapeRegistry, ESPMode::ThreadSafe> GetFixtureShapes()
+	{
+		static const TSharedRef<const FVoxelShapeRegistry, ESPMode::ThreadSafe> Defaults = []()
+		{
+			TSharedRef<FVoxelShapeRegistry, ESPMode::ThreadSafe> Shapes = MakeShared<FVoxelShapeRegistry, ESPMode::ThreadSafe>();
+			Shapes->BuildDefaults();
+			return Shapes;
+		}();
+		return Defaults;
+	}
+#endif
 }
 
 using namespace VoxelWorldRuntimePrivate;
@@ -75,11 +89,13 @@ FVoxelWorldRuntime::FVoxelWorldRuntime(
 	const bool bInAuthority,
 	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
-	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources)
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources,
+	TSharedRef<const FVoxelShapeRegistry, ESPMode::ThreadSafe> InShapes)
 	: WorldEpoch(InWorldEpoch)
 	, bAuthority(bInAuthority)
 	, Registry(InRegistry)
 	, Generator(InGenerator)
+	, Shapes(InShapes)
 	, CommittedJournal(InWorldEpoch)
 	, TerrainResources(InResources)
 {
@@ -90,6 +106,14 @@ FVoxelWorldRuntime::FVoxelWorldRuntime(
 }
 
 #if WITH_DEV_AUTOMATION_TESTS
+FVoxelWorldRuntime::FVoxelWorldRuntime(const uint64 InWorldEpoch, const bool bInAuthority,
+	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
+	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator,
+	TSharedRef<FVoxelTerrainResources, ESPMode::ThreadSafe> InResources)
+	: FVoxelWorldRuntime(InWorldEpoch, bInAuthority, InRegistry, InGenerator, InResources, GetFixtureShapes())
+{
+}
+
 FVoxelWorldRuntime::FVoxelWorldRuntime(const uint64 InWorldEpoch, const bool bInAuthority,
 	TSharedRef<const FVoxelRegistrySnapshot, ESPMode::ThreadSafe> InRegistry,
 	TSharedRef<const FVoxelGenerationPipeline, ESPMode::ThreadSafe> InGenerator)
@@ -1288,6 +1312,21 @@ bool FVoxelWorldRuntime::ValidateTerrainState(const int64 InZ, const FVoxelBlock
 	{
 		OutError = TEXT("Voxel.SuperflatFoundationUnbreakable");
 		return false;
+	}
+	if (InZ == VoxelGeneration::SuperflatSurfaceZ)
+	{
+		const FVoxelRuntimeDefinition* Definition = Registry->Find(InState.TypeId);
+		if (Definition && Definition->bSolid && Definition->Shape == EVoxelShapeKind::FullCube && Definition->StateGeometry.IsEmpty())
+		{
+			return true;
+		}
+		const FVoxelResolvedShape* Shape = Definition ? Definition->FindShape(*Shapes, InState.State) : nullptr;
+		if (!Definition || !Definition->bSolid || !Shape || !Shape->bCollisionCoversTop)
+		{
+			OutError = FString::Printf(TEXT("Voxel.SuperflatFoundationUnsupported: type=%u state=%u"),
+				static_cast<uint32>(InState.TypeId), static_cast<uint32>(InState.State));
+			return false;
+		}
 	}
 	return true;
 }

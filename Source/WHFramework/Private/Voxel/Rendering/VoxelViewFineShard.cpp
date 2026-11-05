@@ -1774,6 +1774,94 @@ bool FVoxelViewManager::IsFineGeometryPrepared(const FIntVector& InSection) cons
 	return false;
 }
 
+bool FVoxelViewManager::IsFineReadinessTerminalFailure(const FIntVector& InSection,
+	const bool bInGeometryPrepared, const bool bInPresented) const
+{
+	if (bInGeometryPrepared && bInPresented) return false;
+	const auto CurrentInterest = Module.GetCurrentInterestSnapshot();
+	const auto Registry = Module.GetRegistry();
+	const auto Shapes = Module.GetShapes();
+	const auto* Runtime = Module.GetRuntime();
+	if (!CurrentInterest || !AppliedInterestSnapshot || !AppliedInputRoot || !Registry || !Shapes || !Runtime ||
+		CurrentInterest.Get() != AppliedInterestSnapshot.Get() || &GetViewInterest() != AppliedInterestSnapshot.Get() ||
+		&GetInputRoot() != AppliedInputRoot.Get() || Module.GetWorldEpoch() != WorldEpoch) return false;
+
+	const auto IsCurrentSlot = [&](const FVoxelFineShardKey& Key, const FFineShardSlot& Slot)
+	{
+		const auto& Input = Slot.Build.GetInput();
+		const uint64 Revision = Runtime->GetChangeHierarchy().GetFineShardRevision(Key);
+		return Input.WorldEpoch == WorldEpoch && Input.Incarnation != 0 && Input.Shard == Key &&
+			Input.GeneratorIdentity == Module.GetManifest().BaseSampleHash && Input.RegistryRevision == Registry->Hash &&
+			Input.ShapeRevision == Shapes->GetContentHash() && Input.DataRevision == Revision && Input.OverlayRevision == Revision;
+	};
+	const auto FindPresentationTransaction = [&](const FVoxelFineShardKey& Key, const FFineShardSlot& Slot) -> const FGuid*
+	{
+		const int32 AtomSide = Key.SideCells / 16;
+		const FIntVector Local = InSection - Key.Min / 16;
+		if (AtomSide <= 0 || Local.X < 0 || Local.Y < 0 || Local.Z < 0 ||
+			Local.X >= AtomSide || Local.Y >= AtomSide || Local.Z >= AtomSide) return nullptr;
+		const int32 AtomIndex = Local.X + AtomSide * (Local.Y + AtomSide * Local.Z);
+		return AtomIndex < UE_ARRAY_COUNT(Slot.RenderTransactions) ? &Slot.RenderTransactions[AtomIndex] : nullptr;
+	};
+	const auto HasCurrentGeometry = [&](const FFineShardSlot& Slot)
+	{
+		const auto Geometry = Slot.Build.GetPreparedGeometry();
+		return Slot.Build.IsMeshReady() && Geometry && Slot.RenderGeometry == Geometry &&
+			Module.IsOverlayVersionCurrent(Geometry->OverlayVersion);
+	};
+	const auto IsTerminalPresentation = [&](const FVoxelFineShardKey& Key, const FFineShardSlot& Slot)
+	{
+		if (!HasCurrentGeometry(Slot) ||
+			(Slot.RenderAdmission != EVoxelTerrainResourceAdmission::CapacityUnachievable &&
+			 Slot.RenderAdmission != EVoxelTerrainResourceAdmission::InvalidRequest)) return false;
+		const FGuid* Transaction = FindPresentationTransaction(Key, Slot);
+		// 其他 Atom 的失败不能抢在此 Atom 的在途呈现回执之前判定。
+		return Transaction && (!Transaction->IsValid() || !Publisher->GetTerrainRenderer().IsTransactionPending(*Transaction));
+	};
+
+	if (GetInputRoot().FineWanted.Contains(InSection))
+	{
+		const FVoxelFineShardKey Key{InSection * 16, 16};
+		const auto* Slot = FineShardSlots.Find(Key);
+		if (!Slot || !IsCurrentSlot(Key, *Slot)) return false;
+		// F0 是 Ready 门槛自身的必需几何；F1 画面可保留，但不能替代它的构建。
+		if (!bInGeometryPrepared) return !Slot->Build.GetFailure().IsEmpty();
+		if (bInPresented || !IsTerminalPresentation(Key, *Slot)) return false;
+		for (const int32 Side : {32, 64})
+		{
+			FIntVector Min;
+			if (!FVoxelFineSpatial::TrySnap(InSection * 16, Side, Min)) continue;
+			const FVoxelFineShardKey Alternative{Min, Side};
+			if (!CurrentInterest->FineShardDemands.Contains(Alternative)) continue;
+			const auto* Other = FineShardSlots.Find(Alternative);
+			if (!Other || !IsCurrentSlot(Alternative, *Other) || !HasCurrentGeometry(*Other)) continue;
+			const FGuid* Transaction = FindPresentationTransaction(Alternative, *Other);
+			if (Transaction && Transaction->IsValid() && Publisher->GetTerrainRenderer().IsTransactionPending(*Transaction)) return false;
+		}
+		return true;
+	}
+
+	bool bHasCandidate = false;
+	for (const int32 Side : {32, 64})
+	{
+		FIntVector Min;
+		if (!FVoxelFineSpatial::TrySnap(InSection * 16, Side, Min)) continue;
+		const FVoxelFineShardKey Key{Min, Side};
+		if (!CurrentInterest->FineShardDemands.Contains(Key)) continue;
+		bHasCandidate = true;
+		const auto* Slot = FineShardSlots.Find(Key);
+		if (!Slot || !IsCurrentSlot(Key, *Slot)) return false;
+		if (!Slot->Build.IsMeshReady())
+		{
+			if (Slot->Build.GetFailure().IsEmpty()) return false;
+			continue;
+		}
+		// 有仍可建立或呈现的当前候选时保留 Pending，不把旧候选的失败提升为终态。
+		if (!bInGeometryPrepared || bInPresented || !IsTerminalPresentation(Key, *Slot)) return false;
+	}
+	return bHasCandidate;
+}
+
 bool FVoxelViewManager::IsLatestFinePresented(const FIntVector& InSection) const
 {
 	const auto* Actual = Publisher->GetTerrainRenderer().FindPresentedAtom(InSection);

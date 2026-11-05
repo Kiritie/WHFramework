@@ -21,5 +21,6 @@ struct WHFRAMEWORK_API FVoxelResolvedShape
     TArray<FVoxelShapeQuad> SelectionQuads;
     uint64 Coverage[6][4] = {};
     uint8 OcclusionMask=0;
+    bool bCollisionCoversTop = false;
     bool Covers(uint8 Face,int32 U,int32 V)const;
 };
