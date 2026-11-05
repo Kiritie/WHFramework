@@ -94,6 +94,25 @@ namespace
 		return InOutSettings.Validate(OutError);
 	}
 
+	bool ValidateSuperflatGround(const EVoxelTerrainType InTerrainType,
+		const FVoxelRegistrySnapshot* InRegistry, const FVoxelShapeRegistry* InShapes,
+		const FVoxelGenerationRuntimeConfig& InConfig, FString& OutError)
+	{
+		if (InTerrainType != EVoxelTerrainType::Superflat) return true;
+		if (!InRegistry || !InShapes)
+		{
+			OutError = TEXT("Voxel.SuperflatInvalidGrass: registry or collision shapes are unavailable");
+			return false;
+		}
+		FString GroundError;
+		if (!FVoxelWorldRuntime::ValidateSuperflatFoundation(*InRegistry, *InShapes, InConfig.Grass, GroundError))
+		{
+			OutError = FString::Printf(TEXT("Voxel.SuperflatInvalidGrass: %s"), *GroundError);
+			return false;
+		}
+		return true;
+	}
+
 	bool IsTerminalInterestBuildError(const FString& InError)
 	{
 		return InError.StartsWith(TEXT("Oversized")) || InError.StartsWith(TEXT("CapacityUnachievable")) ||
@@ -834,6 +853,7 @@ bool UVoxelModule::CreateWorld(
 
 		return false;
 	}
+	if (!ValidateSuperflatGround(InTerrainType, Registry.GetSnapshot().Get(), Shapes.Get(), Config, OutError)) return false;
 
 	FVoxelWorldManifest NewManifest;
 	NewManifest.GeneratorVersion = Config.Recipe->AlgorithmVersion;
@@ -951,6 +971,11 @@ bool UVoxelModule::StartWorld(
 		return false;
 	}
 	Config.TerrainType = Manifest.TerrainType;
+	if (!ValidateSuperflatGround(Manifest.TerrainType, Registry.GetSnapshot().Get(), Shapes.Get(), Config, OutError))
+	{
+		FailInitialization();
+		return false;
+	}
 
 	if (Config.TerrainType != EVoxelTerrainType::Superflat &&
 		((Config.Recipe->Settings.Ecology.Tree.bEnabled &&
@@ -1514,6 +1539,11 @@ bool UVoxelModule::IsCollisionReady(const FIntVector& InSection) const
 			!OverlayReplica->LookupSection(InSection, Revision, Overlay) || Section->CommittedRevision != Revision) return false;
 	}
 	return CollisionPresenter && CollisionPresenter->IsReady(InSection);
+}
+
+bool UVoxelModule::HasCurrentCollisionFailure(const FIntVector& InSection) const
+{
+	return IsReady() && CollisionPresenter && CollisionPresenter->HasCurrentCollisionFailure(InSection);
 }
 
 bool UVoxelModule::CaptureCollisionReceipt(const FIntVector& InSection, FVoxelPhysicsReceipt& OutReceipt) const
@@ -3850,6 +3880,7 @@ bool UVoxelModule::ValidateNewWorldData(const FParameter& InData, FString& OutEr
 		OutError = TEXT("New voxel world generation binding has no frozen recipe");
 		return false;
 	}
+	if (!ValidateSuperflatGround(Data->TerrainType, RegistrySnapshot.Get(), Shapes.Get(), Config, OutError)) return false;
 	OutError.Reset();
 	return true;
 }
@@ -3904,6 +3935,7 @@ bool UVoxelModule::ValidateWorldData(const FParameter& InData, FString& OutError
 		OutError = TEXT("Saved voxel RecipeHash differs from the current generation profile");
 		return false;
 	}
+	if (!ValidateSuperflatGround(SavedManifest.TerrainType, Registry.GetSnapshot().Get(), Shapes.Get(), Config, OutError)) return false;
 	uint64 GenerationIdentitySalt = 0;
 	if (!ResolveGenerationIdentitySalt(SavedManifest.TerrainType, GenerationIdentitySalt))
 	{

@@ -1297,6 +1297,41 @@ bool FVoxelWorldRuntime::ValidateState(const FVoxelBlockState& InState) const
 	return Registry->IsValid(InState);
 }
 
+bool FVoxelWorldRuntime::ValidateSuperflatFoundation(const FVoxelRegistrySnapshot& InRegistry,
+	const FVoxelShapeRegistry& InShapes, const FVoxelBlockState& InState, FString& OutError)
+{
+	if (!InRegistry.IsValid(InState))
+	{
+		OutError = FString::Printf(TEXT("Voxel.SuperflatFoundationUnsupported: type=%u state=%u"),
+			static_cast<uint32>(InState.TypeId), static_cast<uint32>(InState.State));
+		return false;
+	}
+	if (InState.IsAir())
+	{
+		OutError = TEXT("Voxel.SuperflatFoundationUnbreakable");
+		return false;
+	}
+	const FVoxelRuntimeDefinition* Definition = InRegistry.Find(InState.TypeId);
+	if (!Definition || !Definition->bSolid)
+	{
+		OutError = FString::Printf(TEXT("Voxel.SuperflatFoundationUnsupported: type=%u state=%u"),
+			static_cast<uint32>(InState.TypeId), static_cast<uint32>(InState.State));
+		return false;
+	}
+	if (Definition->Shape == EVoxelShapeKind::FullCube && Definition->StateGeometry.IsEmpty())
+	{
+		return true;
+	}
+	const FVoxelResolvedShape* Shape = Definition->FindShape(InShapes, InState.State);
+	if (!Shape || !Shape->bCollisionCoversTop)
+	{
+		OutError = FString::Printf(TEXT("Voxel.SuperflatFoundationUnsupported: type=%u state=%u"),
+			static_cast<uint32>(InState.TypeId), static_cast<uint32>(InState.State));
+		return false;
+	}
+	return true;
+}
+
 bool FVoxelWorldRuntime::ValidateTerrainState(const int64 InZ, const FVoxelBlockState& InState, FString& OutError) const
 {
 	if (Generator->GetRuntimeConfig()->TerrainType != EVoxelTerrainType::Superflat)
@@ -1308,25 +1343,9 @@ bool FVoxelWorldRuntime::ValidateTerrainState(const int64 InZ, const FVoxelBlock
 		OutError = TEXT("Voxel.SuperflatUndergroundMustBeEmpty");
 		return false;
 	}
-	if (InZ == VoxelGeneration::SuperflatSurfaceZ && InState.IsAir())
-	{
-		OutError = TEXT("Voxel.SuperflatFoundationUnbreakable");
-		return false;
-	}
 	if (InZ == VoxelGeneration::SuperflatSurfaceZ)
 	{
-		const FVoxelRuntimeDefinition* Definition = Registry->Find(InState.TypeId);
-		if (Definition && Definition->bSolid && Definition->Shape == EVoxelShapeKind::FullCube && Definition->StateGeometry.IsEmpty())
-		{
-			return true;
-		}
-		const FVoxelResolvedShape* Shape = Definition ? Definition->FindShape(*Shapes, InState.State) : nullptr;
-		if (!Definition || !Definition->bSolid || !Shape || !Shape->bCollisionCoversTop)
-		{
-			OutError = FString::Printf(TEXT("Voxel.SuperflatFoundationUnsupported: type=%u state=%u"),
-				static_cast<uint32>(InState.TypeId), static_cast<uint32>(InState.State));
-			return false;
-		}
+		return ValidateSuperflatFoundation(*Registry, *Shapes, InState, OutError);
 	}
 	return true;
 }

@@ -1136,6 +1136,36 @@ bool FVoxelCollisionPresenter::IsReady(const FIntVector& InSection) const
 	return IsReady(InSection, Data, Body);
 }
 
+bool FVoxelCollisionPresenter::HasCurrentCollisionFailure(const FIntVector& InSection) const
+{
+	check(IsInGameThread());
+	const FVoxelWorldRuntime* Runtime = Module.GetRuntime();
+	if (!Runtime || Runtime->Epoch() != WorldEpoch || Module.GetWorldEpoch() != WorldEpoch ||
+		!Module.GetRegistry() || !Module.GetShapes() || !IsDemanded(InSection))
+	{
+		return false;
+	}
+	const FVoxelSection* Data = Runtime->FindSection(InSection);
+	const FBodyRecord* Body = FindBody(InSection);
+	if (!Data || Data->Status != EVoxelSectionStatus::DataReady || !Body || !Body->bHasFailure ||
+		Body->bRetiring || Body->bCapacityBlocked || IsReady(InSection, Data, Body))
+	{
+		return false;
+	}
+	const FVoxelTaskStamp CurrentStamp = CaptureInputStamp(InSection);
+	if (Body->RequestedStamp != CurrentStamp || Body->FailedStamp != CurrentStamp)
+	{
+		return false;
+	}
+	if (Scheduler.Has(CurrentStamp, EVoxelTaskKind::BuildCollision) ||
+		(Body->Prepared && Body->PreparedStamp == CurrentStamp) ||
+		(Body->Sync && Body->InstalledStamp == CurrentStamp))
+	{
+		return false;
+	}
+	return true;
+}
+
 bool FVoxelCollisionPresenter::IsReadyEmpty(const FIntVector& InSection) const
 {
 	const auto* Data = Module.GetRuntime() ? Module.GetRuntime()->FindSection(InSection) : nullptr;

@@ -134,6 +134,7 @@ public:
 	bool IsReady() const;
 	bool IsPlayable() const;
 	bool IsCollisionReady(const FIntVector& InSection) const;
+	bool HasCurrentCollisionFailure(const FIntVector& InSection) const;
 	bool CaptureCollisionReceipt(const FIntVector& InSection, FVoxelPhysicsReceipt& OutReceipt) const;
 	void NotifyCollisionChanged(const FIntVector& InSection);
 	void NotifyFineCollisionGeometryReady(const FVoxelFineShardKey& InKey);

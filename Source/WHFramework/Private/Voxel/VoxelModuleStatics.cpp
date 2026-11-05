@@ -4,6 +4,65 @@
 #include "Voxel/Voxels/VoxelItemBridge.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+
+namespace
+{
+    EVoxelCollisionRangeStatus QueryVoxelCollisionRange(UVoxelModule& InModule, const FBox& InBounds,
+        FIntVector& OutFailedSection, const bool bCheckFailures)
+    {
+        OutFailedSection = FIntVector::ZeroValue;
+        if (!InModule.IsReady() || !InBounds.IsValid || InBounds.Min.ContainsNaN() || InBounds.Max.ContainsNaN())
+        {
+            return EVoxelCollisionRangeStatus::Pending;
+        }
+        const FVector MinCell = InBounds.Min / InModule.BlockSize();
+        const FVector MaxCell = InBounds.Max / InModule.BlockSize();
+        const FIntVector MinimumCell(FMath::FloorToInt(MinCell.X), FMath::FloorToInt(MinCell.Y), FMath::FloorToInt(MinCell.Z));
+        const FIntVector MaximumCell(FMath::FloorToInt(MaxCell.X), FMath::FloorToInt(MaxCell.Y), FMath::FloorToInt(MaxCell.Z));
+        const auto FloorSection = [](const int32 InCell)
+        {
+            return FMath::FloorToInt(static_cast<double>(InCell) / 16.0);
+        };
+        const FIntVector Minimum(FloorSection(MinimumCell.X), FloorSection(MinimumCell.Y), FloorSection(MinimumCell.Z));
+        const FIntVector Maximum(FloorSection(MaximumCell.X), FloorSection(MaximumCell.Y), FloorSection(MaximumCell.Z));
+        const int64 Count = int64(Maximum.X - Minimum.X + 1) * (Maximum.Y - Minimum.Y + 1) * (Maximum.Z - Minimum.Z + 1);
+        if (Count <= 0 || Count > 512)
+        {
+            return EVoxelCollisionRangeStatus::Pending;
+        }
+        const auto& Settings = InModule.GetManifest().Settings;
+        bool bPending = false;
+        for (int32 Z = Minimum.Z; Z <= Maximum.Z; ++Z)
+        {
+            for (int32 Y = Minimum.Y; Y <= Maximum.Y; ++Y)
+            {
+                for (int32 X = Minimum.X; X <= Maximum.X; ++X)
+                {
+                    if (int64(Z) * 16 >= Settings.MaxZ || int64(Z) * 16 + 16 <= Settings.MinZ)
+                    {
+                        continue;
+                    }
+                    const FIntVector Section(X, Y, Z);
+                    if (!InModule.IsCollisionReady(Section))
+                    {
+                        if (!bCheckFailures)
+                        {
+                            return EVoxelCollisionRangeStatus::Pending;
+                        }
+                        if (InModule.HasCurrentCollisionFailure(Section))
+                        {
+                            OutFailedSection = Section;
+                            return EVoxelCollisionRangeStatus::Failed;
+                        }
+                        bPending = true;
+                    }
+                }
+            }
+        }
+        return bPending ? EVoxelCollisionRangeStatus::Pending : EVoxelCollisionRangeStatus::Ready;
+    }
+}
+
 UVoxelModule* UVoxelModuleStatics::GetVoxelModule(const UObject*C)
 {return C&&GEngine?UVoxelModule::GetPtr(GEngine->GetWorldFromContextObject(C,EGetWorldErrorMode::ReturnNull)):nullptr;}
 bool UVoxelModuleStatics::IsVoxelWorldReady(const UObject*C){auto*M=GetVoxelModule(C);return M&&M->IsReady();}
@@ -37,17 +96,13 @@ bool UVoxelModuleStatics::ExportVoxelPrefab(const UObject*C,FIntVector A,FIntVec
 {auto*M=GetVoxelModule(C);if(!M){E=TEXT("No voxel module");return false;}return M->ExportPrefab(A,B,O,E);}
 bool UVoxelModuleStatics::AreCollisionsReady(UVoxelModule&M,const FBox&B)
 {
-    if(!M.IsReady()||!B.IsValid||B.Min.ContainsNaN()||B.Max.ContainsNaN())return false;FIntVector Lo,Hi;
-    const FVector MinCell=B.Min/M.BlockSize(),MaxCell=B.Max/M.BlockSize();
-    Lo=FIntVector(FMath::FloorToInt(MinCell.X),FMath::FloorToInt(MinCell.Y),FMath::FloorToInt(MinCell.Z));
-    Hi=FIntVector(FMath::FloorToInt(MaxCell.X),FMath::FloorToInt(MaxCell.Y),FMath::FloorToInt(MaxCell.Z));
-    auto FloorSection=[](int32 V){return FMath::FloorToInt(static_cast<double>(V)/16.0);};
-    FIntVector A(FloorSection(Lo.X),FloorSection(Lo.Y),FloorSection(Lo.Z));
-    FIntVector Z(FloorSection(Hi.X),FloorSection(Hi.Y),FloorSection(Hi.Z));int64 Count=int64(Z.X-A.X+1)*(Z.Y-A.Y+1)*(Z.Z-A.Z+1);
-    if(Count<=0||Count>512)return false;const auto&Config=M.GetManifest().Settings;
-    for(int32 K=A.Z;K<=Z.Z;++K)for(int32 J=A.Y;J<=Z.Y;++J)for(int32 I=A.X;I<=Z.X;++I)
-    {if(int64(K)*16>=Config.MaxZ||int64(K)*16+16<=Config.MinZ)continue;if(!M.IsCollisionReady({I,J,K}))return false;}
-    return true;
+    FIntVector UnusedFailedSection;
+    return QueryVoxelCollisionRange(M, B, UnusedFailedSection, false) == EVoxelCollisionRangeStatus::Ready;
+}
+
+EVoxelCollisionRangeStatus UVoxelModuleStatics::QueryCollisionReadiness(UVoxelModule& Module, const FBox& Bounds, FIntVector& OutFailedSection)
+{
+    return QueryVoxelCollisionRange(Module, Bounds, OutFailedSection, true);
 }
 bool UVoxelModuleStatics::FindStandLocation(const UObject*C,FVector Desired,float R,float H,float Search,FVector&O)
 {

@@ -56,6 +56,7 @@ public:
 	bool EnsureNavigationDemand(
 		const FIntVector& InSection);
 	bool IsReady(const FIntVector& InSection) const;
+	bool HasCurrentCollisionFailure(const FIntVector& InSection) const;
 	bool IsReadyEmpty(const FIntVector& InSection) const;
 	bool CaptureCurrentReceipt(const FIntVector& InSection, FVoxelPhysicsReceipt& OutReceipt) const;
 	TSharedPtr<const FVoxelCollisionCoverageSnapshot, ESPMode::ThreadSafe> CaptureSnapshot() const;

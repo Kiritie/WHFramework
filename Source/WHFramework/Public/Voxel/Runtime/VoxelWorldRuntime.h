@@ -109,6 +109,10 @@ public:
 	FVoxelWorldRuntime(const FVoxelWorldRuntime&) = delete;
 	FVoxelWorldRuntime& operator=(const FVoxelWorldRuntime&) = delete;
 
+	// 检查超平坦地基层实际碰撞；启动预检与运行时写入共享同一规则。
+	static bool ValidateSuperflatFoundation(const FVoxelRegistrySnapshot& InRegistry,
+		const FVoxelShapeRegistry& InShapes, const FVoxelBlockState& InState, FString& OutError);
+
 	FVoxelSection* FindSection(const FIntVector& InSection);
 	const FVoxelSection* FindSection(const FIntVector& InSection) const;
 	FVoxelSection* FindOrAllocate(const FIntVector& InSection, uint64 InFrame);
