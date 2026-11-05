@@ -3039,24 +3039,37 @@ bool FVoxelEmergeManager::ResolveOverlay(
 		return false;
 	}
 
+	const auto PublishOverlay = [&](const uint64 InRevision, const TMap<int32, FVoxelBlockState>& InBlocks,
+		const TMap<int32, FVoxelBlockEntityState>& InEntities)
+	{
+		FString Error;
+		if (Runtime.PublishFinal(InKey, InRevision, InBlocks, InEntities, Error)) return true;
+		// 超平坦约束失败不能靠等待恢复；其他发布结果保持既有重试语义。
+		if (Error.StartsWith(TEXT("Voxel.Superflat")))
+		{
+			InSection.Status = EVoxelSectionStatus::Failed;
+			InSection.Error = Error;
+			UE_LOG(LogTemp, Error, TEXT("Voxel overlay publication failed: section=%s error=%s"), *InKey.ToString(), *Error);
+		}
+		return false;
+	};
+
 	bool bKnownNatural = false;
 	if (!Runtime.IsServer())
 	{
 		uint64 Revision = 0;
 		TSharedPtr<const FVoxelOverlaySnapshot, ESPMode::ThreadSafe> Overlay;
 		if (!RemoteOverlayResolver || !RemoteOverlayResolver(InKey, Revision, Overlay)) return false;
-		FString Error;
 		const TMap<int32, FVoxelBlockState> EmptyBlocks;
 		const TMap<int32, FVoxelBlockEntityState> EmptyEntities;
-		return Runtime.PublishFinal(InKey, Revision, Overlay ? Overlay->Blocks : EmptyBlocks,
-			Overlay ? Overlay->Entities : EmptyEntities, Error);
+		return PublishOverlay(Revision, Overlay ? Overlay->Blocks : EmptyBlocks,
+			Overlay ? Overlay->Entities : EmptyEntities);
 	}
 
 	// 已提交 Journal 也包含恢复自然值的 Tombstone；不能从稀疏磁盘索引推导版本为零。
 	if (const auto Overlay = Runtime.FindCommittedOverlay(InKey))
 	{
-		FString Error;
-		return Runtime.PublishFinal(InKey, Overlay->Revision, Overlay->Blocks, Overlay->Entities, Error);
+		return PublishOverlay(Overlay->Revision, Overlay->Blocks, Overlay->Entities);
 	}
 	if (!RegionStore.IsDirectoryReady()) return false;
 
@@ -3069,14 +3082,7 @@ bool FVoxelEmergeManager::ResolveOverlay(
 
 	if (bKnownNatural)
 	{
-		FString Error;
-
-		return Runtime.PublishFinal(
-			InKey,
-			0,
-			{},
-			{},
-			Error);
+		return PublishOverlay(0, {}, {});
 	}
 
 	if (!Runtime.IsServer())

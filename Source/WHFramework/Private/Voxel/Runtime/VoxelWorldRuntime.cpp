@@ -375,7 +375,7 @@ bool FVoxelWorldRuntime::PublishFinal(
 			Entities.Add(Index, MoveTemp(Entity));
 		}
 	}
-	if (!ValidateSection(Candidate, InOverlay, Entities, OutError))
+	if (!ValidateSection(InSection, Candidate, InOverlay, Entities, OutError))
 	{
 		return false;
 	}
@@ -793,7 +793,7 @@ bool FVoxelWorldRuntime::PrepareEdit(
 
 	for (const FVoxelPreparedSection& Section : Prepared.Sections)
 	{
-		if (!ValidateSection(Section.Blocks, Section.Overlay, Section.Entities, OutError))
+		if (!ValidateSection(Section.Patch.Section, Section.Blocks, Section.Overlay, Section.Entities, OutError))
 		{
 			return false;
 		}
@@ -1273,7 +1273,27 @@ bool FVoxelWorldRuntime::ValidateState(const FVoxelBlockState& InState) const
 	return Registry->IsValid(InState);
 }
 
+bool FVoxelWorldRuntime::ValidateTerrainState(const int64 InZ, const FVoxelBlockState& InState, FString& OutError) const
+{
+	if (Generator->GetRuntimeConfig()->TerrainType != EVoxelTerrainType::Superflat)
+	{
+		return true;
+	}
+	if (InZ < VoxelGeneration::SuperflatSurfaceZ && !InState.IsAir())
+	{
+		OutError = TEXT("Voxel.SuperflatUndergroundMustBeEmpty");
+		return false;
+	}
+	if (InZ == VoxelGeneration::SuperflatSurfaceZ && InState.IsAir())
+	{
+		OutError = TEXT("Voxel.SuperflatFoundationUnbreakable");
+		return false;
+	}
+	return true;
+}
+
 bool FVoxelWorldRuntime::ValidateSection(
+	const FIntVector& InSection,
 	const TArray<FVoxelBlockState>& InBlocks,
 	const TMap<int32, FVoxelBlockState>& InOverlay,
 	const TMap<int32, FVoxelBlockEntityState>& InEntities,
@@ -1286,11 +1306,19 @@ bool FVoxelWorldRuntime::ValidateSection(
 	}
 
 	int32 RequiredEntities = 0;
-	for (const FVoxelBlockState& State : InBlocks)
+	const int64 SectionBaseZ = static_cast<int64>(InSection.Z) * RuntimeSectionSide;
+	const bool bCheckTerrain = SectionBaseZ <= VoxelGeneration::SuperflatSurfaceZ &&
+		Generator->GetRuntimeConfig()->TerrainType == EVoxelTerrainType::Superflat;
+	for (int32 Index = 0; Index < InBlocks.Num(); ++Index)
 	{
+		const FVoxelBlockState& State = InBlocks[Index];
 		if (!ValidateState(State))
 		{
 			OutError = TEXT("Voxel section contains an invalid block state");
+			return false;
+		}
+		if (bCheckTerrain && !ValidateTerrainState(SectionBaseZ + Index / (RuntimeSectionSide * RuntimeSectionSide), State, OutError))
+		{
 			return false;
 		}
 		RequiredEntities += Registry->Find(State.TypeId)->EntityKind != 0 ? 1 : 0;
@@ -1431,7 +1459,7 @@ bool FVoxelWorldRuntime::BuildPatchCandidate(
 		}
 	}
 
-	return ValidateSection(OutBlocks, OutOverlay, OutEntities, OutError);
+	return ValidateSection(InPatch.Section, OutBlocks, OutOverlay, OutEntities, OutError);
 }
 
 void FVoxelWorldRuntime::PublishPatchCandidate(
@@ -1659,11 +1687,18 @@ bool FVoxelWorldRuntime::PrepareInventorySections(TConstArrayView<FVoxelInventor
             OutError = TEXT("Inventory.VoxelSectionBounds");
             return Fail();
         }
+        const int64 SectionBaseZ = static_cast<int64>(After.Section.Z) * RuntimeSectionSide;
+        const bool bCheckTerrain = SectionBaseZ <= VoxelGeneration::SuperflatSurfaceZ &&
+            Generator->GetRuntimeConfig()->TerrainType == EVoxelTerrainType::Superflat;
         for(const auto& Cell : After.Blocks)
         {
             if(Cell.Key < 0 || Cell.Key >= SectionVolume || !ValidateState(Cell.Value))
             {
                 OutError = TEXT("Inventory.VoxelCellInvalid");
+                return Fail();
+            }
+            if(bCheckTerrain && !ValidateTerrainState(SectionBaseZ + Cell.Key / (RuntimeSectionSide * RuntimeSectionSide), Cell.Value, OutError))
+            {
                 return Fail();
             }
         }
@@ -1726,7 +1761,7 @@ bool FVoxelWorldRuntime::PrepareInventorySections(TConstArrayView<FVoxelInventor
             {
                 Prepared.Data.Blocks[Cell.Key] = Cell.Value;
             }
-            if(!ValidateSection(Prepared.Data.Blocks, Prepared.Data.Overlay, Prepared.Data.Entities, OutError))
+            if(!ValidateSection(After.Section, Prepared.Data.Blocks, Prepared.Data.Overlay, Prepared.Data.Entities, OutError))
             {
                 return Fail();
             }

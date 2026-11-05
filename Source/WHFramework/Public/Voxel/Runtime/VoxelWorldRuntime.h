@@ -197,7 +197,9 @@ private:
 	friend class FVoxelResidencyManager;
 	void NotifySectionEvent(const FIntVector& InSection, EVoxelRuntimeSectionEvent InEvent);
 	bool ValidateState(const FVoxelBlockState& InState) const;
+	bool ValidateTerrainState(int64 InZ, const FVoxelBlockState& InState, FString& OutError) const;
 	bool ValidateSection(
+		const FIntVector& InSection,
 		const TArray<FVoxelBlockState>& InBlocks,
 		const TMap<int32, FVoxelBlockState>& InOverlay,
 		const TMap<int32, FVoxelBlockEntityState>& InEntities,

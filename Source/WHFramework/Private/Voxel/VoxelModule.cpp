@@ -4847,15 +4847,6 @@ bool UVoxelModule::ExecuteInventoryWorldEdit(FVoxelInteractionPlan& InOutPlan, A
     {
         return false;
     }
-	if (Manifest.TerrainType == EVoxelTerrainType::Superflat && InOutPlan.Cells.ContainsByPredicate(
-		[](const FVoxelCellEdit& InEdit)
-		{
-			return InEdit.Position.Z == VoxelGeneration::SuperflatSurfaceZ && !InEdit.Expected.IsAir() && InEdit.Value.IsAir();
-		}))
-	{
-		OutError = TEXT("Voxel.SuperflatFoundationUnbreakable");
-		return false;
-	}
     if(PlacementOverlapsActors(InOutPlan) ||
         !InventoryBridge->AppendEdit(InOutPlan.Cells, InOutPlan.Entities, InOutRequest.DomainChanges, OutError))
     {
