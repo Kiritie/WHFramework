@@ -1,8 +1,8 @@
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
+#include "Ability/AbilityHandleTypes.h"
 
 #include "GameplayEffectExtension.h"
 #include "Net/UnrealNetwork.h"
-#include "Ability/AbilityModuleTypes.h"
 #include "ReferencePool/ReferencePoolModuleStatics.h"
 
 UVitalityAttributeSetBase::UVitalityAttributeSetBase()

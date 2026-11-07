@@ -1,4 +1,5 @@
 #include "Event/Manager/EventManagerBase.h"
+#include "Common/LifecycleTypes.h"
 
 UEventManagerBase::UEventManagerBase()
 {

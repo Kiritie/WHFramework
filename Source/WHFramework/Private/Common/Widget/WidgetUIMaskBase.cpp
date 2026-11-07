@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Common/Widget/WidgetUIMaskBase.h"
+#include "Widget/ScreenWidgetTypes.h"
 
 UWidgetUIMaskBase::UWidgetUIMaskBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Ability/AbilityInfoTypes.h"
 #include "Ability/Actor/AbilityActorInterface.h"
 
 #include "AbilityVitalityInterface.generated.h"

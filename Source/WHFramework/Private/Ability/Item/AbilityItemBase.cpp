@@ -1,8 +1,8 @@
 #include "Ability/Item/AbilityItemBase.h"
+#include "Ability/AbilityItemTypes.h"
 
-#include "Ability/AbilityModuleTypes.h"
 #include "Ability/Inventory/InventoryItemAssetCatalog.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Engine/World.h"
 
 AAbilityItemBase::AAbilityItemBase()
@@ -30,7 +30,7 @@ void AAbilityItemBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 
 bool AAbilityItemBase::InitializeProjection(const FPrimaryAssetId& InItemId, int32 InLevel, AActor* InAvatar)
 {
-    const UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+    const UInventoryModule* Subsystem = GetWorld() ? UInventoryModule::GetPtr(GetWorld()) : nullptr;
     const FInventoryItemDefinition* Definition = Subsystem ? Subsystem->GetRegistry().Find(InItemId) : nullptr;
     if (!Definition || InLevel < 0 || InLevel > Definition->MaxLevel ||
         !Subsystem->GetItemAssets() || !Subsystem->GetItemAssets()->Find(InItemId) ||
@@ -47,7 +47,7 @@ bool AAbilityItemBase::InitializeProjection(const FPrimaryAssetId& InItemId, int
 
 const UAbilityItemDataBase* AAbilityItemBase::GetItemDefinition() const
 {
-    const UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+    const UInventoryModule* Subsystem = GetWorld() ? UInventoryModule::GetPtr(GetWorld()) : nullptr;
     const UInventoryItemAssetCatalog* Catalog = Subsystem ? Subsystem->GetItemAssets() : nullptr;
     return Catalog ? Catalog->Find(ItemId) : nullptr;
 }

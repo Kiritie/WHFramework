@@ -1,13 +1,17 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Animation/AnimationModule.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Common/LifecycleTypes.h"
 
-#include "DelayAction.h"
+#include "Animation/AnimationRequest.h"
+#include "Animation/TransitionAction.h"
 #include "Animation/Widget/WidgetTransitionMaskBase.h"
-#include "Common/CommonModuleStatics.h"
 #include "Engine/LatentActionManager.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "Main/MainModule.h"
-#include "Widget/WidgetModuleStatics.h"
+#include "Widget/WidgetModule.h"
 
 IMPLEMENTATION_MODULE(UAnimationModule)
 
@@ -21,7 +25,6 @@ UAnimationModule::UAnimationModule()
 
 UAnimationModule::~UAnimationModule()
 {
-	TERMINATION_MODULE(UAnimationModule)
 }
 
 #if WITH_EDITOR
@@ -34,13 +37,13 @@ void UAnimationModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UAnimationModule)
 }
 #endif
 
 void UAnimationModule::OnInitialize()
 {
 	Super::OnInitialize();
+	bAcceptingRequests = true;
 }
 
 void UAnimationModule::OnPreparatory(EPhase InPhase)
@@ -65,70 +68,120 @@ void UAnimationModule::OnUnPause()
 
 void UAnimationModule::OnTermination(EPhase InPhase)
 {
+	if (PHASEC(InPhase, EPhase::Final))
+	{
+		bAcceptingRequests = false;
+		TArray<FGuid> Ids;
+		Requests.GetKeys(Ids);
+		TArray<FGuid> PendingIds;
+		PendingDispatch.GetKeys(PendingIds);
+		Ids.Append(PendingIds);
+		for (const FGuid& Id : Ids) CancelRequest(Id);
+	}
 	Super::OnTermination(InPhase);
 }
 
 void UAnimationModule::CancelableDelay(float Duration, ECancelableDelayAction::Type CancelableDelayAction, const FLatentActionInfo& LatentInfo)
 {
-	FLatentActionManager& LatentActionManager = GetWorld()->GetLatentActionManager();
-	if (LatentActionManager.FindExistingAction<FCancelableDelayAction>(LatentInfo.CallbackTarget, LatentInfo.UUID) == NULL)
+	UWorld* World = GetWorld();
+	if (!bAcceptingRequests || !World || World->bIsTearingDown || !::IsValid(LatentInfo.CallbackTarget)) return;
+	if (CancelableDelayAction == ECancelableDelayAction::None && (!FMath::IsFinite(Duration) || Duration < 0.f)) return;
+	if (UWorld* OwnerWorld = LatentInfo.CallbackTarget->GetWorld(); OwnerWorld && OwnerWorld != World) return;
+	BlueprintDelays.RemoveAll([this](const FBlueprintDelay& Entry)
 	{
-		if(CancelableDelayAction == ECancelableDelayAction::None)
+		return !Entry.Target.IsValid() || (!Requests.Contains(Entry.RequestId) && !PendingDispatch.Contains(Entry.RequestId));
+	});
+	const FBlueprintDelay* Existing = BlueprintDelays.FindByPredicate([&LatentInfo](const FBlueprintDelay& Entry)
+	{
+		return Entry.Target.Get() == LatentInfo.CallbackTarget && Entry.UUID == LatentInfo.UUID;
+	});
+	if (Existing)
+	{
+		const FGuid ExistingId = Existing->RequestId;
+		if (CancelableDelayAction == ECancelableDelayAction::Cancel) CancelRequest(ExistingId);
+		return;
+	}
+	if (CancelableDelayAction != ECancelableDelayAction::None) return;
+	const TWeakObjectPtr<UObject> Target = LatentInfo.CallbackTarget;
+	const FName FunctionName = LatentInfo.ExecutionFunction;
+	const int32 Linkage = LatentInfo.Linkage;
+	const FGuid Id = ExecuteWithDelay(LatentInfo.CallbackTarget, Duration, [Target, FunctionName, Linkage]()
+	{
+		if (UObject* Object = Target.Get())
 		{
-			LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, new FCancelableDelayAction(Duration, LatentInfo));
+			if (UFunction* Function = Object->FindFunction(FunctionName))
+			{
+				int32 ResumeLinkage = Linkage;
+				Object->ProcessEvent(Function, &ResumeLinkage);
+			}
 		}
-	}
-	else
+	});
+	if (Id.IsValid()) BlueprintDelays.Add({ Target, LatentInfo.UUID, Id });
+}
+
+FGuid UAnimationModule::ExecuteWithDelay(UObject* InOwner, float InDuration, TFunction<void()> InFinish, TFunction<void()> InCancel)
+{
+	return StartRequest(InOwner, InDuration, nullptr, MoveTemp(InFinish), MoveTemp(InCancel));
+}
+
+FGuid UAnimationModule::ExecuteWithTransition(APlayerController* InPlayer, UObject* InOwner, float InDuration, TFunction<void()> InFinish, TFunction<void()> InCancel)
+{
+	if (!::IsValid(InPlayer) || !InPlayer->IsLocalController() || InPlayer->GetWorld() != GetWorld()) return {};
+	return StartRequest(InOwner, InDuration, InPlayer, MoveTemp(InFinish), MoveTemp(InCancel));
+}
+
+FGuid UAnimationModule::StartRequest(UObject* InOwner, float InDuration, APlayerController* InTransitionPlayer, TFunction<void()> InFinish, TFunction<void()> InCancel)
+{
+	UWorld* World = GetWorld();
+	if (!bAcceptingRequests || !World || World->bIsTearingDown || !::IsValid(InOwner) ||
+		!FMath::IsFinite(InDuration) || InDuration < 0.f || NextLatentId == MAX_int32) return {};
+	if (UWorld* OwnerWorld = InOwner->GetWorld(); OwnerWorld && OwnerWorld != World) return {};
+	const FGuid Id = FGuid::NewGuid();
+	UAnimationRequest* Request = NewObject<UAnimationRequest>(this);
+	Request->Initialize(*this, *World, *InOwner, Id, MoveTemp(InFinish), MoveTemp(InCancel));
+	Requests.Add(Id, Request);
+	FLatentActionInfo Info;
+	Info.UUID = NextLatentId++;
+	Info.Linkage = 0;
+	Info.CallbackTarget = Request;
+	Info.ExecutionFunction = GET_FUNCTION_NAME_CHECKED(UAnimationRequest, Complete);
+	World->GetLatentActionManager().AddNewAction(Request, Info.UUID,
+		new FTransitionAction(InTransitionPlayer ? InDuration * .5f : InDuration, Info, InOwner));
+	if (InTransitionPlayer)
 	{
-		if(CancelableDelayAction == ECancelableDelayAction::Cancel)
-		{
-			LatentActionManager.FindExistingAction<FCancelableDelayAction>(LatentInfo.CallbackTarget, LatentInfo.UUID)->bExecute = false;
-		}
+		if (UWidgetModule* Widgets = UWidgetModule::GetPtr(World))
+			Widgets->OpenUserWidget<UWidgetTransitionMaskBase>(InTransitionPlayer, FTransitionMaskWidgetOpenParameter(InDuration));
 	}
+	return Requests.Contains(Id) ? Id : FGuid();
 }
 
-void UAnimationModule::ExecuteWithDelay(float Duration, TFunction<void()> OnFinish)
+bool UAnimationModule::CancelRequest(const FGuid& InRequestId)
 {
-	_OnExecuteWithDelayFinish = OnFinish;
-	FLatentActionManager& LatentActionManager = GetWorld()->GetLatentActionManager();
-	FLatentActionInfo LatentInfo;
-	LatentInfo.UUID = 0;
-	LatentInfo.Linkage = 0;
-	LatentInfo.CallbackTarget = this;
-	LatentInfo.ExecutionFunction = GET_FUNCTION_NAME_THISCLASS(OnExecuteWithDelayFinish);
-	LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, new FDelayAction(Duration, LatentInfo));
+	TObjectPtr<UAnimationRequest>* Found = Requests.Find(InRequestId);
+	if (!Found) Found = PendingDispatch.Find(InRequestId);
+	if (!Found || !::IsValid(*Found)) return false;
+	UAnimationRequest* Request = Found->Get();
+	if (UWorld* World = GetWorld()) World->GetLatentActionManager().RemoveActionsForObject(Request);
+	Request->Cancel();
+	return true;
 }
 
-void UAnimationModule::ExecuteWithTransition(float Duration, TFunction<void()> OnFinish)
+void UAnimationModule::FinishRequest(const FGuid& InRequestId, UAnimationRequest* InRequest)
 {
-	_OnExecuteWithTransitionFinish = OnFinish;
-	FLatentActionManager& LatentActionManager = GetWorld()->GetLatentActionManager();
-	FLatentActionInfo LatentInfo;
-	LatentInfo.UUID = 0;
-	LatentInfo.Linkage = 0;
-	LatentInfo.CallbackTarget = this;
-	LatentInfo.ExecutionFunction = GET_FUNCTION_NAME_THISCLASS(OnExecuteWithTransitionFinish);
-	LatentActionManager.AddNewAction(LatentInfo.CallbackTarget, LatentInfo.UUID, new FTransitionAction(Duration / 2.f, LatentInfo));
-
-	UWidgetModuleStatics::OpenUserWidget<UWidgetTransitionMaskBase>(
-		FTransitionMaskWidgetOpenParameter(Duration));
+	BlueprintDelays.RemoveAll([&InRequestId](const FBlueprintDelay& Entry) { return Entry.RequestId == InRequestId; });
+	if (TObjectPtr<UAnimationRequest>* Found = Requests.Find(InRequestId); Found && Found->Get() == InRequest)
+		Requests.Remove(InRequestId);
+	if (TObjectPtr<UAnimationRequest>* Found = PendingDispatch.Find(InRequestId); Found && Found->Get() == InRequest)
+		PendingDispatch.Remove(InRequestId);
 }
 
-void UAnimationModule::OnExecuteWithDelayFinish()
+bool UAnimationModule::QueueRequestCompletion(const FGuid& InRequestId, UAnimationRequest* InRequest)
 {
-	if(_OnExecuteWithDelayFinish)
-	{
-		_OnExecuteWithDelayFinish();
-	}
+	TObjectPtr<UAnimationRequest>* Found = Requests.Find(InRequestId);
+	if (!bAcceptingRequests || !Found || Found->Get() != InRequest || PendingDispatch.Contains(InRequestId)) return false;
+	PendingDispatch.Add(InRequestId, InRequest);
+	Requests.Remove(InRequestId);
+	return true;
 }
-
-void UAnimationModule::OnExecuteWithTransitionFinish()
-{
-	if(_OnExecuteWithTransitionFinish)
-	{
-		_OnExecuteWithTransitionFinish();
-	}
-}
-
 
 

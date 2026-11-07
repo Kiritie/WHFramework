@@ -2,6 +2,7 @@
 
 
 #include "Ability/Hitter/AbilityHitterComponentBase.h"
+#include "Ability/AbilityTags.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Abilities/AbilityBase.h"

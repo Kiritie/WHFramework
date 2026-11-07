@@ -1,4 +1,5 @@
 #include "Common/Interaction/InteractionConditionBase.h"
+#include "Common/InteractionTypes.h"
 
 #include "Components/ActorComponent.h"
 #include "GameFramework/Actor.h"

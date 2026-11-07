@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Ability/AbilityInfoTypes.h"
 #include "Ability/Actor/AbilityActorDataBase.h"
 
 #include "AbilityVitalityDataBase.generated.h"

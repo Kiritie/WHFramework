@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Task/TaskReferenceTypes.h"
 #include "CoreMinimal.h"
 #include "Asset/Base/AssetBase.h"
 #include "Task/TaskModuleTypes.h"

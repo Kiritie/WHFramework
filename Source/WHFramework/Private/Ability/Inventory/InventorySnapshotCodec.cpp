@@ -1,4 +1,6 @@
 #include "Ability/Inventory/InventorySnapshotCodec.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 
 #include "Ability/Inventory/InventoryBinaryArchive.h"
 #include "Misc/Crc.h"

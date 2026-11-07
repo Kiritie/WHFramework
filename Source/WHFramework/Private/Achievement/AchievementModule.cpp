@@ -1,9 +1,14 @@
 // Copyright 2021 Sam Carey. All Rights Reserved.
 
 #include "Achievement/AchievementModule.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Common/LifecycleTypes.h"
 
 #include "Achievement/Widget/WidgetAchievement.h"
 #include "Achievement/Widget/WidgetAchievementHUD.h"
+#include "Engine/GameInstance.h"
+#include "Engine/LocalPlayer.h"
+#include "Engine/World.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Widget/WidgetModuleStatics.h"
@@ -37,7 +42,6 @@ UAchievementModule::UAchievementModule()
 
 UAchievementModule::~UAchievementModule()
 {
-	TERMINATION_MODULE(UAchievementModule)
 }
 
 #if WITH_EDITOR
@@ -50,7 +54,6 @@ void UAchievementModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UAchievementModule)
 }
 #endif
 
@@ -231,30 +234,34 @@ void UAchievementModule::DisplayProgress(FAchievementData InAchievement, int32 I
 	{
 		if (!InAchievement.Spoiler || States[InIndex].Achieved)
 		{
-			if (UWidgetAchievementHUD* HUD = UWidgetModuleStatics::GetUserWidget<UWidgetAchievementHUD>())
+			UWorld* World = GetWorld();
+			UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+			TArray<TWeakObjectPtr<UWidgetAchievementHUD>> HeadsUpDisplays;
+			if (GameInstance) for (ULocalPlayer* LocalPlayer : GameInstance->GetLocalPlayers())
 			{
-				if (InAchievement.Progress && States[InIndex].Progress < InAchievement.ProgressGoal)
+				APlayerController* Player = LocalPlayer ? LocalPlayer->GetPlayerController(World) : nullptr;
+				if (UWidgetAchievementHUD* HUD = UWidgetModuleStatics::GetUserWidget<UWidgetAchievementHUD>(Player))
+					HeadsUpDisplays.Add(HUD);
+			}
+			if (HeadsUpDisplays.IsEmpty()) return;
+			bool bDisplay = !InAchievement.Progress || States[InIndex].Progress >= InAchievement.ProgressGoal;
+			if (!bDisplay && InAchievement.NotificationFrequency > 0)
+			{
+				const int32 Steps = (int32)InAchievement.ProgressGoal / (int32)InAchievement.NotificationFrequency;
+				for (int32 i = Steps; i > States[InIndex].LastProgressUpdate; --i)
 				{
-					if(InAchievement.NotificationFrequency > 0)
+					if (States[InIndex].Progress >= InAchievement.NotificationFrequency * i)
 					{
-						int32 Steps = (int32)InAchievement.ProgressGoal / (int32)InAchievement.NotificationFrequency;
-
-						//Loop from biggest notification bracket to the smallest
-						for (int32 i = Steps; i > States[InIndex].LastProgressUpdate; i--)
-						{
-							if (States[InIndex].Progress >= InAchievement.NotificationFrequency * i)
-							{
-								States[InIndex].LastProgressUpdate = i;
-								HUD->ScheduleAchievementDisplay(InAchievement, States[InIndex]);
-								return;
-							}
-						}
+						States[InIndex].LastProgressUpdate = i;
+						bDisplay = true;
+						break;
 					}
 				}
-				else
-				{
-					HUD->ScheduleAchievementDisplay(InAchievement, States[InIndex]);
-				}
+			}
+			if (bDisplay)
+			{
+				for (const TWeakObjectPtr<UWidgetAchievementHUD>& HUD : HeadsUpDisplays)
+					if (HUD.IsValid()) HUD->ScheduleAchievementDisplay(InAchievement, States[InIndex]);
 			}
 		}
 	}

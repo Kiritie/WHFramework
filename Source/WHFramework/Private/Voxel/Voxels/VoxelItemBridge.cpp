@@ -1,4 +1,5 @@
 #include "Voxel/Voxels/VoxelItemBridge.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 
 bool FVoxelItemBridge::ToItem(const FVoxelRegistrySnapshot& Registry, FVoxelBlockState State, int32 Count, FVoxelItem& Out)
 {

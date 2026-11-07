@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "AssetBase.generated.h"
 
 /**
@@ -24,17 +24,18 @@ public:
 
 	virtual void Initialize();
 
-	virtual UAssetBase* Duplicate()
+	virtual UAssetBase* Duplicate(UObject* InOwner)
 	{
-		UAssetBase* Asset = DuplicateObject<UAssetBase>(this, GetMutableWorldContext());
+		if (!InOwner) return nullptr;
+		UAssetBase* Asset = DuplicateObject<UAssetBase>(this, InOwner);
 		Asset->SourceObject = this;
 		return Asset;
 	}
 
 	template<class T>
-	T* Duplicate()
+	T* Duplicate(UObject* InOwner)
 	{
-		return Cast<T>(Duplicate());
+		return Cast<T>(Duplicate(InOwner));
 	}
 
 	//////////////////////////////////////////////////////////////////////////

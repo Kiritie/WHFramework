@@ -1,11 +1,12 @@
 #pragma once
 
+#include "Ability/Inventory/InventorySnapshotTypes.h"
+#include "Ability/Inventory/InventoryQueryTypes.h"
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
-#include "Ability/Inventory/InventoryTypes.h"
 #include "AbilityInventoryBase.generated.h"
 
-class UInventoryWorldSubsystem;
+class UInventoryModule;
 class FInventoryCommitCoordinator;
 
 UCLASS(BlueprintType)
@@ -27,8 +28,8 @@ public:
 
 private:
     FInventoryState State;
-    TWeakObjectPtr<UInventoryWorldSubsystem> OwnerSubsystem;
+    TWeakObjectPtr<UInventoryModule> OwnerModule;
 
-    friend class UInventoryWorldSubsystem;
+    friend class UInventoryModule;
     friend class FInventoryCommitCoordinator;
 };

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Ability/Inventory/InventoryTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 #include "UObject/Interface.h"
 #include "AbilityInventoryAgentInterface.generated.h"
 

@@ -1,4 +1,5 @@
 #include "Task/Graph/TaskGraphOperations.h"
+#include "Task/TaskReferenceTypes.h"
 
 #include "Task/Base/TaskAsset.h"
 #include "Task/Base/TaskBase.h"

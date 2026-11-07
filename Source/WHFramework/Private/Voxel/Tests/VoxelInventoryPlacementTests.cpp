@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "Ability/Inventory/InventoryItemAssetCatalog.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
 #include "Voxel/WorldObject/VoxelWorldObjectDefinition.h"

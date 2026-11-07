@@ -1,3 +1,4 @@
+#include "Common/LifecycleTypes.h"
 #include "Step/Tests/StepGraphTestTypes.h"
 
 #include "Step/Base/StepAsset.h"

@@ -29,19 +29,21 @@ void UWidgetAchievementHUD::OnInitialize(const FParameter& InParams)
 void UWidgetAchievementHUD::OnOpen(const FParameter& InParams, bool bInstant)
 {
 	Super::OnOpen(InParams, bInstant);
+	const UAchievementModule* Module = UAchievementModule::GetPtr(GetWorld());
+	if (!Module) return;
 
 	SpawnAnchors = FAnchors(
-		UAchievementModule::Get().IsRightOfScreen() ? 1 : 0,
-		UAchievementModule::Get().IsBottomOfScreen() ? 1 : 0
+		Module->IsRightOfScreen() ? 1 : 0,
+		Module->IsBottomOfScreen() ? 1 : 0
 	);
 
-	if(UAchievementModule::Get().UnlockSound.IsValid())
+	if(Module->UnlockSound.IsValid())
 	{
-		UnlockSound_Loaded = Cast<USoundBase>(UAchievementModule::Get().UnlockSound.TryLoad());
+		UnlockSound_Loaded = Cast<USoundBase>(Module->UnlockSound.TryLoad());
 	}
-	if(UAchievementModule::Get().ProgressMadeSound.IsValid())
+	if(Module->ProgressMadeSound.IsValid())
 	{
-		ProgressMadeSound_Loaded = Cast<USoundBase>(UAchievementModule::Get().ProgressMadeSound.TryLoad());
+		ProgressMadeSound_Loaded = Cast<USoundBase>(Module->ProgressMadeSound.TryLoad());
 	}
 }
 
@@ -53,8 +55,10 @@ void UWidgetAchievementHUD::OnClose(bool bInstant)
 void UWidgetAchievementHUD::OnRefresh()
 {
 	Super::OnRefresh();
+	const UAchievementModule* Module = UAchievementModule::GetPtr(GetWorld());
+	if (!Module) return;
 
-	if (Active.Num() < UAchievementModule::Get().TotalOnScreen && !MovingUp)
+	if (Active.Num() < Module->TotalOnScreen && !MovingUp)
 	{
 		if (BackLog.Num() > 0)
 		{
@@ -66,16 +70,16 @@ void UWidgetAchievementHUD::OnRefresh()
 	{
 		if (MovingUp)
 		{
-			CurrentTime += UCommonModuleStatics::GetDeltaSeconds();
+			CurrentTime += GetWorld()->GetDeltaSeconds();
 			for (UWidgetAchievement* i : Active)
 			{
 				UCanvasPanelSlot* CSlot = Cast<UCanvasPanelSlot>(i->Slot);
 				CSlot->SetPosition(FVector2D(
 					CSlot->GetPosition().X,
-					UKismetMathLibrary::MapRangeClamped(CurrentTime, 0, UAchievementModule::Get().EntranceAnimationLength, i->StartHeight, i->StartHeight + (UAchievementModule::Get().IsBottomOfScreen() ? -Size.Y : Size.Y))
+					UKismetMathLibrary::MapRangeClamped(CurrentTime, 0, Module->EntranceAnimationLength, i->StartHeight, i->StartHeight + (Module->IsBottomOfScreen() ? -Size.Y : Size.Y))
 				));
 			}
-			if (CurrentTime >= UAchievementModule::Get().EntranceAnimationLength)
+			if (CurrentTime >= Module->EntranceAnimationLength)
 			{
 				MovingUp = false;
 				CurrentTime = 0;
@@ -95,7 +99,9 @@ void UWidgetAchievementHUD::OnDestroy(EObjectDespawnMode InMode)
 
 void UWidgetAchievementHUD::ScheduleAchievementDisplay(FAchievementData Achievement, FAchievementStates State)
 {
-	if(Active.Num() < UAchievementModule::Get().TotalOnScreen && !MovingUp)
+	const UAchievementModule* Module = UAchievementModule::GetPtr(GetWorld());
+	if (!Module) return;
+	if(Active.Num() < Module->TotalOnScreen && !MovingUp)
 	{
 		Spawn(Achievement, State);
 	}
@@ -110,16 +116,13 @@ void UWidgetAchievementHUD::ScheduleAchievementDisplay(FAchievementData Achievem
 
 void UWidgetAchievementHUD::Spawn(FAchievementData Achievement, FAchievementStates State)
 {
+	const UAchievementModule* Module = UAchievementModule::GetPtr(GetWorld());
+	APlayerController* Player = GetOwningPlayer();
+	if (!Module || !Player) return;
 	if(!IsInViewport())
 	{
-		AddToViewport();
+		AddToPlayerScreen();
 	}
-	
-	//USoundBase * Sound = Cast<USoundBase>((State.Achieved ? UAchievementModule::Get().UnlockSound : UAchievementModule::Get().ProgressMadeSound).TryLoad());
-	//if(IsValid(Sound))
-	//{
-	//	UGameplayStatics::PlaySound2D(GetWorld(), Cast<USoundBase>(Sound));
-	//}
 	
 	USoundBase * Sound = State.Achieved ? UnlockSound_Loaded : ProgressMadeSound_Loaded;
 	if(IsValid(Sound))
@@ -127,22 +130,23 @@ void UWidgetAchievementHUD::Spawn(FAchievementData Achievement, FAchievementStat
 		UGameplayStatics::PlaySound2D(GetWorld(), Sound);
 	}
 	
-	UWidgetAchievement *Temp = CreateWidget<UWidgetAchievement>(UGameplayStatics::GetPlayerController(GetWorld(), 0), UAchievementModule::Get().AchievementWidgetClass);
-	Temp->SetValue(Achievement, State, UAchievementModule::Get().bShowExactProgress);
+	UWidgetAchievement *Temp = CreateWidget<UWidgetAchievement>(Player, Module->AchievementWidgetClass);
+	if (!Temp) return;
+	Temp->SetValue(Achievement, State, Module->bShowExactProgress);
 	Active.Add(Temp);
 	UCanvasPanelSlot *CSlot = Canvas->AddChildToCanvas(Temp);
 	
 	Size = FVector2D(Temp->Root->GetWidthOverride(), Temp->Root->GetHeightOverride());
 	SpawnLocation = FVector2D(
-		UAchievementModule::Get().IsRightOfScreen() ? -Size.X : 0,
-		UAchievementModule::Get().IsBottomOfScreen() ? 0 : -Size.Y
+		Module->IsRightOfScreen() ? -Size.X : 0,
+		Module->IsBottomOfScreen() ? 0 : -Size.Y
 	);
 	
 	CSlot->SetSize(Size);
 	CSlot->SetAnchors(SpawnAnchors);
 	CSlot->SetPosition(SpawnLocation);
 	Temp->OnDeath.AddDynamic(this, &UWidgetAchievementHUD::OnAchievementDeath);
-	Temp->StartDeathTimer(UAchievementModule::Get().ExitAnimationLength, UAchievementModule::Get().ScreenTime, UAchievementModule::Get().ExitAnimation, UAchievementModule::Get().IsRightOfScreen());
+	Temp->StartDeathTimer(Module->ExitAnimationLength, Module->ScreenTime, Module->ExitAnimation, Module->IsRightOfScreen());
 	Temp->StartHeight = SpawnLocation.Y;
 	MovingUp = true;
 }

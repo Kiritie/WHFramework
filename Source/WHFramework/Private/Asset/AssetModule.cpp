@@ -2,6 +2,8 @@
 
 
 #include "Asset/AssetModule.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Common/LifecycleTypes.h"
 
 #include "Asset/AssetManagerBase.h"
 #include "Asset/AssetModuleTypes.h"
@@ -21,7 +23,6 @@ UAssetModule::UAssetModule()
 
 UAssetModule::~UAssetModule()
 {
-	TERMINATION_MODULE(UAssetModule)
 }
 
 #if WITH_EDITOR
@@ -34,7 +35,6 @@ void UAssetModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UAssetModule)
 }
 #endif
 
@@ -102,7 +102,14 @@ void UAssetModule::OnTermination(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		UAssetManagerBase::Get().ReleaseRuntimeData();
+		// These caches belong to this World module. Primary assets are owned by
+		// the engine asset manager and may still be in use by another World.
+		ClassMappings.Empty();
+		ObjectMappings.Empty();
+		DataAssetMap.Empty();
+		DataTableMap.Empty();
+		for (auto& Entry : StaticClasses) Entry.Value.LoadedClass = nullptr;
+		for (auto& Entry : StaticObjects) Entry.Value.LoadedObject = nullptr;
 	}
 }
 

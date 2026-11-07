@@ -1,4 +1,6 @@
 ﻿#include "CoreMinimal.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 

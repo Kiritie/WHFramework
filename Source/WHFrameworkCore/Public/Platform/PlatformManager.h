@@ -1,6 +1,7 @@
 
 #pragma once
 #include "IPlatformManager.h"
+#include "Type/NativeTypeIdentity.h"
 // #include "SceneTypes.h"
 #include "WHFrameworkCoreTypes.h"
 #include "Main/MainTypes.h"

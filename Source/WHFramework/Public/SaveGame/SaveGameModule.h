@@ -1,5 +1,10 @@
-﻿#pragma once
+#pragma once
 
+#include "SaveGame/SaveOperationTypes.h"
+#include "SaveGame/SaveSlotTypes.h"
+#include "SaveGame/SaveManifestTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "Main/Base/ModuleBase.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "SaveGame/SaveGameLoadSnapshot.h"
@@ -37,6 +42,12 @@ public:
 	FString GetStorageRoot() const;
 	FString GetUnboundInventoryRoot() const;
 
+protected:
+	void RequireWorldStoreParticipant(FName InName);
+	void RequireWorldLoadGuard(FName InName);
+
+public:
+
 	UFUNCTION(BlueprintPure, Category = "SaveGame|Session")
 	bool IsTransientSession() const
 	{
@@ -55,9 +66,13 @@ public:
 	virtual void OnInitialize() override;
 	virtual void OnPreparatory(EPhase InPhase) override;
 	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
+	virtual void OnControlRefresh(float RealDeltaSeconds) override;
 	virtual void OnTermination(EPhase InPhase) override;
+	virtual void PrepareForHostTermination() override;
 
 protected:
+	virtual void OnSaveTerminationComplete() { }
+
 	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
 	virtual FParameter ToData() override;
 
@@ -83,16 +98,17 @@ public:
 	FSaveOperationResult GetWorldSaveResult(const FGuid& InOperationId) const;
 	void AdvanceWorldSaveCapture(UVoxelModule& InVoxel);
 	bool HasWorldSaveWork(const UVoxelModule& InVoxel) const;
-	bool RequestUserQuit(uint8 InQuitPreference, bool bInIgnorePlatformRestrictions);
+	bool RequestUserQuit(APlayerController* InPlayer, uint8 InQuitPreference, bool bInIgnorePlatformRestrictions);
 
 	UPROPERTY(BlueprintAssignable)
 	FWorldSaveFinished OnWorldSaveFinished;
 
-	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
-	void BeginPendingSaveSlot(const FCreateSaveSlotParams& Params);
-
-	UFUNCTION(BlueprintCallable, Category = "SaveGame|World")
-	void CancelPendingSaveSlot();
+	FGuid BeginPendingSaveSlot(const FCreateSaveSlotParams& Params);
+	bool CancelPendingSaveSlot(const FGuid& InToken);
+	bool IsPendingSaveSlot(const FGuid& InToken) const;
+	FSaveOperationResult SavePendingSlot(const FGuid& InToken);
+	FSaveOperationResult GetPendingSlotResult(const FGuid& InToken) const;
+	bool ConsumePendingSlotResult(const FGuid& InToken, FSaveOperationResult& OutResult);
 
 	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
 	bool HasPendingSaveSlot() const
@@ -139,6 +155,12 @@ public:
 		return bSaveOperationRunning || bApplyingSaveCallbacks || !AsyncCreatedSlotCleanup.IsCompleted();
 	}
 
+	// Native cleanup of an already cancelled temporary slot does not retain World suspension.
+	bool IsWorldSaveTransactionRunning() const
+	{
+		return (bSaveOperationRunning && !bApplyingWorldLoad) || bSaveTerminationRunning;
+	}
+
 	UFUNCTION(BlueprintPure, Category = "SaveGame|World")
 	FGuid GetActiveSaveId() const
 	{
@@ -171,7 +193,7 @@ private:
 	void AdvanceAsyncSaveCapture(FVoxelTerrainFrameContext* InFrame = nullptr);
 	bool AdvanceModuleFileCapture(FString& OutError, bool& bOutCapacityBlocked);
 	void ResetModuleFileCapture();
-	void FlushDeferredSaveTermination();
+	bool CancelPendingSaveSlotForCleanup(const FGuid& InToken);
 	void CompleteAsyncSave(const FSaveOperationResult& Result);
 	void AdvanceAsyncSaveCompletion(FVoxelTerrainFrameContext* InFrame = nullptr, bool bForce = false);
 	void FinalizeAsyncSave();
@@ -210,6 +232,11 @@ private:
 	UPROPERTY(Transient)
 	FCreateSaveSlotParams PendingSaveSlotParams;
 
+	FGuid PendingSaveSlotToken;
+	FGuid AsyncPendingSaveSlotToken;
+	TMap<FGuid, FSaveOperationResult> PendingSlotResults;
+	bool bPendingSlotAdoptionInProgress = false;
+
 	FSaveGameLoadSnapshot LoadSnapshot;
 
 	FSaveOperationResult LoadOperationResult;
@@ -247,8 +274,9 @@ private:
 	int32 AsyncCompletionCursor = -1;
 	bool bAsyncCompletionFilesCommitted = false;
 	bool bApplyingSaveCallbacks = false;
+	bool bApplyingWorldLoad = false;
 	bool bSaveTerminationRunning = false;
-	EPhase DeferredSaveTermination = EPhase::None;
+	bool bHostTerminationRequested = false;
 	double AsyncCaptureCostMilliseconds = 0.1;
 	double AsyncCompletionCostMilliseconds = 0.1;
 	FGuid AsyncOperationId;
@@ -279,6 +307,9 @@ private:
         FSaveWorldLoadGuard After;
     };
     TMap<FName, FWorldLoadGuardEntry> WorldLoadGuards;
+    TSet<FName> RequiredWorldLoadGuards;
+    FName RequiredWorldStoreParticipant;
+    bool CheckRequiredWorldParticipants(FString& OutError) const;
     bool RunWorldLoadGuards(const FGuid& InSaveId, const TMap<FName, FParameter>& InModules, EPhase InPhase, bool bInAfter, FString& OutError);
     FName WorldStoreParticipantName;
     FSaveWorldStoreParticipant WorldStoreParticipant;

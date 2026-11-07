@@ -1,5 +1,6 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "Task/TaskExecutionTypes.h"
 #include "Misc/AutomationTest.h"
 #include "Dialogue/DialogueEditor.h"
 #include "Dialogue/DialogueGraphClipboard.h"

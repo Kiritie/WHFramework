@@ -1,4 +1,6 @@
 ﻿#include "Voxel/Prefabs/VoxelPrefab.h"
+#include "Common/LifecycleTypes.h"
+#include "WHFrameworkCoreMacros.h"
 #include "Voxel/Prefabs/Data/VoxelPrefabData.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Voxels/VoxelItemBridge.h"

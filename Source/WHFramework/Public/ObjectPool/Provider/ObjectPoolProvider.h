@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ObjectPool/ObjectPoolProvider.h"
+#include "ObjectPool/ObjectPoolProviderInterface.h"
 
 class FObjectPoolProvider : public IObjectPoolProvider
 {

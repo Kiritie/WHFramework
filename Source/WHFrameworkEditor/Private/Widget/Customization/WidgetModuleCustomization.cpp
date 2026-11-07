@@ -1,6 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Widget/Customization/WidgetModuleCustomization.h"
+#include "Widget/ScreenWidgetTypes.h"
+#include "Widget/WorldWidgetTypes.h"
 
 #include "DetailCategoryBuilder.h"
 #include "DetailLayoutBuilder.h"

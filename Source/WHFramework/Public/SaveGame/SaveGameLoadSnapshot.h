@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SaveGame/SaveOperationTypes.h"
+#include "Common/LifecycleTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "SaveGame/SaveGameGenerationLease.h"
 

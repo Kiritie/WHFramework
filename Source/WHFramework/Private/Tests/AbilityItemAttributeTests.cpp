@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "Tests/WHGASTestTypes.h"
 #include "Ability/Abilities/ItemAbilityBase.h"
 #include "Ability/Effects/Calculation/UEffectCalculation_Level.h"

@@ -2,7 +2,11 @@
 
 #pragma once
 
-#include "Ability/AbilityModuleTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
+#include "Asset/AssetModuleTypes.h"
+#include "Asset/AssetMappingTypes.h"
+#include "Asset/DataTableTypes.h"
 #include "Data/DataAssetBase.h"
 #include "Main/Base/ModuleBase.h"
 #include "ReferencePool/ReferencePoolModuleStatics.h"
@@ -70,7 +74,7 @@ public:
 		return LoadClass(T::StaticClass(), InName);
 	}
 
-	UFUNCTION(BlueprintPure)
+	UFUNCTION(BlueprintCallable)
 	UClass* LoadClass(UClass* InClass, const FString& InName);
 
 	//////////////////////////////////////////////////////////////////////////
@@ -111,7 +115,7 @@ public:
 		return Cast<T>(LoadObject(T::StaticClass(), InName));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
+	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
 	UObject* LoadObject(UClass* InClass, const FString& InName);
 
 	//////////////////////////////////////////////////////////////////////////

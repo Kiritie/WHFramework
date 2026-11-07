@@ -1,4 +1,5 @@
 #include "Ability/Inventory/InventoryProfile.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 
 #include "Ability/Inventory/InventoryItemRegistry.h"
 

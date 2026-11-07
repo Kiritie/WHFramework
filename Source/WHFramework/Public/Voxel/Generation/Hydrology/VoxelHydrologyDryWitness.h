@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common/LifecycleTypes.h"
 #include "Voxel/Generation/Hydrology/VoxelHydrologySharedSearch.h"
 
 enum class EVoxelHydrologyDryWitnessStep : uint8

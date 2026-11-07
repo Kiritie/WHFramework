@@ -1,4 +1,5 @@
 #include "Setting/SettingEntry.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "Setting/SettingModule.h"
 

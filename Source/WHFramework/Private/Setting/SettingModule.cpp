@@ -1,11 +1,20 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Setting/SettingModule.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Common/LifecycleTypes.h"
+#include "Setting/SettingPresentationTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
+#include "Setting/SettingEditTypes.h"
+#include "Setting/SettingPropertyAccess.h"
 #include "SaveGame/SaveGameModuleStatics.h"
+#include "SaveGame/SaveGameModule.h"
 
 #include "Audio/AudioModule.h"
 #include "Camera/CameraModule.h"
 #include "Input/InputModule.h"
+#include "GameFramework/PlayerController.h"
+#include "Engine/World.h"
 #include "Parameter/ParameterModule.h"
 #include "Setting/SettingModuleNetworkComponent.h"
 #include "Setting/SettingModuleTypes.h"
@@ -20,6 +29,8 @@
 #include "Video/VideoModule.h"
 #include "Widget/WidgetModule.h"
 #include "UObject/UnrealType.h"
+#include "Gameplay/WHLocalPlayer.h"
+#include "Misc/ScopeExit.h"
 
 IMPLEMENTATION_MODULE(USettingModule)
 
@@ -154,6 +165,7 @@ USettingModule::USettingModule()
 	ModuleName = FName("SettingModule");
 	ModuleDisplayName = FText::FromString(TEXT("Setting Module"));
 	SaveScope = ESaveScope::Profile;
+	SaveDataVersion = 2;
 
 	ModuleNetworkComponent = USettingModuleNetworkComponent::StaticClass();
 
@@ -166,7 +178,6 @@ USettingModule::USettingModule()
 
 USettingModule::~USettingModule()
 {
-	TERMINATION_MODULE(USettingModule)
 }
 
 #if WITH_EDITOR
@@ -184,6 +195,7 @@ void USettingModule::OnDestroy()
 
 void USettingModule::OnInitialize()
 {
+	SaveDataVersion = 2;
 	Super::OnInitialize();
 	BuildSettingDefinitions();
 }
@@ -196,7 +208,27 @@ void USettingModule::OnPreparatory(EPhase InPhase)
 void USettingModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
 	Super::OnRefresh(DeltaSeconds, bInEditor);
+}
 
+void USettingModule::OnControlRefresh(float RealDeltaSeconds)
+{
+	Super::OnControlRefresh(RealDeltaSeconds);
+	if (EditSession.bActive && !IsEditSessionOwner(EditSessionPlayer.Get()))
+	{
+		bHostTerminationPending = true;
+		if (!FinalizeHostTermination()) UE_LOG(LogTemp, Error, TEXT("已失效的设置会话无法关闭。"));
+		return;
+	}
+	if (bEndEditRequested && EditSession.bActive)
+	{
+		EndEdit();
+		return;
+	}
+	if (EditSession.bActive && !EditSessionPlayer.IsValid())
+	{
+		EndEdit();
+		return;
+	}
 	if (ConfirmationTransaction.bActive && FPlatformTime::Seconds() >= ConfirmationTransaction.ExpiresAt)
 	{
 		RejectPendingSettings();
@@ -213,23 +245,84 @@ void USettingModule::OnUnPause()
 	Super::OnUnPause();
 }
 
+void USettingModule::PrepareForHostTermination()
+{
+	Super::PrepareForHostTermination();
+	if (EditSession.bActive)
+	{
+		bHostTerminationPending = true;
+		bEndEditRequested = true;
+		if (!bStartingEdit && !bEndingEdit && !bApplyingEdit && !bCancellingEdit && !FinalizeHostTermination())
+			UE_LOG(LogTemp, Error, TEXT("世界关闭前未能恢复本地玩家未提交的设置。"));
+	}
+}
+
+bool USettingModule::FinalizeHostTermination()
+{
+	if (!bHostTerminationPending || bFinalizingHostTermination) return !bHostTerminationPending;
+	if (bStartingEdit || bEndingEdit || bApplyingEdit || bCancellingEdit) return false;
+	TGuardValue<bool> Finalizing(bFinalizingHostTermination, true);
+	UWHLocalPlayer* Player = EditSessionLocalPlayer.Get();
+	if (::IsValid(Player) && Player->OwnsSettingEdit(this, EditSessionGeneration))
+	{
+		auto RetainFailure = [&]() { if (::IsValid(Player)) Player->RetainSettingRecovery(this, EditSessionGeneration); return false; };
+		const TArray<FSettingDefinition> Definitions = FinalDefinitions;
+		for (const FSettingDefinition& Definition : Definitions)
+		{
+			if (!AppliedUncommittedSettings.Contains(Definition.SettingId)) continue;
+			USettingProviderBase* Provider = FindSettingProvider(Definition);
+			if (!Provider) return RetainFailure();
+			if (!Provider->CanRollbackForHostTermination(Definition, Player))
+			{
+				AppliedUncommittedSettings.Remove(Definition.SettingId);
+				continue;
+			}
+			if (!Provider->RollbackForHostTermination(Definition, Player)) return RetainFailure();
+			if (!::IsValid(Player) || !Player->OwnsSettingEdit(this, EditSessionGeneration)) return RetainFailure();
+			AppliedUncommittedSettings.Remove(Definition.SettingId);
+		}
+		if (!AppliedUncommittedSettings.IsEmpty()) return RetainFailure();
+		Player->ReleaseSettingEdit(this, EditSessionGeneration);
+		Player->ClearSettingRecovery(this);
+	}
+	// 玩家已销毁或租约已被较新的档案操作替换时，不覆盖其后续状态。
+	for (USettingProviderBase* Provider : Providers) if (Provider) Provider->EndEdit();
+	AppliedUncommittedSettings.Reset();
+	EditSession = FSettingEditSession();
+	EditSessionPlayer.Reset();
+	EditSessionLocalPlayer.Reset();
+	EditSessionGeneration = 0;
+	ConfirmationTransaction = FSettingConfirmationTransaction();
+	SettingEntries.Reset();
+	SettingEntryMap.Reset();
+	ValidationResults.Reset();
+	bEndEditRequested = false;
+	bHostTerminationPending = false;
+	return true;
+}
+
+void USettingModule::FinalizeInterruptedEdit()
+{
+	if (EditSession.bActive && !IsEditSessionOwner(EditSessionPlayer.Get())) bHostTerminationPending = true;
+	if (bHostTerminationPending && !FinalizeHostTermination()) UE_LOG(LogTemp, Error, TEXT("本地玩家设置恢复尚未完成。"));
+}
+
+bool USettingModule::RetryHostTerminationRecovery()
+{
+	return FinalizeHostTermination();
+}
+
 void USettingModule::OnTermination(EPhase InPhase)
 {
 	Super::OnTermination(InPhase);
 	if (PHASEC(InPhase, EPhase::Primary))
 	{
-		EditSession = FSettingEditSession();
-		ConfirmationTransaction = FSettingConfirmationTransaction();
-		SettingEntries.Reset();
-		SettingEntryMap.Reset();
-		ValidationResults.Reset();
-		for (USettingProviderBase* Provider : Providers)
-		{
-			if (Provider)
-			{
-				Provider->EndEdit();
-			}
-		}
+		ActiveLocalProfile = NAME_None;
+		bLocalProfilePhaseInProgress = false;
+		bLocalProfilePhaseComplete = false;
+		bHostTerminationPending = true;
+		if (!bStartingEdit && !bEndingEdit && !bApplyingEdit && !bCancellingEdit && !FinalizeHostTermination())
+			UE_LOG(LogTemp, Error, TEXT("世界终止后本地玩家设置恢复失败，保留未完成会话。"));
 	}
 }
 
@@ -258,7 +351,7 @@ void USettingModule::CollectPropertyDefinitions(const UStruct* InStruct, const F
 			}
 		}
 
-		if (!IsSupportedSettingProperty(Property))
+		if (!FSettingPropertyAccess::IsSupported(Property))
 		{
 			continue;
 		}
@@ -309,7 +402,7 @@ void USettingModule::CollectPropertyDefinitions(const UStruct* InStruct, const F
 			Definition.DisplayName = FText::FromString(FName::NameToDisplayString(DisplayPath, false));
 		}
 		Definition.Description = GetPropertyToolTip(*Property);
-		Definition.Renderer = InferRenderer(Property);
+		Definition.Renderer = FSettingPropertyAccess::InferRenderer(Property);
 		const FString Renderer = GetMetadata(*Property, TEXT("SettingRenderer"));
 		if (Renderer.Equals(TEXT("Bool"), ESearchCase::IgnoreCase))
 			Definition.Renderer = ESettingRendererType::Bool;
@@ -393,47 +486,6 @@ void USettingModule::CollectPropertyDefinitions(const UStruct* InStruct, const F
 			}
 		}
 	}
-}
-
-bool USettingModule::IsSupportedSettingProperty(const FProperty* InProperty) const
-{
-	if (CastField<FBoolProperty>(InProperty) || CastField<FIntProperty>(InProperty) || CastField<FInt64Property>(InProperty) ||
-	    CastField<FFloatProperty>(InProperty) || CastField<FDoubleProperty>(InProperty) || CastField<FNameProperty>(InProperty) ||
-	    CastField<FStrProperty>(InProperty) || CastField<FTextProperty>(InProperty) || CastField<FEnumProperty>(InProperty))
-	{
-		return true;
-	}
-	if (const FByteProperty* ByteProperty = CastField<FByteProperty>(InProperty))
-	{
-		return ByteProperty->Enum != nullptr;
-	}
-	if (const FStructProperty* StructProperty = CastField<FStructProperty>(InProperty))
-	{
-		return StructProperty->Struct == TBaseStructure<FKey>::Get() || StructProperty->Struct == TBaseStructure<FIntPoint>::Get();
-	}
-	return false;
-}
-
-ESettingRendererType USettingModule::InferRenderer(const FProperty* InProperty) const
-{
-	if (CastField<FBoolProperty>(InProperty))
-	{
-		return ESettingRendererType::Bool;
-	}
-	if (CastField<FEnumProperty>(InProperty) || CastField<FByteProperty>(InProperty))
-	{
-		return ESettingRendererType::Enum;
-	}
-	if (CastField<FIntProperty>(InProperty) || CastField<FInt64Property>(InProperty) || CastField<FFloatProperty>(InProperty) ||
-	    CastField<FDoubleProperty>(InProperty))
-	{
-		return ESettingRendererType::Number;
-	}
-	if (const FStructProperty* StructProperty = CastField<FStructProperty>(InProperty); StructProperty && StructProperty->Struct == TBaseStructure<FKey>::Get())
-	{
-		return ESettingRendererType::Key;
-	}
-	return ESettingRendererType::Text;
 }
 
 void USettingModule::EnsureBuiltinProviders()
@@ -536,7 +588,7 @@ void USettingModule::BuildSettingDefinitions()
 		if (!FindSettingProvider(Definition))
 		{
 			FResolvedSettingProperty Resolved;
-			ensureEditorMsgf(ResolvePropertyPath(FSettingModuleSaveData::StaticStruct(), &ValidationData, Definition.SourcePath, Resolved),
+			ensureEditorMsgf(FSettingPropertyAccess::Resolve(FSettingModuleSaveData::StaticStruct(), &ValidationData, Definition.SourcePath, Resolved),
 			                 FString::Printf(TEXT("Setting %s has invalid source path %s."), *Definition.SettingId.Name.ToString(), *Definition.SourcePath),
 			                 EDC_Default,
 			                 EDV_Error);
@@ -589,140 +641,6 @@ void USettingModule::BuildSettingDefinitions()
 	{
 		BuildSettingEntries();
 	}
-}
-
-bool USettingModule::ResolvePropertyPath(UStruct* InRootStruct, void* InRootData, const FString& InPath, FResolvedSettingProperty& OutResolved) const
-{
-	TArray<FString> Segments;
-	InPath.ParseIntoArray(Segments, TEXT("."), true);
-	UStruct* CurrentStruct = InRootStruct;
-	void* CurrentContainer = InRootData;
-	for (int32 Index = 0; Index < Segments.Num(); ++Index)
-	{
-		FProperty* Property = FindFProperty<FProperty>(CurrentStruct, *Segments[Index]);
-		if (!Property)
-		{
-			return false;
-		}
-		if (Index == Segments.Num() - 1)
-		{
-			OutResolved.ContainerPtr = CurrentContainer;
-			OutResolved.Property = Property;
-			return true;
-		}
-
-		FStructProperty* StructProperty = CastField<FStructProperty>(Property);
-		if (!StructProperty)
-		{
-			return false;
-		}
-		CurrentContainer = StructProperty->ContainerPtrToValuePtr<void>(CurrentContainer);
-		CurrentStruct = StructProperty->Struct;
-	}
-	return false;
-}
-
-FParameter USettingModule::ReadPropertyValue(const FResolvedSettingProperty& InResolved) const
-{
-	FProperty* Property = InResolved.Property;
-	void* ValuePtr = Property ? Property->ContainerPtrToValuePtr<void>(InResolved.ContainerPtr) : nullptr;
-	if (!ValuePtr)
-		return FParameter();
-	if (const FBoolProperty* Typed = CastField<FBoolProperty>(Property))
-		return FParameter(Typed->GetPropertyValue(ValuePtr));
-	if (const FIntProperty* Typed = CastField<FIntProperty>(Property))
-		return FParameter(Typed->GetPropertyValue(ValuePtr));
-	if (const FInt64Property* Typed = CastField<FInt64Property>(Property))
-		return FParameter(Typed->GetPropertyValue(ValuePtr));
-	if (const FFloatProperty* Typed = CastField<FFloatProperty>(Property))
-		return FParameter(Typed->GetPropertyValue(ValuePtr));
-	if (const FDoubleProperty* Typed = CastField<FDoubleProperty>(Property))
-		return FParameter(Typed->GetPropertyValue(ValuePtr));
-	if (const FNameProperty* Typed = CastField<FNameProperty>(Property))
-		return FParameter(Typed->GetPropertyValue(ValuePtr));
-	if (const FStrProperty* Typed = CastField<FStrProperty>(Property))
-		return FParameter(Typed->GetPropertyValue(ValuePtr));
-	if (const FTextProperty* Typed = CastField<FTextProperty>(Property))
-		return FParameter(Typed->GetPropertyValue(ValuePtr));
-	if (const FEnumProperty* Typed = CastField<FEnumProperty>(Property))
-		return FParameter(Typed->GetUnderlyingProperty()->GetSignedIntPropertyValue(ValuePtr));
-	if (const FByteProperty* Typed = CastField<FByteProperty>(Property))
-		return FParameter(static_cast<int64>(Typed->GetPropertyValue(ValuePtr)));
-	if (const FStructProperty* Typed = CastField<FStructProperty>(Property); Typed && Typed->Struct == TBaseStructure<FKey>::Get())
-		return FParameter(*static_cast<FKey*>(ValuePtr));
-	if (const FStructProperty* Typed = CastField<FStructProperty>(Property); Typed && Typed->Struct == TBaseStructure<FIntPoint>::Get())
-		return FParameter(*static_cast<FIntPoint*>(ValuePtr));
-	return FParameter();
-}
-
-bool USettingModule::WritePropertyValue(const FResolvedSettingProperty& InResolved, const FParameter& InValue) const
-{
-	FProperty* Property = InResolved.Property;
-	void* ValuePtr = Property ? Property->ContainerPtrToValuePtr<void>(InResolved.ContainerPtr) : nullptr;
-	if (!ValuePtr)
-		return false;
-	if (FBoolProperty* Typed = CastField<FBoolProperty>(Property); Typed && InValue.Is<bool>())
-	{
-		Typed->SetPropertyValue(ValuePtr, InValue.Get<bool>());
-		return true;
-	}
-	if (FIntProperty* Typed = CastField<FIntProperty>(Property); Typed && InValue.Is<int32>())
-	{
-		Typed->SetPropertyValue(ValuePtr, InValue.Get<int32>());
-		return true;
-	}
-	if (FInt64Property* Typed = CastField<FInt64Property>(Property); Typed && InValue.Is<int64>())
-	{
-		Typed->SetPropertyValue(ValuePtr, InValue.Get<int64>());
-		return true;
-	}
-	if (FFloatProperty* Typed = CastField<FFloatProperty>(Property); Typed && InValue.Is<float>())
-	{
-		Typed->SetPropertyValue(ValuePtr, InValue.Get<float>());
-		return true;
-	}
-	if (FDoubleProperty* Typed = CastField<FDoubleProperty>(Property); Typed && InValue.Is<double>())
-	{
-		Typed->SetPropertyValue(ValuePtr, InValue.Get<double>());
-		return true;
-	}
-	if (FNameProperty* Typed = CastField<FNameProperty>(Property); Typed && InValue.Is<FName>())
-	{
-		Typed->SetPropertyValue(ValuePtr, InValue.Get<FName>());
-		return true;
-	}
-	if (FStrProperty* Typed = CastField<FStrProperty>(Property); Typed && InValue.Is<FString>())
-	{
-		Typed->SetPropertyValue(ValuePtr, InValue.Get<FString>());
-		return true;
-	}
-	if (FTextProperty* Typed = CastField<FTextProperty>(Property); Typed && InValue.Is<FText>())
-	{
-		Typed->SetPropertyValue(ValuePtr, InValue.Get<FText>());
-		return true;
-	}
-	if (FEnumProperty* Typed = CastField<FEnumProperty>(Property); Typed && InValue.Is<int64>())
-	{
-		Typed->GetUnderlyingProperty()->SetIntPropertyValue(ValuePtr, InValue.Get<int64>());
-		return true;
-	}
-	if (FByteProperty* Typed = CastField<FByteProperty>(Property); Typed && InValue.Is<int64>())
-	{
-		Typed->SetPropertyValue(ValuePtr, static_cast<uint8>(InValue.Get<int64>()));
-		return true;
-	}
-	if (const FStructProperty* Typed = CastField<FStructProperty>(Property); Typed && Typed->Struct == TBaseStructure<FKey>::Get() && InValue.Is<FKey>())
-	{
-		*static_cast<FKey*>(ValuePtr) = InValue.Get<FKey>();
-		return true;
-	}
-	if (const FStructProperty* Typed = CastField<FStructProperty>(Property);
-	    Typed && Typed->Struct == TBaseStructure<FIntPoint>::Get() && InValue.Is<FIntPoint>())
-	{
-		*static_cast<FIntPoint*>(ValuePtr) = InValue.Get<FIntPoint>();
-		return true;
-	}
-	return false;
 }
 
 const FSettingDefinition* USettingModule::FindSettingDefinition(FSettingId InSettingId) const
@@ -832,7 +750,7 @@ FParameter USettingModule::ReadSessionValue(FSettingModuleSaveData& InData, FSet
 {
 	const FSettingDefinition* Definition = FindSettingDefinition(InSettingId);
 	FResolvedSettingProperty Resolved;
-	return Definition && ResolvePropertyPath(FSettingModuleSaveData::StaticStruct(), &InData, Definition->SourcePath, Resolved) ? ReadPropertyValue(Resolved)
+	return Definition && FSettingPropertyAccess::Resolve(FSettingModuleSaveData::StaticStruct(), &InData, Definition->SourcePath, Resolved) ? FSettingPropertyAccess::Read(Resolved)
 	                                                                                                                            : FParameter();
 }
 
@@ -840,21 +758,43 @@ bool USettingModule::WriteSessionValue(FSettingModuleSaveData& InData, FSettingI
 {
 	const FSettingDefinition* Definition = FindSettingDefinition(InSettingId);
 	FResolvedSettingProperty Resolved;
-	return Definition && ResolvePropertyPath(FSettingModuleSaveData::StaticStruct(), &InData, Definition->SourcePath, Resolved) &&
-	       WritePropertyValue(Resolved, InValue);
+	return Definition && FSettingPropertyAccess::Resolve(FSettingModuleSaveData::StaticStruct(), &InData, Definition->SourcePath, Resolved) &&
+	       FSettingPropertyAccess::Write(Resolved, InValue);
 }
 
-FSettingModuleSaveData USettingModule::GetCurrentCombinedSettings() const
+bool USettingModule::GetCurrentCombinedSettings(FSettingModuleSaveData& OutData) const
 {
-	const FScopedWorldContext WorldContext(GetWorld());
-	FSettingModuleSaveData Data;
-	Data.WidgetData = UWidgetModule::Get().GetSaveData(true).GetRef<FWidgetModuleSaveData>();
-	Data.AudioData = UAudioModule::Get().GetSaveData(true).GetRef<FAudioModuleSaveData>();
-	Data.VideoData = UVideoModule::Get().GetSaveData(true).GetRef<FVideoModuleSaveData>();
-	Data.CameraData.FromUserSettings(UCameraModule::Get().GetUserSettings());
-	Data.InputData = UInputModule::Get().GetSaveData(false).GetRef<FInputModuleSaveData>();
-	Data.ParameterData = UParameterModule::Get().GetSaveData(true).GetRef<FParameterModuleSaveData>();
-	return Data;
+	UWidgetModule* Widget = UWidgetModule::GetPtr(GetWorld());
+	UAudioModule* Audio = UAudioModule::GetPtr(GetWorld());
+	UVideoModule* Video = UVideoModule::GetPtr(GetWorld());
+	UCameraModule* Camera = UCameraModule::GetPtr(GetWorld());
+	UInputModule* Input = UInputModule::GetPtr(GetWorld());
+	UParameterModule* Parameters = UParameterModule::GetPtr(GetWorld());
+	if (!Widget || !Audio || !Video || !Camera || !Input || !Parameters)
+	{
+		UE_LOG(LogTemp, Error, TEXT("无法读取当前世界的完整设置：必要模块不可用。"));
+		return false;
+	}
+	const FParameter WidgetData = Widget->GetSaveData(true);
+	const FParameter AudioData = Audio->GetSaveData(true);
+	const FParameter VideoData = Video->GetSaveData(true);
+	const FParameter CameraData = Camera->GetSaveData(true);
+	const FParameter InputData = Input->GetSaveData(false);
+	const FParameter ParameterData = Parameters->GetSaveData(true);
+	if (!WidgetData.Is<FWidgetModuleSaveData>() || !AudioData.Is<FAudioModuleSaveData>() ||
+		!VideoData.Is<FVideoModuleSaveData>() || !CameraData.Is<FCameraModuleSaveData>() || !InputData.Is<FInputModuleSaveData>() ||
+		!ParameterData.Is<FParameterModuleSaveData>())
+	{
+		UE_LOG(LogTemp, Error, TEXT("无法读取当前世界的完整设置：模块返回的数据无效。"));
+		return false;
+	}
+	OutData.WidgetData = WidgetData.GetRef<FWidgetModuleSaveData>();
+	OutData.AudioData = AudioData.GetRef<FAudioModuleSaveData>();
+	OutData.VideoData = VideoData.GetRef<FVideoModuleSaveData>();
+	OutData.CameraData = CameraData.GetRef<FCameraModuleSaveData>();
+	OutData.InputData = InputData.GetRef<FInputModuleSaveData>();
+	OutData.ParameterData = ParameterData.GetRef<FParameterModuleSaveData>();
+	return true;
 }
 
 FSettingModuleSaveData USettingModule::GetDefaultCombinedSettings() const
@@ -862,17 +802,84 @@ FSettingModuleSaveData USettingModule::GetDefaultCombinedSettings() const
 	return FSettingModuleSaveData();
 }
 
-void USettingModule::ApplyCombinedSettings(FSettingModuleSaveData& InData)
+bool USettingModule::ApplyCombinedSettings(FSettingModuleSaveData& InData)
 {
-	const FScopedWorldContext WorldContext(GetWorld());
-	UWidgetModule::Get().LoadSaveData(FParameter(InData.WidgetData), EPhase::All);
-	UVideoModule::Get().LoadSaveData(FParameter(InData.VideoData), EPhase::All);
+	if (!IsBusinessAdmissionOpen()) return false;
+	UWidgetModule* Widget = UWidgetModule::GetPtr(GetWorld());
+	UVideoModule* Video = UVideoModule::GetPtr(GetWorld());
+	if (!Widget || !Video)
+	{
+		UE_LOG(LogTemp, Error, TEXT("无法应用当前世界的设置：必要模块不可用。"));
+		return false;
+	}
+	if (!Widget->LoadSaveData(FParameter(InData.WidgetData), EPhase::All)) return false;
+	return Video->LoadSaveData(FParameter(InData.VideoData), EPhase::All);
 }
 
-void USettingModule::SaveSettings()
+bool USettingModule::SaveSettings()
 {
-	const FScopedWorldContext WorldContext(GetWorld());
-	USaveGameModuleStatics::SaveProfile();
+	if (!IsBusinessAdmissionOpen()) return false;
+	USaveGameModule* Saves = USaveGameModule::GetPtr(GetWorld());
+	const bool bSaved = Saves && !ActiveLocalProfile.IsNone() && Saves->SaveProfile(ActiveLocalProfile).bSuccess;
+	bLastSettingsSaveSucceeded = bSaved;
+	return bLastSettingsSaveSucceeded;
+}
+
+bool USettingModule::PrepareLocalProfileLoad(FName InProfileName)
+{
+	if (!IsBusinessAdmissionOpen()) return false;
+	UWorld* World = GetWorld();
+	if (InProfileName.IsNone() || !World) return false;
+	UInputModule* Input = UInputModule::GetPtr(World);
+	UCameraModule* Camera = UCameraModule::GetPtr(World);
+	if (!Input || !Camera || !UWidgetModule::GetPtr(World) || !UAudioModule::GetPtr(World) ||
+		!UVideoModule::GetPtr(World) || !UParameterModule::GetPtr(World)) return false;
+	if (EditSession.bActive) EndEdit();
+	if (EditSession.bActive || !Input->PrepareLocalProfileLoad(InProfileName)) return false;
+	if (!Camera->PrepareLocalProfileLoad(InProfileName)) return false;
+	ActiveLocalProfile = InProfileName;
+	bLocalProfilePhaseComplete = false;
+	return true;
+}
+
+bool USettingModule::IsLocalProfileDataSupported(const FParameter& InData) const
+{
+	const FSettingModuleSaveData* Data = InData.GetPtr<FSettingModuleSaveData>();
+	const UCameraModule* Camera = UCameraModule::GetPtr(GetWorld());
+	return Data && (!Camera || Camera->ValidateLocalProfileData(Data->CameraData));
+}
+
+bool USettingModule::LoadLocalProfilePhase(const FParameter& InData, EPhase InPhase)
+{
+	if (!IsBusinessAdmissionOpen()) return false;
+	if (bLocalProfilePhaseInProgress || ActiveLocalProfile.IsNone() || !IsLocalProfileDataSupported(InData)) return false;
+	TGuardValue<bool> Loading(bLocalProfilePhaseInProgress, true);
+	bLocalProfilePhaseComplete = false;
+	if (!LoadSaveData(InData, InPhase)) return false;
+	if (!bLocalProfilePhaseComplete) return false;
+	if (!PHASEC(InPhase, EPhase::Final)) return true;
+	const UInputModule* Input = UInputModule::GetPtr(GetWorld());
+	const UCameraModule* Camera = UCameraModule::GetPtr(GetWorld());
+	return Input && Camera && Input->AreLocalProfilesApplied(ActiveLocalProfile) && Camera->AreLocalProfilesApplied(ActiveLocalProfile);
+}
+
+void USettingModule::MarkLocalProfilePhaseComplete()
+{
+	if (bLocalProfilePhaseInProgress) bLocalProfilePhaseComplete = true;
+}
+
+void USettingModule::AbortLocalProfileLoad()
+{
+	ActiveLocalProfile = NAME_None;
+	bLocalProfilePhaseComplete = false;
+}
+
+bool USettingModule::CanSaveLocalProfile(FName InProfileName) const
+{
+	const UInputModule* Input = UInputModule::GetPtr(GetWorld());
+	const UCameraModule* Camera = UCameraModule::GetPtr(GetWorld());
+	return !InProfileName.IsNone() && ActiveLocalProfile == InProfileName && Input && Camera &&
+		Input->AreLocalProfilesApplied(InProfileName) && Camera->AreLocalProfilesApplied(InProfileName);
 }
 
 void USettingModule::BuildSettingEntries()
@@ -890,78 +897,129 @@ void USettingModule::BuildSettingEntries()
 
 void USettingModule::RefreshSettingDefinitions()
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	BuildSettingDefinitions();
 }
 
-void USettingModule::BeginEdit()
+bool USettingModule::BeginEdit(APlayerController* InPlayer)
 {
-	if (EditSession.bActive)
+	if (!IsBusinessAdmissionOpen()) return false;
+	if (bStartingEdit || bEndingEdit || EditSession.bActive || !::IsValid(InPlayer) || !InPlayer->IsLocalController() || InPlayer->GetWorld() != GetWorld())
 	{
-		return;
+		return false;
 	}
+	ON_SCOPE_EXIT { FinalizeInterruptedEdit(); };
+	TGuardValue<bool> Starting(bStartingEdit, true);
 	BuildSettingDefinitions();
 
-	EditSession.AppliedData = GetCurrentCombinedSettings();
+	FSettingModuleSaveData AppliedData;
+	if (!GetCurrentCombinedSettings(AppliedData)) return false;
+	UWHLocalPlayer* Local = Cast<UWHLocalPlayer>(InPlayer->GetLocalPlayer());
+	uint64 Generation = 0;
+	if (!Local || !Local->AcquireSettingEdit(this, Generation)) return false;
+	EditSessionLocalPlayer = Local;
+	EditSessionGeneration = Generation;
+	EditSession.AppliedData = MoveTemp(AppliedData);
+	EditSessionPlayer = InPlayer;
 	EditSession.PendingData = EditSession.AppliedData;
 	EditSession.DefaultData = GetDefaultCombinedSettings();
 	EditSession.bActive = true;
+	bEndEditRequested = false;
+	AppliedUncommittedSettings.Reset();
 	ConfirmationTransaction = FSettingConfirmationTransaction();
 	ValidationResults.Reset();
+	const TArray<FSettingDefinition> DefinitionSnapshot = FinalDefinitions;
 	for (USettingProviderBase* Provider : Providers)
 	{
-		if (Provider)
-		{
-			Provider->BeginEdit(FinalDefinitions);
-		}
+		if (Provider) Provider->BeginEdit(DefinitionSnapshot);
 	}
 	BuildSettingEntries();
 	BroadcastEditStateChanged();
+	return true;
 }
 
-void USettingModule::EndEdit()
+bool USettingModule::IsEditSessionOwner(APlayerController* InPlayer) const
 {
+	const UWHLocalPlayer* Local = EditSessionLocalPlayer.Get();
+	return EditSession.bActive && ::IsValid(InPlayer) && EditSessionPlayer.Get() == InPlayer && InPlayer->GetWorld() == GetWorld() &&
+		::IsValid(Local) && InPlayer->GetLocalPlayer() == Local && Local->IsSettingEditCurrent(this, EditSessionGeneration);
+}
+
+bool USettingModule::EndEdit()
+{
+	if (!IsBusinessAdmissionOpen()) return false;
 	if (!EditSession.bActive)
 	{
-		return;
+		bEndEditRequested = false;
+		return true;
 	}
-	CancelEditSession();
+	if (!IsEditSessionOwner(EditSessionPlayer.Get()))
+	{
+		bHostTerminationPending = true;
+		return FinalizeHostTermination();
+	}
+	if (bEndingEdit) return false;
+	if (bStartingEdit || bCancellingEdit || bApplyingEdit)
+	{
+		bEndEditRequested = true;
+		return false;
+	}
+	const bool bAlreadyRequested = bEndEditRequested;
+	bEndEditRequested = true;
+	ON_SCOPE_EXIT { FinalizeInterruptedEdit(); };
+	TGuardValue<bool> Ending(bEndingEdit, true);
+	if (!UWidgetModule::GetPtr(GetWorld()) || !UVideoModule::GetPtr(GetWorld()) || !CancelEditSession())
+	{
+		if (!bAlreadyRequested) UE_LOG(LogTemp, Error, TEXT("设置会话尚未关闭：恢复未提交的设置失败。"));
+		return false;
+	}
 	for (USettingProviderBase* Provider : Providers)
 	{
-		if (Provider)
-		{
-			Provider->EndEdit();
-		}
+		if (Provider) Provider->EndEdit();
 	}
+	if (UWHLocalPlayer* Local = EditSessionLocalPlayer.Get()) Local->ReleaseSettingEdit(this, EditSessionGeneration);
+	EditSessionLocalPlayer.Reset();
+	EditSessionGeneration = 0;
 	EditSession = FSettingEditSession();
+	EditSessionPlayer.Reset();
 	SettingEntries.Reset();
 	SettingEntryMap.Reset();
 	ValidationResults.Reset();
+	bEndEditRequested = false;
 	BroadcastEditStateChanged();
+	return true;
 }
 
 bool USettingModule::ApplyEditSession()
 {
-	if (!EditSession.bActive || ConfirmationTransaction.bActive)
+	if (!IsBusinessAdmissionOpen()) return false;
+	if (!IsEditSessionOwner(EditSessionPlayer.Get()) || ConfirmationTransaction.bActive || bEndEditRequested || bCancellingEdit || bApplyingEdit)
 	{
 		return false;
 	}
+	ON_SCOPE_EXIT { FinalizeInterruptedEdit(); };
+	TGuardValue<bool> Applying(bApplyingEdit, true);
 
-	TArray<const FSettingDefinition*> DirtyDefinitions;
+	TArray<FSettingDefinition> DirtyDefinitions;
 	bool bRequiresConfirmation = false;
-	for (const FSettingDefinition& Definition : FinalDefinitions)
+	const TArray<FSettingDefinition> Definitions = FinalDefinitions;
+	for (const FSettingDefinition& Definition : Definitions)
 	{
-		if (!IsSettingDirty(Definition.SettingId))
+		const bool bDirty = IsSettingDirty(Definition.SettingId);
+		if (bEndEditRequested) return false;
+		if (!bDirty)
 		{
 			continue;
 		}
 		const FSettingValidationResult Validation = ValidateSettingValue(Definition, GetPendingValue(Definition.SettingId));
+		if (bEndEditRequested) return false;
 		ValidationResults.Add(Definition.SettingId, Validation);
 		if (!Validation.bValid)
 		{
 			BroadcastEditStateChanged();
 			return false;
 		}
-		DirtyDefinitions.Add(&Definition);
+		DirtyDefinitions.Add(Definition);
 		bRequiresConfirmation |= Definition.bRequiresConfirmation;
 	}
 	if (DirtyDefinitions.IsEmpty())
@@ -969,21 +1027,21 @@ bool USettingModule::ApplyEditSession()
 		return false;
 	}
 
-	ApplyCombinedSettings(EditSession.PendingData);
-	for (const FSettingDefinition* Definition : DirtyDefinitions)
+	if (!ApplyCombinedSettings(EditSession.PendingData)) return false;
+	if (bEndEditRequested) return false;
+	for (const FSettingDefinition& Definition : DirtyDefinitions)
 	{
-		if (USettingProviderBase* Provider = FindSettingProvider(*Definition))
+		if (USettingProviderBase* Provider = FindSettingProvider(Definition))
 		{
-			if (!Provider->Apply(*Definition, GetPendingValue(Definition->SettingId)))
+			AppliedUncommittedSettings.Add(Definition.SettingId);
+			const bool bApplied = Provider->Apply(Definition, GetPendingValue(Definition.SettingId));
+			if (bEndEditRequested) return false;
+			if (!bApplied)
 			{
-				ApplyCombinedSettings(EditSession.AppliedData);
-				for (const FSettingDefinition* AppliedDefinition : DirtyDefinitions)
-				{
-					if (USettingProviderBase* AppliedProvider = FindSettingProvider(*AppliedDefinition))
-					{
-						AppliedProvider->Rollback(*AppliedDefinition);
-					}
-				}
+				const bool bCombinedRestored = ApplyCombinedSettings(EditSession.AppliedData);
+				const bool bProvidersRestored = RestorePendingProviders();
+				if (!bCombinedRestored || !bProvidersRestored)
+					UE_LOG(LogTemp, Error, TEXT("设置应用失败，部分预览未能恢复，编辑会话保留。"));
 				return false;
 			}
 		}
@@ -993,11 +1051,11 @@ bool USettingModule::ApplyEditSession()
 	{
 		ConfirmationTransaction.PreviousData = EditSession.AppliedData;
 		ConfirmationTransaction.SettingIds.Reset();
-		for (const FSettingDefinition* Definition : DirtyDefinitions)
+		for (const FSettingDefinition& Definition : DirtyDefinitions)
 		{
-			if (Definition->bRequiresConfirmation)
+			if (Definition.bRequiresConfirmation)
 			{
-				ConfirmationTransaction.SettingIds.Add(Definition->SettingId);
+				ConfirmationTransaction.SettingIds.Add(Definition.SettingId);
 			}
 		}
 		ConfirmationTransaction.ExpiresAt = FPlatformTime::Seconds() + ConfirmationTimeout;
@@ -1009,51 +1067,59 @@ bool USettingModule::ApplyEditSession()
 	EditSession.AppliedData = EditSession.PendingData;
 	for (USettingProviderBase* Provider : Providers)
 	{
-		if (Provider)
-		{
-			Provider->Commit();
-		}
+		if (Provider) Provider->Commit();
 	}
+	AppliedUncommittedSettings.Reset();
 	SaveSettings();
 	ValidationResults.Reset();
 	BroadcastEditStateChanged();
 	return true;
 }
 
-void USettingModule::CancelEditSession()
+bool USettingModule::RestorePendingProviders()
 {
+	const TArray<FSettingDefinition> Definitions = FinalDefinitions;
+	for (const FSettingDefinition& Definition : Definitions)
+	{
+		if (!IsEditSessionOwner(EditSessionPlayer.Get())) return false;
+		USettingProviderBase* Provider = FindSettingProvider(Definition);
+		if (!Provider) continue;
+		if (AppliedUncommittedSettings.Contains(Definition.SettingId))
+		{
+			if (!Provider->Rollback(Definition)) return false;
+			AppliedUncommittedSettings.Remove(Definition.SettingId);
+		}
+		else if (Provider->GetPendingValue(Definition) != Provider->GetAppliedValue(Definition) &&
+			!Provider->SetPendingValue(Definition, Provider->GetAppliedValue(Definition))) return false;
+	}
+	return AppliedUncommittedSettings.IsEmpty();
+}
+
+bool USettingModule::CancelEditSession()
+{
+	if (!IsBusinessAdmissionOpen()) return false;
 	if (!EditSession.bActive)
 	{
-		return;
+		return true;
 	}
+	if (!IsEditSessionOwner(EditSessionPlayer.Get())) return false;
 	if (ConfirmationTransaction.bActive)
 	{
-		RejectPendingSettings();
-		return;
+		return RejectPendingSettings();
 	}
-	ApplyCombinedSettings(EditSession.AppliedData);
-
-	for (USettingProviderBase* Provider : Providers)
-	{
-		if (!Provider)
-		{
-			continue;
-		}
-		for (const FSettingDefinition& Definition : FinalDefinitions)
-		{
-			if (Provider->CanHandle(Definition))
-			{
-				Provider->Rollback(Definition);
-			}
-		}
-	}
+	if (bCancellingEdit || bApplyingEdit) return false;
+	ON_SCOPE_EXIT { FinalizeInterruptedEdit(); };
+	TGuardValue<bool> Cancelling(bCancellingEdit, true);
+	if (!ApplyCombinedSettings(EditSession.AppliedData) || !RestorePendingProviders()) return false;
 	EditSession.PendingData = EditSession.AppliedData;
 	ValidationResults.Reset();
-	for (const FSettingDefinition& Definition : FinalDefinitions)
+	const TArray<FSettingDefinition> Definitions = FinalDefinitions;
+	for (const FSettingDefinition& Definition : Definitions)
 	{
 		OnSettingValueChanged.Broadcast(Definition.SettingId);
 	}
 	BroadcastEditStateChanged();
+	return true;
 }
 
 double USettingModule::GetConfirmationTimeRemaining() const
@@ -1063,60 +1129,52 @@ double USettingModule::GetConfirmationTimeRemaining() const
 
 bool USettingModule::ConfirmPendingSettings()
 {
-	if (!EditSession.bActive || !ConfirmationTransaction.bActive)
+	if (!IsBusinessAdmissionOpen()) return false;
+	if (!IsEditSessionOwner(EditSessionPlayer.Get()) || !ConfirmationTransaction.bActive || bEndEditRequested || bCancellingEdit || bApplyingEdit)
 	{
 		return false;
 	}
+	ON_SCOPE_EXIT { FinalizeInterruptedEdit(); };
+	TGuardValue<bool> Applying(bApplyingEdit, true);
 
 	EditSession.AppliedData = EditSession.PendingData;
 	for (USettingProviderBase* Provider : Providers)
 	{
-		if (Provider)
-		{
-			Provider->Commit();
-		}
+		if (Provider) Provider->Commit();
 	}
 	ConfirmationTransaction = FSettingConfirmationTransaction();
 	ValidationResults.Reset();
+	AppliedUncommittedSettings.Reset();
 	SaveSettings();
 	BroadcastEditStateChanged();
 	return true;
 }
 
-void USettingModule::RejectPendingSettings()
+bool USettingModule::RejectPendingSettings()
 {
-	if (!EditSession.bActive || !ConfirmationTransaction.bActive)
+	if (!IsBusinessAdmissionOpen()) return false;
+	if (!IsEditSessionOwner(EditSessionPlayer.Get()) || !ConfirmationTransaction.bActive || bCancellingEdit || bApplyingEdit)
 	{
-		return;
+		return false;
 	}
-
-	ApplyCombinedSettings(ConfirmationTransaction.PreviousData);
-	for (USettingProviderBase* Provider : Providers)
-	{
-		if (!Provider)
-		{
-			continue;
-		}
-		for (const FSettingDefinition& Definition : FinalDefinitions)
-		{
-			if (Provider->CanHandle(Definition))
-			{
-				Provider->Rollback(Definition);
-			}
-		}
-	}
+	ON_SCOPE_EXIT { FinalizeInterruptedEdit(); };
+	TGuardValue<bool> Cancelling(bCancellingEdit, true);
+	if (!ApplyCombinedSettings(ConfirmationTransaction.PreviousData) || !RestorePendingProviders()) return false;
 	EditSession.PendingData = EditSession.AppliedData;
 	ConfirmationTransaction = FSettingConfirmationTransaction();
 	ValidationResults.Reset();
-	for (const FSettingDefinition& Definition : FinalDefinitions)
+	const TArray<FSettingDefinition> Definitions = FinalDefinitions;
+	for (const FSettingDefinition& Definition : Definitions)
 	{
 		OnSettingValueChanged.Broadcast(Definition.SettingId);
 	}
 	BroadcastEditStateChanged();
+	return true;
 }
 
 void USettingModule::ResetAllToDefault()
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if (!EditSession.bActive)
 	{
 		return;
@@ -1130,6 +1188,7 @@ void USettingModule::ResetAllToDefault()
 
 bool USettingModule::CanApply() const
 {
+	if (!IsBusinessAdmissionOpen()) return false;
 	if (!EditSession.bActive || ConfirmationTransaction.bActive)
 		return false;
 	for (const FSettingDefinition& Definition : FinalDefinitions)
@@ -1142,6 +1201,7 @@ bool USettingModule::CanApply() const
 
 bool USettingModule::CanReset() const
 {
+	if (!IsBusinessAdmissionOpen()) return false;
 	if (!EditSession.bActive)
 		return false;
 	for (const FSettingDefinition& Definition : FinalDefinitions)
@@ -1161,6 +1221,7 @@ bool USettingModule::IsSettingDirty(FSettingId InSettingId) const
 
 bool USettingModule::CanResetSetting(FSettingId InSettingId) const
 {
+	if (!IsBusinessAdmissionOpen()) return false;
 	if (!EditSession.bActive)
 		return false;
 	return GetPendingValue(InSettingId) != GetDefaultValue(InSettingId);
@@ -1239,17 +1300,24 @@ FParameter USettingModule::GetDefaultValue(FSettingId InSettingId) const
 
 bool USettingModule::SetPendingValue(FSettingId InSettingId, const FParameter& InValue)
 {
-	if (!EditSession.bActive || ConfirmationTransaction.bActive)
+	if (!IsBusinessAdmissionOpen()) return false;
+	if (!IsEditSessionOwner(EditSessionPlayer.Get()) || ConfirmationTransaction.bActive || bEndEditRequested || bCancellingEdit || bApplyingEdit)
 	{
 		return false;
 	}
-	const FSettingDefinition* Definition = FindSettingDefinition(InSettingId);
-	if (!Definition || !IsSettingEnabled(InSettingId))
+	ON_SCOPE_EXIT { FinalizeInterruptedEdit(); };
+	TGuardValue<bool> Applying(bApplyingEdit, true);
+	const FSettingDefinition* FoundDefinition = FindSettingDefinition(InSettingId);
+	if (!FoundDefinition)
 	{
 		return false;
 	}
+	const FSettingDefinition DefinitionCopy = *FoundDefinition;
+	const FSettingDefinition* Definition = &DefinitionCopy;
+	if (!IsSettingEnabled(InSettingId) || bEndEditRequested) return false;
 
 	const FSettingValidationResult Validation = ValidateSettingValue(*Definition, InValue);
+	if (bEndEditRequested) return false;
 	ValidationResults.Add(InSettingId, Validation);
 	if (!Validation.bValid)
 	{
@@ -1264,20 +1332,28 @@ bool USettingModule::SetPendingValue(FSettingId InSettingId, const FParameter& I
 		{
 			return false;
 		}
+		if (bEndEditRequested) return false;
 		if (Definition->ApplyPolicy != ESettingApplyPolicy::Deferred)
 		{
+			AppliedUncommittedSettings.Add(InSettingId);
 			const bool bApplied = Definition->ApplyPolicy == ESettingApplyPolicy::Preview ?
 				Provider->Preview(*Definition, InValue) : Provider->Apply(*Definition, InValue);
+			if (bEndEditRequested) return false;
 			if (!bApplied)
 			{
 				Provider->SetPendingValue(*Definition, PreviousValue);
-				Provider->Apply(*Definition, PreviousValue);
-				ValidationResults.Add(InSettingId, FSettingValidationResult::Invalid(NSLOCTEXT("WH.SettingModule", "PreviewFailed", "设置预览失败，已恢复原值。")));
+				const bool bRestored = Provider->Apply(*Definition, PreviousValue);
+				if (bEndEditRequested) return false;
+				if (bRestored && PreviousValue == Provider->GetAppliedValue(*Definition)) AppliedUncommittedSettings.Remove(InSettingId);
+				ValidationResults.Add(InSettingId, FSettingValidationResult::Invalid(bRestored ?
+					NSLOCTEXT("WH.SettingModule", "PreviewFailed", "设置预览失败，已恢复原值。") :
+					NSLOCTEXT("WH.SettingModule", "PreviewRestoreFailed", "设置预览失败，恢复原值也未完成。")));
 				BroadcastEditStateChanged();
 				return false;
 			}
 		}
 		OnSettingValueChanged.Broadcast(InSettingId);
+		if (bEndEditRequested) return false;
 		BroadcastEditStateChanged();
 		return true;
 	}
@@ -1305,20 +1381,36 @@ bool USettingModule::SetPendingValue(FSettingId InSettingId, const FParameter& I
 				BroadcastEditStateChanged();
 				return false;
 			}
-			FWidgetModuleSaveData Preview = Widgets->GetSaveData(true).GetRef<FWidgetModuleSaveData>();
+			const FParameter WidgetData = Widgets->GetSaveData(true);
+			if (bEndEditRequested) return false;
+			if (!WidgetData.Is<FWidgetModuleSaveData>())
+			{
+				WriteSessionValue(EditSession.PendingData, InSettingId, PreviousValue);
+				ValidationResults.Add(InSettingId, FSettingValidationResult::Invalid(NSLOCTEXT("WH.SettingModule", "WidgetPreviewDataUnavailable", "无法读取当前世界的界面设置。")));
+				BroadcastEditStateChanged();
+				return false;
+			}
+			FWidgetModuleSaveData Preview = WidgetData.GetRef<FWidgetModuleSaveData>();
 			FResolvedSettingProperty Resolved;
-			if (!ResolvePropertyPath(FWidgetModuleSaveData::StaticStruct(), &Preview, Definition->SourcePath.RightChop(11), Resolved) || !WritePropertyValue(Resolved, InValue))
+			if (!FSettingPropertyAccess::Resolve(FWidgetModuleSaveData::StaticStruct(), &Preview, Definition->SourcePath.RightChop(11), Resolved) || !FSettingPropertyAccess::Write(Resolved, InValue))
 			{
 				WriteSessionValue(EditSession.PendingData, InSettingId, PreviousValue);
 				ValidationResults.Add(InSettingId, FSettingValidationResult::Invalid(NSLOCTEXT("WH.SettingModule", "WidgetPreviewRejected", "界面设置预览未能应用，已恢复原值。")));
 				BroadcastEditStateChanged();
 				return false;
 			}
-			const FScopedWorldContext WorldContext(GetWorld());
-			Widgets->LoadSaveData(FParameter(Preview), EPhase::All);
+			if (!Widgets->LoadSaveData(FParameter(Preview), EPhase::All))
+			{
+				WriteSessionValue(EditSession.PendingData, InSettingId, PreviousValue);
+				ValidationResults.Add(InSettingId, FSettingValidationResult::Invalid(NSLOCTEXT("WH.SettingModule", "WidgetPreviewLoadFailed", "界面设置预览未能应用。")));
+				BroadcastEditStateChanged();
+				return false;
+			}
+			if (bEndEditRequested) return false;
 		}
 	}
 	OnSettingValueChanged.Broadcast(InSettingId);
+	if (bEndEditRequested) return false;
 	BroadcastEditStateChanged();
 	return true;
 }
@@ -1340,6 +1432,7 @@ void USettingModule::BroadcastEditStateChanged()
 
 void USettingModule::RegisterProvider(USettingProviderBase* InProvider)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if (!InProvider)
 	{
 		return;
@@ -1353,7 +1446,7 @@ void USettingModule::RegisterProvider(USettingProviderBase* InProvider)
 
 void USettingModule::UnregisterProvider(USettingProviderBase* InProvider)
 {
-	if (Providers.Remove(InProvider) > 0 && !FinalDefinitions.IsEmpty())
+	if (Providers.Remove(InProvider) > 0 && IsBusinessAdmissionOpen() && !FinalDefinitions.IsEmpty())
 	{
 		BuildSettingDefinitions();
 	}
@@ -1412,15 +1505,30 @@ TArray<FSettingPageDefinition> USettingModule::GetSettingPages() const
 
 void USettingModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	const FScopedWorldContext WorldContext(GetWorld());
+	if (!IsBusinessAdmissionOpen())
+	{
+		MarkLoadDataFailed();
+		return;
+	}
+	UWidgetModule* Widget = UWidgetModule::GetPtr(GetWorld());
+	UAudioModule* Audio = UAudioModule::GetPtr(GetWorld());
+	UVideoModule* Video = UVideoModule::GetPtr(GetWorld());
+	UCameraModule* Camera = UCameraModule::GetPtr(GetWorld());
+	UInputModule* Input = UInputModule::GetPtr(GetWorld());
+	UParameterModule* Parameters = UParameterModule::GetPtr(GetWorld());
+	if (!Widget || !Audio || !Video || !Camera || !Input || !Parameters)
+	{
+		UE_LOG(LogTemp, Error, TEXT("无法加载当前世界的完整设置：必要模块不可用。"));
+		return;
+	}
 	auto& SaveData = InSaveData.GetRef<FSettingModuleSaveData>();
-
-	UWidgetModule::Get().LoadSaveData(FParameter(SaveData.WidgetData), InPhase);
-	UAudioModule::Get().LoadSaveData(FParameter(SaveData.AudioData), InPhase);
-	UVideoModule::Get().LoadSaveData(FParameter(SaveData.VideoData), InPhase);
-	UCameraModule::Get().LoadSaveData(FParameter(SaveData.CameraData), InPhase);
-	UInputModule::Get().LoadSaveData(FParameter(SaveData.InputData), InPhase);
-	UParameterModule::Get().LoadSaveData(FParameter(SaveData.ParameterData), InPhase);
+	if (!Widget->LoadSaveData(FParameter(SaveData.WidgetData), InPhase)) return;
+	if (!Audio->LoadSaveData(FParameter(SaveData.AudioData), InPhase)) return;
+	if (!Video->LoadSaveData(FParameter(SaveData.VideoData), InPhase)) return;
+	if (!Camera->LoadSaveData(FParameter(SaveData.CameraData), InPhase)) return;
+	if (!Input->LoadSaveData(FParameter(SaveData.InputData), InPhase)) return;
+	if (!Parameters->LoadSaveData(FParameter(SaveData.ParameterData), InPhase)) return;
+	MarkLocalProfilePhaseComplete();
 }
 
 void USettingModule::UnloadData(EPhase InPhase)
@@ -1429,16 +1537,8 @@ void USettingModule::UnloadData(EPhase InPhase)
 
 FParameter USettingModule::ToData()
 {
-	const FScopedWorldContext WorldContext(GetWorld());
 	FSettingModuleSaveData SaveData;
-
-	SaveData.WidgetData = UWidgetModule::Get().GetSaveData(true).GetRef<FWidgetModuleSaveData>();
-	SaveData.AudioData = UAudioModule::Get().GetSaveData(true).GetRef<FAudioModuleSaveData>();
-	SaveData.VideoData = UVideoModule::Get().GetSaveData(true).GetRef<FVideoModuleSaveData>();
-	SaveData.CameraData.FromUserSettings(UCameraModule::Get().GetUserSettings());
-	SaveData.InputData = UInputModule::Get().GetSaveData(false).GetRef<FInputModuleSaveData>();
-	SaveData.ParameterData = UParameterModule::Get().GetSaveData(true).GetRef<FParameterModuleSaveData>();
-
+	if (!GetCurrentCombinedSettings(SaveData)) return FParameter();
 	return FParameter(MoveTemp(SaveData));
 }
 

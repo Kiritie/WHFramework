@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Common/CommonModuleTypes.h"
+#include "Common/InteractionTypes.h"
+#include "Common/CommonTypes.h"
 #include "UObject/Object.h"
 #include "InteractionActionExecution.generated.h"
 

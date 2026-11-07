@@ -105,5 +105,5 @@ private:
 
     friend struct FInventoryArchiveSnapshot;
     friend class FInventoryPreparedStore;
-    friend class UInventoryWorldSubsystem;
+    friend class UInventoryModule;
 };

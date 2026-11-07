@@ -3,7 +3,7 @@
 #pragma once
 
 #include "Animation/AnimInstance.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "CharacterAnimBase.generated.h"
 
 class ACharacterBase;

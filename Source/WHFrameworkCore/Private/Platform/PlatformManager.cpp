@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Platform/PlatformManager.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "Debug/DebugTypes.h"
 #include "Main/MainManager.h"

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Camera/CameraModuleTypes.h"
+#include "Camera/CameraConfigTypes.h"
 #include "UObject/Interface.h"
 #include "CameraTrackableInterface.generated.h"
 

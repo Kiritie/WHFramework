@@ -26,12 +26,13 @@ void UDebugModuleStatics::DebugMessage(const FString& InMessage, EDebugMode InMo
 	FDebugManager::Get().DebugMessage(InMessage, InMode, InCategory, InVerbosity, InDisplayColor, InDuration, InKey, bNewerOnTop);
 }
 
-FDebugCategoryState UDebugModuleStatics::GetDebugCategoryState(EDebugCategory InCategory)
+FDebugCategoryState UDebugModuleStatics::GetDebugCategoryState(UWorld* InWorld, EDebugCategory InCategory)
 {
-	return UDebugModule::Get().GetDebugCategoryState(InCategory);
+	const UDebugModule* Module = UDebugModule::GetPtr(InWorld);
+	return Module ? Module->GetDebugCategoryState(InCategory) : FDebugCategoryState();
 }
 
-void UDebugModuleStatics::SetDebugCategoryState(EDebugCategory InCategory, FDebugCategoryState InState)
+void UDebugModuleStatics::SetDebugCategoryState(UWorld* InWorld, EDebugCategory InCategory, FDebugCategoryState InState)
 {
-	UDebugModule::Get().SetDebugCategoryState(InCategory, InState);
+	if (UDebugModule* Module = UDebugModule::GetPtr(InWorld)) Module->SetDebugCategoryState(InCategory, InState);
 }

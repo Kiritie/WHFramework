@@ -1,4 +1,8 @@
 #include "Camera/Manager/CameraManagerBase.h"
+#include "Camera/CameraInputTypes.h"
+#include "Camera/CameraViewTypes.h"
+#include "Camera/CameraConfigTypes.h"
+#include "Camera/CameraFeatureTypes.h"
 #include "Camera/Actor/CameraRigBase.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/CameraModule.h"
@@ -22,18 +26,15 @@ void ACameraManagerBase::InitializeFor(APlayerController* PC)
 		return;
 	}
 
-	LocalPlayerIndex = 0;
-	PC->IsSplitscreenPlayer(&LocalPlayerIndex);
-
 	SpawnRuntimeRig();
 	if(!RuntimeRig)
 	{
 		return;
 	}
 
-	UCameraModule::Get().RegisterCameraManager(this);
+	UCameraModule::Get(GetWorld()).RegisterCameraManager(this);
 
-	const FCameraConfig& CameraConfig = UCameraModule::Get().GetCameraConfig();
+	const FCameraConfig& CameraConfig = UCameraModule::Get(GetWorld()).GetCameraConfig();
 	DesiredState.PivotRotation = CameraConfig.DefaultRotationOffset;
 	DesiredState.ArmLength = CameraConfig.DefaultDistance;
 	DesiredState.SocketOffset = CameraConfig.DefaultSocketOffset;
@@ -48,9 +49,9 @@ void ACameraManagerBase::InitializeFor(APlayerController* PC)
 
 void ACameraManagerBase::Destroyed()
 {
-	if(UCameraModule::IsValid())
+	if(UCameraModule* Cameras = UCameraModule::GetPtr(GetWorld()))
 	{
-		UCameraModule::Get().UnRegisterCameraManager(this);
+		Cameras->UnRegisterCameraManager(this);
 	}
 
 	StopDirector();
@@ -78,7 +79,7 @@ void ACameraManagerBase::SpawnRuntimeRig()
 		return;
 	}
 
-	TSubclassOf<ACameraRigBase> Class = UCameraModule::Get().GetDefaultRigClass();
+	TSubclassOf<ACameraRigBase> Class = UCameraModule::Get(GetWorld()).GetDefaultRigClass();
 	if(!Class)
 	{
 		Class = ACameraRigBase::StaticClass();
@@ -103,7 +104,7 @@ void ACameraManagerBase::ActivateDefaultMode()
 {
 	FCameraModeContext Context;
 	Context.Transition = FCameraTransitionParams::Instant();
-	SetMode(UCameraModule::Get().GetDefaultModeClass(), Context);
+	SetMode(UCameraModule::Get(GetWorld()).GetDefaultModeClass(), Context);
 }
 
 void ACameraManagerBase::SetMode(TSubclassOf<UCameraModeBase> Class, const FCameraModeContext& Context)
@@ -131,7 +132,7 @@ void ACameraManagerBase::SetDefaultMode(const FCameraTransitionParams& Transitio
 {
 	FCameraModeContext Context;
 	Context.Transition = Transition;
-	SetMode(UCameraModule::Get().GetDefaultModeClass(), Context);
+	SetMode(UCameraModule::Get(GetWorld()).GetDefaultModeClass(), Context);
 }
 
 void ACameraManagerBase::ClearModeTarget()
@@ -165,7 +166,7 @@ void ACameraManagerBase::AddInputIntent(const FCameraInputIntent& Input)
 
 FCameraInputIntent ACameraManagerBase::ResolveInput(const FCameraInputIntent& InRawInput) const
 {
-	const FCameraConfig& Config = UCameraModule::Get().GetCameraConfig();
+	const FCameraConfig& Config = UCameraModule::Get(GetWorld()).GetCameraConfig();
 	FCameraInputIntent Result = InRawInput;
 	Result.Move = Result.Move.GetClampedToMaxSize(1.f) * Config.Movement.MoveSpeed * UserSettings.MovementSensitivity;
 	Result.Look.X *= Config.Rotation.HorizontalSpeed * UserSettings.HorizontalLookSensitivity;
@@ -264,7 +265,7 @@ const FCameraTargetParams* ACameraManagerBase::GetActiveTargetParams() const
 
 FCameraResolvedConfig ACameraManagerBase::ResolveCameraConfig(const FCameraTargetParams* InTargetParams) const
 {
-	const FCameraConfig& Config = UCameraModule::Get().GetCameraConfig();
+	const FCameraConfig& Config = UCameraModule::Get(GetWorld()).GetCameraConfig();
 	FCameraResolvedConfig Result;
 	Result.PivotOffset = Config.DefaultPivotOffset;
 	Result.SocketOffset = Config.DefaultSocketOffset;
@@ -408,7 +409,7 @@ void ACameraManagerBase::ApplyRig(float DeltaTime)
 	}
 	RuntimeRig->SetActorLocationAndRotation(State.PivotLocation, State.PivotRotation);
 	UCameraSpringArmComponent* Boom = RuntimeRig->GetCameraBoom();
-	const FCameraConfig& Config = UCameraModule::Get().GetCameraConfig();
+	const FCameraConfig& Config = UCameraModule::Get(GetWorld()).GetCameraConfig();
 	const bool bUseZoomSmoothing = Config.Zoom.bSmoothZoom && UserSettings.bSmoothZoom && !bTransitionActive;
 	if(!bUseZoomSmoothing)
 	{

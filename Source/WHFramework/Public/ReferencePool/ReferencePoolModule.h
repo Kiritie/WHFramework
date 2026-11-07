@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "ReferencePoolInterface.h"
 #include "Main/Base/ModuleBase.h"
 

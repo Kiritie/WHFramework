@@ -1,5 +1,7 @@
 #pragma once
 #include "Camera/Mode/CameraModeBase.h"
+#include "Camera/CameraInputTypes.h"
+#include "Camera/CameraViewTypes.h"
 #include "FreeCameraMode.generated.h"
 
 UCLASS()

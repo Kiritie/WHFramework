@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Setting/SettingModuleTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "SettingEntry.generated.h"
 

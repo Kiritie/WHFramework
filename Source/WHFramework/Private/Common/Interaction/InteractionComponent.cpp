@@ -2,6 +2,7 @@
 
 
 #include "Common/Interaction/InteractionComponent.h"
+#include "Common/InteractionTypes.h"
 
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "Common/Interaction/InteractionOptionBase.h"

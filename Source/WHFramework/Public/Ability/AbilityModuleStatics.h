@@ -2,7 +2,8 @@
 
 #pragma once
 
-#include "AbilityModuleTypes.h"
+#include "Ability/AbilityInfoTypes.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "Asset/AssetModuleStatics.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Math/MathHelper.h"
@@ -41,10 +42,10 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	// Race
 	template<class T>
-	static bool GetNoiseRaceDatas(FVector2D InLocation, int32 InOffset, TArray<T>& OutDatas)
+	static bool GetNoiseRaceDatas(const UObject* WorldContextObject, FVector2D InLocation, int32 InOffset, TArray<T>& OutDatas)
 	{
 		TArray<T> RaceDatas;
-		if(UAssetModuleStatics::ReadDataTable(RaceDatas))
+		if(UAssetModuleStatics::ReadDataTable(WorldContextObject, RaceDatas))
 		{
 			for(int32 i = 0; i < RaceDatas.Num(); i++)
 			{
@@ -61,19 +62,19 @@ public:
 	
 	//////////////////////////////////////////////////////////////////////////
 	// Attribute
-	UFUNCTION(BlueprintPure, Category = "Ability|GameplayAbility")
-	static FLinearColor GetAttributeColor(const FGameplayAttribute& InAttribute);
+	UFUNCTION(BlueprintPure, meta=(WorldContext="InWorld"), Category = "Ability|GameplayAbility")
+	static FLinearColor GetAttributeColor(UWorld* InWorld, const FGameplayAttribute& InAttribute);
 
-	UFUNCTION(BlueprintCallable, Category = "Ability|GameplayAbility")
-	static void SetAttributeColor(const FGameplayAttribute& InAttribute, const FLinearColor& InColor);
+	UFUNCTION(BlueprintCallable, meta=(WorldContext="InWorld"), Category = "Ability|GameplayAbility")
+	static void SetAttributeColor(UWorld* InWorld, const FGameplayAttribute& InAttribute, const FLinearColor& InColor);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Item
-	static AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer = nullptr);
+	static AAbilityItemBase* SpawnAbilityItem(UWorld* InWorld, FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer = nullptr);
 
-	static AAbilityItemBase* SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor = nullptr);
+	static AAbilityItemBase* SpawnAbilityItem(UWorld* InWorld, FAbilityItem InItem, AActor* InOwnerActor);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Actor
-	static AActor* SpawnAbilityActor(const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr);
+	static AActor* SpawnAbilityActor(UWorld* InWorld, const FParameter& InSaveData, ISceneContainerInterface* InContainer = nullptr);
 };

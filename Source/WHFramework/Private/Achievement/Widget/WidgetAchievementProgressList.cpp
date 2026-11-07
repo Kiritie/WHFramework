@@ -15,12 +15,15 @@ UWidgetAchievementProgressList::UWidgetAchievementProgressList(const FObjectInit
 
 void UWidgetAchievementProgressList::UpdateList()
 {
-	TArray<FAchievementStates> States = UAchievementModule::Get().States;
-	TArray<FAchievementData> Data = UAchievementModule::Get().Achievements;
+	const UAchievementModule* Module = UAchievementModule::GetPtr(GetWorld());
+	APlayerController* Player = GetOwningPlayer();
+	if (!Module || !Player) return;
+	const TArray<FAchievementStates>& States = Module->States;
+	const TArray<FAchievementData>& Data = Module->Achievements;
 	int32 InList = 0;
 	
 	ListView->ClearChildren();
-	for(int i = 0; i < Data.Num(); i++)
+	for(int i = 0; i < Data.Num() && i < States.Num(); i++)
 	{
 		if(	Filter == EAchievementProgressFilter::ANY || 
 			Filter == EAchievementProgressFilter::ACHIEVED && States[i].Achieved ||
@@ -29,9 +32,11 @@ void UWidgetAchievementProgressList::UpdateList()
 		{
 			if(!Data[i].Spoiler || States[i].Achieved)
 			{
-				UWidgetAchievement* Temp = CreateWidget<UWidgetAchievement>(UGameplayStatics::GetPlayerController(GetWorld(), 0), UAchievementModule::Get().AchievementWidgetClass);
-				Temp->SetValue(UAchievementModule::Get().Achievements[i], States[i], true);
-				ListView->AddChild(Temp);
+				if (UWidgetAchievement* Temp = CreateWidget<UWidgetAchievement>(Player, Module->AchievementWidgetClass))
+				{
+					Temp->SetValue(Data[i], States[i], true);
+					ListView->AddChild(Temp);
+				}
 			}
 			else
 			{

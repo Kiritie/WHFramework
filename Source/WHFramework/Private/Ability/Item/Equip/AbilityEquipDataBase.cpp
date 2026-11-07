@@ -1,4 +1,5 @@
 #include "Ability/Item/Equip/AbilityEquipDataBase.h"
+#include "Ability/AbilityItemTypes.h"
 
 UAbilityEquipDataBase::UAbilityEquipDataBase()
 {

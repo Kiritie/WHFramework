@@ -1,3 +1,4 @@
+#include "Common/LifecycleTypes.h"
 #include "Gameplay/WHGameInstance.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/Paths.h"

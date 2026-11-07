@@ -1,7 +1,7 @@
 #pragma once
 
+#include "Ability/AbilityHandleTypes.h"
 #include "VitalityAttributeSetBase.h"
-#include "Ability/AbilityModuleTypes.h"
 
 #include "PawnAttributeSetBase.generated.h"
 

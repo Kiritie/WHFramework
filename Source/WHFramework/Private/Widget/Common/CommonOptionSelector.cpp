@@ -1,4 +1,5 @@
 #include "Widget/Common/CommonOptionSelector.h"
+#include "Widget/WidgetMountTypes.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/HorizontalBox.h"

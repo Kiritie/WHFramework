@@ -3,6 +3,13 @@
 #pragma once
 
 
+#include "Task/TaskExecutionTypes.h"
+#include "Task/TaskReferenceTypes.h"
+#include "Task/TaskObjectiveTypes.h"
+#include "Task/TaskPresentationTypes.h"
+#include "Task/TaskSaveTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "TaskModuleTypes.h"
 #include "Base/TaskAsset.h"
 #include "Base/TaskBase.h"
@@ -11,6 +18,7 @@
 #include "TaskModule.generated.h"
 
 class UTaskBase;
+class FTaskTerminationFinalizer;
 
 /**
  * 
@@ -54,7 +62,9 @@ public:
 	virtual void OnTermination(EPhase InPhase) override;
 
 protected:
+	virtual bool PrepareTaskTermination(FString& OutError) { return true; }
 	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
+	virtual bool WasLoadDataApplied() const override { return bTaskLoadSucceeded; }
 
 	virtual void UnloadData(EPhase InPhase) override;
 
@@ -153,8 +163,8 @@ public:
 
 	TArray<FTaskAssetPresentation> CaptureOwnerPresentation(const FGuid& InOwnerActorID) const;
 	void ApplyOwnerPresentation(const FGuid& InOwnerActorID, const TArray<FTaskAssetPresentation>& InAssets);
-	bool IsLocallyVisible(const UTaskAsset* InAsset) const;
-	TArray<UTaskAsset*> GetVisibleAssets() const;
+	bool IsVisibleToPlayer(const UTaskAsset* InAsset, FGuid InPlayerId) const;
+	TArray<UTaskAsset*> GetVisibleAssets(FGuid InPlayerId) const;
 
 public:
 	UFUNCTION(BlueprintPure)
@@ -172,12 +182,17 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "TaskModule|Task Stats")
 	TArray<UTaskAsset*> DefaultAssets;
 	/// 当前任务 
-	UPROPERTY(VisibleAnywhere, Category = "TaskModule|Task Stats")
-	UTaskBase* CurrentTask;
+	UPROPERTY(Transient)
+	TMap<FGuid, TObjectPtr<UTaskBase>> CurrentTasks;
 
 	UPROPERTY(Transient)
 	TMap<UTaskBase*, FTaskRuntimeSaveData> PendingResume;
 	bool bLoadingTasks = false;
+	bool bClearingRuntimeAssets = false;
+	bool bTaskTerminationFinalized = false;
+	bool bTaskTerminationFinalizing = false;
+	bool bRefreshingTaskMarkers = false;
+	bool bTaskLoadSucceeded = false;
 	bool bDefaultAssetsPerOwner = false;
 	UTaskBase* TurningInTask = nullptr;
 	TSet<FGuid> TaskMarkerIDs;
@@ -185,7 +200,9 @@ protected:
 	bool bTaskMarkersDirty = false;
 	bool bAutomaticTaskEntryDirty = false;
 	bool bResolvingAutomaticTasks = false;
-	void ClearRuntimeAssets();
+	bool ClearRuntimeAssets();
+	bool FinalizeTaskTermination(FString& OutError);
+	friend class FTaskTerminationFinalizer;
 	UTaskBase* ResolveRuntimeTask(UTaskBase* Task) const;
 	UTaskAsset* AddAssetInternal(UTaskAsset* InAsset, FGuid InInstanceID, FGuid InAgentID, FGuid InOwnerActorID = FGuid(), bool bPresentationOnly = false);
 	void BeginTaskMutation();
@@ -194,7 +211,8 @@ protected:
 	void EnterEligibleAutomaticTasks();
 	void EnterEligibleAutomaticTasks(UTaskBase* InTask);
 	void RefreshTaskMarkers();
-	void RemoveTaskMarkers(const UTaskAsset* InAsset = nullptr);
+	bool RemoveTaskMarkers(const UTaskAsset* InAsset = nullptr);
+	void ClearCurrentTasksForSubtree(const UTaskBase* InTask);
 	static FGuid MakeTaskMarkerID(const UTaskAsset* Asset, const FString& GUID);
 	static FString GetSaveKey(const UTaskAsset* Asset, const FString& GUID);
 
@@ -213,15 +231,16 @@ public:
 	* 获取当前任务
 	*/
 	UFUNCTION(BlueprintPure)
-	UTaskBase* GetCurrentTask() const { return CurrentTask; }
+	UTaskBase* GetCurrentTask(FGuid InPlayerId) const { return CurrentTasks.FindRef(InPlayerId); }
 
 	UFUNCTION(BlueprintPure)
-	UTaskBase* GetGuidanceTask() const;
+	UTaskBase* GetGuidanceTask(FGuid InPlayerId) const;
+	FGuid GetGuidanceMarkerId(FGuid InPlayerId) const;
 	/**
 	* 设置当前任务
 	*/
 	UFUNCTION(BlueprintCallable)
-	void SetCurrentTask(UTaskBase* InTask);
+	void SetCurrentTask(FGuid InPlayerId, UTaskBase* InTask);
 	/**
 	* 是否有指定GUID的任务
 	*/

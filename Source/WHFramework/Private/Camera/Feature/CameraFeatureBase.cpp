@@ -1,4 +1,6 @@
 #include "Camera/Feature/CameraFeatureBase.h"
+#include "Camera/CameraViewTypes.h"
+#include "Camera/CameraFeatureTypes.h"
 
 void UCameraFeatureBase::Enter(ACameraManagerBase* InManager, const FCameraFeatureContext& InContext)
 {

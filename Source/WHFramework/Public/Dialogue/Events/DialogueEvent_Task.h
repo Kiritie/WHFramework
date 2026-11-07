@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Task/TaskReferenceTypes.h"
+#include "Common/InteractionTypes.h"
 #include "Dialogue/Base/DialogueEventBase.h"
 #include "Dialogue/Base/DialogueAsset.h"
 #include "Task/TaskModuleTypes.h"

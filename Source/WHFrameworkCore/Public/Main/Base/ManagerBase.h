@@ -2,6 +2,7 @@
 
 #pragma once
 #include "WHFrameworkCoreTypes.h"
+#include "Type/NativeTypeIdentity.h"
 
 class WHFRAMEWORKCORE_API FManagerBase : public FUniqueClass
 {

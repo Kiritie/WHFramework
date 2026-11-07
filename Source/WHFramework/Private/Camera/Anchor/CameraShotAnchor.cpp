@@ -4,14 +4,14 @@
 void ACameraShotAnchor::BeginPlay()
 {
 	Super::BeginPlay();
-	UCameraModule::Get().RegisterShotAnchor(this);
+	if (UCameraModule* Cameras = UCameraModule::GetPtr(GetWorld())) Cameras->RegisterShotAnchor(this);
 }
 
 void ACameraShotAnchor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if(UCameraModule::IsValid())
+	if(UCameraModule* Cameras = UCameraModule::GetPtr(GetWorld()))
 	{
-		UCameraModule::Get().UnregisterShotAnchor(this);
+		Cameras->UnregisterShotAnchor(this);
 	}
 	Super::EndPlay(EndPlayReason);
 }

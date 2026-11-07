@@ -1,7 +1,6 @@
 #pragma once
 
 #include "AbilitySystemInterface.h"
-#include "Ability/AbilityModuleTypes.h"
 
 #include "AbilityActorInterface.generated.h"
 

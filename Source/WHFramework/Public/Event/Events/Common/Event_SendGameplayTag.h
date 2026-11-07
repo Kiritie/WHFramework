@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "Event/EventModuleTypes.h"
 

@@ -1,8 +1,9 @@
 #pragma once
 
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
-#include "Ability/Inventory/InventoryTypes.h"
 #include "InventoryAbilitySource.generated.h"
 
 class AActor;

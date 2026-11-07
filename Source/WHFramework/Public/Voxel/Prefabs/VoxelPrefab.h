@@ -1,4 +1,5 @@
 #pragma once
+#include "Common/LifecycleTypes.h"
 #include "Common/Base/WHActor.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "VoxelPrefab.generated.h"

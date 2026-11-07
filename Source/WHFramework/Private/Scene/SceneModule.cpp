@@ -1,5 +1,16 @@
 
 #include "Scene/SceneModule.h"
+#include "Common/CommonTypes.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Widget/WorldWidgetTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Scene/SceneMapTypes.h"
+#include "Scene/SceneAreaTypes.h"
+#include "Scene/SceneMarkerTypes.h"
+#include "Scene/SceneStreamingTypes.h"
+#include "Scene/SceneActorSaveTypes.h"
+#include "Scene/WorldTimerTypes.h"
+#include "Scene/WorldWeatherTypes.h"
 #include "Scene/Camera/CameraStreamingBridge.h"
 
 #include "Camera/CameraModuleStatics.h"
@@ -24,6 +35,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Main/MainModule.h"
+#include "Misc/ScopeExit.h"
+#include "Misc/ScopeLock.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Math/MathHelper.h"
 #include "Runtime/LevelSequence/Public/LevelSequenceActor.h"
@@ -36,6 +49,9 @@
 #include "Scene/Widget/WidgetLoadingLevelPanel.h"
 #include "Scene/Widget/WidgetSceneWorldMarker.h"
 #include "Scene/Widget/WidgetWorldText.h"
+#include "Engine/GameInstance.h"
+#include "Engine/LocalPlayer.h"
+#include "GameFramework/PlayerController.h"
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "WorldPartition/DataLayer/DataLayerSubsystem.h"
@@ -44,6 +60,7 @@ IMPLEMENTATION_MODULE(USceneModule)
 
 USceneModule::USceneModule()
 {
+	SaveDataVersion = 2;
 	ModuleName = FName("SceneModule");
 	ModuleDisplayName = FText::FromString(TEXT("Scene Module"));
 	SaveScope = ESaveScope::World;
@@ -54,10 +71,6 @@ USceneModule::USceneModule()
 	bSaveActorDatas = false;
 
 	SeaLevel = 0.f;
-	Altitude = 0.f;
-
-	MiniMapCapture = nullptr;
-
 	bMiniMapRotatable = false;
 	MiniMapSource = EWorldMiniMapSource::SceneCapture;
 	MapBackgroundWidgetClass = nullptr;
@@ -81,7 +94,6 @@ USceneModule::USceneModule()
 
 	SceneAreas = TArray<FSceneArea>();
 	Markers = TMap<FGuid, FSceneMarker>();
-	TrackedMarkerID.Invalidate();
 	WorldMarkerWidgets.Reset();
 	bWorldMarkerWidgetsDirty = true;
 	bDrawSceneArea = false;
@@ -117,12 +129,10 @@ USceneModule::USceneModule()
 	OutlineColor = FLinearColor(0.03f, 0.7f, 1.f);
 	OutlineMatInst = nullptr;
 
-	AsyncLoadLevelQueue = TArray<FAsyncLoadLevelTask>();
 }
 
 USceneModule::~USceneModule()
 {
-	TERMINATION_MODULE(USceneModule)
 }
 
 #if WITH_EDITOR
@@ -133,28 +143,25 @@ void USceneModule::OnGenerate()
 
 void USceneModule::OnDestroy()
 {
+	bSceneRuntimeClosing = true;
+	EndOwnerMappingMonitoring();
+	ClearCameraStreamingBridges();
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(USceneModule)
 
-	if(MiniMapCapture)
-	{
-		MiniMapCapture->Destroy();
-		MiniMapCapture = nullptr;
-	}
+	ClearMiniMapCaptures();
 }
 #endif
 
 void USceneModule::OnInitialize()
 {
+	bSceneRuntimeClosing = false;
+	SaveDataVersion = 2;
 	Super::OnInitialize();
 
 	RefreshMiniMapCapture();
 	IDebuggerInterface::Register();
-	if(GetWorld() && GetWorld()->GetNetMode() != NM_DedicatedServer)
-	{
-		CameraStreamingBridge = GetWorld()->SpawnActor<ACameraStreamingBridge>();
-	}
+	RefreshCameraStreamingBridges();
 
 	UEventModuleStatics::SubscribeEvent<FEventAsyncLoadLevels>(this, &ThisClass::OnAsyncLoadLevels);
 	UEventModuleStatics::SubscribeEvent<FEventAsyncUnloadLevels>(this, &ThisClass::OnAsyncUnloadLevels);
@@ -164,6 +171,7 @@ void USceneModule::OnInitialize()
 	UEventModuleStatics::SubscribeEvent<FEventSetDataLayerRuntimeState>(this, &ThisClass::OnSetDataLayerRuntimeState);
 	UEventModuleStatics::SubscribeEvent<FEventSetDataLayerOwnerPlayer>(this, &ThisClass::OnSetDataLayerOwnerPlayer);
 	UEventModuleStatics::SubscribeEvent<FEventSetLevelOwnerPlayer>(this, &ThisClass::OnSetLevelOwnerPlayer);
+	BeginOwnerMappingMonitoring();
 
 	if(WorldTimer)
 	{
@@ -265,7 +273,9 @@ void USceneModule::OnPreparatory(EPhase InPhase)
 
 void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	Super::OnRefresh(DeltaSeconds, bInEditor);
+	if (!IsBusinessAdmissionOpen()) return;
 
 	if(bInEditor) return;
 
@@ -275,10 +285,6 @@ void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		AddSceneArea(PendingSceneArea);
 	}
 
-	Altitude = UCameraModuleStatics::GetViewLocation().Z - SeaLevel;
-	RefreshWorldMarkerWidgets();
-
-	UpdateMiniMapCapture();
 
 	if(WorldTimer)
 	{
@@ -290,28 +296,36 @@ void USceneModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		WorldWeather->OnRefresh(DeltaSeconds);
 	}
 
-	if(AsyncLoadLevelQueue.Num() > 0)
-	{
-		FAsyncLoadLevelTask& Task = AsyncLoadLevelQueue[0];
-		if(!Task.bLoading)
-		{
-			switch(Task.State)
-			{
-				case EFAsyncLoadLevelState::Loading:
-				{
-					AsyncLoadLevelInternal(Task);
-					break;
-				}
-				case EFAsyncLoadLevelState::Unloading:
-				{
-					AsyncUnloadLevelInternal(Task);
-					break;
-				}
-				default: break;
-			}
-		}
-	}
 
+}
+
+void USceneModule::OnControlRefresh(float RealDeltaSeconds)
+{
+	if (!IsBusinessAdmissionOpen()) return;
+    Super::OnControlRefresh(RealDeltaSeconds);
+	for (auto It = SceneActorReservations.CreateIterator(); It; ++It) if (!It.Value().IsValid()) It.RemoveCurrent();
+	RetrySceneActorRegistrations();
+	RefreshOwnerPlayerMappings();
+	RefreshCameraStreamingBridges();
+	UpdateMiniMapCapture();
+	RefreshWorldMarkerWidgets();
+    if(bWaitingLevelFinish && !AsyncLoadLevelQueue.IsEmpty())
+    {
+        LevelFinishRemaining -= RealDeltaSeconds;
+        if(LevelFinishRemaining <= 0.f)
+        {
+            bWaitingLevelFinish = false;
+            CompleteLevelOperation(AsyncLoadLevelQueue[0].OperationId, ESceneLevelLoadResult::Succeeded);
+        }
+    }
+    if(!bLevelOperationsClosing && !AsyncLoadLevelQueue.IsEmpty() && !AsyncLoadLevelQueue[0].bLoading)
+    {
+        StartLevelOperation(AsyncLoadLevelQueue[0]);
+    }
+    if (!bLevelOperationsClosing && !AsyncLoadLevelQueue.IsEmpty() && AsyncLoadLevelQueue[0].bLoading)
+    {
+        RefreshLevelOperationWidgets(AsyncLoadLevelQueue[0].OperationId);
+    }
 }
 
 void USceneModule::OnPause()
@@ -344,36 +358,59 @@ void USceneModule::OnUnPause()
 
 void USceneModule::OnTermination(EPhase InPhase)
 {
+	if (PHASEC(InPhase, EPhase::Primary))
+	{
+		bSceneRuntimeClosing = true;
+		EndOwnerMappingMonitoring();
+	}
 	Super::OnTermination(InPhase);
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
+		if (UWorld* World = GetWorld())
+			for (FTimerHandle& Timer : SceneSequenceTimers) World->GetTimerManager().ClearTimer(Timer);
+		SceneSequenceTimers.Reset();
+		DeferredSceneActorRegistrations.Reset();
+		SceneActorReservations.Reset();
+        CancelLevelOperations();
 		IDebuggerInterface::UnRegister();
-		if(CameraStreamingBridge)
-		{
-			CameraStreamingBridge->Destroy();
-			CameraStreamingBridge = nullptr;
-		}
-		if(MiniMapCapture)
-		{
-			MiniMapCapture->Destroy();
-			MiniMapCapture = nullptr;
-		}
+		ClearCameraStreamingBridges();
+		ClearMiniMapCaptures();
 
-		FSceneArea Area;
-		while(PendingSceneAreas.Dequeue(Area)) { }
+		{
+			FScopeLock Lock(&PendingSceneAreasMutex);
+			FSceneArea Area;
+			while(PendingSceneAreas.Dequeue(Area)) { }
+		}
 		ClearWorldMarkerWidgets();
-		ClearMarkers(true);
+		ClearMarkersInternal(true);
 	}
+}
+
+bool USceneModule::LoadSceneSaveData(const FParameter& InData, EPhase InPhase)
+{
+	if (!IsBusinessAdmissionOpen()) return false;
+	if (bSceneLoadInProgress || bSceneRuntimeClosing || !InData.Is<FSceneModuleSaveData>()) return false;
+	TGuardValue<bool> Loading(bSceneLoadInProgress, true);
+	bLastSceneLoadSucceeded = false;
+	return LoadSaveData(InData, InPhase) && bLastSceneLoadSucceeded;
 }
 
 void USceneModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData.GetRef<FSceneModuleSaveData>();
+	if (!IsBusinessAdmissionOpen())
+	{
+		MarkLoadDataFailed();
+		return;
+	}
+	bLastSceneLoadSucceeded = false;
+	const FSceneModuleSaveData* Data = InSaveData.GetPtr<FSceneModuleSaveData>();
+	if (!Data || bSceneRuntimeClosing) return;
+	const FSceneModuleSaveData& SaveData = *Data;
 
 	if(PHASEC(InPhase, EPhase::All))
 	{
-		if(SaveData.IsSaved())
+		if(PHASEC(InPhase, EPhase::Primary) && SaveData.IsSaved())
 		{
 			MiniMapRange = SaveData.MiniMapRange;
 			WorldMapCenter = SaveData.WorldMapCenter;
@@ -384,18 +421,18 @@ void USceneModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 			{
 				if(Marker.MarkerID.IsValid()) Markers.Add(Marker.MarkerID, Marker);
 			}
-			TrackedMarkerID = SaveData.TrackedMarkerID;
+			PlayerTrackedMarkers = SaveData.PlayerTrackedMarkers;
 			NotifySceneMarkersChanged();
 		}
 
 		if(WorldTimer && WorldTimer->IsAutoSave())
 		{
-			WorldTimer->LoadSaveData(FParameter(SaveData.TimerData), InPhase);
+			if (!WorldTimer->LoadSaveData(FParameter(SaveData.TimerData), InPhase)) return;
 		}
 
 		if(WorldWeather && WorldWeather->IsAutoSave())
 		{
-			WorldWeather->LoadSaveData(FParameter(SaveData.WeatherData), InPhase);
+			if (!WorldWeather->LoadSaveData(FParameter(SaveData.WeatherData), InPhase)) return;
 		}
 
 		if(WorldTimer)
@@ -409,54 +446,60 @@ void USceneModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 
 		if(bSaveActorDatas)
 		{
+			if (PHASEC(InPhase, EPhase::Primary)) DestroyedSceneActorIds.Reset();
 			for(const FSceneActorSaveRecord& Record : SaveData.ActorSaveRecords)
 			{
+				if (!Record.ActorId.IsValid()) return;
 				AActor* Actor = GetSceneActor(Record.ActorId.ToString(), nullptr, false);
+				if (Record.bDestroyed)
+				{
+					if (PHASEC(InPhase, EPhase::Primary))
+					{
+						if (Actor && !Actor->Destroy()) return;
+						DestroyedSceneActorIds.Add(Record.ActorId);
+					}
+					continue;
+				}
 				if(PHASEC(InPhase, EPhase::Primary))
 				{
-					if(Record.bDestroyed)
-					{
-						if(Actor)
-						{
-							Actor->Destroy();
-						}
-						DestroyedSceneActorIds.Add(Record.ActorId);
-						continue;
-					}
 					if(!Actor && Record.bRuntimeSpawned && !Record.ActorClass.IsNull())
 					{
-						if(UClass* ActorClass = Record.ActorClass.TryLoadClass<AActor>())
+						UClass* ActorClass = Record.ActorClass.TryLoadClass<AActor>();
+						if(ActorClass)
 						{
 							Actor = GetWorld()->SpawnActorDeferred<AActor>(ActorClass, Record.Transform);
 							if(Actor && Actor->Implements<USceneActorInterface>())
 							{
-								ISceneActorInterface::Execute_SetActorID(Actor, Record.ActorId.ToString());
+								if (!ISceneActorInterface::Execute_SetActorID(Actor, Record.ActorId)) { Actor->Destroy(); return; }
 								UGameplayStatics::FinishSpawningActor(Actor, Record.Transform);
-								AddSceneActor(Actor);
+								if (!AddSceneActor(Actor) && GetSceneActor(Record.ActorId.ToString(), nullptr, false) != Actor) return;
+							}
+							else if (Actor)
+							{
+								Actor->Destroy();
+								return;
 							}
 						}
 					}
 				}
-				if(Actor)
-				{
-					Actor->SetActorTransform(Record.Transform);
-					if(ISaveDataAgentInterface* Agent = Cast<ISaveDataAgentInterface>(Actor))
-					{
-						Agent->LoadSaveData(Record.Data, InPhase);
-					}
-				}
+				if (!::IsValid(Actor)) return;
+				Actor->SetActorTransform(Record.Transform);
+				ISaveDataAgentInterface* Agent = Cast<ISaveDataAgentInterface>(Actor);
+				if (!Agent || !Agent->LoadSaveData(Record.Data, InPhase)) return;
 			}
 		}
 	}
+	bLastSceneLoadSucceeded = true;
 }
 
 FParameter USceneModule::ToData()
 {
+	if (bSceneRuntimeClosing) return FParameter();
 	FSceneModuleSaveData SaveData;
 	SaveData.MiniMapRange = MiniMapRange;
 	SaveData.WorldMapCenter = WorldMapCenter;
 	SaveData.WorldMapRange = WorldMapRange;
-	SaveData.TrackedMarkerID = TrackedMarkerID;
+	SaveData.PlayerTrackedMarkers = PlayerTrackedMarkers;
 	SaveData.SceneAreas = SceneAreas;
 	for (const auto& Iter : Markers)
 	{
@@ -503,8 +546,7 @@ FParameter USceneModule::ToData()
 				Record.Transform = Actor->GetActorTransform();
 				Record.bRuntimeSpawned = !Actor->HasAnyFlags(RF_WasLoaded);
 				Record.Data = Agent->GetSaveData(true);
-				if (!Record.Data.HasValue() || !::IsValid(Actor) ||
-					SceneActorMap.FindRef(Iter.Key) != Actor || SceneActorMap.Num() != CapturedActors.Num())
+				if (!Record.Data.HasValue())
 				{
 					UE_LOG(LogTemp, Error, TEXT("Scene capture failed for %s; actor was not omitted"), *Iter.Key.ToString());
 					return FParameter();
@@ -576,6 +618,7 @@ void USceneModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapTexture) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapMode))
 		{
+			if (PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapTexture)) ClearMiniMapCaptures();
 			RefreshMiniMapCapture();
 		}
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(USceneModule, MiniMapSource) ||
@@ -591,157 +634,16 @@ void USceneModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 }
 #endif
 
-float USceneModule::GetAltitude(bool bUnsigned, bool bRefresh) const
+float USceneModule::GetAltitude(APlayerController* InPlayer, bool bUnsigned) const
 {
-	const float ReturnValue = bRefresh ? UCameraModuleStatics::GetViewLocation().Z - SeaLevel : Altitude;
+	if (!InPlayer || InPlayer->GetWorld() != GetWorld() || !InPlayer->IsLocalController()) return 0.f;
+	FVector Location;
+	FRotator Rotation;
+	InPlayer->GetPlayerViewPoint(Location, Rotation);
+	const float ReturnValue = Location.Z - SeaLevel;
 	return bUnsigned ? FMath::Max(ReturnValue, 0.f) : ReturnValue;
 }
 
-void USceneModule::RefreshMiniMapCapture()
-{
-	if(!GetWorld() || !GetWorld()->IsGameWorld()) return;
-	if(!::IsValid(MiniMapCapture))
-	{
-		MiniMapCapture = nullptr;
-	}
-	if(MiniMapSource != EWorldMiniMapSource::SceneCapture || GetWorld()->GetNetMode() == NM_DedicatedServer)
-	{
-		if(MiniMapCapture)
-		{
-			MiniMapCapture->Destroy();
-			MiniMapCapture = nullptr;
-		}
-		return;
-	}
-	if(!MiniMapCapture)
-	{
-		FActorSpawnParameters ActorSpawnParameters;
-		ActorSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		ActorSpawnParameters.ObjectFlags |= RF_Transient;
-		ActorSpawnParameters.Owner = GetModuleOwner();
-		MiniMapCapture = GetWorld()->SpawnActor<AMiniMapCapture>(ActorSpawnParameters);
-		if(MiniMapCapture)
-		{
-#if WITH_EDITOR
-			MiniMapCapture->SetActorLabel(TEXT("MiniMapCapture"), false);
-#endif
-			MiniMapCapture->AttachToActor(GetModuleOwner(), FAttachmentTransformRules::KeepWorldTransform);
-		}
-	}
-	UpdateMiniMapCapture();
-}
-
-void USceneModule::UpdateMiniMapCapture()
-{
-	if(!::IsValid(MiniMapCapture)) return;
-	USceneCaptureComponent2D* Capture = MiniMapCapture->GetCapture();
-	FVector Location;
-	const FSceneMapView View = ResolveMiniMapView(&Location);
-	const bool bCaptureEnabled = MiniMapSource == EWorldMiniMapSource::SceneCapture && View.Range > UE_SMALL_NUMBER;
-	Capture->TextureTarget = bCaptureEnabled ? MiniMapTexture : nullptr;
-	Capture->SetVisibility(bCaptureEnabled);
-	if(Capture->IsActive() != bCaptureEnabled) Capture->SetActive(bCaptureEnabled);
-	if(!bCaptureEnabled) return;
-
-	// Camera right is +Y at yaw 0; map right is +X. The image flips V for map up.
-	MiniMapCapture->SetActorLocationAndRotation(Location, FRotator(0.f, View.Yaw - 90.f, 0.f));
-	const float TextureAspect = static_cast<float>(MiniMapTexture->SizeX) / MiniMapTexture->SizeY;
-	// Cover the full square map extent even when the target has a wide aspect ratio.
-	Capture->OrthoWidth = View.Range * FMath::Max(1.f, TextureAspect);
-}
-
-void USceneModule::SetMiniMapSource(EWorldMiniMapSource InMiniMapSource)
-{
-	const bool bChanged = MiniMapSource != InMiniMapSource;
-	MiniMapSource = InMiniMapSource;
-	RefreshMiniMapCapture();
-	if (bChanged) OnMapPresentationChanged.Broadcast();
-}
-
-void USceneModule::SetMapBackgroundWidgetClass(TSubclassOf<UWidgetSceneMapBase> InClass)
-{
-	if (MapBackgroundWidgetClass == InClass) return;
-	MapBackgroundWidgetClass = InClass;
-	OnMapPresentationChanged.Broadcast();
-}
-
-void USceneModule::SetMiniMapMode(EWorldMiniMapMode InMiniMapMode)
-{
-	const bool bChanged = MiniMapMode != InMiniMapMode;
-	MiniMapMode = InMiniMapMode;
-	RefreshMiniMapCapture();
-	if (bChanged) OnMapPresentationChanged.Broadcast();
-}
-
-void USceneModule::SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture)
-{
-	const bool bChanged = MiniMapTexture != InMiniMapTexture;
-	MiniMapTexture = InMiniMapTexture;
-
-	UpdateMiniMapCapture();
-	if (bChanged) OnMapPresentationChanged.Broadcast();
-}
-
-FSceneMapView USceneModule::GetMapView(ESceneMarkerChannel InChannel) const
-{
-	FSceneMapView View;
-	if (InChannel == ESceneMarkerChannel::Compass)
-	{
-		View.Center = FVector2D(UCameraModuleStatics::GetViewLocation());
-		View.Yaw = UCameraModuleStatics::GetViewRotation().Yaw;
-		return View;
-	}
-	if(InChannel == ESceneMarkerChannel::Map)
-	{
-		View.Center = WorldMapCenter;
-		View.Range = WorldMapRange;
-		return View;
-	}
-	return InChannel == ESceneMarkerChannel::MiniMap ? ResolveMiniMapView() : View;
-}
-
-FSceneMapView USceneModule::ResolveMiniMapView(FVector* OutLocation) const
-{
-	FSceneMapView View;
-	if(OutLocation) *OutLocation = FVector::ZeroVector;
-	if(MiniMapSource == EWorldMiniMapSource::None || MiniMapMode == EWorldMiniMapMode::None ||
-		!FMath::IsFinite(MiniMapRange) || MiniMapRange <= UE_SMALL_NUMBER) return View;
-	if(MiniMapSource == EWorldMiniMapSource::SceneCapture &&
-		(!::IsValid(MiniMapTexture) || MiniMapTexture->SizeX <= 0 || MiniMapTexture->SizeY <= 0 ||
-		!FMath::IsFinite(MiniMapRange * FMath::Max(1.f, static_cast<float>(MiniMapTexture->SizeX) / MiniMapTexture->SizeY)))) return View;
-
-	FVector Location = MiniMapPoint.GetLocation();
-	float Yaw = MiniMapPoint.Rotator().Yaw;
-	switch(MiniMapMode)
-	{
-		case EWorldMiniMapMode::ViewPoint:
-		{
-			if(const APlayerController* PlayerController = UCommonModuleStatics::GetPlayerController())
-			{
-				if(const AActor* ViewTarget = PlayerController->GetViewTarget())
-				{
-					Location = ViewTarget->GetActorLocation();
-					Yaw = ViewTarget->GetActorRotation().Yaw;
-				}
-			}
-			break;
-		}
-		case EWorldMiniMapMode::CameraPoint:
-		{
-			const FTransform ViewTransform = UCameraModuleStatics::GetViewTransform();
-			Location = ViewTransform.GetLocation();
-			Yaw = ViewTransform.Rotator().Yaw;
-			break;
-		}
-		default: break;
-	}
-	if(Location.ContainsNaN() || !FMath::IsFinite(Yaw)) return View;
-	if(OutLocation) *OutLocation = Location;
-	View.Center = FVector2D(Location);
-	View.Range = MiniMapRange;
-	View.Yaw = bMiniMapRotatable ? Yaw : 0.f;
-	return View;
-}
 bool USceneModule::HasSceneArea(const FName InName) const
 {
 	for(auto& Iter : SceneAreas)
@@ -817,6 +719,7 @@ FSceneArea USceneModule::GetSceneAreaByPoint(const FVector2D& InPoint) const
 
 void USceneModule::RegisterSceneAreaResolver(ESceneAreaType InType, const FSceneAreaResolver& InResolver)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	SceneAreaResolvers.Add(InType, InResolver);
 }
 
@@ -829,9 +732,12 @@ void USceneModule::AddSceneArea(const FSceneArea& InArea, bool bThreadSafe)
 {
 	if(bThreadSafe)
 	{
+		FScopeLock Lock(&PendingSceneAreasMutex);
+		if (!IsBusinessAdmissionOpen()) return;
 		PendingSceneAreas.Enqueue(InArea);
 		return;
 	}
+	if (!IsBusinessAdmissionOpen()) return;
 
 	FSceneArea Area = InArea;
 	if(Area.AreaName.IsNone())
@@ -842,12 +748,14 @@ void USceneModule::AddSceneArea(const FSceneArea& InArea, bool bThreadSafe)
 	{
 		SceneAreas.Add(Area);
 		OnSceneAreaAdded.Broadcast(Area);
+		if (!IsBusinessAdmissionOpen()) return;
 		OnSceneAreasChanged.Broadcast();
 	}
 }
 
 void USceneModule::RemoveSceneArea(const FName InName)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	for(int32 Index = 0; Index < SceneAreas.Num(); ++Index)
 	{
 		if(SceneAreas[Index].AreaName == InName)
@@ -861,16 +769,21 @@ void USceneModule::RemoveSceneArea(const FName InName)
 
 void USceneModule::ClearSceneArea()
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	const bool bHadSceneAreas = !SceneAreas.IsEmpty();
 	SceneAreas.Empty();
 
-	FSceneArea Area;
-	while(PendingSceneAreas.Dequeue(Area)) { }
+	{
+		FScopeLock Lock(&PendingSceneAreasMutex);
+		FSceneArea Area;
+		while(PendingSceneAreas.Dequeue(Area)) { }
+	}
 	if(bHadSceneAreas) OnSceneAreasChanged.Broadcast();
 }
 
 FGuid USceneModule::AddMarker(const FSceneMarker& InMarker)
 {
+	if (!IsBusinessAdmissionOpen()) return FGuid();
 	FSceneMarker Marker = InMarker;
 	if(!Marker.MarkerID.IsValid()) Marker.MarkerID = FGuid::NewGuid();
 	if(Markers.Contains(Marker.MarkerID)) return FGuid();
@@ -881,12 +794,14 @@ FGuid USceneModule::AddMarker(const FSceneMarker& InMarker)
 
 bool USceneModule::UpdateMarker(const FSceneMarker& InMarker)
 {
+	if (!IsBusinessAdmissionOpen()) return false;
 	FSceneMarker* Existing = InMarker.MarkerID.IsValid() ? Markers.Find(InMarker.MarkerID) : nullptr;
 	if(!Existing) return false;
 	if(Existing->MarkerTag == InMarker.MarkerTag && Existing->DisplayName.EqualTo(InMarker.DisplayName) &&
 		Existing->Symbol.EqualTo(InMarker.Symbol) && Existing->Badge.EqualTo(InMarker.Badge) && Existing->Description.EqualTo(InMarker.Description) && Existing->Icon == InMarker.Icon &&
 		Existing->Color.Equals(InMarker.Color) && Existing->Location.Equals(InMarker.Location) && Existing->Offset.Equals(InMarker.Offset) &&
 		Existing->ActorID == InMarker.ActorID && Existing->AreaName == InMarker.AreaName && Existing->Channels == InMarker.Channels &&
+		Existing->OwnerPlayerId == InMarker.OwnerPlayerId && Existing->bNavigationOnlyWhenTracked == InMarker.bNavigationOnlyWhenTracked &&
 		Existing->Priority == InMarker.Priority && FMath::IsNearlyEqual(Existing->MinDistance, InMarker.MinDistance) &&
 		FMath::IsNearlyEqual(Existing->MaxDistance, InMarker.MaxDistance) && Existing->bPersistent == InMarker.bPersistent) return true;
 	*Existing = InMarker;
@@ -896,25 +811,43 @@ bool USceneModule::UpdateMarker(const FSceneMarker& InMarker)
 
 bool USceneModule::RemoveMarker(FGuid InMarkerID)
 {
+	if (!IsBusinessAdmissionOpen()) return false;
 	if(!Markers.Remove(InMarkerID)) return false;
-	if(TrackedMarkerID == InMarkerID) TrackedMarkerID.Invalidate();
+	for (auto It = PlayerTrackedMarkers.CreateIterator(); It; ++It)
+	{
+		if (It.Value() == InMarkerID) It.RemoveCurrent();
+	}
 	NotifySceneMarkersChanged();
 	return true;
 }
 
 void USceneModule::ClearMarkers(bool bIncludePersistent)
 {
+	if (!IsBusinessAdmissionOpen()) return;
+	ClearMarkersInternal(bIncludePersistent);
+}
+
+void USceneModule::ClearMarkersInternal(bool bIncludePersistent)
+{
 	bool bChanged = false;
 	for(auto Iter = Markers.CreateIterator(); Iter; ++Iter)
 	{
 		if(bIncludePersistent || !Iter.Value().bPersistent)
 		{
-			if(TrackedMarkerID == Iter.Key()) TrackedMarkerID.Invalidate();
+			for (auto Tracked = PlayerTrackedMarkers.CreateIterator(); Tracked; ++Tracked)
+			{
+				if (Tracked.Value() == Iter.Key()) Tracked.RemoveCurrent();
+			}
 			Iter.RemoveCurrent();
 			bChanged = true;
 		}
 	}
-	if(bChanged) NotifySceneMarkersChanged();
+	if (bIncludePersistent && !PlayerTrackedMarkers.IsEmpty())
+	{
+		PlayerTrackedMarkers.Reset();
+		bChanged = true;
+	}
+	if(bChanged && IsBusinessAdmissionOpen()) NotifySceneMarkersChanged();
 }
 
 FSceneMarker USceneModule::GetMarker(FGuid InMarkerID) const
@@ -923,137 +856,15 @@ FSceneMarker USceneModule::GetMarker(FGuid InMarkerID) const
 	return FSceneMarker();
 }
 
-FSceneMarkerView USceneModule::ResolveMarker(const FSceneMarker& InMarker, const FVector& InViewLocation, float InViewYaw) const
+bool USceneModule::SetTrackedMarker(FGuid InPlayerID, FGuid InMarkerID)
 {
-	FSceneMarkerView View;
-	View.Marker = InMarker;
-	View.Location = InMarker.Location;
-	if(InMarker.ActorID.IsValid())
-	{
-		if(AActor* const* Actor = SceneActorMap.Find(InMarker.ActorID); Actor != nullptr && ::IsValid(*Actor))
-		{
-			View.Location = (*Actor)->GetActorLocation();
-			View.bTargetLoaded = true;
-		}
-	}
-	else if(!InMarker.AreaName.IsNone())
-	{
-		const FSceneArea Area = GetSceneArea(InMarker.AreaName);
-		if(!Area.AreaName.IsNone())
-		{
-			View.Location = Area.EntranceLocation.IsNearlyZero() ? FVector(Area.AreaCenter, InMarker.Location.Z) : Area.EntranceLocation;
-			View.bTargetLoaded = true;
-		}
-	}
-	View.Location += InMarker.Offset;
-	const FVector2D Delta = FVector2D(View.Location - InViewLocation);
-	View.Distance = Delta.Size();
-	const float DirectionYaw = FMath::RadiansToDegrees(FMath::Atan2(Delta.Y, Delta.X));
-	View.Bearing = FMath::FindDeltaAngleDegrees(InViewYaw, DirectionYaw);
-	View.bTracked = TrackedMarkerID == InMarker.MarkerID;
-	return View;
-}
-
-FSceneMarkerView USceneModule::GetMarkerView(FGuid InMarkerID, FVector InViewLocation, float InViewYaw) const
-{
-	if(const FSceneMarker* Marker = Markers.Find(InMarkerID)) return ResolveMarker(*Marker, InViewLocation, InViewYaw);
-	return FSceneMarkerView();
-}
-
-TArray<FSceneMarkerView> USceneModule::GetMarkerViews(ESceneMarkerChannel InChannel, FVector InViewLocation, float InViewYaw, bool bFilterByDistance) const
-{
-	TArray<FSceneMarkerView> Views;
-	for(const auto& Iter : Markers)
-	{
-		if(!Iter.Value.HasChannel(InChannel) && !(InChannel == ESceneMarkerChannel::Compass &&
-			Iter.Key == TrackedMarkerID && Iter.Value.HasChannel(ESceneMarkerChannel::Map))) continue;
-		FSceneMarkerView View = ResolveMarker(Iter.Value, InViewLocation, InViewYaw);
-		if(bFilterByDistance && (View.Distance < Iter.Value.MinDistance || (Iter.Value.MaxDistance > 0.f && View.Distance > Iter.Value.MaxDistance))) continue;
-		Views.Add(MoveTemp(View));
-	}
-	Views.StableSort([](const FSceneMarkerView& A, const FSceneMarkerView& B)
-	{
-		return A.Marker.Priority == B.Marker.Priority ? A.Distance < B.Distance : A.Marker.Priority > B.Marker.Priority;
-	});
-	return Views;
-}
-
-void USceneModule::RefreshWorldMarkerWidgets()
-{
-	if(!UWidgetModule::IsValid()) return;
-
-	if(bWorldMarkerWidgetsDirty)
-	{
-		TSet<FGuid> DesiredIDs;
-		for(const auto& Pair : Markers)
-		{
-			if(!Pair.Value.HasChannel(ESceneMarkerChannel::World)) continue;
-			DesiredIDs.Add(Pair.Key);
-			UWidgetSceneWorldMarker*& Widget = WorldMarkerWidgets.FindOrAdd(Pair.Key);
-			if(!::IsValid(Widget))
-			{
-				Widget = UWidgetModule::Get().CreateWorldWidget<UWidgetSceneWorldMarker>(
-					FWorldWidgetMapping(Pair.Value.Location + Pair.Value.Offset),
-					FWidgetSpawnParameter(this),
-					UWidgetSceneWorldMarker::StaticClass());
-			}
-			if(Widget)
-			{
-				Widget->SetMarkerView(ResolveMarker(Pair.Value, FVector::ZeroVector, 0.f));
-			}
-		}
-
-		for(auto Iter = WorldMarkerWidgets.CreateIterator(); Iter; ++Iter)
-		{
-			if(DesiredIDs.Contains(Iter.Key())) continue;
-			if(::IsValid(Iter.Value()))
-			{
-				UWidgetModule::Get().DestroyWorldWidget(Iter.Value(), EObjectDespawnMode::Recovery);
-			}
-			Iter.RemoveCurrent();
-		}
-		bWorldMarkerWidgetsDirty = false;
-	}
-
-	const FVector ViewLocation = UCameraModuleStatics::GetViewLocation();
-	float ViewYaw = 0.f;
-	if(const APlayerController* PlayerController = UCommonModuleStatics::GetPlayerController())
-	{
-		ViewYaw = PlayerController->GetControlRotation().Yaw;
-	}
-	for(const auto& Pair : WorldMarkerWidgets)
-	{
-		const FSceneMarker* Marker = Markers.Find(Pair.Key);
-		if(Marker && ::IsValid(Pair.Value))
-		{
-			Pair.Value->UpdateMarkerState(ResolveMarker(*Marker, ViewLocation, ViewYaw));
-		}
-	}
-}
-
-void USceneModule::NotifySceneMarkersChanged()
-{
-	bWorldMarkerWidgetsDirty = true;
-	OnSceneMarkersChanged.Broadcast();
-}
-
-void USceneModule::ClearWorldMarkerWidgets()
-{
-	if(UWidgetModule::IsValid())
-	{
-		for(const auto& Pair : WorldMarkerWidgets)
-		{
-			if(::IsValid(Pair.Value)) UWidgetModule::Get().DestroyWorldWidget(Pair.Value, EObjectDespawnMode::Recovery);
-		}
-	}
-	WorldMarkerWidgets.Reset();
-}
-
-bool USceneModule::SetTrackedMarker(FGuid InMarkerID)
-{
+	if (!IsBusinessAdmissionOpen()) return false;
+	if (!InPlayerID.IsValid()) return false;
 	if(InMarkerID.IsValid() && !Markers.Contains(InMarkerID)) return false;
-	if(TrackedMarkerID == InMarkerID) return true;
-	TrackedMarkerID = InMarkerID;
+	if (const FSceneMarker* Marker = Markers.Find(InMarkerID); Marker && Marker->OwnerPlayerId.IsValid() && Marker->OwnerPlayerId != InPlayerID) return false;
+	if(GetTrackedMarker(InPlayerID) == InMarkerID) return true;
+	if (InMarkerID.IsValid()) PlayerTrackedMarkers.Add(InPlayerID, InMarkerID);
+	else PlayerTrackedMarkers.Remove(InPlayerID);
 	NotifySceneMarkersChanged();
 	return true;
 }
@@ -1063,6 +874,13 @@ UWorldTimer* USceneModule::GetWorldTimer(TSubclassOf<UWorldTimer> InClass) const
 	return GetDeterminesOutputObject(WorldTimer, InClass);
 }
 
+int64 USceneModule::GetWorldTicks(UWorld* InWorld)
+{
+	const USceneModule* Scene = GetPtr(InWorld);
+	const UWorldTimer* Timer = Scene ? Scene->GetWorldTimer() : nullptr;
+	return Timer ? Timer->GetDateTime().GetTicks() : 0;
+}
+
 UWorldWeather* USceneModule::GetWorldWeather(TSubclassOf<UWorldWeather> InClass) const
 {
 	return GetDeterminesOutputObject(WorldWeather, InClass);
@@ -1070,6 +888,7 @@ UWorldWeather* USceneModule::GetWorldWeather(TSubclassOf<UWorldWeather> InClass)
 
 void USceneModule::OnAsyncLoadLevels(UObject* InSender, const FEventAsyncLoadLevels& InEvent)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	for(auto& Iter : InEvent.SoftLevelPaths)
 	{
 		FOnAsyncLoadLevelFinished OnAsyncLoadLevelFinished;
@@ -1086,6 +905,7 @@ void USceneModule::OnAsyncLoadLevels(UObject* InSender, const FEventAsyncLoadLev
 
 void USceneModule::OnAsyncUnloadLevels(UObject* InSender, const FEventAsyncUnloadLevels& InEvent)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	for(auto& Iter : InEvent.SoftLevelPaths)
 	{
 		FOnAsyncLoadLevelFinished OnAsyncUnloadLevelFinished;
@@ -1102,34 +922,48 @@ void USceneModule::OnAsyncUnloadLevels(UObject* InSender, const FEventAsyncUnloa
 
 void USceneModule::OnSetActorVisible(UObject* InSender, const FEventSetActorVisible& InEvent)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(AActor* Actor = InEvent.ActorPath.LoadSynchronous())
 	{
-		Actor->GetRootComponent()->SetVisibility(InEvent.bVisible, true);
+		if (Actor->GetRootComponent())
+			Actor->GetRootComponent()->SetVisibility(InEvent.bVisible, true);
 	}
 }
 
 void USceneModule::OnPlayLevelSequence(UObject* InSender, const FEventPlayLevelSequence& InEvent)
 {
+	if (!IsBusinessAdmissionOpen()) return;
+	UWorld* World = GetWorld();
+	if (!World) return;
 	if(ALevelSequenceActor* Actor = InEvent.LevelSequence.LoadSynchronous())
 	{
-		FTimerHandle TimerHandle;
-		auto PlaySequence = [Actor, InEvent]()
+		const TWeakObjectPtr<USceneModule> Owner(this);
+		const TWeakObjectPtr<ALevelSequenceActor> SequenceActor(Actor);
+		auto PlaySequence = [Owner, SequenceActor, InEvent]()
 		{
+			USceneModule* Scene = Owner.Get();
+			ALevelSequenceActor* Target = SequenceActor.Get();
+			if (!Scene || !Scene->IsBusinessAdmissionOpen() || !Target) return;
+			ULevelSequencePlayer* Player = Target->GetSequencePlayer();
+			if (!Player) return;
 			if(!InEvent.bReverse)
 			{
-				Actor->GetSequencePlayer()->Play();
+				Player->Play();
 			}
 			else
 			{
-				Actor->GetSequencePlayer()->PlayReverse();
+				Player->PlayReverse();
 			}
 		};
 		if(InEvent.Delay > 0.f)
 		{
-			GetWorld()->GetTimerManager().SetTimer(TimerHandle, [PlaySequence]()
+			const TSharedRef<FTimerHandle> TimerHandle = MakeShared<FTimerHandle>();
+			World->GetTimerManager().SetTimer(*TimerHandle, [Owner, TimerHandle, PlaySequence]()
 			{
+				if (USceneModule* Scene = Owner.Get()) Scene->SceneSequenceTimers.Remove(*TimerHandle);
 				PlaySequence();
 			}, InEvent.Delay, false);
+			SceneSequenceTimers.Add(*TimerHandle);
 		}
 		else
 		{
@@ -1140,118 +974,43 @@ void USceneModule::OnPlayLevelSequence(UObject* InSender, const FEventPlayLevelS
 
 void USceneModule::OnStopLevelSequence(UObject* InSender, const FEventStopLevelSequence& InEvent)
 {
+	if (!IsBusinessAdmissionOpen()) return;
+	UWorld* World = GetWorld();
+	if (!World) return;
 	if(ALevelSequenceActor* Actor = InEvent.LevelSequence.LoadSynchronous())
 	{
-		FTimerHandle TimerHandle;
-		auto StopSequence = [Actor, InEvent]()
+		const TWeakObjectPtr<USceneModule> Owner(this);
+		const TWeakObjectPtr<ALevelSequenceActor> SequenceActor(Actor);
+		auto StopSequence = [Owner, SequenceActor, InEvent]()
 		{
+			USceneModule* Scene = Owner.Get();
+			ALevelSequenceActor* Target = SequenceActor.Get();
+			if (!Scene || !Scene->IsBusinessAdmissionOpen() || !Target) return;
+			ULevelSequencePlayer* Player = Target->GetSequencePlayer();
+			if (!Player) return;
 			if(!InEvent.bKeepState)
 			{
-				Actor->GetSequencePlayer()->Stop();
+				Player->Stop();
 			}
 			else
 			{
-				Actor->GetSequencePlayer()->StopAtCurrentTime();
+				Player->StopAtCurrentTime();
 			}
 		};
 		if(InEvent.Delay > 0.f)
 		{
-			GetWorld()->GetTimerManager().SetTimer(TimerHandle, [StopSequence]()
+			const TSharedRef<FTimerHandle> TimerHandle = MakeShared<FTimerHandle>();
+			World->GetTimerManager().SetTimer(*TimerHandle, [Owner, TimerHandle, StopSequence]()
 			{
+				if (USceneModule* Scene = Owner.Get()) Scene->SceneSequenceTimers.Remove(*TimerHandle);
 				StopSequence();
 			}, InEvent.Delay, false);
+			SceneSequenceTimers.Add(*TimerHandle);
 		}
 		else
 		{
 			StopSequence();
 		}
-	}
-}
-
-void USceneModule::OnSetDataLayerRuntimeState(UObject* InSender, const FEventSetDataLayerRuntimeState& InEvent)
-{
-	if(UDataLayerManager* DataLayerManager = UDataLayerManager::GetDataLayerManager(this))
-	{
-		DataLayerManager->SetDataLayerRuntimeState(InEvent.DataLayer, InEvent.State, InEvent.bRecursive);
-		ApplyDataLayerOwnerPlayer(InEvent.DataLayer);
-	}
-}
-
-void USceneModule::OnSetDataLayerOwnerPlayer(UObject* InSender, const FEventSetDataLayerOwnerPlayer& InEvent)
-{
-	if(InEvent.PlayerIndex != -1)
-	{
-		DataLayerPlayerMappings.Emplace(InEvent.DataLayer, InEvent.PlayerIndex);
-		ApplyDataLayerOwnerPlayer(InEvent.DataLayer);
-	}
-	else if(DataLayerPlayerMappings.Contains(InEvent.DataLayer))
-	{
-		DataLayerPlayerMappings.Remove(InEvent.DataLayer);
-		ApplyOwnerPlayerToActors(UCommonModuleStatics::GetAllActorsOfDataLayer(InEvent.DataLayer), INDEX_NONE);
-	}
-}
-
-void USceneModule::OnSetLevelOwnerPlayer(UObject* InSender, const FEventSetLevelOwnerPlayer& InEvent)
-{
-	const FName LevelPath = InEvent.LevelObjectPtr ? FName(*FPackageName::ObjectPathToPackageName(InEvent.LevelObjectPtr.ToString())) : InEvent.LevelPath;
-	if(InEvent.PlayerIndex != -1)
-	{
-		LevelPlayerMappings.Emplace(LevelPath, InEvent.PlayerIndex);
-		ApplyLevelOwnerPlayer(LevelPath);
-	}
-	else if(LevelPlayerMappings.Contains(LevelPath))
-	{
-		LevelPlayerMappings.Remove(LevelPath);
-		ApplyOwnerPlayerToActors(UCommonModuleStatics::GetAllActorsOfLevel(LevelPath), INDEX_NONE);
-	}
-}
-
-void USceneModule::ApplyOwnerPlayerToActors(const TArray<AActor*>& InActors, int32 InPlayerIndex) const
-{
-	AActor* OwnerActor = nullptr;
-	if(InPlayerIndex != INDEX_NONE)
-	{
-		const AWHPlayerController* PlayerController = UCommonModuleStatics::GetPlayerController(InPlayerIndex);
-		OwnerActor = PlayerController ? PlayerController->GetViewTarget() : nullptr;
-		if(!OwnerActor) return;
-	}
-
-	for(AActor* Actor : InActors)
-	{
-		if(!::IsValid(Actor)) continue;
-		Actor->SetOwner(OwnerActor);
-		TArray<UPrimitiveComponent*> Components;
-		Actor->GetComponents<UPrimitiveComponent>(Components);
-		for(UPrimitiveComponent* Component : Components)
-		{
-			if(Component) Component->SetOnlyOwnerSee(OwnerActor != nullptr);
-		}
-	}
-}
-
-void USceneModule::ApplyDataLayerOwnerPlayer(UDataLayerAsset* InDataLayer) const
-{
-	const int32* PlayerIndex = DataLayerPlayerMappings.Find(InDataLayer);
-	if(!PlayerIndex) return;
-	ApplyOwnerPlayerToActors(UCommonModuleStatics::GetAllActorsOfDataLayer(InDataLayer), *PlayerIndex);
-}
-
-void USceneModule::ApplyLevelOwnerPlayer(FName InLevelPath) const
-{
-	const int32* PlayerIndex = LevelPlayerMappings.Find(InLevelPath);
-	if(!PlayerIndex) return;
-	ApplyOwnerPlayerToActors(UCommonModuleStatics::GetAllActorsOfLevel(InLevelPath), *PlayerIndex);
-}
-
-void USceneModule::ApplyAllOwnerPlayerMappings() const
-{
-	for(const auto& Pair : DataLayerPlayerMappings)
-	{
-		ApplyDataLayerOwnerPlayer(Pair.Key);
-	}
-	for(const auto& Pair : LevelPlayerMappings)
-	{
-		ApplyLevelOwnerPlayer(Pair.Key);
 	}
 }
 
@@ -1273,6 +1032,7 @@ FTraceMapping USceneModule::GetTraceMapping(const FName InName, bool bEnsured) c
 
 void USceneModule::AddTraceMapping(const FName InName, ECollisionChannel InTraceChannel)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(!TraceMappings.Contains(InName))
 	{
 		TraceMappings.Add(InName, InTraceChannel);
@@ -1281,6 +1041,7 @@ void USceneModule::AddTraceMapping(const FName InName, ECollisionChannel InTrace
 
 void USceneModule::RemoveTraceMapping(const FName InName)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(TraceMappings.Contains(InName))
 	{
 		TraceMappings.Remove(InName);
@@ -1289,47 +1050,72 @@ void USceneModule::RemoveTraceMapping(const FName InName)
 
 bool USceneModule::HasSceneActor(const FString& InID, bool bEnsured) const
 {
-	if(SceneActorMap.Contains(FGuid(InID))) return true;
+	FGuid Id;
+	AActor* const* Entry = FGuid::Parse(InID, Id) && Id.IsValid() ? SceneActorMap.Find(Id) : nullptr;
+	if (Entry && ::IsValid(*Entry) && (*Entry)->GetWorld() == GetWorld()) return true;
 	ensureEditorMsgf(!bEnsured, FString::Printf(TEXT("No scene actor, actor id: %s"), *InID), EDC_Scene, EDV_Error);
 	return false;
 }
 
 AActor* USceneModule::GetSceneActor(const FString& InID, TSubclassOf<AActor> InClass, bool bEnsured) const
 {
-	if(HasSceneActor(InID, bEnsured))
-	{
-		return GetDeterminesOutputObject(SceneActorMap[FGuid(InID)], InClass);
-	}
-	return nullptr;
+	if (!HasSceneActor(InID, bEnsured)) return nullptr;
+	FGuid Id;
+	if (!FGuid::Parse(InID, Id)) return nullptr;
+	AActor* const* Actor = SceneActorMap.Find(Id);
+	return GetDeterminesOutputObject(Actor ? *Actor : nullptr, InClass);
 }
 
 bool USceneModule::AddSceneActor(AActor* InActor)
 {
-	if(!InActor || !InActor->Implements<USceneActorInterface>()) return false;
+	if (!IsBusinessAdmissionOpen()) return false;
+	return TryAddSceneActor(InActor, true);
+}
 
-	if(!SceneActorMap.Contains(ISceneActorInterface::Execute_GetActorID(InActor)))
+bool USceneModule::TryAddSceneActor(AActor* InActor, bool bReportConflict, const FGuid* ExpectedId, bool bNotifyMarkers)
+{
+	if (!IsBusinessAdmissionOpen()) return false;
+	UWorld* World = GetWorld();
+	if (bSceneRuntimeClosing || !::IsValid(InActor) || !World || World->bIsTearingDown || InActor->GetWorld() != World ||
+		!InActor->Implements<USceneActorInterface>()) return false;
+	const TWeakObjectPtr<AActor> ActorKey(InActor);
+	if (PendingSceneActorRegistrations.Contains(ActorKey)) return false;
+	PendingSceneActorRegistrations.Add(ActorKey);
+	ON_SCOPE_EXIT { PendingSceneActorRegistrations.Remove(ActorKey); };
+	const FGuid Id = ISceneActorInterface::Execute_GetActorID(InActor);
+	if (ExpectedId && Id != *ExpectedId) return false;
+	if (const FDeferredSceneActorRegistration* Deferred = DeferredSceneActorRegistrations.Find(ActorKey); Deferred && Deferred->ExpectedId != Id) return false;
+	if (AActor* const* Existing = SceneActorMap.Find(Id); Existing && *Existing == InActor) return true;
+	if (TWeakObjectPtr<AActor>* Reserved = SceneActorReservations.Find(Id); Reserved && !Reserved->IsValid()) SceneActorReservations.Remove(Id);
+	const TWeakObjectPtr<AActor>* Reservation = SceneActorReservations.Find(Id);
+	const FGuid* ReservedId = SceneActorReservations.FindKey(ActorKey);
+	if (!Id.IsValid() || SceneActorMap.Contains(Id) || SceneActorMap.FindKey(InActor) ||
+		(Reservation && Reservation->Get() != InActor) || (ReservedId && *ReservedId != Id))
 	{
-		SceneActorMap.Add(ISceneActorInterface::Execute_GetActorID(InActor), InActor);
-		for(const auto& Iter : Markers)
-		{
-			if(Iter.Value.ActorID == ISceneActorInterface::Execute_GetActorID(InActor))
-			{
-				NotifySceneMarkersChanged();
-				break;
-			}
-		}
-		return true;
+		if (bReportConflict) UE_LOG(LogTemp, Error, TEXT("Scene actor identity is invalid or already registered: world=%s actor=%s id=%s"),
+			*GetNameSafe(World), *GetNameSafe(InActor), *Id.ToString());
+		return false;
 	}
-	return false;
+	SceneActorMap.Add(Id, InActor);
+	SceneActorReservations.Remove(Id);
+	bool bMarkerChanged = false;
+	for (const auto& Pair : Markers) if (Pair.Value.ActorID == Id) { bMarkerChanged = true; break; }
+	if (bMarkerChanged && bNotifyMarkers) NotifySceneMarkersChanged();
+	return true;
 }
 
 bool USceneModule::RemoveSceneActor(AActor* InActor)
 {
-	if(!InActor || !InActor->Implements<USceneActorInterface>()) return false;
-
-	if(SceneActorMap.Contains(ISceneActorInterface::Execute_GetActorID(InActor)))
+	if (!InActor || !GetWorld() || InActor->GetWorld() != GetWorld()) return false;
+	const TWeakObjectPtr<AActor> ActorKey(InActor);
+	const bool bRemovedDeferred = DeferredSceneActorRegistrations.Remove(ActorKey) > 0;
+	const FGuid* ReservedId = SceneActorReservations.FindKey(ActorKey);
+	const bool bReleasedReservation = ReservedId != nullptr;
+	if (ReservedId) { const FGuid Id = *ReservedId; SceneActorReservations.Remove(Id); }
+	const FGuid* FoundId = SceneActorMap.FindKey(InActor);
+	if (FoundId)
 	{
-		const FGuid ActorID = ISceneActorInterface::Execute_GetActorID(InActor);
+		const FGuid ActorID = *FoundId;
 		bool bMarkerChanged = false;
 		for(auto& Iter : Markers)
 		{
@@ -1343,14 +1129,120 @@ bool USceneModule::RemoveSceneActor(AActor* InActor)
 		if(bMarkerChanged) NotifySceneMarkersChanged();
 		return true;
 	}
-	return false;
+	return bReleasedReservation || bRemovedDeferred;
+}
+
+bool USceneModule::QueueSceneActorRegistration(AActor* InActor, const FGuid& ExpectedId)
+{
+	if (!IsBusinessAdmissionOpen()) return false;
+	check(IsInGameThread());
+	UWorld* World = GetWorld();
+	if (bSceneRuntimeClosing || !::IsValid(World) || World->bIsTearingDown || !::IsValid(InActor) ||
+		InActor->GetWorld() != World || !ExpectedId.IsValid()) return false;
+	const TWeakObjectPtr<AActor> ActorKey(InActor);
+	FDeferredSceneActorRegistration& Request = DeferredSceneActorRegistrations.FindOrAdd(ActorKey);
+	Request.ExpectedId = ExpectedId;
+	Request.Serial = ++SceneActorRegistrationSerial;
+	if (!PendingSceneActorRegistrations.Contains(ActorKey))
+	{
+		if (const FGuid* Existing = SceneActorMap.FindKey(InActor); Existing && *Existing != ExpectedId)
+		{
+			const FGuid Previous = *Existing;
+			if (!Request.PreviousId.IsValid()) Request.PreviousId = Previous;
+			SceneActorMap.Remove(Previous);
+		}
+		if (const FGuid* Existing = SceneActorReservations.FindKey(ActorKey); Existing && *Existing != ExpectedId)
+		{
+			const FGuid Previous = *Existing;
+			SceneActorReservations.Remove(Previous);
+		}
+	}
+	return true;
+}
+
+void USceneModule::RetrySceneActorRegistrations()
+{
+	if (!IsBusinessAdmissionOpen()) return;
+	if (bRetryingSceneActorRegistrations || bSceneRuntimeClosing || DeferredSceneActorRegistrations.IsEmpty()) return;
+	TGuardValue<bool> Guard(bRetryingSceneActorRegistrations, true);
+	TArray<TWeakObjectPtr<AActor>> Actors;
+	DeferredSceneActorRegistrations.GenerateKeyArray(Actors);
+	for (const TWeakObjectPtr<AActor>& ActorKey : Actors)
+	{
+		if (bSceneRuntimeClosing) return;
+		FDeferredSceneActorRegistration* Current = DeferredSceneActorRegistrations.Find(ActorKey);
+		if (!Current) continue;
+		FDeferredSceneActorRegistration Request = *Current;
+		AActor* Actor = ActorKey.Get();
+		if (!Actor || Actor->GetWorld() != GetWorld()) { DeferredSceneActorRegistrations.Remove(ActorKey); continue; }
+		if (const FGuid* Existing = SceneActorMap.FindKey(Actor); Existing && *Existing != Request.ExpectedId)
+		{
+			const FGuid Previous = *Existing;
+			if (!Current->PreviousId.IsValid()) Current->PreviousId = Previous;
+			Request.PreviousId = Current->PreviousId;
+			SceneActorMap.Remove(Previous);
+		}
+		if (const FGuid* Existing = SceneActorReservations.FindKey(ActorKey); Existing && *Existing != Request.ExpectedId)
+		{
+			const FGuid Previous = *Existing;
+			SceneActorReservations.Remove(Previous);
+		}
+		const bool bRegistered = TryAddSceneActor(Actor, false, &Request.ExpectedId, false);
+		if (bSceneRuntimeClosing) return;
+		Current = DeferredSceneActorRegistrations.Find(ActorKey);
+		if (!Current || Current->Serial != Request.Serial || !bRegistered) continue;
+		DeferredSceneActorRegistrations.Remove(ActorKey);
+		bool bMarkersChanged = false;
+		for (const auto& Pair : Markers) if (Pair.Value.ActorID == Request.ExpectedId) { bMarkersChanged = true; break; }
+		if (Request.PreviousId.IsValid() && Request.PreviousId != Request.ExpectedId)
+			for (auto& Pair : Markers)
+				if (Pair.Value.ActorID == Request.PreviousId) { Pair.Value.ActorID = Request.ExpectedId; bMarkersChanged = true; }
+		if (bMarkersChanged) NotifySceneMarkersChanged();
+	}
+}
+
+bool USceneModule::ReassignSceneActorIdentity(AActor* InActor, const FGuid& OldId, const FGuid& NewId, TFunctionRef<void()> ApplyIdentity)
+{
+	if (!IsBusinessAdmissionOpen()) return false;
+	check(IsInGameThread());
+	UWorld* World = GetWorld();
+	if (bSceneRuntimeClosing || !::IsValid(World) || World->bIsTearingDown || !::IsValid(InActor) ||
+		InActor->GetWorld() != World || !NewId.IsValid()) return false;
+	const TWeakObjectPtr<AActor> ActorKey(InActor);
+	if (PendingSceneActorRegistrations.Contains(ActorKey)) return false;
+	const FGuid* Registered = SceneActorMap.FindKey(InActor);
+	if (Registered && *Registered != OldId) return false;
+	if (AActor* const* Existing = SceneActorMap.Find(NewId); Existing && *Existing != InActor) return false;
+	if (TWeakObjectPtr<AActor>* Reserved = SceneActorReservations.Find(NewId); Reserved && !Reserved->IsValid()) SceneActorReservations.Remove(NewId);
+	if (const TWeakObjectPtr<AActor>* Reserved = SceneActorReservations.Find(NewId); Reserved && Reserved->Get() != InActor) return false;
+	const FGuid* OldReservation = SceneActorReservations.FindKey(ActorKey);
+	if (OldReservation && *OldReservation != OldId) return false;
+	const bool bRegistered = Registered != nullptr;
+	const bool bHadReservation = OldReservation != nullptr;
+	PendingSceneActorRegistrations.Add(ActorKey);
+	ON_SCOPE_EXIT { PendingSceneActorRegistrations.Remove(ActorKey); };
+	ApplyIdentity();
+	if (bHadReservation && OldId != NewId) SceneActorReservations.Remove(OldId);
+	if (!bRegistered) SceneActorReservations.Add(NewId, ActorKey);
+	if (bRegistered && OldId != NewId)
+	{
+		SceneActorMap.Remove(OldId);
+		SceneActorMap.Add(NewId, InActor);
+		bool bMarkersChanged = false;
+		for (auto& Pair : Markers)
+		{
+			if (Pair.Value.ActorID == OldId) { Pair.Value.ActorID = NewId; bMarkersChanged = true; }
+		}
+		if (bMarkersChanged) NotifySceneMarkersChanged();
+	}
+	return true;
 }
 
 void USceneModule::MarkSceneActorDestroyed(AActor* InActor)
 {
-	if(InActor && InActor->Implements<USceneActorInterface>() && InActor->HasAnyFlags(RF_WasLoaded))
+	if (InActor && InActor->GetWorld() == GetWorld() && InActor->HasAnyFlags(RF_WasLoaded))
 	{
-		DestroyedSceneActorIds.Add(ISceneActorInterface::Execute_GetActorID(InActor));
+		if (const FGuid* Id = SceneActorMap.FindKey(InActor)) DestroyedSceneActorIds.Add(*Id);
 	}
 }
 
@@ -1372,6 +1264,7 @@ ATargetPoint* USceneModule::GetTargetPointByName(const FName InName, bool bEnsur
 
 void USceneModule::AddTargetPointByName(const FName InName, ATargetPoint* InPoint)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(!TargetPoints.Contains(InName))
 	{
 		TargetPoints.Add(InName, InPoint);
@@ -1384,6 +1277,7 @@ void USceneModule::AddTargetPointByName(const FName InName, ATargetPoint* InPoin
 
 void USceneModule::RemoveTargetPointByName(const FName InName)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(TargetPoints.Contains(InName))
 	{
 		TargetPoints.Remove(InName);
@@ -1408,6 +1302,7 @@ USceneComponent* USceneModule::GetScenePointByName(const FName InName, bool bEns
 
 void USceneModule::AddScenePointByName(const FName InName, USceneComponent* InSceneComp)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(!ScenePoints.Contains(InName))
 	{
 		ScenePoints.Add(InName, InSceneComp);
@@ -1416,6 +1311,7 @@ void USceneModule::AddScenePointByName(const FName InName, USceneComponent* InSc
 
 void USceneModule::RemoveScenePointByName(const FName InName)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(ScenePoints.Contains(InName))
 	{
 		ScenePoints.Remove(InName);
@@ -1462,6 +1358,7 @@ APhysicsVolumeBase* USceneModule::GetPhysicsVolumeByName(const FName InName, TSu
 
 void USceneModule::AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(!InPhysicsVolume) return;
 
 	AddPhysicsVolumeByName(InPhysicsVolume->GetVolumeName(), InPhysicsVolume);
@@ -1469,6 +1366,7 @@ void USceneModule::AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
 
 void USceneModule::AddPhysicsVolumeByName(const FName InName, APhysicsVolumeBase* InPhysicsVolume)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(!InPhysicsVolume) return;
 
 	if(!PhysicsVolumes.Contains(InName))
@@ -1479,6 +1377,7 @@ void USceneModule::AddPhysicsVolumeByName(const FName InName, APhysicsVolumeBase
 
 void USceneModule::RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(!InPhysicsVolume) return;
 
 	RemovePhysicsVolumeByName(InPhysicsVolume->GetVolumeName());
@@ -1486,6 +1385,7 @@ void USceneModule::RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
 
 void USceneModule::RemovePhysicsVolumeByName(const FName InName)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(PhysicsVolumes.Contains(InName))
 	{
 		PhysicsVolumes.Remove(InName);
@@ -1494,13 +1394,22 @@ void USceneModule::RemovePhysicsVolumeByName(const FName InName)
 
 void USceneModule::SpawnWorldText(const FString& InText, const FLinearColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(InOffsetRange != FVector::ZeroVector)
 	{
 		InMapping.Location = InMapping.Location + FMath::RandPointInBox(FBox(-InOffsetRange * 0.5f, InOffsetRange * 0.5f));
 	}
-	UWidgetModuleStatics::CreateWorldWidget<UWidgetWorldText>(
-		InMapping,
-		FWorldTextWidgetParameter(InText, InTextColor, static_cast<int32>(InTextStyle)));
+	UGameInstance* Instance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld());
+	if (!Instance || !Widgets) return;
+	for (ULocalPlayer* LocalPlayer : Instance->GetLocalPlayers())
+	{
+		APlayerController* Controller = LocalPlayer ? LocalPlayer->GetPlayerController(GetWorld()) : nullptr;
+		if (!Controller) continue;
+		FWorldTextWidgetParameter Param(InText, InTextColor, static_cast<int32>(InTextStyle));
+		Param.OwningPlayer = Controller;
+		Widgets->CreateWorldWidget<UWidgetWorldText>(InMapping, Param);
+	}
 }
 
 FLinearColor USceneModule::GetOutlineColor() const
@@ -1510,223 +1419,10 @@ FLinearColor USceneModule::GetOutlineColor() const
 
 void USceneModule::SetOutlineColor(const FLinearColor& InColor)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	OutlineColor = InColor;
 	if(OutlineMatInst)
 	{
 		OutlineMatInst->SetVectorParameterValue("Color", OutlineColor);
-	}
-}
-
-void USceneModule::AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
-{
-	bool bExistTask = false;
-	ITER_ARRAY_WITHINDEX(AsyncLoadLevelQueue, Index, Item,
-		if(Item.LevelPath == InLevelPath)
-		{
-			if(Item.State == EFAsyncLoadLevelState::Loading)
-			{
-				bExistTask = true;
-			}
-			else if(!AsyncLoadLevelQueue[Index].bLoading)
-			{
-				AsyncLoadLevelQueue.RemoveAt(Index);
-			}
-			break;
-		}
-	)
-	if(!bExistTask)
-	{
-		FAsyncLoadLevelTask Task;
-		Task.State = EFAsyncLoadLevelState::Loading;
-		Task.LevelPath = InLevelPath;
-		Task.OnLoadFinished = InOnLoadFinished;
-		Task.FinishDelayTime = InFinishDelayTime;
-		Task.bCreateLoadingWidget = bCreateLoadingWidget;
-
-		AsyncLoadLevelQueue.Add(Task);
-	}
-}
-
-void USceneModule::AsyncLoadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
-{
-	const FName LevelPath = FName(*FPackageName::ObjectPathToPackageName(InLevelObjectPtr.ToString()));
-	AsyncLoadLevel(LevelPath, InOnLoadFinished, InFinishDelayTime, bCreateLoadingWidget);
-}
-
-void USceneModule::AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
-{
-	bool bExistTask = false;
-	ITER_ARRAY_WITHINDEX(AsyncLoadLevelQueue, Index, Item,
-		if(Item.LevelPath == InLevelPath)
-		{
-			if(Item.State == EFAsyncLoadLevelState::Unloading)
-			{
-				bExistTask = true;
-			}
-			else if(!AsyncLoadLevelQueue[Index].bLoading)
-			{
-				AsyncLoadLevelQueue.RemoveAt(Index);
-			}
-			break;
-		}
-	)
-	if(!bExistTask)
-	{
-		FAsyncLoadLevelTask Task;
-		Task.State = EFAsyncLoadLevelState::Unloading;
-		Task.LevelPath = InLevelPath;
-		Task.OnLoadFinished = InOnUnloadFinished;
-		Task.FinishDelayTime = InFinishDelayTime;
-		Task.bCreateLoadingWidget = bCreateLoadingWidget;
-
-		AsyncLoadLevelQueue.Add(Task);
-	}
-}
-
-void USceneModule::AsyncUnloadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
-{
-	const FName LevelPath = FName(*FPackageName::ObjectPathToPackageName(InLevelObjectPtr.ToString()));
-	AsyncUnloadLevel(LevelPath, InOnUnloadFinished, InFinishDelayTime, bCreateLoadingWidget);
-}
-
-float USceneModule::GetAsyncLoadLevelProgress(const FName InLevelPath) const
-{
-	return 1.f;
-}
-
-float USceneModule::GetAsyncLoadLevelProgressByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr) const
-{
-	const FName LevelPath = FName(*FPackageName::ObjectPathToPackageName(InLevelObjectPtr.ToString()));
-	return GetAsyncLoadLevelProgress(LevelPath);
-}
-
-float USceneModule::GetAsyncUnloadLevelProgress(const FName InLevelPath) const
-{
-	return 1.f;
-}
-
-float USceneModule::GetAsyncUnloadLevelProgressByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr) const
-{
-	const FName LevelPath = FName(*FPackageName::ObjectPathToPackageName(InLevelObjectPtr.ToString()));
-	return GetAsyncUnloadLevelProgress(LevelPath);
-}
-
-void USceneModule::AsyncLoadLevelInternal(FAsyncLoadLevelTask& InTask)
-{
-	WHLog(TEXT("Start load level: %s") + InTask.LevelPath.ToString(), EDC_Scene);
-
-	const FString LoadPackagePath = FPaths::GetBaseFilename(InTask.LevelPath.ToString(), false);
-
-	InTask.bLoading = true;
-
-	if(InTask.bCreateLoadingWidget)
-	{
-		UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>(
-			FLoadingLevelWidgetOpenParameter(InTask.LevelPath, false));
-	}
-
-	LoadPackageAsync(LoadPackagePath, FLoadPackageAsyncDelegate::CreateLambda([this, InTask](const FName PackageName, UPackage* LoadedPackage, EAsyncLoadingResult::Type Result){
-		if(Result == EAsyncLoadingResult::Failed)
-		{
-			WHLog(TEXT("Load level failed!"));
-		}
-		else if(Result == EAsyncLoadingResult::Succeeded)
-		{
-			FLatentActionInfo LatentActionInfo;
-			LatentActionInfo.UUID = FMath::Rand();
-			LatentActionInfo.Linkage = 0;
-			LatentActionInfo.CallbackTarget = this;
-			LatentActionInfo.ExecutionFunction = GET_FUNCTION_NAME_THISCLASS(OnHandleAsyncLoadLevelFinish);
-			UGameplayStatics::LoadStreamLevel(this, InTask.LevelPath, true, false, LatentActionInfo);
-		}
-	}), 0, PKG_ContainsMap);
-}
-
-void USceneModule::AsyncUnloadLevelInternal(FAsyncLoadLevelTask& InTask)
-{
-	WHLog(TEXT("Start unload level: ") + InTask.LevelPath.ToString());
-
-	InTask.bLoading = true;
-
-	if(InTask.bCreateLoadingWidget)
-	{
-		UWidgetModuleStatics::OpenUserWidget<UWidgetLoadingLevelPanel>(
-			FLoadingLevelWidgetOpenParameter(InTask.LevelPath, true));
-	}
-
-	FLatentActionInfo LatentActionInfo;
-	LatentActionInfo.UUID = FMath::Rand();
-	LatentActionInfo.Linkage = 0;
-	LatentActionInfo.CallbackTarget = this;
-	LatentActionInfo.ExecutionFunction = GET_FUNCTION_NAME_THISCLASS(OnHandleAsyncUnloadLevelFinish);
-	UGameplayStatics::UnloadStreamLevel(this, InTask.LevelPath, LatentActionInfo, false);
-}
-
-void USceneModule::OnAsyncLoadLevelFinished(FAsyncLoadLevelTask InTask)
-{
-	WHLog(TEXT("Load level Succeeded!"));
-	ApplyAllOwnerPlayerMappings();
-
-	if(InTask.bCreateLoadingWidget)
-	{
-		UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
-	}
-
-	if(InTask.OnLoadFinished.IsBound())
-	{
-		InTask.OnLoadFinished.Execute(InTask.LevelPath);
-	}
-	UEventModuleStatics::BroadcastEvent<FEventAsyncLoadLevelFinished>(this, { InTask.LevelPath }, EEventNetType::Multicast);
-}
-
-void USceneModule::OnAsyncUnloadLevelFinished(FAsyncLoadLevelTask InTask)
-{
-	WHLog(TEXT("Unload level Succeeded!"));
-
-	if(InTask.bCreateLoadingWidget)
-	{
-		UWidgetModuleStatics::CloseUserWidget<UWidgetLoadingLevelPanel>();
-	}
-
-	if(InTask.OnLoadFinished.IsBound())
-	{
-		InTask.OnLoadFinished.Execute(InTask.LevelPath);
-	}
-	UEventModuleStatics::BroadcastEvent<FEventAsyncUnloadLevelFinished>(this, { InTask.LevelPath }, EEventNetType::Multicast);
-}
-
-void USceneModule::OnHandleAsyncLoadLevelFinish()
-{
-	if(AsyncLoadLevelQueue.IsValidIndex(0))
-	{
-		FAsyncLoadLevelTask Task = AsyncLoadLevelQueue[0];
-		AsyncLoadLevelQueue.RemoveAt(0);
-		if(Task.FinishDelayTime > 0.f)
-		{
-			FTimerHandle TimerHandle;
-			GetWorld()->GetTimerManager().SetTimer(TimerHandle, FTimerDelegate::CreateUObject(this, &USceneModule::OnAsyncLoadLevelFinished, Task), Task.FinishDelayTime, false);
-		}
-		else
-		{
-			OnAsyncLoadLevelFinished(Task);
-		}
-	}
-}
-
-void USceneModule::OnHandleAsyncUnloadLevelFinish()
-{
-	if(AsyncLoadLevelQueue.IsValidIndex(0))
-	{
-		FAsyncLoadLevelTask Task = AsyncLoadLevelQueue[0];
-		AsyncLoadLevelQueue.RemoveAt(0);
-		if(Task.FinishDelayTime > 0.f)
-		{
-			FTimerHandle TimerHandle;
-			GetWorld()->GetTimerManager().SetTimer(TimerHandle, FTimerDelegate::CreateUObject(this, &USceneModule::OnAsyncUnloadLevelFinished, Task), Task.FinishDelayTime, false);
-		}
-		else
-		{
-			OnAsyncUnloadLevelFinished(Task);
-		}
 	}
 }

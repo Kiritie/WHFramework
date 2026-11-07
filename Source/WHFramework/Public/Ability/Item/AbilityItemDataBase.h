@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Ability/AbilityModuleTypes.h"
+#include "Ability/AbilityItemTypes.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "Ability/Inventory/InventoryItemRegistry.h"
 #include "Ability/Inventory/InventoryItemPresentation.h"
 #include "Asset/Primary/PrimaryAssetBase.h"

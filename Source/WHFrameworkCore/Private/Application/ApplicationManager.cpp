@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Application/ApplicationManager.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "Main/MainManager.h"
 

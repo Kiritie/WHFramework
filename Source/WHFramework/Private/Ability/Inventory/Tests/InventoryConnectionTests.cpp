@@ -1,6 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Ability/Inventory/InventoryCommandTypes.h"
 #include "Ability/Inventory/InventoryNetworkComponent.h"
 #include "UObject/StrongObjectPtr.h"
 

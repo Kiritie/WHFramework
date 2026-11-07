@@ -1,7 +1,9 @@
 #include "Ability/Inventory/InventoryPickupActor.h"
+#include "Common/InteractionTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 
 #include "Ability/Inventory/InventoryItemAssetCatalog.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Ability/Inventory/Widget/WidgetInventoryPickupIcon.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/Interaction/AbilityInteractionOptions.h"
@@ -81,7 +83,7 @@ void AInventoryPickupActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
     DOREPLIFETIME(AInventoryPickupActor, PublicCount);
 }
 
-bool AInventoryPickupActor::BindInventory(UInventoryWorldSubsystem& InSystem, const FGuid& InInventoryId)
+bool AInventoryPickupActor::BindInventory(UInventoryModule& InSystem, const FGuid& InInventoryId)
 {
     if (!HasAuthority() || InSystem.GetWorld() != GetWorld() || !InInventoryId.IsValid()) return false;
     if (System.IsValid())
@@ -158,7 +160,7 @@ void AInventoryPickupActor::OnRep_Presentation()
 void AInventoryPickupActor::RefreshVisual()
 {
     if (!GetWorld() || GetWorld()->GetNetMode() == NM_DedicatedServer || PublicCount <= 0) return;
-    const UInventoryWorldSubsystem* WorldSystem = GetWorld()->GetSubsystem<UInventoryWorldSubsystem>();
+    const UInventoryModule* WorldSystem = UInventoryModule::GetPtr(GetWorld());
     const UInventoryItemAssetCatalog* Assets = WorldSystem ? WorldSystem->GetItemAssets() : nullptr;
     if (!Assets || !Assets->IsInitialized())
     {

@@ -1,4 +1,5 @@
 #include "Ability/Inventory/InventoryItemRegistry.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 
 bool FInventoryItemRegistry::Initialize(TConstArrayView<FInventoryItemDefinition> InDefinitions, FString& OutError)
 {

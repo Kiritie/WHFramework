@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "CoreMinimal.h"
 #include "AbilitySpawnerBase.h"
 #include "AbilityActorSpawner.generated.h"

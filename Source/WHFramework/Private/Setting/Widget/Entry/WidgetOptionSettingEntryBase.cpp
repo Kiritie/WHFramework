@@ -1,4 +1,5 @@
 #include "Setting/Widget/Entry/WidgetOptionSettingEntryBase.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "Setting/SettingEntry.h"
 #include "Widget/Common/CommonOptionSelector.h"

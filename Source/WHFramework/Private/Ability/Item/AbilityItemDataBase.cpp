@@ -1,4 +1,6 @@
 #include "Ability/Item/AbilityItemDataBase.h"
+#include "Ability/AbilityItemTypes.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "GameplayEffect.h"
 #include "Ability/Inventory/InventoryPickupActor.h"
 
@@ -48,7 +50,7 @@ int32 UAbilityItemDataBase::ClampLevel(int32 InLevel) const
 
 EAbilityItemType UAbilityItemDataBase::GetItemType() const
 {
-	return (EAbilityItemType)UCommonModuleStatics::GetEnumValueByAuthoredName(TEXT("/Script/WHFramework.EAbilityItemType"), Type.ToString());
+	return static_cast<EAbilityItemType>(StaticEnum<EAbilityItemType>()->GetValueByNameString(Type.ToString()));
 }
 
 FString UAbilityItemDataBase::GetItemAbilityInfo(int32 InLevel) const

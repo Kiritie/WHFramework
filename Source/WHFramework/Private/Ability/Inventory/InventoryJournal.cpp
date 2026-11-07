@@ -1,4 +1,5 @@
 #include "Ability/Inventory/InventoryJournal.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 
 #include "Ability/Inventory/InventoryBinaryArchive.h"
 #include "Ability/Inventory/InventorySnapshotCodec.h"

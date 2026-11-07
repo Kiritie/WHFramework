@@ -1,4 +1,7 @@
 #include "Ability/Components/AbilitySystemComponentBase.h"
+#include "Ability/AbilityEffectTypes.h"
+#include "Ability/AbilityInfoTypes.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "Ability/Inventory/InventoryAbilitySource.h"
 
 #include "Abilities/GameplayAbility.h"

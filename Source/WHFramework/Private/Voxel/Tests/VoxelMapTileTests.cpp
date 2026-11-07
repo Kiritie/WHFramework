@@ -1,5 +1,6 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "Scene/SceneMapTypes.h"
 #include "Misc/AutomationTest.h"
 #include "Engine/Texture2D.h"
 #include "HAL/PlatformProcess.h"

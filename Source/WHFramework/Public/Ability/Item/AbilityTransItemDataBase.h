@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "AbilityItemDataBase.h"
 
 #include "AbilityTransItemDataBase.generated.h"

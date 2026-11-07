@@ -1,4 +1,5 @@
 #include "Common/Interaction/InteractionActionExecution.h"
+#include "Common/InteractionTypes.h"
 
 #include "Common/Interaction/InteractionActionBase.h"
 #include "Common/Interaction/InteractionComponent.h"

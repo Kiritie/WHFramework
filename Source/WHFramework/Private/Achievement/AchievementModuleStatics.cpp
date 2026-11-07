@@ -1,41 +1,57 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Achievement/AchievementModuleStatics.h"
 
 #include "Achievement/AchievementModule.h"
+#include "Engine/Engine.h"
 
-bool UAchievementModuleStatics::IsAchievementExists(FName InKey)
+namespace
 {
-	return UAchievementModule::Get().IsAchievementExists(InKey);
+	UAchievementModule* FindAchievements(const UObject* Context)
+	{
+		UWorld* World = GEngine && Context ? GEngine->GetWorldFromContextObject(Context, EGetWorldErrorMode::ReturnNull) : nullptr;
+		return World ? UAchievementModule::GetPtr(World) : nullptr;
+	}
 }
 
-int32 UAchievementModuleStatics::GetAchievedAchievementCount()
+bool UAchievementModuleStatics::IsAchievementExists(const UObject* WorldContextObject, FName InKey)
 {
-	return UAchievementModule::Get().GetAchievedAchievementCount();
+	const UAchievementModule* Module = FindAchievements(WorldContextObject);
+	return Module && Module->IsAchievementExists(InKey);
 }
 
-float UAchievementModuleStatics::GetAchievedAchievementPercentage()
+int32 UAchievementModuleStatics::GetAchievedAchievementCount(const UObject* WorldContextObject)
 {
-	return UAchievementModule::Get().GetAchievedAchievementPercentage();
+	const UAchievementModule* Module = FindAchievements(WorldContextObject);
+	return Module ? Module->GetAchievedAchievementCount() : 0;
 }
 
-void UAchievementModuleStatics::GetAchievementState(FName InKey, bool& OutFoundAchievement, FAchievementData& OutData, FAchievementStates& OutState)
+float UAchievementModuleStatics::GetAchievedAchievementPercentage(const UObject* WorldContextObject)
 {
-	UAchievementModule::Get().GetAchievementState(InKey, OutFoundAchievement, OutData, OutState);
+	const UAchievementModule* Module = FindAchievements(WorldContextObject);
+	return Module ? Module->GetAchievedAchievementPercentage() : 0.f;
 }
 
-void UAchievementModuleStatics::UnlockAchievement(FName InKey)
+void UAchievementModuleStatics::GetAchievementState(const UObject* WorldContextObject, FName InKey, bool& OutFoundAchievement, FAchievementData& OutData, FAchievementStates& OutState)
 {
-	UAchievementModule::Get().UnlockAchievement(InKey);
+	OutFoundAchievement = false;
+	OutData = FAchievementData();
+	OutState = FAchievementStates();
+	if (const UAchievementModule* Module = FindAchievements(WorldContextObject))
+	{
+		Module->GetAchievementState(InKey, OutFoundAchievement, OutData, OutState);
+	}
 }
 
-void UAchievementModuleStatics::SetAchievementProgress(FName InKey, float InProgress)
+void UAchievementModuleStatics::UnlockAchievement(const UObject* WorldContextObject, FName InKey)
 {
-	UAchievementModule::Get().SetAchievementProgress(InKey, InProgress);
+	if (UAchievementModule* Module = FindAchievements(WorldContextObject)) Module->UnlockAchievement(InKey);
 }
 
-void UAchievementModuleStatics::AddAchievementProgress(FName InKey, float InProgress)
+void UAchievementModuleStatics::SetAchievementProgress(const UObject* WorldContextObject, FName InKey, float InProgress)
 {
-	UAchievementModule::Get().AddAchievementProgress(InKey, InProgress);
+	if (UAchievementModule* Module = FindAchievements(WorldContextObject)) Module->SetAchievementProgress(InKey, InProgress);
+}
+
+void UAchievementModuleStatics::AddAchievementProgress(const UObject* WorldContextObject, FName InKey, float InProgress)
+{
+	if (UAchievementModule* Module = FindAchievements(WorldContextObject)) Module->AddAchievementProgress(InKey, InProgress);
 }

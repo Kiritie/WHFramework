@@ -2,6 +2,8 @@
 
 
 #include "Debug/DebugManager.h"
+#include "Type/NativeTypeIdentity.h"
+#include "WHFrameworkCoreMacros.h"
 
 #include "WHFrameworkCoreTypes.h"
 #include "Main/MainManager.h"

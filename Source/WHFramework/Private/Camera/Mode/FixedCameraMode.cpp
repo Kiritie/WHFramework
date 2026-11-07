@@ -1,4 +1,7 @@
 #include "Camera/Mode/FixedCameraMode.h"
+#include "Camera/CameraViewTypes.h"
+#include "Camera/CameraConfigTypes.h"
+#include "Camera/CameraFeatureTypes.h"
 #include "Camera/Anchor/CameraShotAnchor.h"
 #include "Camera/Manager/CameraManagerBase.h"
 

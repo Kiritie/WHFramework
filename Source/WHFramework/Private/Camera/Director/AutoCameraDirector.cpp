@@ -1,4 +1,6 @@
 #include "Camera/Director/AutoCameraDirector.h"
+#include "Camera/CameraViewTypes.h"
+#include "Camera/CameraFeatureTypes.h"
 #include "Camera/Anchor/CameraShotAnchor.h"
 #include "Camera/CameraModule.h"
 #include "Camera/Manager/CameraManagerBase.h"
@@ -53,7 +55,9 @@ void UAutoCameraDirector::SelectNextShot()
 {
 	ACameraShotAnchor* Best = nullptr;
 	float BestScore = -FLT_MAX;
-	for(const TWeakObjectPtr<ACameraShotAnchor>& Candidate : UCameraModule::Get().GetShotAnchors())
+	const UCameraModule* Cameras = CameraManager ? UCameraModule::GetPtr(CameraManager->GetWorld()) : nullptr;
+	if (!Cameras) return;
+	for(const TWeakObjectPtr<ACameraShotAnchor>& Candidate : Cameras->GetShotAnchors())
 	{
 		const float Score = ScoreCandidate(Candidate.Get());
 		if(Score > BestScore)

@@ -1,4 +1,5 @@
 #include "Widget/Theme/WidgetTheme.h"
+#include "Setting/SettingPresentationTypes.h"
 #include "Widget/Theme/WidgetStyleTags.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
 #include "Setting/Widget/Entry/WidgetSettingCategoryEntry.h"

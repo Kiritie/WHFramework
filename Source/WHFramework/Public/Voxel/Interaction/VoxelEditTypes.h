@@ -1,7 +1,7 @@
 #pragma once
 
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 #include "CoreMinimal.h"
-#include "Ability/Inventory/InventoryTypes.h"
 #include "Voxel/Runtime/VoxelBlockState.h"
 #include "Voxel/Save/VoxelDeltaTypes.h"
 

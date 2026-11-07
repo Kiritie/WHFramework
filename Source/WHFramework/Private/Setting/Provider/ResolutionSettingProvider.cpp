@@ -1,4 +1,6 @@
 #include "Setting/Provider/ResolutionSettingProvider.h"
+#include "Setting/SettingPresentationTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "DynamicRHI.h"
 #include "GenericPlatform/GenericApplication.h"

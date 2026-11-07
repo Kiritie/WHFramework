@@ -1,5 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "Task/TaskExecutionTypes.h"
+#include "Task/TaskReferenceTypes.h"
 #include "Misc/AutomationTest.h"
 #include "Task/Base/TaskAsset.h"
 #include "Task/Base/TaskAssetReferenceTask.h"

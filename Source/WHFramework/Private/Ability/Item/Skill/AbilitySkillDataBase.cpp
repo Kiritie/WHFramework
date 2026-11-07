@@ -1,4 +1,5 @@
 #include "Ability/Item/Skill/AbilitySkillDataBase.h"
+#include "Ability/AbilityItemTypes.h"
 
 UAbilitySkillDataBase::UAbilitySkillDataBase()
 {

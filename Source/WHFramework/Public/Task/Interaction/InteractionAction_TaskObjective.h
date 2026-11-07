@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common/InteractionTypes.h"
 #include "Common/Interaction/InteractionActionBase.h"
 #include "GameplayTagContainer.h"
 #include "InteractionAction_TaskObjective.generated.h"

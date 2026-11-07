@@ -1,7 +1,8 @@
 #pragma once
 
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 #include "Ability/Item/AbilityItemDataBase.h"
-#include "Ability/AbilityModuleTypes.h"
 #include "Ability/Effects/EffectBase.h"
 
 #include "AbilityActorDataBase.generated.h"

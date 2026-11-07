@@ -2,6 +2,7 @@
 
 
 #include "AI/AIModule.h"
+#include "Common/LifecycleTypes.h"
 
 #include "AI/AIModuleNetworkComponent.h"
 
@@ -18,7 +19,6 @@ UAIModule::UAIModule()
 
 UAIModule::~UAIModule()
 {
-	TERMINATION_MODULE(UAIModule)
 }
 
 #if WITH_EDITOR
@@ -31,7 +31,6 @@ void UAIModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UAIModule)
 }
 #endif
 

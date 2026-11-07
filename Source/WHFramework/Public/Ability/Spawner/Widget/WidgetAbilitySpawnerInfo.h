@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Ability/Inventory/InventoryTypes.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "Widget/World/WorldWidgetBase.h"
 #include "WidgetAbilitySpawnerInfo.generated.h"
 

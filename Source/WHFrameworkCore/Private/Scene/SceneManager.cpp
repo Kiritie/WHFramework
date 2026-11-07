@@ -2,6 +2,7 @@
 
 
 #include "Scene/SceneManager.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "WHFrameworkCoreTypes.h"
 #include "Main/MainManager.h"

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Camera/Mode/CameraModeBase.h"
+#include "Camera/CameraViewTypes.h"
+#include "Camera/CameraFeatureTypes.h"
 #include "FixedCameraMode.generated.h"
 
 class ACameraShotAnchor;

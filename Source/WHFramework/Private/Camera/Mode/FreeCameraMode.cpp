@@ -1,4 +1,6 @@
 #include "Camera/Mode/FreeCameraMode.h"
+#include "Camera/CameraInputTypes.h"
+#include "Camera/CameraViewTypes.h"
 
 void UFreeCameraMode::AddInput(const FCameraInputIntent& Intent)
 {

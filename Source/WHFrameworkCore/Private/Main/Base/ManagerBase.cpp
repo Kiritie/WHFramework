@@ -2,6 +2,7 @@
 
 
 #include "Main/Base/ManagerBase.h"
+#include "Type/NativeTypeIdentity.h"
 
 const FUniqueType FManagerBase::Type = FUniqueType(&FUniqueClass::Type);
 

@@ -1,8 +1,9 @@
 #pragma once
 
+#include "Common/InteractionTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Ability/Inventory/InventoryTypes.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "InventoryPickupActor.generated.h"
 
@@ -11,7 +12,7 @@ class UMaterialBillboardComponent;
 class UWidgetComponent;
 class UStaticMeshComponent;
 class USkeletalMeshComponent;
-class UInventoryWorldSubsystem;
+class UInventoryModule;
 class UInteractionComponent;
 
 /** 任意库存物品的世界投影。库存快照是唯一物品真值，Actor 不直接增删物品。 */
@@ -29,7 +30,7 @@ public:
     virtual EInteractAgentType GetInteractAgentType() const override;
     virtual bool IsInteractable(IInteractionAgentInterface* InAgent) override;
 
-    bool BindInventory(UInventoryWorldSubsystem& InSystem, const FGuid& InInventoryId);
+    bool BindInventory(UInventoryModule& InSystem, const FGuid& InInventoryId);
     void InitializePresentation(const FGuid& InInventoryId, const FPrimaryAssetId& InItemId, int32 InCount);
     void SetPickupAction(FName InAction);
     void SetPickupCollisionProfile(FName InProfile);
@@ -93,7 +94,7 @@ private:
     UPROPERTY(ReplicatedUsing=OnRep_Presentation)
     int32 PublicCount = 0;
 
-    TWeakObjectPtr<UInventoryWorldSubsystem> System;
+    TWeakObjectPtr<UInventoryModule> System;
     FDelegateHandle CommitHandle;
     FDelegateHandle DeleteHandle;
     FTimerHandle PresentationRetry;

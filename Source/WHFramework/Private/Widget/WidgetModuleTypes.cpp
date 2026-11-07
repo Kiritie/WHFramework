@@ -2,6 +2,8 @@
 
 
 #include "Widget/WidgetModuleTypes.h"
+#include "Widget/ScreenWidgetTypes.h"
+#include "Widget/WorldWidgetTypes.h"
 
 #include "Widget/Screen/UserWidgetBase.h"
 #include "Widget/World/WorldWidgetBase.h"

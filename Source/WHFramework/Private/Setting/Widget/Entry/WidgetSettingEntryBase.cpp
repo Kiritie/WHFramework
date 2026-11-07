@@ -1,4 +1,5 @@
 #include "Setting/Widget/Entry/WidgetSettingEntryBase.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "Setting/SettingEntry.h"
 #include "GameplayTagContainer.h"

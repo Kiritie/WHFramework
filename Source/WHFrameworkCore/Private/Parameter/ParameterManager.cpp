@@ -2,6 +2,7 @@
 
 
 #include "Parameter/ParameterManager.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "Main/MainManager.h"
 

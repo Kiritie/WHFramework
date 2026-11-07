@@ -3,6 +3,11 @@
 #pragma once
 
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
+#include "Setting/SettingPresentationTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
+#include "Setting/SettingEditTypes.h"
 #include "Main/Base/ModuleBase.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Setting/SettingModuleTypes.h"
@@ -11,13 +16,7 @@
 
 class USettingProviderBase;
 class USettingEntry;
-class FProperty;
-
-struct FResolvedSettingProperty
-{
-	void* ContainerPtr = nullptr;
-	FProperty* Property = nullptr;
-};
+class UWHLocalPlayer;
 
 UCLASS()
 class WHFRAMEWORK_API USettingModule : public UModuleBase
@@ -46,15 +45,19 @@ public:
 	virtual void OnPreparatory(EPhase InPhase) override;
 
 	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
+	virtual void OnControlRefresh(float RealDeltaSeconds) override;
 
 	virtual void OnPause() override;
 
 	virtual void OnUnPause() override;
 	
+	virtual void PrepareForHostTermination() override;
+
 	virtual void OnTermination(EPhase InPhase) override;
 
 protected:
 	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
+	virtual bool WasLoadDataApplied() const override { return !bLocalProfilePhaseInProgress || bLocalProfilePhaseComplete; }
 
 	virtual void UnloadData(EPhase InPhase) override;
 
@@ -69,23 +72,29 @@ protected:
 
 	void CollectPropertyDefinitions(const UStruct* InStruct, const FString& InPrefix, TArray<FSettingDefinition>& OutDefinitions) const;
 
-	bool IsSupportedSettingProperty(const FProperty* InProperty) const;
-
-	ESettingRendererType InferRenderer(const FProperty* InProperty) const;
-
-	bool ResolvePropertyPath(UStruct* InRootStruct, void* InRootData, const FString& InPath, FResolvedSettingProperty& OutResolved) const;
-
-	FParameter ReadPropertyValue(const FResolvedSettingProperty& InResolved) const;
-
-	bool WritePropertyValue(const FResolvedSettingProperty& InResolved, const FParameter& InValue) const;
-
-	FSettingModuleSaveData GetCurrentCombinedSettings() const;
+	bool GetCurrentCombinedSettings(FSettingModuleSaveData& OutData) const;
 
 	FSettingModuleSaveData GetDefaultCombinedSettings() const;
 
-	void ApplyCombinedSettings(FSettingModuleSaveData& InData);
+	bool ApplyCombinedSettings(FSettingModuleSaveData& InData);
+	bool RestorePendingProviders();
+	bool FinalizeHostTermination();
+	void FinalizeInterruptedEdit();
 
-	void SaveSettings();
+	bool SaveSettings();
+
+public:
+	bool RetryHostTerminationRecovery();
+	bool HasUncommittedAppliedSettings() const { return !AppliedUncommittedSettings.IsEmpty(); }
+	bool PrepareLocalProfileLoad(FName InProfileName);
+	virtual bool IsLocalProfileDataSupported(const FParameter& InData) const;
+	bool LoadLocalProfilePhase(const FParameter& InData, EPhase InPhase);
+	void AbortLocalProfileLoad();
+	FName GetActiveLocalProfile() const { return ActiveLocalProfile; }
+	bool CanSaveLocalProfile(FName InProfileName) const;
+
+protected:
+	void MarkLocalProfilePhaseComplete();
 
 	const FSettingDefinition* FindSettingDefinition(FSettingId InSettingId) const;
 
@@ -116,6 +125,21 @@ protected:
 
 	UPROPERTY(Transient)
 	FSettingEditSession EditSession;
+	TWeakObjectPtr<APlayerController> EditSessionPlayer;
+	TWeakObjectPtr<UWHLocalPlayer> EditSessionLocalPlayer;
+	uint64 EditSessionGeneration = 0;
+	bool bHostTerminationPending = false;
+	bool bFinalizingHostTermination = false;
+	bool bLastSettingsSaveSucceeded = false;
+	FName ActiveLocalProfile;
+	bool bLocalProfilePhaseInProgress = false;
+	bool bLocalProfilePhaseComplete = false;
+	bool bStartingEdit = false;
+	bool bEndingEdit = false;
+	bool bEndEditRequested = false;
+	bool bCancellingEdit = false;
+	bool bApplyingEdit = false;
+	TSet<FSettingId> AppliedUncommittedSettings;
 
 	UPROPERTY(Transient)
 	FSettingConfirmationTransaction ConfirmationTransaction;
@@ -147,22 +171,28 @@ public:
 	void RefreshSettingDefinitions();
 
 	UFUNCTION(BlueprintCallable)
-	void BeginEdit();
+	bool BeginEdit(APlayerController* InPlayer);
+
+	UFUNCTION(BlueprintPure, Category = "Setting")
+	bool IsEditSessionOwner(APlayerController* InPlayer) const;
+
+	APlayerController* GetEditSessionPlayer() const { return EditSessionPlayer.Get(); }
+	bool WasLastSettingsSaveSuccessful() const { return bLastSettingsSaveSucceeded; }
 
 	UFUNCTION(BlueprintCallable)
-	void EndEdit();
+	bool EndEdit();
 
 	UFUNCTION(BlueprintCallable)
 	bool ApplyEditSession();
 
 	UFUNCTION(BlueprintCallable)
-	void CancelEditSession();
+	bool CancelEditSession();
 
 	UFUNCTION(BlueprintCallable)
 	bool ConfirmPendingSettings();
 
 	UFUNCTION(BlueprintCallable)
-	void RejectPendingSettings();
+	bool RejectPendingSettings();
 
 	UFUNCTION(BlueprintPure)
 	bool HasPendingConfirmation() const { return ConfirmationTransaction.bActive; }

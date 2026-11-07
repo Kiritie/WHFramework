@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Common/LifecycleTypes.h"
 #include "Common/Base/WHObject.h"
 #include "Components/ActorComponent.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"

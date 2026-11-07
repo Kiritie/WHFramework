@@ -3,7 +3,7 @@
 #pragma once
 
 #include "Components/ActorComponent.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "FSM/FSMModuleTypes.h"
 #include "FSM/Base/FiniteStateBase.h"
 

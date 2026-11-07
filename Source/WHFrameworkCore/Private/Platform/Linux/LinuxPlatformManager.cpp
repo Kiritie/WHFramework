@@ -1,5 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 #include "Platform/Linux/LinuxPlatformManager.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"

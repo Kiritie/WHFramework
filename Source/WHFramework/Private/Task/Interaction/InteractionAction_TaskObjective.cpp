@@ -1,4 +1,5 @@
 #include "Task/Interaction/InteractionAction_TaskObjective.h"
+#include "Common/InteractionTypes.h"
 
 #include "Task/TaskModule.h"
 #include "Scene/Actor/SceneActorInterface.h"

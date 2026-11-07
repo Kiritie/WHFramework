@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common/InteractionTypes.h"
 #include "Common/Interaction/InteractionActionBase.h"
 #include "Common/Interaction/InteractionConditionBase.h"
 #include "Common/Interaction/InteractionOptionBase.h"

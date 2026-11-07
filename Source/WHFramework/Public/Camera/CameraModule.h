@@ -1,4 +1,7 @@
 #pragma once
+#include "Common/LifecycleTypes.h"
+#include "Camera/CameraConfigTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "Camera/Mode/CameraModeBase.h"
 
 #include "CameraModuleTypes.h"
@@ -10,6 +13,7 @@ class ACameraManagerBase;
 class ACameraRigBase;
 class ACameraShotAnchor;
 class UCameraModeBase;
+class ULocalPlayer;
 
 UCLASS()
 class WHFRAMEWORK_API UCameraModule : public UModuleBase, public IDebuggerInterface
@@ -46,6 +50,8 @@ public:
 
 protected:
 	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
+	virtual FParameter ToData() override;
+	virtual FParameter GetData() override;
 
 public:
 	virtual FString GetModuleDebugMessage() override;
@@ -73,12 +79,13 @@ protected:
 	UPROPERTY(Transient)
 	TArray<TWeakObjectPtr<ACameraShotAnchor>> ShotAnchors;
 
-	UPROPERTY(VisibleAnywhere, Category = "Settings")
-	FCameraUserSettings UserSettings;
+	FCameraModuleSaveData LocalSaveData;
+	bool bLocalProfilesLoaded = false;
+	FName CameraContainerProfile;
 
 public:
 	UFUNCTION(BlueprintPure, Category = "CameraModule")
-	ACameraManagerBase* GetCameraManager(int32 InPlayerIndex = 0) const;
+	ACameraManagerBase* GetCameraManagerForPlayer(APlayerController* InController) const;
 
 	void RegisterCameraManager(ACameraManagerBase* InManager);
 
@@ -109,10 +116,13 @@ public:
 		return CameraConfig;
 	}
 
-	const FCameraUserSettings& GetUserSettings() const
-	{
-		return UserSettings;
-	}
-
-	void ApplyUserSettings(const FCameraUserSettings& InSettings);
+	FCameraUserSettings GetUserSettings(APlayerController* InPlayer) const;
+	bool ApplyUserSettings(APlayerController* InPlayer, const FCameraUserSettings& InSettings, const UObject* SettingOwner = nullptr);
+	void ApplyLocalCameraProfile(ULocalPlayer* InPlayer, bool bAdoptGuest = false);
+	void CaptureLocalCameraProfile(ULocalPlayer* InPlayer);
+	void InitializeEmptyLocalProfiles();
+	bool PrepareLocalProfileLoad(FName InProfileName);
+	bool ValidateLocalProfileData(const FCameraModuleSaveData& InData) const;
+	bool CanSaveLocalProfile(FName InProfileName) const { return bLocalProfilesLoaded && CameraContainerProfile == InProfileName; }
+	bool AreLocalProfilesApplied(FName InProfileName) const;
 };

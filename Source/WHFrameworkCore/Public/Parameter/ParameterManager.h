@@ -3,6 +3,7 @@
 #pragma once
 
 #include "ParameterManagerInterface.h"
+#include "Type/NativeTypeIdentity.h"
 #include "ParameterTypes.h"
 #include "Main/MainTypes.h"
 #include "Main/Base/ManagerBase.h"

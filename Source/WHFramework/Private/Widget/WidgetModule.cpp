@@ -2,6 +2,14 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Widget/WidgetModule.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Widget/WidgetMountTypes.h"
+#include "Widget/ScreenWidgetTypes.h"
+#include "Widget/WorldWidgetTypes.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Common/LanguageTypes.h"
+#include "Setting/SettingPresentationTypes.h"
 
 #include "WHFrameworkCoreStatics.h"
 #include "Blueprint/WidgetBlueprintGeneratedClass.h"
@@ -13,95 +21,41 @@
 #include "Components/ContentWidget.h"
 #include "Components/Image.h"
 #include "Components/PanelWidget.h"
+#include "Components/SceneComponent.h"
 #include "Components/TextBlock.h"
 #include "Components/WidgetSwitcher.h"
 #include "Event/EventModuleStatics.h"
+#include "Event/EventModule.h"
+#include "Main/MainModuleStatics.h"
 #include "Event/Events/Widget/Event_CloseUserWidget.h"
 #include "Event/Events/Widget/Event_OpenUserWidget.h"
 #include "Event/Events/Widget/Event_SetWorldWidgetVisible.h"
 #include "Widget/World/WorldWidgetContainer.h"
+#include "Widget/World/WorldWidgetComponent.h"
 #include "Widget/Common/CommonButton.h"
 #include "Widget/Common/CommonImageN.h"
 #include "Widget/Common/CommonTextBlockN.h"
 #include "Widget/Screen/WidgetMountSlot.h"
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
-#include "Widget/Theme/WidgetThemeSubsystem.h"
 #include "Engine/GameInstance.h"
+#include "Engine/LocalPlayer.h"
+#include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
 #include "Setting/Widget/Entry/WidgetSettingEntryBase.h"
 		
 IMPLEMENTATION_MODULE(UWidgetModule)
 
-namespace
-{
-	FParameter MakeWidgetSpawnParam(const FParameter& InParam)
-	{
-		if(!InParam.HasValue())
-		{
-			return FParameter(FWidgetSpawnParameter());
-		}
+#include "Widget/WidgetParameterHelpers.h"
 
-		if(!InParam.GetPtr<FWidgetSpawnParameter>())
-		{
-			ensureEditorMsgf(
-			false,
-			FString::Printf(
-				TEXT("Widget parameter %s must derive from FWidgetSpawnParameter."),
-				*GetNameSafe(InParam.GetValueStruct())),
-			EDC_Widget,
-			EDV_Error);
-			return FParameter(FWidgetSpawnParameter());
-		}
-		return InParam;
-	}
-
-	FParameter MakeWidgetOpenParam(const FParameter& InParam)
-	{
-		if(!InParam.HasValue())
-		{
-			return FParameter(FWidgetOpenParameter());
-		}
-
-		if(!InParam.GetPtr<FWidgetOpenParameter>())
-		{
-			ensureEditorMsgf(
-				false,
-				FString::Printf(
-					TEXT("Widget parameter %s must derive from FWidgetOpenParameter."),
-					*GetNameSafe(InParam.GetValueStruct())),
-				EDC_Widget,
-				EDV_Error);
-			return FParameter(FWidgetOpenParameter());
-		}
-		return InParam;
-	}
-
-	UObject* GetWidgetOwnerObject(const FParameter& InParam)
-	{
-		if(const FWidgetSpawnParameter* Param = InParam.GetPtr<FWidgetSpawnParameter>())
-		{
-			return Param->OwnerObject.Get();
-		}
-		if(const FWidgetOpenParameter* Param = InParam.GetPtr<FWidgetOpenParameter>())
-		{
-			return Param->OwnerObject.Get();
-		}
-		return nullptr;
-	}
-
-	FParameter MakeWidgetSpawnOwnerParam(const FParameter& InParam)
-	{
-		return FParameter(FWidgetSpawnParameter(GetWidgetOwnerObject(InParam)));
-	}
-
-}
+using namespace WidgetParameterHelpers;
 
 // Sets default values
 UWidgetModule::UWidgetModule()
 {
 	ModuleName = FName("WidgetModule");
 	ModuleDisplayName = FText::FromString(TEXT("Widget Module"));
+	ModuleDependencies = { FName("ObjectPoolModule"), FName("EventModule") };
 
 
 	bModuleRequired = true;
@@ -120,12 +74,10 @@ UWidgetModule::UWidgetModule()
 	}
 	WorldWidgetContainerZOrder = -1;
 	WorldWidgetTraceType = UEngineTypes::ConvertToTraceType(ECC_Visibility);
-	WorldWidgetContainer = nullptr;
 }
 
 UWidgetModule::~UWidgetModule()
 {
-	TERMINATION_MODULE(UWidgetModule)
 }
 
 #if WITH_EDITOR
@@ -497,7 +449,6 @@ void UWidgetModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UWidgetModule)
 }
 #endif
 
@@ -511,49 +462,104 @@ void UWidgetModule::OnInitialize()
 
 	BuildRuntimeCaches();
 
-	WorldWidgetContainer = CreateWidget<UWorldWidgetContainer>(GetWorld(), WorldWidgetContainerClass);
-	if(WorldWidgetContainer)
-	{
-		WorldWidgetContainer->AddToViewport(WorldWidgetContainerZOrder);
-	}
 }
 
 void UWidgetModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory(InPhase);
+    if (PHASEC(InPhase, EPhase::Final))
+    {
+        SetLanguageType(LanguageType);
+        SetGlobalScale(GlobalScale);
+        bPlayerWidgetsReady = true;
+        RefreshPlayerWidgets();
+    }
+    Super::OnPreparatory(InPhase);
+}
 
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		SetLanguageType(LanguageType);
-		SetGlobalScale(GlobalScale);
-		for(const FScreenWidgetConfig& Config : UserWidgetConfigs)
+void UWidgetModule::OnControlRefresh(float RealDeltaSeconds)
+{
+	if (!IsBusinessAdmissionOpen()) return;
+    Super::OnControlRefresh(RealDeltaSeconds);
+    if (bPlayerWidgetsReady)
+    {
+        RefreshPlayerWidgets();
+		if (!bPlayerWidgetsReady) return;
+		TArray<TWeakObjectPtr<UWorldWidgetComponent>> Components = WorldWidgetComponents.Array();
+		for (const TWeakObjectPtr<UWorldWidgetComponent>& Component : Components)
 		{
-			const FGameplayTag WidgetTag = Config.ResolveWidgetTag();
-			if(!WidgetTag.IsValid() || Config.ResolveParentWidgetTag().IsValid())
+			if (Component.IsValid()) Component->RefreshPlayerWorldWidgets();
+			else WorldWidgetComponents.Remove(Component);
+			if (!bPlayerWidgetsReady) return;
+		}
+		TArray<TWeakObjectPtr<UWorldWidgetBase>> WorldWidgets;
+		for (const auto& Entry : WorldWidgetByTag)
+			for (UWorldWidgetBase* Widget : Entry.Value.WorldWidgets) if (Widget) WorldWidgets.Add(Widget);
+		for (const TWeakObjectPtr<UWorldWidgetBase>& Widget : WorldWidgets)
+			if (Widget.IsValid() && Widget->GetWidgetTag().IsValid()) Widget->RefreshLocationAndVisibility();
+    }
+}
+
+void UWidgetModule::RegisterWorldWidgetComponent(UWorldWidgetComponent* InComponent)
+{
+	if (!IsBusinessAdmissionOpen()) return;
+	if (InComponent) WorldWidgetComponents.Add(InComponent);
+}
+
+void UWidgetModule::UnregisterWorldWidgetComponent(UWorldWidgetComponent* InComponent)
+{
+	WorldWidgetComponents.Remove(InComponent);
+}
+
+void UWidgetModule::RefreshPlayerWidgets()
+{
+	if (!IsBusinessAdmissionOpen()) return;
+    UWorld* World = GetWorld();
+    UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+    if (!World || !GameInstance || World->GetNetMode() == NM_DedicatedServer) return;
+    const TArray<ULocalPlayer*> LocalPlayers = GameInstance->GetLocalPlayers();
+	TArray<TWeakObjectPtr<ULocalPlayer>> PreparedKeys;
+	PreparedPlayers.GetKeys(PreparedKeys);
+    for (const TWeakObjectPtr<ULocalPlayer>& Key : PreparedKeys)
+    {
+        ULocalPlayer* LocalPlayer = Key.Get();
+        APlayerController* Current = LocalPlayer ? LocalPlayer->GetPlayerController(World) : nullptr;
+        if (!LocalPlayer || !LocalPlayers.Contains(LocalPlayer) || !Current || Current != PreparedPlayers.FindRef(Key).Get())
+        {
+			PreparedPlayers.Remove(Key);
+            if (LocalPlayer) ClearLocalPlayerWidgets(LocalPlayer, EObjectDespawnMode::Destroy);
+			if (UWorldWidgetContainer* Container = WorldWidgetContainers.FindRef(LocalPlayer)) Container->RemoveFromParent();
+			WorldWidgetContainers.Remove(LocalPlayer);
+			if (!bPlayerWidgetsReady) return;
+        }
+    }
+    for (ULocalPlayer* LocalPlayer : LocalPlayers)
+    {
+        APlayerController* Player = LocalPlayer ? LocalPlayer->GetPlayerController(World) : nullptr;
+        if (!ResolveLocalPlayer(Player)) continue;
+		if (WorldWidgetContainerClass && !WorldWidgetContainers.Contains(LocalPlayer))
+		{
+			if (UWorldWidgetContainer* Container = CreateWidget<UWorldWidgetContainer>(Player, WorldWidgetContainerClass))
 			{
-				continue;
-			}
-			switch(Config.CreateType)
-			{
-				case EWidgetCreateType::AutoCreate:
-				{
-					CreateUserWidgetByTag(WidgetTag);
-					break;
-				}
-				case EWidgetCreateType::AutoCreateAndOpen:
-				{
-					OpenUserWidgetByTag(WidgetTag, FParameter());
-					break;
-				}
-				default:
-					break;
+				Container->SetVisibility(bWorldWidgetsVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+				if (Container->AddToPlayerScreen(WorldWidgetContainerZOrder)) WorldWidgetContainers.Add(LocalPlayer, Container);
 			}
 		}
-	}
+		if (PreparedPlayers.Contains(LocalPlayer)) continue;
+        PreparedPlayers.Add(LocalPlayer, Player);
+        for (const FScreenWidgetConfig& Config : UserWidgetConfigs)
+        {
+            const FGameplayTag Tag = Config.ResolveWidgetTag();
+            if (!Tag.IsValid() || Config.ResolveParentWidgetTag().IsValid()) continue;
+            if (Config.CreateType == EWidgetCreateType::AutoCreate) CreateUserWidgetByTag(Player, Tag);
+            else if (Config.CreateType == EWidgetCreateType::AutoCreateAndOpen) OpenUserWidgetByTag(Player, Tag, FParameter());
+			if (!bPlayerWidgetsReady) return;
+        }
+    }
 }
 
 void UWidgetModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	Super::OnRefresh(DeltaSeconds, bInEditor);
 
 	if(bInEditor)
@@ -561,14 +567,20 @@ void UWidgetModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		return;
 	}
 
-	for(auto Iter = TickableWidgets.CreateIterator(); Iter; ++Iter)
+	TArray<TWeakObjectPtr<UUserWidget>> TickSnapshot;
+	for (auto It = TickableWidgets.CreateIterator(); It; ++It)
 	{
-		UUserWidget* Widget = *Iter;
+		if (!::IsValid(*It)) It.RemoveCurrent();
+		else TickSnapshot.Add(*It);
+	}
+	for (const TWeakObjectPtr<UUserWidget>& WeakWidget : TickSnapshot)
+	{
+		UUserWidget* Widget = WeakWidget.Get();
 		if(!::IsValid(Widget))
 		{
-			Iter.RemoveCurrent();
 			continue;
 		}
+		if (!TickableWidgets.Contains(Widget)) continue;
 		if((Widget->IsInViewport() || Widget->GetParent())
 			&& ITickAbleWidgetInterface::Execute_IsTickAble(Widget))
 		{
@@ -588,10 +600,13 @@ void UWidgetModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		}
 	}
 
-	for(const auto& Iter : UserWidgetByTag)
+	TArray<TWeakObjectPtr<UUserWidgetBase>> ScreenSnapshot;
+	for (const auto& Iter : UserWidgetByTag) if (Iter.Value) ScreenSnapshot.Add(Iter.Value.Get());
+	for (const TWeakObjectPtr<UUserWidgetBase>& WeakWidget : ScreenSnapshot)
 	{
-		UUserWidgetBase* UserWidget = Iter.Value;
+		UUserWidgetBase* UserWidget = WeakWidget.Get();
 		if(UserWidget
+			&& UserWidget->GetWidgetTag().IsValid()
 			&& UserWidget->GetWidgetState() == EScreenWidgetState::Opened
 			&& UserWidget->IsWidgetActiveInHierarchy()
 			&& UserWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
@@ -600,24 +615,17 @@ void UWidgetModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		}
 	}
 
-	for(const auto& Iter : WorldWidgetByTag)
-	{
-		for(UWorldWidgetBase* WorldWidget : Iter.Value.WorldWidgets)
-		{
-			if(WorldWidget)
-			{
-				WorldWidget->RefreshLocationAndVisibility();
-				if(WorldWidget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
-				{
-					WorldWidget->Refresh();
-				}
-			}
-		}
-	}
+	TArray<TWeakObjectPtr<UWorldWidgetBase>> WorldSnapshot;
+	for (const auto& Iter : WorldWidgetByTag)
+		for (UWorldWidgetBase* Widget : Iter.Value.WorldWidgets) if (Widget) WorldSnapshot.Add(Widget);
+	for (const TWeakObjectPtr<UWorldWidgetBase>& WeakWidget : WorldSnapshot)
+		if (UWorldWidgetBase* Widget = WeakWidget.Get(); Widget && Widget->GetWidgetTag().IsValid() && Widget->GetWidgetRefreshType() == EWidgetRefreshType::Tick)
+			Widget->Refresh();
 }
 
 void UWidgetModule::RegisterTickableWidget(UUserWidget* InWidget)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(InWidget && InWidget->Implements<UTickAbleWidgetInterface>())
 	{
 		TickableWidgets.Add(InWidget);
@@ -645,8 +653,18 @@ void UWidgetModule::OnTermination(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
+		bPlayerWidgetsReady = false;
+		if (UEventModule* Events = UMainModuleStatics::GetModuleForCleanup<UEventModule>(GetWorld()))
+		{
+			Events->UnsubscribeEvent<FEventOpenUserWidget>(this);
+			Events->UnsubscribeEvent<FEventCloseUserWidget>(this);
+			Events->UnsubscribeEvent<FEventSetWorldWidgetVisible>(this);
+		}
 		ClearAllUserWidget();
-		ClearAllWorldWidget();
+		ClearAllWorldWidgetForCleanup(EObjectDespawnMode::Destroy);
+		for (const auto& Pair : WorldWidgetContainers) if (Pair.Value) Pair.Value->RemoveFromParent();
+		WorldWidgetContainers.Reset();
+		WorldWidgetComponents.Reset();
 		TickableWidgets.Reset();
 	}
 }
@@ -763,472 +781,99 @@ FGameplayTag UWidgetModule::ResolveWidgetTagForClass(TSubclassOf<UUserWidgetBase
 	return Tags.Num() == 1 ? Tags[0] : FGameplayTag();
 }
 
-UUserWidgetBase* UWidgetModule::GetUserWidgetByTag(FGameplayTag InWidgetTag, TSubclassOf<UUserWidgetBase> InExpectedClass) const
+ULocalPlayer* UWidgetModule::ResolveLocalPlayer(APlayerController* InPlayer) const
 {
-	const TObjectPtr<UUserWidgetBase>* Found = UserWidgetByTag.Find(InWidgetTag);
-	UUserWidgetBase* Widget = Found ? Found->Get() : nullptr;
-	return !InExpectedClass || (Widget && Widget->IsA(InExpectedClass)) ? Widget : nullptr;
+    return ::IsValid(InPlayer) && InPlayer->GetWorld() == GetWorld() && InPlayer->IsLocalController() ? InPlayer->GetLocalPlayer() : nullptr;
 }
 
-bool UWidgetModule::MountUserWidget(UUserWidgetBase* InWidget, const FScreenWidgetConfig& InConfig)
+UUserWidgetBase* UWidgetModule::GetUserWidgetByTag(APlayerController* InPlayer, FGameplayTag InWidgetTag, TSubclassOf<UUserWidgetBase> InExpectedClass) const
 {
-	if(!InWidget)
-	{
-		return false;
-	}
-
-	const FGameplayTag WidgetTag = InConfig.ResolveWidgetTag();
-	const FGameplayTag ParentWidgetTag = InConfig.ResolveParentWidgetTag();
-	if(!ParentWidgetTag.IsValid())
-	{
-		InWidget->AddToViewport(InConfig.ZOrder);
-		return true;
-	}
-
-	UUserWidgetBase* ParentWidget = GetUserWidgetByTag(ParentWidgetTag);
-	if(!ParentWidget)
-	{
-		ensureEditorMsgf(false, FString::Printf(TEXT("Failed to mount widget %s: parent %s does not exist."), *WidgetTag.ToString(), *ParentWidgetTag.ToString()), EDC_Widget, EDV_Error);
-		return false;
-	}
-
-	UPanelWidget* MountPanel = nullptr;
-	if(InConfig.SlotTag.IsValid())
-	{
-		MountPanel = ParentWidget->GetWidgetMountSlot(InConfig.SlotTag);
-		if(!MountPanel)
-		{
-			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to mount widget %s: slot %s was not found in parent %s."), *WidgetTag.ToString(), *InConfig.SlotTag.ToString(), *ParentWidgetTag.ToString()), EDC_Widget, EDV_Error);
-			return false;
-		}
-	}
-	else
-	{
-		MountPanel = Cast<UPanelWidget>(ParentWidget->GetRootWidget());
-		if(!MountPanel)
-		{
-			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to mount widget %s: parent %s root widget is not a PanelWidget."), *WidgetTag.ToString(), *ParentWidgetTag.ToString()), EDC_Widget, EDV_Error);
-			return false;
-		}
-	}
-
-	if(UContentWidget* ContentWidget = Cast<UContentWidget>(MountPanel))
-	{
-		if(ContentWidget->GetContent() && ContentWidget->GetContent() != InWidget)
-		{
-			ensureEditorMsgf(false, FString::Printf(TEXT("Failed to mount widget %s: mount target in parent %s already contains %s."), *WidgetTag.ToString(), *ParentWidgetTag.ToString(), *GetNameSafe(ContentWidget->GetContent())), EDC_Widget, EDV_Error);
-			return false;
-		}
-		ContentWidget->SetContent(InWidget);
-	}
-	else if(UCanvasPanel* CanvasPanel = Cast<UCanvasPanel>(MountPanel))
-	{
-		UCanvasPanelSlot* CanvasSlot = CanvasPanel->AddChildToCanvas(InWidget);
-		if(!CanvasSlot)
-		{
-			return false;
-		}
-		CanvasSlot->SetZOrder(InConfig.ZOrder);
-		CanvasSlot->SetAnchors(InConfig.Anchors);
-		CanvasSlot->SetOffsets(InConfig.Offsets);
-		CanvasSlot->SetAlignment(InConfig.Alignment);
-	}
-	else if(!MountPanel->AddChild(InWidget))
-	{
-		ensureEditorMsgf(false, FString::Printf(TEXT("Failed to add widget %s to parent %s panel %s."), *WidgetTag.ToString(), *ParentWidgetTag.ToString(), *GetNameSafe(MountPanel)), EDC_Widget, EDV_Error);
-		return false;
-	}
-
-	InWidget->ParentWidget = ParentWidget;
-	ParentWidget->AddChildWidget(InWidget);
-	return true;
-}
-
-void UWidgetModule::UnMountUserWidget(UUserWidgetBase* InWidget)
-{
-	if(InWidget->IsInViewport() || InWidget->GetParent())
-	{
-		InWidget->RemoveFromParent();
-	}
-	if(InWidget->ParentWidget)
-	{
-		InWidget->ParentWidget->RemoveChildWidget(InWidget);
-		InWidget->ParentWidget = nullptr;
-	}
-}
-
-UUserWidgetBase* UWidgetModule::CreateUserWidgetByTag(FGameplayTag InWidgetTag, const FParameter& InParam, TSubclassOf<UUserWidgetBase> InClass)
-{
-	const FScopedWorldContext WorldContextScope(GetWorld());
-	if(UUserWidgetBase* Existing = GetUserWidgetByTag(InWidgetTag))
-	{
-		return Existing;
-	}
-
-	const FParameter SpawnParam = MakeWidgetSpawnParam(InParam);
-	const FParameter OwnerParam = MakeWidgetSpawnOwnerParam(SpawnParam);
-	const FScreenWidgetConfig* Config = GetUserWidgetConfig(InWidgetTag);
-	if(!Config)
-	{
-		return nullptr;
-	}
-	const FGameplayTag ParentWidgetTag = Config->ResolveParentWidgetTag();
-	if(ParentWidgetTag.IsValid() && !GetUserWidgetByTag(ParentWidgetTag))
-	{
-		return nullptr;
-	}
-
-	const TSubclassOf<UUserWidgetBase> SpawnClass = InClass ? InClass : Config->WidgetClass;
-	UUserWidgetBase* Widget = SpawnClass
-		? Cast<UUserWidgetBase>(UObjectPoolModuleStatics::SpawnObject(SpawnClass.Get(), SpawnParam))
-		: nullptr;
-	if(!Widget)
-	{
-		return nullptr;
-	}
-
-	Widget->WidgetTag = Config->ResolveWidgetTag();
-	UserWidgetByTag.Add(InWidgetTag, Widget);
-
-	Widget->OnCreate(SpawnParam);
-	Widget->Init(SpawnParam, false);
-	Widget->SetVisibility(ESlateVisibility::Hidden);
-	if(!MountUserWidget(Widget, *Config))
-	{
-		UserWidgetByTag.Remove(InWidgetTag);
-		Widget->OnDestroy(EObjectDespawnMode::Destroy);
-		return nullptr;
-	}
-	TArray<FGameplayTag> ChildTags;
-	UserWidgetChildrenMap.MultiFind(InWidgetTag, ChildTags);
-	for(const FGameplayTag& ChildTag : ChildTags)
-	{
-		const FScreenWidgetConfig* ChildConfig = GetUserWidgetConfig(ChildTag);
-		if(!ChildConfig)
-		{
-			continue;
-		}
-		if(ChildConfig->CreateType == EWidgetCreateType::AutoCreate
-			|| ChildConfig->CreateType == EWidgetCreateType::AutoCreateAndOpen)
-		{
-			CreateUserWidgetByTag(ChildTag, OwnerParam);
-		}
-	}
-	return Widget;
-}
-
-bool UWidgetModule::OpenUserWidgetByTag(FGameplayTag InWidgetTag, const FParameter& InParam, bool bInstant, bool bForce, TSubclassOf<UUserWidgetBase> InClass)
-{
-	const FScopedWorldContext WorldContextScope(GetWorld());
-	const FParameter OpenParam = MakeWidgetOpenParam(InParam);
-	const FParameter SpawnOwnerParam = MakeWidgetSpawnOwnerParam(OpenParam);
-	const FScreenWidgetConfig* Config = GetUserWidgetConfig(InWidgetTag);
-	if(!Config)
-	{
-		return false;
-	}
-	const FGameplayTag ParentWidgetTag = Config->ResolveParentWidgetTag();
-	if(ParentWidgetTag.IsValid())
-	{
-		const UUserWidgetBase* ParentWidget = GetUserWidgetByTag(ParentWidgetTag);
-		if(!ParentWidget || !ParentWidget->IsWidgetOpened())
-		{
-			return false;
-		}
-	}
-
-	UUserWidgetBase* Widget = GetUserWidgetByTag(InWidgetTag);
-	if(!Widget)
-	{
-		Widget = CreateUserWidgetByTag(
-			InWidgetTag,
-			SpawnOwnerParam,
-			InClass);
-	}
-	if(!Widget || !Widget->CanOpen())
-	{
-		return false;
-	}
-
-	if(Config->WidgetType == EWidgetType::Temporary)
-	{
-		FWidgetMountContext Context;
-		Context.ParentWidgetTag = ParentWidgetTag;
-		Context.SlotTag = Config->SlotTag;
-		if(UUserWidgetBase* ActiveWidget = ActiveTemporaryWidgets.FindRef(Context); ActiveWidget && ActiveWidget != Widget)
-		{
-			FTemporaryWidgetHistory& History = TemporaryWidgetHistories.FindOrAdd(Context);
-			History.Widgets.Remove(Widget);
-			History.Widgets.Add(ActiveWidget);
-			ActiveWidget->OnClosed.RemoveAll(this);
-			ActiveWidget->OnClose(true);
-		}
-		ActiveTemporaryWidgets.Add(Context, Widget);
-	}
-
-	if(bForce && Widget->GetWidgetState() != EScreenWidgetState::None)
-	{
-		Widget->OnClose(true);
-	}
-	const EScreenWidgetState PreviousState = Widget->GetWidgetState();
-	Widget->OnOpen(OpenParam, bInstant);
-	if(PreviousState != EScreenWidgetState::Opening && PreviousState != EScreenWidgetState::Opened)
-	{
-		TArray<FGameplayTag> ChildTags;
-		UserWidgetChildrenMap.MultiFind(InWidgetTag, ChildTags);
-		for(const FGameplayTag& ChildTag : ChildTags)
-		{
-			const FScreenWidgetConfig* ChildConfig = GetUserWidgetConfig(ChildTag);
-			if(ChildConfig
-				&& ChildConfig->CreateType == EWidgetCreateType::AutoCreateAndOpen)
-			{
-				OpenUserWidgetByTag(ChildTag, FWidgetOpenParameter(), bInstant);
-			}
-		}
-	}
-	return true;
-}
-
-bool UWidgetModule::CloseUserWidgetByTag(FGameplayTag InWidgetTag, bool bInstant)
-{
-	const FScopedWorldContext WorldContextScope(GetWorld());
-	if(UUserWidgetBase* Widget = GetUserWidgetByTag(InWidgetTag))
-	{
-		if(const FScreenWidgetConfig* Config = GetUserWidgetConfig(InWidgetTag); Config && Config->WidgetType == EWidgetType::Temporary)
-		{
-			FWidgetMountContext Context;
-			Context.ParentWidgetTag = Config->ResolveParentWidgetTag();
-			Context.SlotTag = Config->SlotTag;
-			if(ActiveTemporaryWidgets.FindRef(Context) == Widget)
-			{
-				ActiveTemporaryWidgets.Remove(Context);
-				Widget->OnClosed.RemoveAll(this);
-				Widget->OnClosed.AddUObject(this, &ThisClass::HandleTemporaryWidgetClosed, Context, Widget);
-			}
-		}
-		Widget->OnClose(bInstant);
-		return true;
-	}
-	return false;
-}
-
-bool UWidgetModule::ToggleUserWidgetByTag(FGameplayTag InWidgetTag, bool bInstant)
-{
-	UUserWidgetBase* Widget = GetUserWidgetByTag(InWidgetTag);
-	if(!Widget)
-	{
-		return OpenUserWidgetByTag(InWidgetTag, FWidgetOpenParameter(), bInstant);
-	}
-	if(Widget->GetWidgetState() == EScreenWidgetState::Opened)
-	{
-		return CloseUserWidgetByTag(InWidgetTag, bInstant);
-	}
-	return OpenUserWidgetByTag(InWidgetTag, FWidgetOpenParameter(), bInstant);
-}
-
-bool UWidgetModule::CloseActiveTemporaryWidget(const FWidgetMountContext& InContext, bool bInstant)
-{
-	if(UUserWidgetBase* Widget = ActiveTemporaryWidgets.FindRef(InContext))
-	{
-		return CloseUserWidgetByTag(Widget->GetWidgetTag(), bInstant);
-	}
-	return false;
-}
-
-void UWidgetModule::HandleTemporaryWidgetClosed(bool bInstant, FWidgetMountContext InContext, UUserWidgetBase* InWidget)
-{
-	const FScopedWorldContext WorldContextScope(GetWorld());
-	InWidget->OnClosed.RemoveAll(this);
-	if(ActiveTemporaryWidgets.Contains(InContext))
-	{
-		return;
-	}
-
-	FTemporaryWidgetHistory* History = TemporaryWidgetHistories.Find(InContext);
-	while(History && !History->Widgets.IsEmpty())
-	{
-		UUserWidgetBase* PreviousWidget = History->Widgets.Pop();
-		if(PreviousWidget && OpenUserWidgetByTag(
-			PreviousWidget->GetWidgetTag(),
-			PreviousWidget->CurrentOpenParameter,
-			bInstant))
-		{
-			break;
-		}
-	}
-	if(History && History->Widgets.IsEmpty())
-	{
-		TemporaryWidgetHistories.Remove(InContext);
-	}
-}
-
-bool UWidgetModule::CloseTemporaryWidgetInSlot(FGameplayTag InParentWidgetTag, FGameplayTag InSlotTag, bool bInstant)
-{
-	FWidgetMountContext Context;
-	Context.ParentWidgetTag = InParentWidgetTag;
-	Context.SlotTag = InSlotTag;
-	return CloseActiveTemporaryWidget(Context, bInstant);
-}
-
-void UWidgetModule::CloseTemporaryWidgetsForParent(FGameplayTag InParentWidgetTag, bool bInstant)
-{
-	TArray<FWidgetMountContext> Contexts;
-	ActiveTemporaryWidgets.GetKeys(Contexts);
-	for(const FWidgetMountContext& Context : Contexts)
-	{
-		if(Context.ParentWidgetTag == InParentWidgetTag)
-		{
-			TemporaryWidgetHistories.Remove(Context);
-			CloseActiveTemporaryWidget(Context, bInstant);
-		}
-	}
-}
-
-bool UWidgetModule::DestroyUserWidgetByTag(FGameplayTag InWidgetTag, EObjectDespawnMode InMode)
-{
-	const FScopedWorldContext WorldContextScope(GetWorld());
-	if(UUserWidgetBase* Widget = GetUserWidgetByTag(InWidgetTag))
-	{
-		UserWidgetByTag.Remove(InWidgetTag);
-
-		TArray<FGameplayTag> ChildTags;
-		UserWidgetChildrenMap.MultiFind(InWidgetTag, ChildTags);
-		for(const FGameplayTag& ChildTag : ChildTags)
-		{
-			DestroyUserWidgetByTag(ChildTag, InMode);
-		}
-
-		TArray<FWidgetMountContext> TemporaryContexts;
-		ActiveTemporaryWidgets.GetKeys(TemporaryContexts);
-		for(const FWidgetMountContext& Context : TemporaryContexts)
-		{
-			if(Context.ParentWidgetTag == InWidgetTag
-				|| ActiveTemporaryWidgets.FindRef(Context) == Widget)
-			{
-				ActiveTemporaryWidgets.Remove(Context);
-				TemporaryWidgetHistories.Remove(Context);
-			}
-		}
-		TArray<FWidgetMountContext> HistoryContexts;
-		TemporaryWidgetHistories.GetKeys(HistoryContexts);
-		for(const FWidgetMountContext& Context : HistoryContexts)
-		{
-			if(Context.ParentWidgetTag == InWidgetTag)
-			{
-				TemporaryWidgetHistories.Remove(Context);
-			}
-			else if(FTemporaryWidgetHistory* History = TemporaryWidgetHistories.Find(Context))
-			{
-				History->Widgets.Remove(Widget);
-				if(History->Widgets.IsEmpty())
-				{
-					TemporaryWidgetHistories.Remove(Context);
-				}
-			}
-		}
-
-		Widget->OnDestroy(InMode);
-
-		UnMountUserWidget(Widget);
-
-		return true;
-	}
-	return false;
+    ULocalPlayer* LocalPlayer = ResolveLocalPlayer(InPlayer);
+    if (!LocalPlayer) return nullptr;
+    FScreenWidgetKey Key; Key.LocalPlayer = LocalPlayer; Key.WidgetTag = InWidgetTag;
+    const TObjectPtr<UUserWidgetBase>* Found = UserWidgetByTag.Find(Key);
+    UUserWidgetBase* Widget = Found ? Found->Get() : nullptr;
+    return !InExpectedClass || (Widget && Widget->IsA(InExpectedClass)) ? Widget : nullptr;
 }
 
 void UWidgetModule::OnOpenUserWidget(UObject* InSender, const FEventOpenUserWidget& InEvent)
 {
-	const FGameplayTag WidgetTag = InEvent.WidgetTag.IsValid()
-		? InEvent.WidgetTag
-		: ResolveWidgetTagForClass(InEvent.WidgetClassOverride, false);
-	if(WidgetTag.IsValid())
-	{
-		OpenUserWidgetByTag(
-			WidgetTag,
-			InEvent.WidgetParam,
-			InEvent.bInstant,
-			InEvent.bForce,
-			InEvent.WidgetClassOverride);
-	}
+    const FGameplayTag Tag = InEvent.WidgetTag.IsValid() ? InEvent.WidgetTag : ResolveWidgetTagForClass(InEvent.WidgetClassOverride, false);
+    if (Tag.IsValid()) OpenUserWidgetByTag(InEvent.Player, Tag, InEvent.WidgetParam, InEvent.bInstant, InEvent.bForce, InEvent.WidgetClassOverride);
 }
 
 void UWidgetModule::OnCloseUserWidget(UObject* InSender, const FEventCloseUserWidget& InEvent)
 {
-	if(InEvent.WidgetTag.IsValid())
+    if (InEvent.WidgetTag.IsValid()) CloseUserWidgetByTag(InEvent.Player, InEvent.WidgetTag, InEvent.bInstant);
+}
+
+bool UWidgetModule::HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass) const { return HasUserWidgetClass<UUserWidgetBase>(InClass); }
+TSubclassOf<UUserWidgetBase> UWidgetModule::GetUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass) const { return GetUserWidgetClass<UUserWidgetBase>(InClass); }
+bool UWidgetModule::HasUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass) const { return HasUserWidget<UUserWidgetBase>(InPlayer, InClass); }
+UUserWidgetBase* UWidgetModule::GetUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass) const { return GetUserWidget<UUserWidgetBase>(InPlayer, InClass); }
+UUserWidgetBase* UWidgetModule::CreateUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass, const FParameter& InParam) { return CreateUserWidget<UUserWidgetBase>(InPlayer, InParam, InClass); }
+bool UWidgetModule::OpenUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass, const FParameter& InParam, bool bInstant, bool bForce) { return OpenUserWidget<UUserWidgetBase>(InPlayer, InParam, bInstant, bForce, InClass); }
+bool UWidgetModule::CloseUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass, bool bInstant) { return CloseUserWidget<UUserWidgetBase>(InPlayer, bInstant, InClass); }
+bool UWidgetModule::ToggleUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass, bool bInstant) { return ToggleUserWidget<UUserWidgetBase>(InPlayer, bInstant, InClass); }
+bool UWidgetModule::DestroyUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass, EObjectDespawnMode InMode) { return DestroyUserWidget<UUserWidgetBase>(InPlayer, InMode, InClass); }
+
+void UWidgetModule::CloseAllUserWidget(APlayerController* InPlayer, bool bInstant)
+{
+    if (!IsBusinessAdmissionOpen()) return;
+    ULocalPlayer* LocalPlayer = ResolveLocalPlayer(InPlayer);
+    if (!LocalPlayer) return;
+    for (auto It = TemporaryWidgetHistories.CreateIterator(); It; ++It) if (It.Key().LocalPlayer == LocalPlayer) It.RemoveCurrent();
+    for (auto It = ActiveTemporaryWidgets.CreateIterator(); It; ++It) if (It.Key().LocalPlayer == LocalPlayer) It.RemoveCurrent();
+    TArray<TObjectPtr<UUserWidgetBase>> Widgets;
+    for (const auto& Entry : UserWidgetByTag) if (Entry.Key.LocalPlayer == LocalPlayer) Widgets.Add(Entry.Value);
+    for (UUserWidgetBase* Widget : Widgets) if (::IsValid(Widget)) Widget->OnClose(bInstant);
+}
+
+void UWidgetModule::ClearPlayerWidgets(APlayerController* InPlayer, EObjectDespawnMode InMode)
+{
+    if (!IsBusinessAdmissionOpen()) return;
+    if (ULocalPlayer* LocalPlayer = ResolveLocalPlayer(InPlayer)) ClearLocalPlayerWidgets(LocalPlayer, InMode);
+}
+
+void UWidgetModule::ClearLocalPlayerWidgets(ULocalPlayer* InLocalPlayer, EObjectDespawnMode InMode)
+{
+    if (!InLocalPlayer) return;
+	TArray<UWorldWidgetBase*> PlayerWorldWidgets;
+	for (const auto& Entry : WorldWidgetByTag)
+		for (UWorldWidgetBase* Widget : Entry.Value.WorldWidgets)
+			if (Widget && Widget->GetOwningLocalPlayer() == InLocalPlayer) PlayerWorldWidgets.Add(Widget);
+	for (UWorldWidgetBase* Widget : PlayerWorldWidgets)
 	{
-		CloseUserWidgetByTag(InEvent.WidgetTag, InEvent.bInstant);
+		if (Widget)
+			DestroyWorldWidgetByTagForCleanup(Widget->GetWidgetTag(), Widget, InMode);
 	}
-}
-
-bool UWidgetModule::HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass) const
-{
-	return HasUserWidgetClass<UUserWidgetBase>(InClass);
-}
-
-TSubclassOf<UUserWidgetBase> UWidgetModule::GetUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass) const
-{
-	return GetUserWidgetClass<UUserWidgetBase>(InClass);
-}
-
-bool UWidgetModule::HasUserWidget(TSubclassOf<UUserWidgetBase> InClass) const
-{
-	return HasUserWidget<UUserWidgetBase>(InClass);
-}
-
-UUserWidgetBase* UWidgetModule::GetUserWidget(TSubclassOf<UUserWidgetBase> InClass) const
-{
-	return GetUserWidget<UUserWidgetBase>(InClass);
-}
-
-UUserWidgetBase* UWidgetModule::CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, const FParameter& InParam)
-{
-	return CreateUserWidget<UUserWidgetBase>(InParam, InClass);
-}
-
-bool UWidgetModule::OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const FParameter& InParam, bool bInstant, bool bForce)
-{
-	return OpenUserWidget<UUserWidgetBase>(InParam, bInstant, bForce, InClass);
-}
-
-bool UWidgetModule::CloseUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bInstant)
-{
-	return CloseUserWidget<UUserWidgetBase>(bInstant, InClass);
-}
-
-bool UWidgetModule::ToggleUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bInstant)
-{
-	return ToggleUserWidget<UUserWidgetBase>(bInstant, InClass);
-}
-
-bool UWidgetModule::DestroyUserWidget(TSubclassOf<UUserWidgetBase> InClass, EObjectDespawnMode InMode)
-{
-	return DestroyUserWidget<UUserWidgetBase>(InMode, InClass);
-}
-
-void UWidgetModule::CloseAllUserWidget(bool bInstant)
-{
-	TemporaryWidgetHistories.Empty();
-	for(const auto& Iter : UserWidgetByTag)
-	{
-		if(Iter.Value)
-		{
-			Iter.Value->OnClose(bInstant);
-		}
-	}
-	ActiveTemporaryWidgets.Empty();
+    for (auto It = TemporaryWidgetHistories.CreateIterator(); It; ++It) if (It.Key().LocalPlayer == InLocalPlayer) It.RemoveCurrent();
+    for (auto It = ActiveTemporaryWidgets.CreateIterator(); It; ++It) if (It.Key().LocalPlayer == InLocalPlayer) It.RemoveCurrent();
+    TArray<FScreenWidgetKey> Keys;
+    for (const auto& Entry : UserWidgetByTag)
+    {
+        if (Entry.Key.LocalPlayer == InLocalPlayer) Keys.Add(Entry.Key);
+    }
+    for (const FScreenWidgetKey& Key : Keys)
+    {
+        UUserWidgetBase* Widget = UserWidgetByTag.FindRef(Key);
+        if (!Widget) { UserWidgetByTag.Remove(Key); continue; }
+        UserWidgetByTag.Remove(Key);
+        Widget->OnClosed.RemoveAll(this);
+        UnMountUserWidget(Widget);
+        Widget->OnDestroy(InMode);
+    }
 }
 
 void UWidgetModule::ClearAllUserWidget(EObjectDespawnMode InMode)
 {
-	TArray<FGameplayTag> WidgetTags;
-	UserWidgetByTag.GetKeys(WidgetTags);
-	for(const FGameplayTag& WidgetTag : WidgetTags)
-	{
-		DestroyUserWidgetByTag(WidgetTag, InMode);
-	}
-	UserWidgetByTag.Reset();
-	ActiveTemporaryWidgets.Empty();
-	TemporaryWidgetHistories.Empty();
+    TSet<ULocalPlayer*> Players;
+    for (const auto& Entry : UserWidgetByTag) if (Entry.Key.LocalPlayer) Players.Add(Entry.Key.LocalPlayer);
+    for (ULocalPlayer* LocalPlayer : Players) ClearLocalPlayerWidgets(LocalPlayer, InMode);
+    UserWidgetByTag.Reset();
+    ActiveTemporaryWidgets.Reset();
+    TemporaryWidgetHistories.Reset();
+    PreparedPlayers.Reset();
 }
 
 const FWorldWidgetConfig* UWidgetModule::GetWorldWidgetConfig(FGameplayTag InWidgetTag) const
@@ -1288,18 +933,24 @@ TArray<UWorldWidgetBase*> UWidgetModule::GetWorldWidgetsByTag(FGameplayTag InWid
 
 UWorldWidgetBase* UWidgetModule::CreateWorldWidgetByTag(FGameplayTag InWidgetTag, FWorldWidgetMapping InMapping, const FParameter& InParam, TSubclassOf<UWorldWidgetBase> InClass)
 {
-	const FScopedWorldContext WorldContextScope(GetWorld());
+	if (!IsBusinessAdmissionOpen()) return nullptr;
+	if (!bPlayerWidgetsReady) return nullptr;
 	const FParameter SpawnParam = MakeWidgetSpawnParam(InParam);
 	const FWorldWidgetConfig* Config = GetWorldWidgetConfig(InWidgetTag);
 	if(!Config)
 	{
 		return nullptr;
 	}
+	const FWorldWidgetConfig ConfigSnapshot = *Config;
+	const FWidgetSpawnParameter* Spawn = SpawnParam.GetPtr<FWidgetSpawnParameter>();
+	if (Config->Space == EWorldWidgetSpace::Screen &&
+		(!Spawn || !ResolveLocalPlayer(Spawn->OwningPlayer.Get()) || !GetWorldWidgetContainer(Spawn->OwningPlayer.Get()))) return nullptr;
 	const TSubclassOf<UWorldWidgetBase> SpawnClass = InClass && InClass->IsChildOf(Config->WidgetClass)
 		? InClass
 		: Config->WidgetClass;
-	UWorldWidgetBase* Widget = SpawnClass
-		? Cast<UWorldWidgetBase>(UObjectPoolModuleStatics::SpawnObject(SpawnClass.Get(), SpawnParam))
+	UObjectPoolModule* Pool = UObjectPoolModule::GetPtr(GetWorld());
+	UWorldWidgetBase* Widget = SpawnClass && Pool
+		? Cast<UWorldWidgetBase>(Pool->SpawnObject(SpawnClass.Get(), SpawnParam))
 		: nullptr;
 	if(!Widget)
 	{
@@ -1307,7 +958,7 @@ UWorldWidgetBase* UWidgetModule::CreateWorldWidgetByTag(FGameplayTag InWidgetTag
 	}
 
 	FWorldWidgets& Widgets = WorldWidgetByTag.FindOrAdd(InWidgetTag);
-	Widget->WidgetTag = Config->ResolveWidgetTag();
+	Widget->WidgetTag = ConfigSnapshot.ResolveWidgetTag();
 	Widgets.WorldWidgets.Add(Widget);
 	Widget->OnCreate(InMapping, SpawnParam);
 	return Widget;
@@ -1315,7 +966,12 @@ UWorldWidgetBase* UWidgetModule::CreateWorldWidgetByTag(FGameplayTag InWidgetTag
 
 bool UWidgetModule::DestroyWorldWidgetByTag(FGameplayTag InWidgetTag, UWorldWidgetBase* InWidget, EObjectDespawnMode InMode)
 {
-	const FScopedWorldContext WorldContextScope(GetWorld());
+	if (!IsBusinessAdmissionOpen()) return false;
+	return DestroyWorldWidgetByTagForCleanup(InWidgetTag, InWidget, InMode);
+}
+
+bool UWidgetModule::DestroyWorldWidgetByTagForCleanup(FGameplayTag InWidgetTag, UWorldWidgetBase* InWidget, EObjectDespawnMode InMode)
+{
 	FWorldWidgets* Widgets = WorldWidgetByTag.Find(InWidgetTag);
 	if(!Widgets || !InWidget)
 	{
@@ -1339,13 +995,14 @@ bool UWidgetModule::GetWorldWidgetVisibleByTag(FGameplayTag InWidgetTag) const
 {
 	if(const FWorldWidgets* Widgets = WorldWidgetByTag.Find(InWidgetTag))
 	{
-		return Widgets->bVisible;
+		return bWorldWidgetsVisible && Widgets->bVisible;
 	}
 	return false;
 }
 
 void UWidgetModule::SetWorldWidgetVisibleByTag(FGameplayTag InWidgetTag, bool bVisible)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(FWorldWidgets* Widgets = WorldWidgetByTag.Find(InWidgetTag))
 	{
 		Widgets->bVisible = bVisible;
@@ -1363,21 +1020,28 @@ bool UWidgetModule::GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass)
 	{
 		return GetWorldWidgetVisibleByTag(ResolveWorldWidgetTagForClass(InClass, false));
 	}
-	return WorldWidgetContainer
-		&& WorldWidgetContainer->GetVisibility() == ESlateVisibility::SelfHitTestInvisible;
+	return bWorldWidgetsVisible;
 }
 
 void UWidgetModule::SetWorldWidgetVisible(bool bVisible, TSubclassOf<UWorldWidgetBase> InClass)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(InClass)
 	{
 		SetWorldWidgetVisibleByTag(ResolveWorldWidgetTagForClass(InClass, false), bVisible);
 	}
-	else if(WorldWidgetContainer)
+	else
 	{
-		WorldWidgetContainer->SetVisibility(
-			bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		bWorldWidgetsVisible = bVisible;
+		for (const auto& Pair : WorldWidgetContainers) if (Pair.Value)
+			Pair.Value->SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	}
+}
+
+UWorldWidgetContainer* UWidgetModule::GetWorldWidgetContainer(APlayerController* InPlayer) const
+{
+	ULocalPlayer* LocalPlayer = ResolveLocalPlayer(InPlayer);
+	return LocalPlayer ? WorldWidgetContainers.FindRef(LocalPlayer) : nullptr;
 }
 
 TArray<UWorldWidgetBase*> UWidgetModule::GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass) const
@@ -1403,18 +1067,20 @@ void UWidgetModule::DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, E
 
 void UWidgetModule::ClearAllWorldWidget(EObjectDespawnMode InMode)
 {
-	const FScopedWorldContext WorldContextScope(GetWorld());
+	if (!IsBusinessAdmissionOpen()) return;
+	ClearAllWorldWidgetForCleanup(InMode);
+}
+
+void UWidgetModule::ClearAllWorldWidgetForCleanup(EObjectDespawnMode InMode)
+{
 	TArray<UWorldWidgetBase*> WidgetsToDestroy;
 	for(const auto& Iter : WorldWidgetByTag)
 	{
-		WidgetsToDestroy.Append(Iter.Value.WorldWidgets);
+		for (UWorldWidgetBase* Widget : Iter.Value.WorldWidgets)
+			if (Widget) WidgetsToDestroy.Add(Widget);
 	}
-	WorldWidgetByTag.Empty();
 	for(UWorldWidgetBase* Widget : WidgetsToDestroy)
 	{
-		if(Widget)
-		{
-			Widget->OnDestroy(InMode);
-		}
+		DestroyWorldWidgetByTagForCleanup(Widget->GetWidgetTag(), Widget, InMode);
 	}
 }

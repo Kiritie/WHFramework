@@ -1,7 +1,7 @@
 #pragma once
 
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "Ability/Abilities/EffectAbilityBase.h"
-#include "Ability/Inventory/InventoryTypes.h"
 
 #include "ItemAbilityBase.generated.h"
 

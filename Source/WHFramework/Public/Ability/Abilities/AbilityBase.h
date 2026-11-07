@@ -1,7 +1,8 @@
 #pragma once
 
+#include "Ability/AbilityExecutionTypes.h"
+#include "Ability/AbilityEffectTypes.h"
 #include "Abilities/GameplayAbility.h"
-#include "Ability/AbilityModuleTypes.h"
 #include "Ability/AbilityActionTypes.h"
 #include "AbilityBase.generated.h"
 

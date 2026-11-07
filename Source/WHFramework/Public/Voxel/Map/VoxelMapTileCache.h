@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Scene/SceneMapTypes.h"
 #include "CoreMinimal.h"
 #include "Scene/SceneModuleTypes.h"
 #include "Styling/SlateBrush.h"

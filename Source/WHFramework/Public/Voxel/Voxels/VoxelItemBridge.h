@@ -1,6 +1,6 @@
 #pragma once
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "CoreMinimal.h"
-#include "Ability/AbilityModuleTypes.h"
 #include "Voxel/VoxelModuleTypes.h"
 #include "Voxel/Runtime/VoxelRegistry.h"
 class WHFRAMEWORK_API FVoxelItemBridge

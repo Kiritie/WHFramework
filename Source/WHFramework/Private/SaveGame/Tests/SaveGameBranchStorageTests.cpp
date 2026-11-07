@@ -1,3 +1,4 @@
+#include "SaveGame/SaveManifestTypes.h"
 #include "SaveGame/SaveGameStorage.h"
 
 #if WITH_DEV_AUTOMATION_TESTS

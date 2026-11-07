@@ -1,4 +1,5 @@
 #include "Voxel/WorldObject/VoxelWorldObjectRegistry.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "Voxel/Voxels/Data/VoxelData.h"
 
 #include "Misc/SecureHash.h"

@@ -1,6 +1,7 @@
 // Copyright Underflow Studios 2017
 
 #include "Dialogue/Base/DialogueEventBase.h"
+#include "Common/InteractionTypes.h"
 #include "Dialogue/Base/DialogueAsset.h"
 
 UDialogueEventBase::UDialogueEventBase() {}

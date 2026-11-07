@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "SaveGame/SaveManifestTypes.h"
 #include "CoreMinimal.h"
 #include "Containers/ArrayView.h"
 #include "SaveGame/SaveGameGenerationLease.h"

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Blueprint/UserWidget.h"
+#include "Setting/SettingDefinitionTypes.h"
 #include "Setting/SettingModuleTypes.h"
 #include "WidgetCustomSettingValueBase.generated.h"
 

@@ -1,4 +1,5 @@
 #include "Ability/Inventory/Widget/WidgetAbilityInventorySlotBase.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 
 #include "TimerManager.h"
 

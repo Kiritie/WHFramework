@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "CoreMinimal.h"
 #include "AchievementModuleTypes.h"
 

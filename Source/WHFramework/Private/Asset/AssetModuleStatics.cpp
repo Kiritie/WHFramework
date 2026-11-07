@@ -5,117 +5,134 @@
 
 #include "Asset/AssetModule.h"
 
-void UAssetModuleStatics::AddStaticClass(const FName InName, const FStaticClass& InStaticClass)
+void UAssetModuleStatics::AddStaticClass(const UObject* WorldContextObject, const FName InName, const FStaticClass& InStaticClass)
 {
-	UAssetModule::Get().AddStaticClass(InName, InStaticClass);
+	UAssetModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).AddStaticClass(InName, InStaticClass);
 }
 
-UClass* UAssetModuleStatics::GetStaticClass(const FName InName)
+UClass* UAssetModuleStatics::GetStaticClass(const UObject* WorldContextObject, const FName InName)
 {
-	return UAssetModule::Get().GetStaticClass(InName);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->GetStaticClass(InName) : nullptr;
 }
 
-UClass* UAssetModuleStatics::FindClass(const FString& InName, bool bExactClass)
+UClass* UAssetModuleStatics::FindClass(const UObject* WorldContextObject, const FString& InName, bool bExactClass)
 {
-	return UAssetModule::Get().FindClass(InName, bExactClass);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->FindClass(InName, bExactClass) : nullptr;
 }
 
-UClass* UAssetModuleStatics::LoadClass(UClass* InClass, const FString& InName)
+UClass* UAssetModuleStatics::LoadClass(const UObject* WorldContextObject, UClass* InClass, const FString& InName)
 {
-	return UAssetModule::Get().LoadClass(InClass, InName);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->LoadClass(InClass, InName) : nullptr;
 }
 
-void UAssetModuleStatics::AddStaticObject(const FName InName, const FStaticObject& InStaticObject)
+void UAssetModuleStatics::AddStaticObject(const UObject* WorldContextObject, const FName InName, const FStaticObject& InStaticObject)
 {
-	UAssetModule::Get().AddStaticObject(InName, InStaticObject);
+	UAssetModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).AddStaticObject(InName, InStaticObject);
 }
 
-UObject* UAssetModuleStatics::GetStaticObject(UClass* InClass, const FName InName)
+UObject* UAssetModuleStatics::GetStaticObject(const UObject* WorldContextObject, UClass* InClass, const FName InName)
 {
-	return UAssetModule::Get().GetStaticObject(InClass, InName);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->GetStaticObject(InClass, InName) : nullptr;
 }
 
-UObject* UAssetModuleStatics::FindObject(UClass* InClass, const FString& InName, bool bExactClass)
+UObject* UAssetModuleStatics::FindObject(const UObject* WorldContextObject, UClass* InClass, const FString& InName, bool bExactClass)
 {
-	return UAssetModule::Get().FindObject(InClass, InName, bExactClass);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->FindObject(InClass, InName, bExactClass) : nullptr;
 }
 
-UObject* UAssetModuleStatics::LoadObject(UClass* InClass, const FString& InName)
+UObject* UAssetModuleStatics::LoadObject(const UObject* WorldContextObject, UClass* InClass, const FString& InName)
 {
-	return UAssetModule::Get().LoadObject(InClass, InName);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->LoadObject(InClass, InName) : nullptr;
 }
 
-FText UAssetModuleStatics::GetLocalizedText(FName InNamespace, const FString& InKey)
+FText UAssetModuleStatics::GetLocalizedText(const UObject* WorldContextObject, FName InNamespace, const FString& InKey)
 {
-	return UAssetModule::Get().GetLocalizedText(InNamespace, InKey);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->GetLocalizedText(InNamespace, InKey) : FText::GetEmpty();
 }
 
-FName UAssetModuleStatics::GetRandomTextKey(FName InNamespace, const FString& InPrefix, int32 InSeed)
+FName UAssetModuleStatics::GetRandomTextKey(const UObject* WorldContextObject, FName InNamespace, const FString& InPrefix, int32 InSeed)
 {
-	return UAssetModule::Get().GetRandomTextKey(InNamespace, InPrefix, InSeed);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->GetRandomTextKey(InNamespace, InPrefix, InSeed) : NAME_None;
 }
 
-UEnum* UAssetModuleStatics::FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass)
+UEnum* UAssetModuleStatics::FindEnumByValue(const UObject* WorldContextObject, const FString& InEnumName, int32 InEnumValue, bool bExactClass)
 {
-	return UAssetModule::Get().FindEnumByValue(InEnumName, InEnumValue, bExactClass);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->FindEnumByValue(InEnumName, InEnumValue, bExactClass) : nullptr;
 }
 
-UEnum* UAssetModuleStatics::FindEnumByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName, bool bExactClass)
+UEnum* UAssetModuleStatics::FindEnumByAuthoredName(const UObject* WorldContextObject, const FString& InEnumName, const FString& InEnumAuthoredName, bool bExactClass)
 {
-	return UAssetModule::Get().FindEnumByAuthoredName(InEnumName, InEnumAuthoredName, bExactClass);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->FindEnumByAuthoredName(InEnumName, InEnumAuthoredName, bExactClass) : nullptr;
 }
 
-UEnum* UAssetModuleStatics::FindEnumByDisplayName(const FString& InEnumName, const FString& InEnumDisplayName, bool bExactClass)
+UEnum* UAssetModuleStatics::FindEnumByDisplayName(const UObject* WorldContextObject, const FString& InEnumName, const FString& InEnumDisplayName, bool bExactClass)
 {
-	return UAssetModule::Get().FindEnumByDisplayName(InEnumName, InEnumDisplayName, bExactClass);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->FindEnumByDisplayName(InEnumName, InEnumDisplayName, bExactClass) : nullptr;
 }
 
-void UAssetModuleStatics::AddEnumMapping(const FString& InEnumName, const FString& InOtherName)
+void UAssetModuleStatics::AddEnumMapping(const UObject* WorldContextObject, const FString& InEnumName, const FString& InOtherName)
 {
-	return UAssetModule::Get().AddEnumMapping(InEnumName, InOtherName);
+	UAssetModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).AddEnumMapping(InEnumName, InOtherName);
 }
 
-void UAssetModuleStatics::RemoveEnumMapping(const FString& InEnumName, const FString& InOtherName)
+void UAssetModuleStatics::RemoveEnumMapping(const UObject* WorldContextObject, const FString& InEnumName, const FString& InOtherName)
 {
-	return UAssetModule::Get().RemoveEnumMapping(InEnumName, InOtherName);
+	UAssetModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).RemoveEnumMapping(InEnumName, InOtherName);
 }
 
-bool UAssetModuleStatics::HasDataAsset(const FGameplayTag& InTag)
+bool UAssetModuleStatics::HasDataAsset(const UObject* WorldContextObject, const FGameplayTag& InTag)
 {
-	return UAssetModule::Get().HasDataAsset(InTag);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->HasDataAsset(InTag) : false;
 }
 
-UDataAssetBase* UAssetModuleStatics::GetDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag)
+UDataAssetBase* UAssetModuleStatics::GetDataAsset(const UObject* WorldContextObject, TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag)
 {
-	return UAssetModule::Get().GetDataAsset(InClass, InTag);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->GetDataAsset(InClass, InTag) : nullptr;
 }
 
-UDataAssetBase* UAssetModuleStatics::CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag)
+UDataAssetBase* UAssetModuleStatics::CreateDataAsset(const UObject* WorldContextObject, TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag)
 {
-	return UAssetModule::Get().CreateDataAsset(InClass, InTag);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->CreateDataAsset(InClass, InTag) : nullptr;
 }
 
-bool UAssetModuleStatics::RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag)
+bool UAssetModuleStatics::RemoveDataAsset(const UObject* WorldContextObject, TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag)
 {
-	return UAssetModule::Get().RemoveDataAsset(InClass, InTag);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->RemoveDataAsset(InClass, InTag) : false;
 }
 
-void UAssetModuleStatics::RemoveAllDataAsset()
+void UAssetModuleStatics::RemoveAllDataAsset(const UObject* WorldContextObject)
 {
-	return UAssetModule::Get().RemoveAllDataAsset();
+	UAssetModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).RemoveAllDataAsset();
 }
 
-bool UAssetModuleStatics::AddDataTable(UDataTable* InDataTable)
+bool UAssetModuleStatics::AddDataTable(const UObject* WorldContextObject, UDataTable* InDataTable)
 {
-	return UAssetModule::Get().AddDataTable(InDataTable);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->AddDataTable(InDataTable) : false;
 }
 
-bool UAssetModuleStatics::RemoveDataTable(UDataTable* InDataTable)
+bool UAssetModuleStatics::RemoveDataTable(const UObject* WorldContextObject, UDataTable* InDataTable)
 {
-	return UAssetModule::Get().RemoveDataTable(InDataTable);
+	UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->RemoveDataTable(InDataTable) : false;
 }
 
-void UAssetModuleStatics::RemoveAllDataTable()
+void UAssetModuleStatics::RemoveAllDataTable(const UObject* WorldContextObject)
 {
-	return UAssetModule::Get().RemoveAllDataTable();
+	UAssetModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).RemoveAllDataTable();
 }

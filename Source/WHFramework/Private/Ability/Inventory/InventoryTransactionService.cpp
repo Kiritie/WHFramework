@@ -1,13 +1,17 @@
 #include "Ability/Inventory/InventoryTransactionService.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
+#include "Ability/Inventory/InventoryCommandTypes.h"
+#include "Ability/Inventory/InventoryPlanTypes.h"
 
 #include "Ability/Inventory/InventoryCommitCoordinator.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Ability/Inventory/InventorySnapshotCodec.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/ScopeExit.h"
 
-FInventoryTransactionService::FInventoryTransactionService(UInventoryWorldSubsystem& InWorld)
+FInventoryTransactionService::FInventoryTransactionService(UInventoryModule& InWorld)
     : World(InWorld)
 {
 }

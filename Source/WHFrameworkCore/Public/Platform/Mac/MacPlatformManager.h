@@ -2,6 +2,7 @@
 
 #pragma once
 #include "Platform/PlatformManager.h"
+#include "Type/NativeTypeIdentity.h"
 
 class WHFRAMEWORKCORE_API FMacPlatformManager : public FPlatformManager
 {

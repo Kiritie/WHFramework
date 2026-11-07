@@ -1,10 +1,11 @@
 #pragma once
 
+#include "Ability/Inventory/InventorySnapshotTypes.h"
+#include "Ability/Inventory/InventoryCommandTypes.h"
 #include "CoreMinimal.h"
-#include "Ability/Inventory/InventoryTypes.h"
 
 class APlayerController;
-class UInventoryWorldSubsystem;
+class UInventoryModule;
 class FInventoryTransactionService;
 class FInventoryCommitCoordinator;
 
@@ -29,7 +30,7 @@ private:
     TSet<FGuid> AllowedInventories;
     bool bServerDomain = false;
 
-    friend class UInventoryWorldSubsystem;
+    friend class UInventoryModule;
     friend class FInventoryTransactionService;
 };
 
@@ -105,7 +106,7 @@ private:
     void Capture(TArray<FInventoryDomainRecord>& OutRecords) const;
 
     friend class FInventoryCommitCoordinator;
-    friend class UInventoryWorldSubsystem;
+    friend class UInventoryModule;
 };
 
 class WHFRAMEWORK_API IInventoryDomainAdapter

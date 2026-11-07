@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Pawn/States/AbilityPawnState_Spawn.h"
+#include "Ability/AbilityTags.h"
 
 #include "Ability/Pawn/AbilityPawnBase.h"
 #include "Ability/Pawn/States/AbilityPawnState_Walk.h"

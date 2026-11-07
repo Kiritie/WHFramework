@@ -11,12 +11,9 @@ UAssetManagerBase::UAssetManagerBase()
 
 UAssetManagerBase& UAssetManagerBase::Get()
 {
-	if(UAssetManagerBase* Instance = Cast<UAssetManagerBase>(GEngine->AssetManager))
-	{
-		return *Instance;
-	}
-	ensureEditorMsgf(false, FString::Printf(TEXT("Invalid AssetManager in DefaultEngine.ini, must be AssetManagerBase!")), EDC_Asset, EDV_Error);
-	return *NewObject<UAssetManagerBase>();
+	UAssetManagerBase* Instance = GEngine ? Cast<UAssetManagerBase>(GEngine->AssetManager) : nullptr;
+	checkf(Instance, TEXT("Invalid AssetManager in DefaultEngine.ini, must be AssetManagerBase"));
+	return *Instance;
 }
 
 void UAssetManagerBase::StartInitialLoading()

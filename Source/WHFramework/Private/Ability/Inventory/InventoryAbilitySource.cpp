@@ -1,6 +1,8 @@
 #include "Ability/Inventory/InventoryAbilitySource.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 
@@ -8,8 +10,8 @@ bool UInventoryAbilitySource::ResolveItem(FAbilityItem& OutItem) const
 {
     OutItem = FAbilityItem();
     const AActor* CurrentAvatar = Avatar.Get();
-    const UWorld* World = CurrentAvatar ? CurrentAvatar->GetWorld() : nullptr;
-    const UInventoryWorldSubsystem* Subsystem = World ? World->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+    UWorld* World = CurrentAvatar ? CurrentAvatar->GetWorld() : nullptr;
+    const UInventoryModule* Subsystem = World ? UInventoryModule::GetPtr(World) : nullptr;
     if (!Subsystem || !Subsystem->IsReady() || !InventoryId.IsValid() || !SlotKey.IsValid())
     {
         return false;

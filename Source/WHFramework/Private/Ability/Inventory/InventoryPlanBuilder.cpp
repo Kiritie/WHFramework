@@ -1,4 +1,8 @@
 #include "InventoryPlanBuilder.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
+#include "Ability/Inventory/InventoryCommandTypes.h"
+#include "Ability/Inventory/InventoryPlanTypes.h"
 
 FInventoryPlanBuilder::FInventoryPlanBuilder(const FInventoryPlannerContext& InContext)
     : Context(InContext)

@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Vitality/States/AbilityVitalityState_Spawn.h"
+#include "Ability/AbilityTags.h"
 
 #include "Ability/Vitality/AbilityVitalityBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Walk.h"

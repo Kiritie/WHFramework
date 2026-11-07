@@ -2,6 +2,7 @@
 
 #pragma once
 #include "WHFrameworkCoreTypes.h"
+#include "Type/NativeTypeIdentity.h"
 #include "WebRequest/WebRequestManager.h"
 #include "WebRequest/WebRequestTypes.h"
 

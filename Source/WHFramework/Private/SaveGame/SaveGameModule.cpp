@@ -1,4 +1,11 @@
-﻿#include "SaveGame/SaveGameModule.h"
+#include "SaveGame/SaveGameModule.h"
+#include "SaveGame/SaveOperationTypes.h"
+#include "WHFrameworkCoreMacros.h"
+#include "SaveGame/SaveSlotTypes.h"
+#include "SaveGame/SaveManifestTypes.h"
+#include "SaveGame/SaveFileTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Common/NativeTaskRetirement.h"
 
 #include "Event/EventModuleStatics.h"
 #include "Event/Events/Common/Game/Event_GameExited.h"
@@ -15,14 +22,12 @@
 #include "SaveGame/SaveDataSerializer.h"
 #include "SaveGame/SaveGameStorage.h"
 #include "SaveGame/SaveGameAsyncExecutor.h"
+#include "SaveGame/SaveGameCaptureOperation.h"
 #include "Setting/SettingModule.h"
 #include "Scene/SceneModule.h"
-#include "Scene/Object/WorldTimer.h"
-#include "Scene/Object/WorldWeather.h"
 #include "Voxel/VoxelModule.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Task/VoxelTerrainResources.h"
-#include "UObject/StrongObjectPtr.h"
 
 IMPLEMENTATION_MODULE(USaveGameModule)
 
@@ -31,59 +36,27 @@ namespace
 TAutoConsoleVariable<int32> CVarSaveStepTimeLimit(TEXT("wh.SaveGame.EnforceStepTimeLimit"), 1,
 	TEXT("Reject save steps that exceed the configured time limit. 0 records overruns without rejecting saves."), ECVF_Default);
 
+bool IsValidProfileName(FName ProfileName)
+{
+	if (ProfileName.IsNone()) return false;
+	const FString Name = ProfileName.ToString();
+	if (Name.IsEmpty() || Name.Len() > 64) return false;
+	for (TCHAR Character : Name)
+	{
+		if (!FChar::IsAlnum(Character) && Character != TEXT('_') && Character != TEXT('-')) return false;
+	}
+	const FString Upper = Name.ToUpper();
+	if (Upper == TEXT("CON") || Upper == TEXT("PRN") || Upper == TEXT("AUX") || Upper == TEXT("NUL")) return false;
+	if (Upper.Len() == 4 && (Upper.StartsWith(TEXT("COM")) || Upper.StartsWith(TEXT("LPT"))) && Upper[3] >= TEXT('1') && Upper[3] <= TEXT('9')) return false;
+	return true;
+}
+
 FSaveOperationResult TransientSessionUnsupported()
 {
 	return FSaveOperationResult::Failed(ESaveResultCode::Unsupported,
 		NSLOCTEXT("WH.SaveGame", "TransientSessionUnsupported", "当前关卡是临时会话，不读取或写入游戏存档。"));
 }
 
-struct FCreatedSlotCleanupTask
-{
-	TSharedPtr<const FSaveGenerationPlan, ESPMode::ThreadSafe> Plan;
-	void operator()() const
-	{
-		FSaveGameStorage OwnerStorage(Plan->UserIndex, Plan->StorageRoot, Plan->TransactionId);
-		if (OwnerStorage.BeginWorldWrite(Plan->SaveId, nullptr, {}) != ESaveWorldWriteResult::Acquired)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Created slot cleanup could not acquire native write ownership; directory retained: %s"), *Plan->SaveId.ToString());
-			return;
-		}
-        if (Plan->ExternalOperation)
-        {
-            FString Error;
-            Plan->ExternalOperation->Store->CloseNative();
-            if (!OwnerStorage.AbortPendingWorld(Plan->ExternalOperation->PendingLease, Error))
-                UE_LOG(LogTemp, Error, TEXT("未发布世界分支保留恢复 intent：%s"), *Error);
-            return;
-        }
-		FSaveManifest Current;
-		// 只删除原请求创建、且仍没有已提交代的槽；任务不读取模块或 World。
-		if (OwnerStorage.ReadManifest(Plan->SaveId, Current) && Current.CurrentGeneration == 0 &&
-			!OwnerStorage.DeleteWorldDirectory(Plan->SaveId))
-			UE_LOG(LogTemp, Error, TEXT("Failed save capture left an uncommitted created slot: %s"), *Plan->SaveId.ToString());
-	}
-};
-
-void RestoreSceneEnvironment(UModuleBase* Module, const FParameter& Data, EPhase Phase)
-{
-	USceneModule* Scene = Cast<USceneModule>(Module);
-	const FSceneModuleSaveData* SceneData = Data.GetPtr<FSceneModuleSaveData>();
-	if(!Scene || !SceneData) return;
-
-	// Keep timer/weather restoration explicit at the save transaction boundary.
-	// This also repairs projects that temporarily shipped SceneModule with these
-	// two agent-load calls commented out. Reapplying the same values is safe.
-	if(UWorldTimer* Timer = Scene->GetWorldTimer())
-	{
-		if(Timer->IsAutoSave()) Timer->LoadSaveData(FParameter(SceneData->TimerData), Phase);
-		Timer->OnRefresh(0.f);
-	}
-	if(UWorldWeather* Weather = Scene->GetWorldWeather())
-	{
-		if(Weather->IsAutoSave()) Weather->LoadSaveData(FParameter(SceneData->WeatherData), Phase);
-		Weather->OnRefresh(0.f);
-	}
-}
 }
 
 USaveGameModule::USaveGameModule()
@@ -100,14 +73,12 @@ USaveGameModule::USaveGameModule()
 
 USaveGameModule::~USaveGameModule()
 {
-	TERMINATION_MODULE(USaveGameModule)
 }
 
 #if WITH_EDITOR
 void USaveGameModule::OnDestroy()
 {
 	Super::OnDestroy();
-	TERMINATION_MODULE(USaveGameModule)
 }
 #endif
 
@@ -212,66 +183,80 @@ void USaveGameModule::OnPreparatory(EPhase InPhase)
 		const FPendingSaveLoadContext Context = LoadSnapshot.Context;
 		LoadOperationResult = RestoreLoadSnapshot(Context.LoadPhase);
 		LoadOperationResult.OperationId = Context.OperationId;
-		FlushDeferredSaveTermination();
 	}
+}
+
+void USaveGameModule::PrepareForHostTermination()
+{
+    bHostTerminationRequested = true;
+    if (!bSaveOperationRunning || !AsyncOperationId.IsValid()) return;
+
+    TGuardValue<bool> Terminating(bSaveTerminationRunning, true);
+    bPendingUserQuit = false;
+    if (AsyncSave) AsyncSave->RequestCancel();
+    while (AsyncSave && AsyncSave->IsRunning() && !AsyncCompletionResult.IsSet())
+    {
+        AsyncSave->WaitForNativeExit(1000);
+        PollNativeSave(nullptr);
+    }
+    if (!AsyncCompletionResult.IsSet())
+    {
+        CompleteAsyncSave(FSaveOperationResult::Failed(ESaveResultCode::Cancelled,
+            FText::FromString(TEXT("World termination cancelled the unfinished save capture"))));
+    }
+    while (AsyncCompletionResult.IsSet()) AdvanceAsyncSaveCompletion(nullptr, true);
 }
 
 void USaveGameModule::OnTermination(EPhase InPhase)
 {
-	if (bApplyingSaveCallbacks || bSaveTerminationRunning)
-	{
-		DeferredSaveTermination = EPhase(uint8(DeferredSaveTermination) | uint8(InPhase));
-		if (AsyncSave) AsyncSave->RequestCancel();
-		return;
-	}
-	{
-		TGuardValue<bool> Terminating(bSaveTerminationRunning, true);
-		bPendingUserQuit = false;
-        PollPendingSave();
-        if (bSaveOperationRunning && bAsyncWorkerStarted && AsyncSave && AsyncSave->IsRunning() && !AsyncCompletionResult.IsSet())
-        {
-            AsyncSave->RequestCancel();
-            DeferredSaveTermination = EPhase(uint8(DeferredSaveTermination) | uint8(InPhase));
-            return;
-        }
-		if (bSaveOperationRunning)
-		{
-			bPendingUserQuit = false;
-			if (!AsyncCompletionResult.IsSet())
-			{
-				if (AsyncSave) AsyncSave->RequestCancel();
-				CompleteAsyncSave(FSaveOperationResult::Failed(ESaveResultCode::Busy,
-					FText::FromString(TEXT("World termination interrupted the save; native task retirement remains owned until its actual exit"))));
-			}
-			// 明确销毁按原事务收尾；正常 Tick 只推进一个有预算的步骤。
-			while (AsyncCompletionResult.IsSet()) AdvanceAsyncSaveCompletion(nullptr, true);
-		}
-		Super::OnTermination(InPhase);
-		if (PHASEC(InPhase, EPhase::Final))
-		{
-			AsyncSave.Reset();
-			AsyncExecutorLease.Reset();
-			LoadSnapshot = FSaveGameLoadSnapshot();
-			Storage.Reset();
-			LocalSaveContext.Reset();
-		}
-		DeferredSaveTermination = EPhase(uint8(DeferredSaveTermination) & ~uint8(InPhase));
-	}
-	FlushDeferredSaveTermination();
+    if (!bHostTerminationRequested) PrepareForHostTermination();
+    Super::OnTermination(InPhase);
+    if (PHASEC(InPhase, EPhase::Final))
+    {
+        OnSaveTerminationComplete();
+        AsyncSave.Reset();
+        AsyncExecutorLease.Reset();
+        LoadSnapshot = FSaveGameLoadSnapshot();
+        Storage.Reset();
+        LocalSaveContext.Reset();
+    }
 }
-
 void USaveGameModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 {
 	Super::OnRefresh(DeltaSeconds, bInEditor);
+}
+
+void USaveGameModule::OnControlRefresh(float RealDeltaSeconds)
+{
+	Super::OnControlRefresh(RealDeltaSeconds);
 	if (AsyncCreatedSlotCleanup.IsCompleted()) AsyncCreatedSlotCleanup = {};
-	if (bInEditor || !bSaveOperationRunning)
+	if (!bSaveOperationRunning)
 	{
 		return;
 	}
+	const bool bLostVoxelOwner = AsyncVoxelOwner && !::IsValid(AsyncVoxelOwner);
+	if (AsyncVoxelOwner && !bLostVoxelOwner)
+	{
+		return;
+	}
+	if (bLostVoxelOwner && !AsyncCompletionResult.IsSet())
+	{
+		if (bAsyncWorkerStarted && AsyncSave)
+		{
+			if (AsyncSave->IsRunning()) AsyncSave->RequestCancel();
+			PollNativeSave(nullptr);
+			if (!AsyncCompletionResult.IsSet()) return;
+		}
+	}
+	if (bLostVoxelOwner && !AsyncCompletionResult.IsSet())
+	{
+		CompleteAsyncSave(FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed,
+			FText::FromString(TEXT("Save capture lost its original voxel module owner"))));
+	}
 	const bool bCaptureAdvanced = AsyncPlan.IsValid() && !AsyncCompletionResult.IsSet();
 	if (bCaptureAdvanced) AdvanceAsyncSaveCapture();
-	PollPendingSave();
-    if (AsyncCompletionResult.IsSet() && DeferredSaveTermination != EPhase::None)
+	PollNativeSave(nullptr);
+    if (AsyncCompletionResult.IsSet() && bLostVoxelOwner)
         AdvanceAsyncSaveCompletion(nullptr, true);
     else if (!bCaptureAdvanced && AsyncCompletionResult.IsSet() && !AsyncVoxelOwner) AdvanceAsyncSaveCompletion();
 }
@@ -287,6 +272,7 @@ FParameter USaveGameModule::ToData()
 
 void USaveGameModule::SetUserIndex(int32 InUserIndex)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if (IsSaveOperationRunning())
 	{
 		return;
@@ -311,7 +297,12 @@ void USaveGameModule::SetUserIndex(int32 InUserIndex)
 FSaveOperationResult USaveGameModule::CreateSaveSlot(const FCreateSaveSlotParams& Params, FSaveSlotSummary& OutSummary)
 {
     OutSummary = {};
+	if (!IsBusinessAdmissionOpen()) return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, FText::FromString(TEXT("原世界正在终止。")));
 	if (IsTransientSession()) return TransientSessionUnsupported();
+	if (bHasPendingSaveSlot && !bPendingSlotAdoptionInProgress)
+		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("已有待创建存档，必须先处理原请求。")));
+	FString RequiredError;
+	if (!CheckRequiredWorldParticipants(RequiredError)) return FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(RequiredError));
     if (!Storage || IsSaveOperationRunning() || !GetWorld() || GetWorld()->GetNetMode() == NM_Client)
         return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("当前不能创建世界存档。")));
     FSaveManifest Manifest;
@@ -360,6 +351,7 @@ FSaveOperationResult USaveGameModule::SaveSlot(FGuid SaveId)
 
 FSaveOperationResult USaveGameModule::SaveActiveSlot()
 {
+	if (!IsBusinessAdmissionOpen()) return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, FText::FromString(TEXT("原世界正在终止。")));
 	if (IsTransientSession()) return TransientSessionUnsupported();
 	return ActiveSaveId.IsValid() ? SaveSlot(ActiveSaveId) : FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("No active save")));
 }
@@ -367,7 +359,12 @@ FSaveOperationResult USaveGameModule::SaveActiveSlot()
 FSaveOperationResult USaveGameModule::SaveSlotAsync(FGuid SaveId)
 {
 	check(IsInGameThread());
+	if (!IsBusinessAdmissionOpen()) return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, FText::FromString(TEXT("原世界正在终止。")));
 	if (IsTransientSession()) return TransientSessionUnsupported();
+	if (bHasPendingSaveSlot && !bPendingSlotAdoptionInProgress)
+		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("已有待创建存档，必须先处理原请求。")));
+	FString RequiredError;
+	if (!CheckRequiredWorldParticipants(RequiredError)) return FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(RequiredError));
 	if (!Storage || IsSaveOperationRunning() || bApplyingSaveCallbacks || bSaveTerminationRunning ||
 		!SaveId.IsValid() || !GetWorld() || GetWorld()->GetNetMode() == NM_Client)
 	{
@@ -404,6 +401,7 @@ FSaveOperationResult USaveGameModule::SaveSlotAsync(FGuid SaveId)
 	{
 		const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FSaveGenerationPlan>() +
 			VoxelBoundedAllocation::TaskBytes<FCreatedSlotCleanupTask>() +
+			VoxelBoundedAllocation::TaskBytes<FNativeTaskRetirementSignal>() + VoxelBoundedAllocation::WorkerSharedBytes<FEventRef>() +
 			VoxelBoundedAllocation::ArrayBytes<TObjectPtr<UModuleBase>>(MaximumModules) +
 			VoxelBoundedAllocation::ArrayBytes<FSaveModuleBytes>(MaximumModules) +
 			VoxelBoundedAllocation::ArrayBytes<TCHAR>(Storage->GetRootDir().Len() + 1);
@@ -468,515 +466,32 @@ FSaveOperationResult USaveGameModule::SaveSlotAsync(FGuid SaveId)
 	return FSaveOperationResult::Accepted(AsyncOperationId);
 }
 
-void USaveGameModule::AdvanceWorldSaveCapture(UVoxelModule& InVoxel)
-{
-	check(IsInGameThread());
-	if (AsyncWorld != InVoxel.GetWorld() || AsyncVoxelOwner != &InVoxel) return;
-	PollNativeSave(&InVoxel.GetTerrainFrameContext());
-	if (AsyncCompletionResult.IsSet()) AdvanceAsyncSaveCompletion(&InVoxel.GetTerrainFrameContext());
-	else AdvanceAsyncSaveCapture(&InVoxel.GetTerrainFrameContext());
-}
-
-bool USaveGameModule::HasWorldSaveWork(const UVoxelModule& InVoxel) const
-{
-	check(IsInGameThread());
-	return bSaveOperationRunning && AsyncWorld == InVoxel.GetWorld() && AsyncVoxelOwner == &InVoxel;
-}
-
-void USaveGameModule::AdvanceAsyncSaveCapture(FVoxelTerrainFrameContext* InFrame)
-{
-	check(IsInGameThread());
-	if (!AsyncPlan || !bSaveOperationRunning || bApplyingSaveCallbacks || AsyncCompletionResult.IsSet()) return;
-	if (!::IsValid(AsyncWorld.Get()) || GetWorld() != AsyncWorld)
-	{
-		CompleteAsyncSave(FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed,
-			FText::FromString(TEXT("Save capture lost its original world owner"))));
-		return;
-	}
-	UVoxelModule* VoxelOwner = AsyncVoxelOwner;
-	const bool bPreparationPending = AsyncPrepareCount < AsyncCaptured.Num();
-	if (VoxelOwner)
-	{
-		// Voxel 捕获和模块序列化共用它当前帧的预算；普通 SaveGame Tick 不重开预算。
-		if (!::IsValid(VoxelOwner) || VoxelOwner->GetWorld() != AsyncWorld)
-		{
-			CompleteAsyncSave(FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed,
-				FText::FromString(TEXT("Save capture lost its original voxel module owner"))));
-			return;
-		}
-		if (!VoxelOwner->IsReady())
-		{
-			CompleteAsyncSave(FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed,
-				FText::FromString(TEXT("Original voxel world stopped serving its accepted save capture"))));
-			return;
-		}
-		if (!InFrame || !InFrame->IsActive()) return;
-		if (!bPreparationPending)
-		{
-			FString Error;
-			const auto State = VoxelOwner->GetSaveCaptureState(Error);
-			if (State == EVoxelSceneCaptureStep::Failed)
-			{
-				CompleteAsyncSave(FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed, FText::FromString(Error)));
-				return;
-			}
-			if (State != EVoxelSceneCaptureStep::Complete) return;
-		}
-	}
-	if (bAsyncWorkerCapacityBlocked && AsyncPlan->Voxel.IsSet())
-	{
-		const auto Resources = AsyncPlan->Voxel->Voxels.Journal.Resources;
-		if (Resources && Resources->Snapshot().ReleaseVersion <= AsyncWorkerBlockedReleaseVersion) return;
-		bAsyncWorkerCapacityBlocked = false;
-	}
-	const double Started = FPlatformTime::Seconds();
-	if (InFrame && !InFrame->GetPublishBudget().TryStart(EVoxelPublishPhase::Prepare, Started, AsyncCaptureCostMilliseconds))
-	{
-		if (!InFrame->IsOverdueOpportunityAvailable()) return;
-		InFrame->ConsumeOverdueOpportunity();
-	}
-	FSaveOperationResult Failure = FSaveOperationResult::Success();
-	FString Error;
-	bool bCapacityBlocked = false;
-	const FGuid CaptureOperation = AsyncOperationId;
-	const int32 CapturePhase = AsyncModuleCapturePhase;
-	const int32 CaptureIndex = bPreparationPending ? AsyncPrepareCount : AsyncBuildCursor;
-	const UModuleBase* CaptureModule = AsyncCaptured.IsValidIndex(CaptureIndex) ? AsyncCaptured[CaptureIndex] : nullptr;
-	const FName CaptureModuleName = ::IsValid(CaptureModule) ? CaptureModule->GetModuleName() : NAME_None;
-	const TCHAR* CaptureStage = bPreparationPending ? TEXT("BeforeSaveData") :
-		VoxelOwner && !AsyncPlan->Voxel.IsSet() ? TEXT("CopyVoxelSnapshot") :
-		VoxelOwner && !AsyncPlan->Voxel->Voxels.Completion->ExpectedStorageRoot ? TEXT("BindVoxelCommitOwner") :
-		AsyncBuildCursor < AsyncCaptured.Num() ? TEXT("ModuleFile") : TEXT("StartWorker");
-	if (bPreparationPending)
-	{
-		UModuleBase* Module = AsyncCaptured[AsyncPrepareCount];
-		if (!::IsValid(Module) || Module->GetWorld() != AsyncWorld)
-			Failure = FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed,
-				FText::FromString(TEXT("Save preparation lost its original module owner")));
-		else
-		{
-			TGuardValue<bool> Applying(bApplyingSaveCallbacks, true);
-			++AsyncPrepareCount;
-			Module->OnBeforeSaveData();
-		}
-	}
-	else if (VoxelOwner && !AsyncPlan->Voxel.IsSet())
-	{
-		FVoxelModuleSaveCapture Capture;
-		if (!VoxelOwner->CopySaveCapture(Capture, Error))
-			Failure = FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed, FText::FromString(Error));
-		else
-		{
-			AsyncPlan->TransactionId = Capture.Voxels.TransactionId;
-			AsyncPlan->Voxel = MoveTemp(Capture);
-		}
-	}
-	else if (Failure && VoxelOwner && AsyncPlan->Voxel.IsSet() &&
-		!AsyncPlan->Voxel->Voxels.Completion->ExpectedStorageRoot)
-	{
-		if (!VoxelOwner->BindSaveCommitOwner(AsyncSaveId, AsyncPlan->StorageRoot, Error))
-		{
-			bCapacityBlocked = Error.StartsWith(TEXT("CapacityBlocked:"));
-			if (!bCapacityBlocked) Failure = FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed, FText::FromString(Error));
-		}
-	}
-	else if (Failure && !bCapacityBlocked && AsyncBuildCursor < AsyncCaptured.Num())
-	{
-		TGuardValue<bool> Applying(bApplyingSaveCallbacks, true);
-		if (!AdvanceModuleFileCapture(Error, bCapacityBlocked) && !bCapacityBlocked)
-			Failure = FSaveOperationResult::Failed(ESaveResultCode::SerializeFailed, FText::FromString(Error));
-	}
-	else if (Failure && !bCapacityBlocked)
-	{
-		if (!AsyncSave)
-		{
-			if (AsyncPlan->Voxel.IsSet())
-			{
-				const auto& Capture = AsyncPlan->Voxel->Voxels;
-				bCapacityBlocked = !Capture.Journal.Resources->Acquire(FVoxelGenerationConsumerKey::Section(
-					Capture.WorldEpoch, Capture.TransactionId, 1, {}, 10), EVoxelTerrainResourcePool::Input,
-					FMemory::QuantizeSize(sizeof(FSaveGameAsyncExecutor), alignof(FSaveGameAsyncExecutor)), AsyncExecutorLease);
-			}
-			if (!bCapacityBlocked) AsyncSave = MakeUnique<FSaveGameAsyncExecutor>();
-		}
-		if (!bCapacityBlocked && !AsyncSave->Start(MoveTemp(*AsyncPlan), &Error))
-		{
-			if (Error.StartsWith(TEXT("CapacityBlocked:")) && AsyncPlan->Voxel.IsSet())
-			{
-				bCapacityBlocked = true;
-			}
-			else Failure = FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(Error));
-		}
-		else if (!bCapacityBlocked)
-		{
-			bAsyncWorkerStarted = true;
-			AsyncPlan.Reset();
-		}
-	}
-	if (bCapacityBlocked && AsyncPlan && AsyncPlan->Voxel.IsSet())
-	{
-		bAsyncWorkerCapacityBlocked = true;
-		AsyncWorkerBlockedReleaseVersion = AsyncPlan->Voxel->Voxels.Journal.Resources->Snapshot().ReleaseVersion;
-	}
-	const double Finished = FPlatformTime::Seconds();
-	const double Actual = (Finished - Started) * 1000.0;
-	if (Actual >= 0.25 || !Failure)
-	{
-		UE_LOG(LogTemp, Display, TEXT("Save capture slice: operation=%s stage=%s module=%s phase=%d duration=%.3fms capacityBlocked=%s"),
-			*CaptureOperation.ToString(), CaptureStage, *CaptureModuleName.ToString(), CapturePhase, Actual,
-			bCapacityBlocked ? TEXT("true") : TEXT("false"));
-	}
-	AsyncCaptureCostMilliseconds = FMath::Lerp(AsyncCaptureCostMilliseconds, Actual, 0.15);
-	if (InFrame)
-	{
-		InFrame->GetPublishBudget().Finish(EVoxelPublishPhase::Prepare, Started, Finished);
-		if (VoxelOwner && Actual > VoxelOwner->GetMaximumSceneCaptureStepMilliseconds() && AsyncPlan)
-		{
-			const FString TimingError = FString::Printf(
-				TEXT("Save module capture step capability error: stage=%s module=%s phase=%d %.3fms exceeds %.3fms"),
-				CaptureStage, *CaptureModuleName.ToString(), CapturePhase, Actual, VoxelOwner->GetMaximumSceneCaptureStepMilliseconds());
-			if (IsStepTimeLimitEnforced()) Failure = FSaveOperationResult::Failed(ESaveResultCode::CaptureFailed, FText::FromString(TimingError));
-			else UE_LOG(LogTemp, Warning, TEXT("Save timing limit disabled: %s"), *TimingError);
-		}
-	}
-	if (!Failure) CompleteAsyncSave(Failure);
-	FlushDeferredSaveTermination();
-}
-
-bool USaveGameModule::AdvanceModuleFileCapture(FString& OutError, bool& bOutCapacityBlocked)
-{
-	check(IsInGameThread() && AsyncPlan && AsyncBuildCursor < AsyncCaptured.Num());
-	bOutCapacityBlocked = false;
-	OutError.Reset();
-	UModuleBase* Module = AsyncCaptured[AsyncBuildCursor];
-	if (!::IsValid(Module) || Module->GetWorld() != AsyncWorld)
-	{
-		OutError = TEXT("Module file capture lost its original world/module owner");
-		return false;
-	}
-	const auto Resources = AsyncPlan->Voxel.IsSet() ? AsyncPlan->Voxel->Voxels.Journal.Resources : nullptr;
-	const auto Consumer = AsyncPlan->Voxel.IsSet() ? FVoxelGenerationConsumerKey::Section(
-		AsyncPlan->Voxel->Voxels.WorldEpoch, AsyncPlan->Voxel->Voxels.TransactionId,
-		uint64(AsyncBuildCursor) + 1, {}, 9) : FVoxelGenerationConsumerKey();
-	auto Reserve = [&](TArray<uint8>& Buffer, const int32 Required,
-		TSharedPtr<FVoxelTerrainResourceLease, ESPMode::ThreadSafe>& Lease, const EVoxelTerrainResourcePool Pool)
-	{
-		if (Required <= Buffer.Max()) return true;
-		const int32 Capacity = int32(FMath::Min<int64>(MAX_int32,
-			FMath::Max<int64>(Required, FMath::Max<int64>(4096, int64(Buffer.Max()) * 2))));
-		const uint64 Peak = Buffer.GetAllocatedSize() + VoxelBoundedAllocation::ArrayBytes<uint8>(Capacity);
-		if (Resources)
-		{
-			const auto Limits = Resources->Snapshot().Limits;
-			const uint64 Limit = Pool == EVoxelTerrainResourcePool::Working ? Limits.WorkingBytes : Limits.InputBytes;
-			if (Peak > Limit)
-			{
-				OutError = TEXT("Module serialization capability error: backing growth exceeds the configured pool capacity");
-				return false;
-			}
-		}
-		if (Resources && !(Lease ? Lease->Resize(Peak) : Resources->Acquire(Consumer, Pool, Peak, Lease)))
-		{
-			bOutCapacityBlocked = true;
-			OutError = TEXT("CapacityBlocked: original module payload/file backing is retained for retry");
-			return false;
-		}
-		Buffer.Reserve(Capacity);
-		if (Lease) verify(Lease->Resize(Buffer.GetAllocatedSize()));
-		return true;
-	};
-	constexpr int32 WindowBytes = 64 * 1024;
-	switch (AsyncModuleCapturePhase)
-	{
-	case 0:
-		AsyncModuleFile.Emplace();
-		AsyncModuleFile->ModuleName = Module->GetModuleName();
-		AsyncModuleFile->Version = Module->GetSaveDataVersion();
-		AsyncModuleData = Module->GetSaveData(true);
-		if (DeferredSaveTermination != EPhase::None)
-		{
-			OutError = TEXT("Module capture callback requested world termination");
-			return false;
-		}
-		if (!AsyncModuleData.HasValue())
-		{
-			OutError = FString::Printf(TEXT("Module %s returned no captured save payload"), *Module->GetModuleName().ToString());
-			return false;
-		}
-        if (AsyncExternalOperation && AsyncStoreParticipant.Transform &&
-            !AsyncStoreParticipant.Transform(AsyncExternalOperation->Context, AsyncExternalOperation->Store,
-                Module->GetModuleName(), AsyncModuleData, OutError)) return false;
-		AsyncModuleCapturePhase = 1;
-		break;
-	case 1:
-		if (!FSaveDataSerializer::SerializeParameterBounded(AsyncModuleData, MAX_int32, AsyncModulePayload,
-			[&](TArray<uint8>& Buffer, const int32 Required)
-			{
-				return Reserve(Buffer, Required, AsyncModulePayloadLease, EVoxelTerrainResourcePool::Working);
-			}))
-		{
-			if (OutError.IsEmpty()) OutError = TEXT("Captured module reflection serialization failed");
-			return false;
-		}
-		AsyncModulePayloadCursor = 0;
-		AsyncModulePayloadCrc = 0;
-		AsyncModuleCapturePhase = 2;
-		break;
-	case 2:
-	{
-		const int32 Count = FMath::Min(WindowBytes, AsyncModulePayload.Num() - AsyncModulePayloadCursor);
-		if (Count > 0)
-		{
-			AsyncModulePayloadCrc = FCrc::MemCrc32(AsyncModulePayload.GetData() + AsyncModulePayloadCursor, Count, AsyncModulePayloadCrc);
-			AsyncModulePayloadCursor += Count;
-		}
-		if (AsyncModulePayloadCursor == AsyncModulePayload.Num()) AsyncModuleCapturePhase = 3;
-		break;
-	}
-	case 3:
-		if (!FSaveDataSerializer::WriteModuleHeaderBounded(AsyncModuleFile->ModuleName, AsyncModuleFile->Version,
-			AsyncModulePayload.Num(), AsyncModulePayloadCrc, AsyncModuleFile->Bytes,
-			[&](TArray<uint8>& Buffer, const int32 Required)
-			{
-				return Reserve(Buffer, Required, AsyncModuleFile->ResourceLease, EVoxelTerrainResourcePool::Input);
-			}))
-		{
-			if (OutError.IsEmpty()) OutError = TEXT("Captured module header serialization failed");
-			return false;
-		}
-		if (AsyncModulePayload.Num() > MAX_int32 - AsyncModuleFile->Bytes.Num())
-		{
-			OutError = TEXT("Captured module file exceeds the byte-array protocol capacity");
-			return false;
-		}
-		// 在正文复制前一次授予最终大小，避免后续每个窗口重新搬动旧正文。
-		if (!Reserve(AsyncModuleFile->Bytes, AsyncModuleFile->Bytes.Num() + AsyncModulePayload.Num(),
-			AsyncModuleFile->ResourceLease, EVoxelTerrainResourcePool::Input)) return false;
-		AsyncModulePayloadCursor = 0;
-		AsyncModuleCapturePhase = 4;
-		break;
-	case 4:
-	{
-		const int32 Count = FMath::Min(WindowBytes, AsyncModulePayload.Num() - AsyncModulePayloadCursor);
-		if (Count > 0)
-		{
-			AsyncModuleFile->Bytes.Append(AsyncModulePayload.GetData() + AsyncModulePayloadCursor, Count);
-			AsyncModulePayloadCursor += Count;
-		}
-		if (AsyncModulePayloadCursor == AsyncModulePayload.Num()) AsyncModuleCapturePhase = 5;
-		break;
-	}
-	case 5:
-		AsyncPlan->Modules.Add(MoveTemp(AsyncModuleFile.GetValue()));
-		ResetModuleFileCapture();
-		++AsyncBuildCursor;
-		break;
-	default:
-		OutError = TEXT("Invalid persistent module capture phase");
-		return false;
-	}
-	return true;
-}
-
-void USaveGameModule::ResetModuleFileCapture()
-{
-	AsyncModuleData.Reset();
-	AsyncModulePayload.Empty();
-	AsyncModulePayloadLease.Reset();
-	AsyncModuleFile.Reset();
-	AsyncModuleCapturePhase = 0;
-	AsyncModulePayloadCursor = 0;
-	AsyncModulePayloadCrc = 0;
-}
-
-void USaveGameModule::FlushDeferredSaveTermination()
-{
-	if (bApplyingSaveCallbacks || bSaveTerminationRunning || DeferredSaveTermination == EPhase::None) return;
-	const EPhase Phase = DeferredSaveTermination;
-	DeferredSaveTermination = EPhase::None;
-	bPendingUserQuit = false;
-	OnTermination(Phase);
-}
-
 FSaveOperationResult USaveGameModule::SaveActiveSlotAsync()
 {
+	if (!IsBusinessAdmissionOpen()) return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, FText::FromString(TEXT("原世界正在终止。")));
 	if (IsTransientSession()) return TransientSessionUnsupported();
 	return ActiveSaveId.IsValid() ? SaveSlotAsync(ActiveSaveId)
 	                              : FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("No active save")));
 }
 
-void USaveGameModule::CompleteAsyncSave(const FSaveOperationResult& Result)
+bool USaveGameModule::RequestUserQuit(APlayerController* InPlayer, const uint8 InQuitPreference, const bool bInIgnorePlatformRestrictions)
 {
 	check(IsInGameThread());
-	if (!bSaveOperationRunning || AsyncCompletionResult.IsSet()) return;
-	AsyncCompletionResult = Result;
-	AsyncCompletionResult->OperationId = AsyncOperationId;
-	bAsyncCompletionFilesCommitted = bool(Result) || (AsyncExternalOperation && AsyncExternalOperation->bFilesCommitted.load());
-	AsyncCompletionCursor = -1;
-}
-
-void USaveGameModule::AdvanceAsyncSaveCompletion(FVoxelTerrainFrameContext* InFrame, const bool bForce)
-{
-	check(IsInGameThread());
-	if (!AsyncCompletionResult.IsSet() || bApplyingSaveCallbacks) return;
-	UVoxelModule* const VoxelOwner = AsyncVoxelOwner;
-	if (!bForce && VoxelOwner && (!InFrame || !InFrame->IsActive())) return;
-	const int32 CompletionCursor = AsyncCompletionCursor;
-	const FString CompletionStage = CompletionCursor < 0 ? TEXT("ReleaseCapture") :
-		CompletionCursor < AsyncPrepareCount ? GetNameSafe(AsyncCaptured[CompletionCursor]) : TEXT("FinalizeSave");
-	const double Started = FPlatformTime::Seconds();
-	if (!bForce && InFrame &&
-		!InFrame->GetPublishBudget().TryStart(EVoxelPublishPhase::Retire, Started, AsyncCompletionCostMilliseconds))
-	{
-		if (!InFrame->IsOverdueOpportunityAvailable()) return;
-		InFrame->ConsumeOverdueOpportunity();
-	}
-	if (AsyncCompletionCursor < 0)
-	{
-        if (!bAsyncCompletionFilesCommitted && !bAsyncWorkerStarted && AsyncPlan &&
-            (PendingCreatedSaveId == AsyncSaveId || AsyncExternalOperation))
-		{
-			check(AsyncCreatedSlotCleanup.IsCompleted());
-			AsyncCreatedSlotCleanup = UE::Tasks::Launch(UE_SOURCE_LOCATION, FCreatedSlotCleanupTask{AsyncPlan});
-		}
-		AsyncPlan.Reset();
-		ResetModuleFileCapture();
-		AsyncCompletionCursor = 0;
-	}
-	else if (AsyncCompletionCursor < AsyncPrepareCount)
-	{
-		UModuleBase* Module = AsyncCaptured[AsyncCompletionCursor++];
-		TGuardValue<bool> Applying(bApplyingSaveCallbacks, true);
-		if (::IsValid(Module))
-		{
-			Module->OnAfterSaveData(bAsyncCompletionFilesCommitted);
-		}
-        if (bAsyncCompletionFilesCommitted && AsyncVoxelOwner && Module == AsyncVoxelOwner &&
-            (!::IsValid(AsyncVoxelOwner) || !AsyncVoxelOwner->DidApplySaveCommit()))
-        {
-            const FString Error = TEXT("存档文件已提交，但原体素世界没有接受目标基线；必须重新加载目标存档。");
-            AsyncCompletionResult->bSuccess = false;
-            AsyncCompletionResult->Code = ESaveResultCode::CommitFailed;
-            AsyncCompletionResult->Message = FText::FromString(Error);
-            if (AsyncExternalOperation)
-            {
-                AsyncExternalOperation->Context.bProjectionFailed = true;
-                AsyncExternalOperation->Context.ProjectionFailure = Error;
-            }
-        }
-	}
-	else FinalizeAsyncSave();
-	const double Finished = FPlatformTime::Seconds();
-	const double Actual = (Finished - Started) * 1000.0;
-	UE_LOG(LogTemp, Display, TEXT("Save completion slice: operation=%s stage=%s cursor=%d duration=%.3fms committed=%s"),
-		*AsyncOperationId.ToString(), *CompletionStage, CompletionCursor, Actual, bAsyncCompletionFilesCommitted ? TEXT("true") : TEXT("false"));
-	AsyncCompletionCostMilliseconds = FMath::Lerp(AsyncCompletionCostMilliseconds, Actual, 0.15);
-	if (!bForce && InFrame)
-	{
-		InFrame->GetPublishBudget().Finish(EVoxelPublishPhase::Retire, Started, Finished);
-		if (VoxelOwner && Actual > VoxelOwner->GetMaximumSceneCaptureStepMilliseconds())
-		{
-			const FString Error = FString::Printf(TEXT("Save completion capability error: %s[%d] %.3fms exceeds %.3fms"),
-				*CompletionStage, CompletionCursor, Actual, VoxelOwner->GetMaximumSceneCaptureStepMilliseconds());
-			if (!IsStepTimeLimitEnforced())
-			{
-				UE_LOG(LogTemp, Warning, TEXT("Save timing limit disabled: %s"), *Error);
-			}
-			else if (AsyncCompletionResult.IsSet())
-			{
-				AsyncCompletionResult->bSuccess = false;
-				AsyncCompletionResult->Code = ESaveResultCode::CommitFailed;
-				AsyncCompletionResult->Message = FText::FromString(Error);
-			}
-			else UE_LOG(LogTemp, Error, TEXT("%s"), *Error);
-		}
-	}
-	FlushDeferredSaveTermination();
-}
-
-void USaveGameModule::FinalizeAsyncSave()
-{
-	check(IsInGameThread() && AsyncCompletionResult.IsSet() && AsyncCompletionCursor == AsyncPrepareCount);
-    if (AsyncExternalOperation)
-    {
-        FString Error;
-        TGuardValue<bool> Applying(bApplyingSaveCallbacks, true);
-        if (!FinishExternalStore(AsyncStoreParticipant, AsyncExternalOperation, bAsyncCompletionFilesCommitted, Error))
-        {
-            AsyncCompletionResult->bSuccess = false;
-            AsyncCompletionResult->Code = AsyncExternalOperation->Context.bPublicationUncertain ?
-                ESaveResultCode::ConfirmationPending : ESaveResultCode::CommitFailed;
-            AsyncCompletionResult->Message = FText::FromString(Error);
-        }
-    }
-    const bool bPublicationUncertain = AsyncExternalOperation && AsyncExternalOperation->Context.bPublicationUncertain;
-    AsyncExternalOperation.Reset();
-    AsyncStoreParticipant = {};
-	const FGuid CompletedId = AsyncSaveId;
-	const FSaveOperationResult Completed = AsyncCompletionResult.GetValue();
-	const bool bFilesCommitted = bAsyncCompletionFilesCommitted;
-	AsyncSaveId.Invalidate();
-	AsyncOperationId.Invalidate();
-	AsyncCompletionResult.Reset();
-	AsyncCompletionCursor = -1;
-	bAsyncCompletionFilesCommitted = false;
-	AsyncPrepareCount = 0;
-	AsyncCaptured.Empty();
-	AsyncVoxelOwner = nullptr;
-	AsyncCaptureMetadataLease.Reset();
-	if (bFilesCommitted)
-	{
-		ActiveSaveId = CompletedId;
-	}
-	if (PendingCreatedSaveId == CompletedId)
-	{
-		if (!bFilesCommitted && !bPublicationUncertain)
-		{
-			ActiveSaveId = PendingCreationPreviousSaveId;
-		}
-		PendingCreatedSaveId.Invalidate();
-        PendingCreatedManifest.Reset();
-		PendingCreationPreviousSaveId.Invalidate();
-	}
-    if (bPublicationUncertain) ActiveSaveId.Invalidate();
-	const bool bFinishedPendingSlot = Completed && bAsyncCompletesPendingSlot;
-	if (!Completed && bFilesCommitted && bAsyncCompletesPendingSlot) PendingSlotSaveId = CompletedId;
-	bAsyncCompletesPendingSlot = false;
-	bAsyncWorkerStarted = false;
-	bAsyncWorkerCapacityBlocked = false;
-	AsyncWorld = nullptr;
-	bSaveOperationRunning = false;
-	if (bFinishedPendingSlot) CancelPendingSaveSlot();
-	LastWorldSaveResult = Completed;
-	{
-		TGuardValue<bool> Applying(bApplyingSaveCallbacks, true);
-		OnWorldSaveFinished.Broadcast(CompletedId, Completed);
-	}
-	if (DeferredSaveTermination != EPhase::None)
-	{
-		FlushDeferredSaveTermination();
-		return;
-	}
-	if (bPendingUserQuit) CompleteUserQuit(Completed);
-}
-
-bool USaveGameModule::RequestUserQuit(const uint8 InQuitPreference, const bool bInIgnorePlatformRestrictions)
-{
-	check(IsInGameThread());
+	if (!IsBusinessAdmissionOpen() || bHostTerminationRequested || !::IsValid(InPlayer) || !InPlayer->IsLocalController() || InPlayer->GetWorld() != GetWorld()) return false;
 	if (IsTransientSession())
 	{
 		TWeakObjectPtr<UWorld> World = GetWorld();
 		if (!World.IsValid()) return false;
-		TWeakObjectPtr<APlayerController> Controller = UGameplayStatics::GetPlayerController(World.Get(), 0);
+		TWeakObjectPtr<APlayerController> Controller = InPlayer;
 		UEventModuleStatics::BroadcastEvent<FEventGameExited>(this, { false });
-		if (World.IsValid() && !World->bIsTearingDown)
+		if (World.IsValid() && !World->bIsTearingDown && Controller.IsValid() && Controller->GetWorld() == World.Get())
 		{
 			UKismetSystemLibrary::QuitGame(World.Get(), Controller.Get(),
 				static_cast<EQuitPreference::Type>(InQuitPreference), bInIgnorePlatformRestrictions);
 		}
 		return true;
 	}
-	if (bPendingUserQuit) return true;
+	if (bPendingUserQuit) return QuitController.Get() == InPlayer;
 	bPendingUserQuit = true;
 	bQuitNeedsFreshCapture = bSaveOperationRunning;
 	PendingQuitPreference = InQuitPreference;
@@ -985,7 +500,7 @@ bool USaveGameModule::RequestUserQuit(const uint8 InQuitPreference, const bool b
 	bQuitSaveModuleWasPaused = GetModuleState() == EModuleState::Paused;
 	QuitVoxel = UVoxelModule::GetPtr(GetWorld());
 	bQuitVoxelModuleWasPaused = QuitVoxel.IsValid() && QuitVoxel->GetModuleState() == EModuleState::Paused;
-	QuitController = GetWorld() ? UGameplayStatics::GetPlayerController(GetWorld(), 0) : nullptr;
+	QuitController = InPlayer;
 	if (QuitController.IsValid())
 	{
 		QuitController->SetIgnoreMoveInput(true);
@@ -1011,13 +526,15 @@ void USaveGameModule::CompleteUserQuit(const FSaveOperationResult& InResult)
 		if (Next.Code != ESaveResultCode::Accepted) CompleteUserQuit(Next);
 		return;
 	}
-	const auto Profile = InResult ? SaveProfile() : InResult;
+	const USettingModule* Settings = USettingModule::GetPtr(GetWorld());
+	const auto Profile = !InResult ? InResult : Settings ? SaveProfile(Settings->GetActiveLocalProfile()) :
+		FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(TEXT("SettingModule missing.")));
 	// Profile 的回调可要求停止原世界；延后停止已执行时不能再退出旧 owner。
 	if (!bPendingUserQuit || !::IsValid(GetWorld())) return;
-	if (!InResult || !Profile)
+	if (!InResult || !Profile || !QuitController.IsValid() || QuitController->GetWorld() != GetWorld())
 	{
 		UE_LOG(LogTemp, Error, TEXT("User quit retained its live world after save failure: %s"),
-			*(InResult ? Profile.Message : InResult.Message).ToString());
+			*(!InResult ? InResult.Message : !Profile ? Profile.Message : FText::FromString(TEXT("Quit controller no longer belongs to the original world"))).ToString());
 		bPendingUserQuit = false;
 		if (QuitController.IsValid())
 		{
@@ -1033,13 +550,16 @@ void USaveGameModule::CompleteUserQuit(const FSaveOperationResult& InResult)
 	}
 	bQuitSaveCommitted = true;
 	bPendingUserQuit = false;
+	UWorld* World = GetWorld();
+	APlayerController* Controller = QuitController.Get();
 	UEventModuleStatics::BroadcastEvent<FEventGameExited>(this, { false });
-	UKismetSystemLibrary::QuitGame(GetWorld(), QuitController.Get(),
+	UKismetSystemLibrary::QuitGame(World, Controller,
 		static_cast<EQuitPreference::Type>(PendingQuitPreference), bPendingQuitIgnorePlatformRestrictions);
 }
 
 FSaveOperationResult USaveGameModule::PollPendingSave()
 {
+	if (!IsBusinessAdmissionOpen()) return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, FText::FromString(TEXT("原世界正在终止。")));
 	return PollNativeSave(nullptr);
 }
 
@@ -1047,7 +567,7 @@ FSaveOperationResult USaveGameModule::PollNativeSave(FVoxelTerrainFrameContext* 
 {
 	if (!bSaveOperationRunning) return LastWorldSaveResult;
 	FSaveOperationResult Result;
-	if (AsyncSave && AsyncSave->Poll(Result, InFrame, bSaveTerminationRunning || DeferredSaveTermination != EPhase::None))
+	if (AsyncSave && AsyncSave->Poll(Result, InFrame, bSaveTerminationRunning))
 	{
 		CompleteAsyncSave(Result);
 	}
@@ -1063,43 +583,88 @@ FSaveOperationResult USaveGameModule::GetWorldSaveResult(const FGuid& InOperatio
 	return FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("Save operation receipt is unavailable")));
 }
 
-void USaveGameModule::BeginPendingSaveSlot(const FCreateSaveSlotParams& Params)
+FGuid USaveGameModule::BeginPendingSaveSlot(const FCreateSaveSlotParams& Params)
 {
-	if (IsTransientSession()) return;
-	if (IsSaveOperationRunning()) return;
+	if (!IsBusinessAdmissionOpen() || IsTransientSession() || IsSaveOperationRunning() ||
+		bPendingSlotAdoptionInProgress || bHasPendingSaveSlot) return {};
 	PendingSlotSaveId.Invalidate();
 	PendingSaveSlotParams = Params;
 	PendingSaveSlotParams.bCaptureCurrentWorld = true;
+	PendingSaveSlotToken = FGuid::NewGuid();
 	bHasPendingSaveSlot = true;
+	return PendingSaveSlotToken;
 }
 
-void USaveGameModule::CancelPendingSaveSlot()
+bool USaveGameModule::IsPendingSaveSlot(const FGuid& InToken) const
 {
-	if (IsSaveOperationRunning()) return;
+	return InToken.IsValid() && HasPendingSaveSlot() && PendingSaveSlotToken == InToken;
+}
+
+bool USaveGameModule::CancelPendingSaveSlot(const FGuid& InToken)
+{
+	return IsBusinessAdmissionOpen() && !PendingSlotSaveId.IsValid() && CancelPendingSaveSlotForCleanup(InToken);
+}
+
+bool USaveGameModule::CancelPendingSaveSlotForCleanup(const FGuid& InToken)
+{
+	if (!IsPendingSaveSlot(InToken) || IsSaveOperationRunning() || bPendingSlotAdoptionInProgress) return false;
+	PendingSlotResults.Add(InToken, FSaveOperationResult::Failed(ESaveResultCode::Cancelled, FText::FromString(TEXT("原待创建存档已取消。"))));
 	PendingSlotSaveId.Invalidate();
+	PendingSaveSlotToken.Invalidate();
 	bHasPendingSaveSlot = false;
 	PendingSaveSlotParams = FCreateSaveSlotParams();
+	return true;
+}
+
+FSaveOperationResult USaveGameModule::GetPendingSlotResult(const FGuid& InToken) const
+{
+	if (const FSaveOperationResult* Result = PendingSlotResults.Find(InToken)) return *Result;
+	if (InToken.IsValid() && AsyncPendingSaveSlotToken == InToken && AsyncOperationId.IsValid())
+		return FSaveOperationResult::Accepted(AsyncOperationId);
+	return FSaveOperationResult::Failed(ESaveResultCode::NotFound, FText::FromString(TEXT("原待创建存档尚无完成回执。")));
+}
+
+bool USaveGameModule::ConsumePendingSlotResult(const FGuid& InToken, FSaveOperationResult& OutResult)
+{
+	check(IsInGameThread());
+	if (!InToken.IsValid() || IsPendingSaveSlot(InToken) || AsyncPendingSaveSlotToken == InToken) return false;
+	return PendingSlotResults.RemoveAndCopyValue(InToken, OutResult);
+}
+
+FSaveOperationResult USaveGameModule::SavePendingSlot(const FGuid& InToken)
+{
+	if (!IsBusinessAdmissionOpen() || !IsPendingSaveSlot(InToken))
+		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("待创建存档的原始请求身份不匹配。")));
+	if (bSaveOperationRunning && AsyncPendingSaveSlotToken == InToken && AsyncOperationId.IsValid())
+		return FSaveOperationResult::Accepted(AsyncOperationId);
+	if (IsSaveOperationRunning() || bPendingSlotAdoptionInProgress)
+		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("存档请求正在执行。")));
+	TGuardValue<bool> Adopting(bPendingSlotAdoptionInProgress, true);
+	FSaveOperationResult Result;
+	if (PendingSlotSaveId.IsValid()) Result = SaveSlotAsync(PendingSlotSaveId);
+	else
+	{
+		FSaveSlotSummary Summary;
+		const FCreateSaveSlotParams Params = PendingSaveSlotParams;
+		Result = CreateSaveSlot(Params, Summary);
+	}
+	if (Result.Code == ESaveResultCode::Accepted && IsPendingSaveSlot(InToken) && AsyncOperationId == Result.OperationId)
+	{
+		PendingSlotResults.Remove(InToken);
+		bAsyncCompletesPendingSlot = true;
+		AsyncPendingSaveSlotToken = InToken;
+	}
+	return Result;
 }
 
 FSaveOperationResult USaveGameModule::SaveCurrentSlot()
 {
+	if (!IsBusinessAdmissionOpen()) return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, FText::FromString(TEXT("原世界正在终止。")));
 	if (IsTransientSession()) return TransientSessionUnsupported();
+	if (bHasPendingSaveSlot) return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("待创建存档必须由原请求身份提交。")));
 	if (bSaveOperationRunning) return FSaveOperationResult::Accepted(AsyncOperationId);
 	if (!AsyncCreatedSlotCleanup.IsCompleted())
 		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("The original failed slot is still being retired")));
-	if (bHasPendingSaveSlot)
-	{
-		if (PendingSlotSaveId.IsValid())
-		{
-			const auto Result = SaveSlotAsync(PendingSlotSaveId);
-			bAsyncCompletesPendingSlot = bool(Result);
-			return Result;
-		}
-		FSaveSlotSummary Summary;
-		const FSaveOperationResult Result = CreateSaveSlot(PendingSaveSlotParams, Summary);
-		bAsyncCompletesPendingSlot = bool(Result);
-		return Result;
-	}
 	if (ActiveSaveId.IsValid())
 	{
 		return SaveActiveSlot();
@@ -1109,6 +674,7 @@ FSaveOperationResult USaveGameModule::SaveCurrentSlot()
 
 void USaveGameModule::DetachActiveSave()
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if (IsSaveOperationRunning()) return;
 	LoadSnapshot = FSaveGameLoadSnapshot();
 	ActiveSaveId.Invalidate();
@@ -1120,6 +686,7 @@ void USaveGameModule::DetachActiveSave()
 
 void USaveGameModule::ClearActiveSave()
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if (IsSaveOperationRunning()) return;
 	DetachActiveSave();
 	if(!IsTransientSession() && Storage)
@@ -1170,7 +737,6 @@ void USaveGameModule::CancelLoadOperation(const FGuid& InOperationId)
 
 FSaveOperationResult USaveGameModule::RequestLoadSlot(FGuid SaveId, EPhase InPhase, const FGuid& InOperationId)
 {
-	ON_SCOPE_EXIT { FlushDeferredSaveTermination(); };
 	if (!InOperationId.IsValid())
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, NSLOCTEXT("WH.SaveGame", "InvalidLoadOperation", "存档加载请求缺少有效操作身份。"));
@@ -1181,6 +747,11 @@ FSaveOperationResult USaveGameModule::RequestLoadSlot(FGuid SaveId, EPhase InPha
 		Result.OperationId = InOperationId;
 		return Result;
 	};
+	if (!IsBusinessAdmissionOpen()) return Reject(ESaveResultCode::Cancelled, FText::FromString(TEXT("原世界正在终止。")));
+	if (PHASEC(InPhase, EPhase::Primary) && bHasPendingSaveSlot)
+		return Reject(ESaveResultCode::Busy, FText::FromString(TEXT("已有待提交世界，请先由原请求处理。")));
+	FString RequiredError;
+	if (!CheckRequiredWorldParticipants(RequiredError)) return Reject(ESaveResultCode::ModuleMissing, FText::FromString(RequiredError));
 	if (IsTransientSession())
 	{
 		FSaveOperationResult Result = TransientSessionUnsupported();
@@ -1210,7 +781,8 @@ FSaveOperationResult USaveGameModule::RequestLoadSlot(FGuid SaveId, EPhase InPha
 		{
 			return Reject(ESaveResultCode::InvalidArgument, NSLOCTEXT("WH.SaveGame", "MissingLoadSnapshot", "存档后续阶段缺少匹配的加载快照。"));
 		}
-		LoadOperationResult = RestoreLoadSnapshot(InPhase);
+		const FSaveOperationResult Restored = RestoreLoadSnapshot(InPhase);
+		LoadOperationResult = Restored;
 		LoadOperationResult.OperationId = InOperationId;
 		return LoadOperationResult;
 	}
@@ -1252,18 +824,26 @@ FSaveOperationResult USaveGameModule::RequestLoadSlot(FGuid SaveId, EPhase InPha
 		{
 			return Reject(ESaveResultCode::Busy, NSLOCTEXT("WH.SaveGame", "PendingLoadOccupied", "游戏实例已有等待接手的存档请求。"));
 		}
-		LoadOperationResult = FSaveOperationResult::Accepted(InOperationId);
+		const FSaveOperationResult Accepted = FSaveOperationResult::Accepted(InOperationId);
+		LoadOperationResult = Accepted;
 		UGameplayStatics::OpenLevel(this, Manifest.CurrentMap);
-		return LoadOperationResult;
+		return Accepted;
 	}
 	LoadSnapshot = MoveTemp(Snapshot);
-	LoadOperationResult = RestoreLoadSnapshot(InPhase);
+	const FSaveOperationResult Restored = RestoreLoadSnapshot(InPhase);
+	LoadOperationResult = Restored;
 	LoadOperationResult.OperationId = InOperationId;
 	return LoadOperationResult;
 }
 
 FSaveOperationResult USaveGameModule::RestoreLoadSnapshot(EPhase InPhase)
 {
+	FString RequiredError;
+	if (!CheckRequiredWorldParticipants(RequiredError))
+	{
+		LoadSnapshot = FSaveGameLoadSnapshot();
+		return FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(RequiredError));
+	}
 	const FSaveGameLoadSnapshot Snapshot = LoadSnapshot;
 	const FPendingSaveLoadContext& Context = Snapshot.Context;
 	const FName CurrentMap(*UGameplayStatics::GetCurrentLevelName(GetWorld(), true));
@@ -1276,9 +856,10 @@ FSaveOperationResult USaveGameModule::RestoreLoadSnapshot(EPhase InPhase)
 			NSLOCTEXT("WH.SaveGame", "InvalidLoadSnapshot", "存档加载快照、目标地图或阶段不匹配。"));
 	}
 	TGuardValue<bool> Guard(bSaveOperationRunning, true);
+	TGuardValue<bool> Loading(bApplyingWorldLoad, true);
 	TGuardValue<bool> Applying(bApplyingSaveCallbacks, true);
 	FSaveOperationResult Result = LoadModulesFromGeneration(Context.SaveId, Context.Generation, InPhase);
-	if (LoadSnapshot.Context.OperationId != Context.OperationId || DeferredSaveTermination != EPhase::None)
+	if (LoadSnapshot.Context.OperationId != Context.OperationId)
 	{
 		LoadSnapshot = FSaveGameLoadSnapshot();
 		return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, NSLOCTEXT("WH.SaveGame", "LoadCancelled", "存档加载请求已取消。"));
@@ -1291,7 +872,6 @@ FSaveOperationResult USaveGameModule::RestoreLoadSnapshot(EPhase InPhase)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Loaded save, but last_active.txt could not be updated."));
 		}
-		CancelPendingSaveSlot();
 	}
 	if (!Result || PHASEC(InPhase, EPhase::Final))
 	{
@@ -1302,16 +882,8 @@ FSaveOperationResult USaveGameModule::RestoreLoadSnapshot(EPhase InPhase)
 
 FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& SaveId, int32 Generation, EPhase InPhase)
 {
-	const FGuid OperationId = LoadSnapshot.Context.OperationId;
-	const auto IsCancelled = [this, OperationId]()
-	{
-		return LoadSnapshot.Context.OperationId != OperationId || DeferredSaveTermination != EPhase::None;
-	};
-	const auto Cancelled = []()
-	{
-		return FSaveOperationResult::Failed(ESaveResultCode::Cancelled,
-			NSLOCTEXT("WH.SaveGame", "LoadCancelled", "存档加载请求已取消。"));
-	};
+	FString RequiredError;
+	if (!CheckRequiredWorldParticipants(RequiredError)) return FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(RequiredError));
     if (!Storage || Storage->HasPendingWorld(SaveId))
         return FSaveOperationResult::Failed(ESaveResultCode::ConfirmationPending,
             FText::FromString(TEXT("世界文件代尚未完成分支确认，不能应用其模块。")));
@@ -1322,9 +894,8 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		FParameter Data;
 	};
 	TArray<FLoadedModuleSaveData> Loaded;
-	for (UModuleBase* Module : GetSaveModules(
-		ESaveScope::World,
-		false))
+	const TArray<UModuleBase*> SourceModules = GetSaveModules(ESaveScope::World, false);
+	for (UModuleBase* Module : SourceModules)
 	{
 		TArray<uint8> Bytes;
 		FLoadedModuleSaveData Item;
@@ -1341,7 +912,6 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		{
 			return FSaveOperationResult::Failed(ESaveResultCode::VersionMismatch, FText::FromName(Module->GetModuleName()));
 		}
-		if (IsCancelled()) return Cancelled();
 		Loaded.Add(MoveTemp(Item));
 	}
 	for (const FLoadedModuleSaveData& Item : Loaded)
@@ -1358,11 +928,21 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
     TMap<FName, FParameter> GuardModules;
     for(const FLoadedModuleSaveData& Item : Loaded) GuardModules.Add(Item.Module->GetModuleName(), Item.Data);
     FString GuardError;
-    if(!RunWorldLoadGuards(SaveId, GuardModules, InPhase, false, GuardError))
+    const bool bBeforeGuardsPassed = RunWorldLoadGuards(SaveId, GuardModules, InPhase, false, GuardError);
+    if(!bBeforeGuardsPassed)
     {
         return FSaveOperationResult::Failed(ESaveResultCode::LoadFailed, FText::FromString(GuardError));
     }
-	if (IsCancelled()) return Cancelled();
+	const auto LoadFailed = [&Loaded](const FLoadedModuleSaveData& FailedItem, EPhase FailedPhase)
+	{
+		const FName ModuleName = FailedItem.Header.ModuleName;
+		for (FLoadedModuleSaveData& Item : Loaded)
+		{
+			if (::IsValid(Item.Module)) Item.Module->OnAfterLoadData(false);
+		}
+		return FSaveOperationResult::Failed(ESaveResultCode::LoadFailed,
+			FText::FromString(FString::Printf(TEXT("模块 %s 的存档加载阶段 %d 失败。"), *ModuleName.ToString(), static_cast<int32>(FailedPhase))));
+	};
 	if (PHASEC(InPhase, EPhase::Primary))
 	{
 		if (UVoxelModule* Voxel = UVoxelModule::GetPtr(GetWorld()))
@@ -1372,41 +952,41 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 		for (FLoadedModuleSaveData& Item : Loaded)
 		{
 			Item.Module->OnBeforeLoadData();
-			if (IsCancelled()) return Cancelled();
 		}
 		for (FLoadedModuleSaveData& Item : Loaded)
 		{
-			Item.Module->LoadSaveData(Item.Data, EPhase::Primary);
-			if (IsCancelled()) return Cancelled();
-			RestoreSceneEnvironment(Item.Module, Item.Data, EPhase::Primary);
-			if (IsCancelled()) return Cancelled();
+			USceneModule* Scene = Cast<USceneModule>(Item.Module);
+			const bool bLoaded = Scene ? Scene->LoadSceneSaveData(Item.Data, EPhase::Primary) : Item.Module->LoadSaveData(Item.Data, EPhase::Primary);
+			if (!bLoaded) return LoadFailed(Item, EPhase::Primary);
 		}
 	}
 	if (PHASEC(InPhase, EPhase::Lesser))
 	{
 		for (FLoadedModuleSaveData& Item : Loaded)
 		{
-			Item.Module->LoadSaveData(Item.Data, EPhase::Lesser);
-			if (IsCancelled()) return Cancelled();
-			RestoreSceneEnvironment(Item.Module, Item.Data, EPhase::Lesser);
-			if (IsCancelled()) return Cancelled();
+			USceneModule* Scene = Cast<USceneModule>(Item.Module);
+			const bool bLoaded = Scene ? Scene->LoadSceneSaveData(Item.Data, EPhase::Lesser) : Item.Module->LoadSaveData(Item.Data, EPhase::Lesser);
+			if (!bLoaded) return LoadFailed(Item, EPhase::Lesser);
 		}
 	}
 	if (PHASEC(InPhase, EPhase::Final))
 	{
 		for (FLoadedModuleSaveData& Item : Loaded)
 		{
-			Item.Module->LoadSaveData(Item.Data, EPhase::Final);
-			if (IsCancelled()) return Cancelled();
-			RestoreSceneEnvironment(Item.Module, Item.Data, EPhase::Final);
-			if (IsCancelled()) return Cancelled();
+			USceneModule* Scene = Cast<USceneModule>(Item.Module);
+			const bool bLoaded = Scene ? Scene->LoadSceneSaveData(Item.Data, EPhase::Final) : Item.Module->LoadSaveData(Item.Data, EPhase::Final);
+			if (!bLoaded) return LoadFailed(Item, EPhase::Final);
 		}
 	}
-    if(!RunWorldLoadGuards(SaveId, GuardModules, InPhase, true, GuardError))
+    const bool bAfterGuardsPassed = RunWorldLoadGuards(SaveId, GuardModules, InPhase, true, GuardError);
+    if(!bAfterGuardsPassed)
     {
         if(PHASEC(InPhase, EPhase::Final))
         {
-            for(FLoadedModuleSaveData& Item : Loaded) Item.Module->OnAfterLoadData(false);
+            for(FLoadedModuleSaveData& Item : Loaded)
+			{
+				Item.Module->OnAfterLoadData(false);
+			}
         }
         return FSaveOperationResult::Failed(ESaveResultCode::LoadFailed, FText::FromString(GuardError));
     }
@@ -1414,7 +994,6 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 	{
 		for(FLoadedModuleSaveData& Item : Loaded)
 		{
-			if (IsCancelled()) return Cancelled();
 			Item.Module->OnAfterLoadData(true);
 		}
 	}
@@ -1423,7 +1002,10 @@ FSaveOperationResult USaveGameModule::LoadModulesFromGeneration(const FGuid& Sav
 
 FSaveOperationResult USaveGameModule::DeleteSaveSlot(FGuid SaveId)
 {
+	if (!IsBusinessAdmissionOpen()) return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, FText::FromString(TEXT("原世界正在终止。")));
 	if (IsTransientSession()) return TransientSessionUnsupported();
+	FString RequiredError;
+	if (!CheckRequiredWorldParticipants(RequiredError)) return FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(RequiredError));
 	if (IsSaveOperationRunning())
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("Save transaction is in progress")));
@@ -1444,6 +1026,7 @@ FSaveOperationResult USaveGameModule::DeleteSaveSlot(FGuid SaveId)
         if (!BeforeDelete(SaveId, Error))
             return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(Error));
     }
+	if (!CheckRequiredWorldParticipants(RequiredError)) return FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(RequiredError));
 	FSaveManifest ExistingManifest;
 	const bool bHadManifest = Storage->ReadManifest(SaveId, ExistingManifest);
 	const bool bWasActive = SaveId == ActiveSaveId;
@@ -1486,6 +1069,9 @@ FSaveOperationResult USaveGameModule::DeleteSaveSlot(FGuid SaveId)
 
 FSaveOperationResult USaveGameModule::RenameSaveSlot(FGuid SaveId, const FString& NewName)
 {
+	if (!IsBusinessAdmissionOpen()) return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, FText::FromString(TEXT("原世界正在终止。")));
+	FString RequiredError;
+	if (!CheckRequiredWorldParticipants(RequiredError)) return FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(RequiredError));
 	if (IsTransientSession()) return TransientSessionUnsupported();
 	if (IsSaveOperationRunning())
 	{
@@ -1512,7 +1098,10 @@ FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, cons
 {
     check(IsInGameThread());
     OutSummary = {};
+	if (!IsBusinessAdmissionOpen()) return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, FText::FromString(TEXT("原世界正在终止。")));
 	if (IsTransientSession()) return TransientSessionUnsupported();
+	FString RequiredError;
+	if (!CheckRequiredWorldParticipants(RequiredError)) return FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(RequiredError));
     if (IsSaveOperationRunning() || !Storage || !GetWorld() || GetWorld()->GetNetMode() == NM_Client)
         return FSaveOperationResult::Failed(ESaveResultCode::Busy, FText::FromString(TEXT("当前不能复制存档。")));
     if (!SourceSaveId.IsValid() || NewName.IsEmpty())
@@ -1526,7 +1115,6 @@ FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, cons
         Manifest.CurrentGeneration <= 0 || Manifest.ModuleVersions.IsEmpty() || Manifest.ModuleVersions.Num() > 256 ||
         !Storage->IsGenerationComplete(SourceSaveId, Manifest.CurrentGeneration, Manifest))
         return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("源存档无完整可复制代次。")));
-    ON_SCOPE_EXIT { FlushDeferredSaveTermination(); };
     TGuardValue<bool> Running(bSaveOperationRunning, true);
     TGuardValue<bool> Applying(bApplyingSaveCallbacks, true);
     const FString SourceDirectory = Storage->GetGenerationDir(SourceSaveId, Manifest.CurrentGeneration);
@@ -1577,6 +1165,7 @@ FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, cons
     bool bPublished = false;
     bool bFinished = false;
     bool bWriteOwned = false;
+	bool bParticipantFinished = true;
     auto Finish = [&]()
     {
         if (bFinished) return;
@@ -1584,9 +1173,10 @@ FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, cons
         FString FinishError;
         if (External)
         {
-            FinishExternalStore(Participant, External, bPublished, FinishError);
+			bParticipantFinished =
+				FinishExternalStore(Participant, External, bPublished, FinishError);
             External->Store->CloseNative();
-            const bool bCleaned = External->Context.bPublicationUncertain ? false :
+            const bool bCleaned = (!bParticipantFinished || External->Context.bPublicationUncertain) ? false :
                 (bPublished ? Storage->CompletePendingWorld(External->PendingLease, FinishError) :
                     Storage->AbortPendingWorld(External->PendingLease, FinishError));
             if (!bCleaned || !FinishError.IsEmpty()) UE_LOG(LogTemp, Warning, TEXT("复制存档保留安全恢复信息：%s"), *FinishError);
@@ -1618,8 +1208,11 @@ FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, cons
     for (const FName SourceModuleName : ModuleNames)
     {
         FParameter Data = SourceModules[SourceModuleName];
-        if (External && !Participant.Transform(Context, External->Store, SourceModuleName, Data, Error))
-            return Fail(ESaveResultCode::SerializeFailed, Error);
+		if (External)
+		{
+			const bool bTransformed = Participant.Transform(Context, External->Store, SourceModuleName, Data, Error);
+			if (!bTransformed) return Fail(ESaveResultCode::SerializeFailed, Error);
+		}
         TArray<uint8> Bytes;
         if (!FSaveDataSerializer::BuildModuleFile(SourceModuleName, Manifest.ModuleVersions[SourceModuleName], Data, Bytes) ||
             !Storage->WriteBinary(Storage->GetTempModuleFilePath(Context.TargetSaveId, Context.TargetGeneration, SourceModuleName), Bytes))
@@ -1669,6 +1262,8 @@ FSaveOperationResult USaveGameModule::DuplicateSaveSlot(FGuid SourceSaveId, cons
     if (External) External->bFilesCommitted.store(true);
     OutSummary = Manifest.ToSummary(Storage->GetWorldDir(Context.TargetSaveId));
     Finish();
+	if (!bParticipantFinished)
+		return Fail(ESaveResultCode::ConfirmationPending, TEXT("Duplicate files were published but the original World participant did not finish; recovery intent was retained."));
     FSaveOperationResult Result = FSaveOperationResult::Success();
     Result.OperationId = Context.OperationId;
     return Result;
@@ -1711,6 +1306,8 @@ TArray<FSaveSlotSummary> USaveGameModule::GetSaveSlotSummaries() const
 
 FSaveOperationResult USaveGameModule::SaveProfile(FName ProfileName)
 {
+	if (!IsValidProfileName(ProfileName)) return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("Invalid profile name.")));
+	if (!IsBusinessAdmissionOpen() || bHostTerminationRequested) return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, FText::FromString(TEXT("Original World is terminating")));
 	if (IsTransientSession()) return TransientSessionUnsupported();
 	if (IsSaveOperationRunning())
 	{
@@ -1721,24 +1318,30 @@ FSaveOperationResult USaveGameModule::SaveProfile(FName ProfileName)
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(TEXT("SettingModule missing.")));
 	}
-	const TStrongObjectPtr<USettingModule> SettingOwner(Setting);
+	if (!Setting->CanSaveLocalProfile(ProfileName))
+	{
+		return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("Profile does not match the loaded local settings identity.")));
+	}
 	FSaveOperationResult Result;
 	{
 		TGuardValue<bool> Applying(bApplyingSaveCallbacks, true);
 		Setting->OnBeforeSaveData();
 		TArray<uint8> Bytes;
-		const bool bSaved = ::IsValid(Setting) && Setting->BuildSaveFile(Bytes) && ::IsValid(Setting) &&
+		const bool bBuilt = Setting->BuildSaveFile(Bytes);
+		const bool bSaved = bBuilt &&
 			Storage->WriteBinaryAtomic(Storage->GetProfileModuleFilePath(ProfileName, Setting->GetModuleName()), Bytes);
-		if (::IsValid(Setting)) Setting->OnAfterSaveData(bSaved);
+		Setting->OnAfterSaveData(bSaved);
 		Result = bSaved ? FSaveOperationResult::Success() :
-			FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(TEXT("Profile save failed.")));
+			FSaveOperationResult::Failed(bBuilt ? ESaveResultCode::WriteFailed : ESaveResultCode::CaptureFailed,
+				FText::FromString(bBuilt ? TEXT("Profile file could not be written.") : TEXT("Profile settings could not be captured or serialized.")));
 	}
-	FlushDeferredSaveTermination();
 	return Result;
 }
 
 FSaveOperationResult USaveGameModule::LoadProfile(FName ProfileName)
 {
+	if (!IsValidProfileName(ProfileName)) return FSaveOperationResult::Failed(ESaveResultCode::InvalidArgument, FText::FromString(TEXT("Invalid profile name.")));
+	if (!IsBusinessAdmissionOpen() || bHostTerminationRequested) return FSaveOperationResult::Failed(ESaveResultCode::Cancelled, FText::FromString(TEXT("Original World is terminating")));
 	if (IsTransientSession()) return TransientSessionUnsupported();
 	if (IsSaveOperationRunning())
 	{
@@ -1748,36 +1351,55 @@ FSaveOperationResult USaveGameModule::LoadProfile(FName ProfileName)
 	TArray<uint8> Bytes;
 	FModuleSaveFileHeader Header;
 	FParameter Data;
-	if (!Setting || !Storage || !Storage->ReadBinary(Storage->GetProfileModuleFilePath(ProfileName, Setting->GetModuleName()), Bytes))
+	if (!Setting || !Storage)
 	{
-		return FSaveOperationResult::Failed(Setting ? ESaveResultCode::NotFound : ESaveResultCode::ModuleMissing,
-		                                    FText::FromString(TEXT("Profile not found.")));
+		return FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(TEXT("Profile storage or SettingModule is unavailable.")));
+	}
+	const FString ProfilePath = Storage->GetProfileModuleFilePath(ProfileName, Setting->GetModuleName());
+	if (!Storage->ReadBinary(ProfilePath, Bytes))
+	{
+		const bool bExists = IFileManager::Get().FileExists(*ProfilePath);
+		return FSaveOperationResult::Failed(bExists ? ESaveResultCode::ReadFailed : ESaveResultCode::NotFound,
+			FText::FromString(bExists ? TEXT("Profile could not be read.") : TEXT("Profile not found.")));
 	}
 	if (!FSaveDataSerializer::ReadModuleFile(Bytes, Header, Data) || Header.ModuleName != Setting->GetModuleName())
 	{
 		return FSaveOperationResult::Failed(ESaveResultCode::CorruptData, FText::FromString(TEXT("Profile data is corrupt.")));
 	}
-	const TStrongObjectPtr<USettingModule> SettingOwner(Setting);
 	FSaveOperationResult Result;
 	{
 		TGuardValue<bool> Applying(bApplyingSaveCallbacks, true);
-		if (Header.ModuleVersion != Setting->GetSaveDataVersion() && !Setting->MigrateSaveData(Header.ModuleVersion, Data))
+		const bool bMigrated = Header.ModuleVersion == Setting->GetSaveDataVersion() || Setting->MigrateSaveData(Header.ModuleVersion, Data);
+		if (!bMigrated)
 		{
 			Result = FSaveOperationResult::Failed(ESaveResultCode::VersionMismatch, FText::FromString(TEXT("Profile version mismatch.")));
 		}
-		else if (::IsValid(Setting))
+		else if (!Setting->IsLocalProfileDataSupported(Data))
 		{
-			Setting->OnBeforeLoadData();
-			if (::IsValid(Setting)) Setting->LoadSaveData(Data, EPhase::Primary);
-			if (::IsValid(Setting)) Setting->LoadSaveData(Data, EPhase::Final);
-			if (::IsValid(Setting)) Setting->OnAfterLoadData(true);
-			Result = ::IsValid(Setting) ? FSaveOperationResult::Success() :
-				FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(TEXT("Profile load lost its original setting module owner.")));
+			Result = FSaveOperationResult::Failed(ESaveResultCode::CorruptData, FText::FromString(TEXT("Profile contains invalid settings data.")));
 		}
-		else Result = FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing,
-			FText::FromString(TEXT("Profile migration lost its original setting module owner.")));
+		else
+		{
+			const bool bPrepared = Setting->PrepareLocalProfileLoad(ProfileName);
+			if (!bPrepared)
+			{
+				if (!Setting->CanSaveLocalProfile(Setting->GetActiveLocalProfile())) Setting->AbortLocalProfileLoad();
+				Result = FSaveOperationResult::Failed(ESaveResultCode::LoadFailed, FText::FromString(TEXT("Profile could not prepare the local setting modules.")));
+			}
+			else
+			{
+				Setting->OnBeforeLoadData();
+				const bool bPrimaryLoaded = Setting->LoadLocalProfilePhase(Data, EPhase::Primary);
+				const bool bLoaded = bPrimaryLoaded && Setting->LoadLocalProfilePhase(Data, EPhase::Final);
+				if (!bLoaded) Setting->AbortLocalProfileLoad();
+				Setting->OnAfterLoadData(bLoaded);
+				const bool bStillLoaded = bLoaded && Setting->CanSaveLocalProfile(ProfileName);
+				if (!bStillLoaded && Setting->GetActiveLocalProfile() == ProfileName) Setting->AbortLocalProfileLoad();
+				Result = bStillLoaded ? FSaveOperationResult::Success() :
+					FSaveOperationResult::Failed(ESaveResultCode::LoadFailed, FText::FromString(TEXT("Profile settings were not fully applied.")));
+			}
+		}
 	}
-	FlushDeferredSaveTermination();
 	return Result;
 }
 
@@ -1818,12 +1440,57 @@ void USaveGameModule::OnGameExited(UObject* InSender, const FEventGameExited& In
 	{
 		UE_LOG(LogTemp, Error, TEXT("Saving before exit failed: %s"), *SaveResult.Message.ToString());
 	}
-	SaveProfile();
+	const USettingModule* Settings = USettingModule::GetPtr(GetWorld());
+	const FSaveOperationResult ProfileResult = Settings ? SaveProfile(Settings->GetActiveLocalProfile()) :
+		FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, FText::FromString(TEXT("SettingModule missing.")));
+	if (!ProfileResult)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Saving the local profile before exit failed: %s"), *ProfileResult.Message.ToString());
+	}
 }
 
 
+void USaveGameModule::RequireWorldStoreParticipant(FName InName)
+{
+	check(!InName.IsNone() && (RequiredWorldStoreParticipant.IsNone() || RequiredWorldStoreParticipant == InName));
+	RequiredWorldStoreParticipant = InName;
+}
+
+void USaveGameModule::RequireWorldLoadGuard(FName InName)
+{
+	check(!InName.IsNone());
+	RequiredWorldLoadGuards.Add(InName);
+}
+
+bool USaveGameModule::CheckRequiredWorldParticipants(FString& OutError) const
+{
+	if (!IsBusinessAdmissionOpen() || bHostTerminationRequested)
+	{
+		OutError = TEXT("Original World is terminating");
+		return false;
+	}
+	if (!RequiredWorldStoreParticipant.IsNone() &&
+		(WorldStoreParticipantName != RequiredWorldStoreParticipant || !WorldStoreParticipant.IsAvailable || !WorldStoreParticipant.IsAvailable() || !WorldStoreParticipant.Begin ||
+		 !WorldStoreParticipant.Transform || !WorldStoreParticipant.Finish || !WorldStoreParticipant.BeforeDelete || !WorldStoreParticipant.Abandon))
+	{
+		OutError = FString::Printf(TEXT("Required world store participant is unavailable: %s"), *RequiredWorldStoreParticipant.ToString());
+		return false;
+	}
+	for (FName Name : RequiredWorldLoadGuards)
+	{
+		const FWorldLoadGuardEntry* Guard = WorldLoadGuards.Find(Name);
+		if (!Guard || !Guard->Before || !Guard->After)
+		{
+			OutError = FString::Printf(TEXT("Required world load guard is unavailable: %s"), *Name.ToString());
+			return false;
+		}
+	}
+	return true;
+}
+
 bool USaveGameModule::RegisterWorldLoadGuard(FName InName, FSaveWorldLoadGuard InBefore, FSaveWorldLoadGuard InAfter)
 {
+	if (!IsBusinessAdmissionOpen()) return false;
     if(!IsInGameThread() || InName.IsNone() || !InBefore || !InAfter || WorldLoadGuards.Contains(InName)) return false;
     FWorldLoadGuardEntry Entry;
     Entry.Before = MoveTemp(InBefore);
@@ -1840,6 +1507,7 @@ void USaveGameModule::UnregisterWorldLoadGuard(FName InName)
 
 bool USaveGameModule::RunWorldLoadGuards(const FGuid& InSaveId, const TMap<FName, FParameter>& InModules, EPhase InPhase, bool bInAfter, FString& OutError)
 {
+    if (!CheckRequiredWorldParticipants(OutError)) return false;
     TArray<FName> Names;
     WorldLoadGuards.GetKeys(Names);
     Names.Sort(FNameLexicalLess());
@@ -1848,17 +1516,20 @@ bool USaveGameModule::RunWorldLoadGuards(const FGuid& InSaveId, const TMap<FName
         FWorldLoadGuardEntry* Entry = WorldLoadGuards.Find(Name);
         if(!Entry) continue;
         FSaveWorldLoadGuard Guard = bInAfter ? Entry->After : Entry->Before;
-        if(!Guard(InSaveId, InModules, InPhase, OutError))
+		const bool bPassed = Guard(InSaveId, InModules, InPhase, OutError);
+        if(!bPassed)
         {
             if(OutError.IsEmpty()) OutError = FString::Printf(TEXT("World load guard failed: %s"), *Name.ToString());
             return false;
         }
+		if (!CheckRequiredWorldParticipants(OutError)) return false;
     }
     return true;
 }
 
 bool USaveGameModule::RegisterWorldStoreParticipant(FName InName, FSaveWorldStoreParticipant InParticipant)
 {
+	if (!IsBusinessAdmissionOpen()) return false;
     check(IsInGameThread());
     if (InName.IsNone() || !WorldStoreParticipantName.IsNone() || !InParticipant.Begin ||
         !InParticipant.Transform || !InParticipant.Finish || !InParticipant.BeforeDelete) return false;
@@ -1899,12 +1570,14 @@ bool USaveGameModule::BeginExternalStore(FSaveWorldCaptureContext InContext,
     TSharedPtr<FSaveWorldExternalOperation, ESPMode::ThreadSafe>& OutOperation, FString& OutError)
 {
     check(IsInGameThread());
+	if (!CheckRequiredWorldParticipants(OutError)) return false;
     OutOperation.Reset();
     OutParticipant = WorldStoreParticipant;
     if (!OutParticipant.Begin) return true;
     TGuardValue<bool> Applying(bApplyingSaveCallbacks, true);
     TSharedPtr<ISaveWorldExternalStore, ESPMode::ThreadSafe> Prepared;
-    if (!OutParticipant.Begin(InContext, InSourceModules, Prepared, OutError)) return false;
+    const bool bBegan = OutParticipant.Begin(InContext, InSourceModules, Prepared, OutError);
+	if (!bBegan) return false;
     if (!Prepared) return true;
     FSavePendingWorld Intent;
     Intent.OperationId = InContext.OperationId;

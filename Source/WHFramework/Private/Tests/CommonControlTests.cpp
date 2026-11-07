@@ -1,4 +1,5 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
+#include "Widget/WidgetMountTypes.h"
 #include "Misc/AutomationTest.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/EditableTextBox.h"

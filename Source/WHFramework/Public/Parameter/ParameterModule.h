@@ -3,6 +3,8 @@
 #pragma once
 
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "Main/Base/ModuleBase.h"
 #include "Parameter/ParameterManagerInterface.h"
 #include "ParameterModule.generated.h"

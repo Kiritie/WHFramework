@@ -1,12 +1,18 @@
 #include "Ability/Inventory/InventoryNetworkComponent.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
+#include "Ability/Inventory/InventoryCommandTypes.h"
 
 #include "Ability/Inventory/InventorySnapshotCodec.h"
 #include "Ability/Inventory/InventoryTransactionService.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Engine/World.h"
+#include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
+#include "Gameplay/WHGameInstance.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/Crc.h"
+#include "Misc/ScopeExit.h"
 #include "Serialization/MemoryWriter.h"
 
 namespace InventoryNetworkFormat
@@ -303,13 +309,22 @@ UInventoryNetworkComponent::UInventoryNetworkComponent()
 void UInventoryNetworkComponent::BeginPlay()
 {
     Super::BeginPlay();
-    if(!Cast<APlayerController>(GetOwner()))
+    APlayerController* Controller = Cast<APlayerController>(GetOwner());
+    if(!Controller)
     {
         SetComponentTickEnabled(false);
         return;
     }
-    WorldSubsystem = GetWorld()->GetSubsystem<UInventoryWorldSubsystem>();
-    if(UInventoryWorldSubsystem* World = WorldSubsystem.Get())
+    InventoryModule = UInventoryModule::GetPtr(GetWorld());
+	if (ULocalPlayer* LocalPlayer = Controller->GetLocalPlayer())
+	{
+		if (UWHGameInstance* Instance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr)
+		{
+			ClientReceiptLedger = Instance->GetInventoryReceiptLedger(LocalPlayer);
+			bClientReceiptLedgerSessionOwned = ClientReceiptLedger.IsValid();
+		}
+	}
+    if(UInventoryModule* World = InventoryModule.Get())
     {
         if(GetOwner()->HasAuthority())
         {
@@ -319,12 +334,16 @@ void UInventoryNetworkComponent::BeginPlay()
             AdoptedHandle = World->OnStoreAdopted.AddUObject(this, &UInventoryNetworkComponent::HandleStoreAdopted);
         }
     }
+	ApplyDeferredClientBegins();
 }
 
 void UInventoryNetworkComponent::EndPlay(const EEndPlayReason::Type InEndPlayReason)
 {
     HandleClosing();
-    if(UInventoryWorldSubsystem* World = WorldSubsystem.Get())
+	bClientResetDeliveryClosed = true;
+	if (!Pending.IsEmpty() && ConnectionId.IsValid())
+		ClientReset_Implementation(ConnectionId, EInventoryResultCode::WorldNotReady);
+    if(UInventoryModule* World = InventoryModule.Get())
     {
         World->OnCommitted.Remove(CommitHandle);
         World->OnDeleted.Remove(DeleteHandle);
@@ -336,7 +355,8 @@ void UInventoryNetworkComponent::EndPlay(const EEndPlayReason::Type InEndPlayRea
         }
     }
     Actions.Reset();
-    Pending.Reset();
+	// 已接纳请求由原连接批次持有；不能在回调重入时静默丢弃。
+    if (!Pending.IsEmpty()) UE_LOG(LogTemp, Error, TEXT("Inventory connection still owns pending requests at EndPlay."));
     Views.Reset();
     Assemblies.Reset();
     Super::EndPlay(InEndPlayReason);
@@ -345,12 +365,23 @@ void UInventoryNetworkComponent::EndPlay(const EEndPlayReason::Type InEndPlayRea
 void UInventoryNetworkComponent::TickComponent(float InDeltaTime, ELevelTick InTickType, FActorComponentTickFunction* InTickFunction)
 {
     Super::TickComponent(InDeltaTime, InTickType, InTickFunction);
-    UInventoryWorldSubsystem* World = WorldSubsystem.Get();
+    UInventoryModule* World = InventoryModule.Get();
     APlayerController* Controller = Cast<APlayerController>(GetOwner());
     if(!World || !Controller)
     {
         return;
     }
+	if (!World->IsRuntimeBusinessOpen()) return;
+	const int32 NotificationCount = QueuedRequestNotifications.Num();
+	for (int32 Index = 0; Index < NotificationCount && !QueuedRequestNotifications.IsEmpty(); ++Index)
+	{
+		const uint64 RequestId = QueuedRequestNotifications[0];
+		QueuedRequestNotifications.RemoveAt(0);
+		const FPendingRequest* PendingEntry = Pending.Find(RequestId);
+		if (!PendingEntry || PendingEntry->Request.ConnectionId != ConnectionId) continue;
+		const FInventoryClientRequest Notification = PendingEntry->Request;
+		OnRequestQueued.Broadcast(Notification);
+	}
     if(Controller->HasAuthority())
     {
         SessionCheckAccumulator += InDeltaTime;
@@ -400,7 +431,7 @@ void UInventoryNetworkComponent::TickComponent(float InDeltaTime, ELevelTick InT
                 Result.Code = EInventoryResultCode::ConfirmationPending;
                 const TArray<FInventoryClientParticipant> Participants = Entry->Request.Participants;
                 const FGuid OriginalConnection = ConnectionId;
-                OnResult.Broadcast(Result);
+				if (!PublishClientResult(OriginalConnection, Result)) return;
                 for(const FInventoryClientParticipant& Participant : Participants)
                 {
                     if (ConnectionId != OriginalConnection || !Pending.Contains(RequestId)) break;
@@ -435,7 +466,7 @@ void UInventoryNetworkComponent::TickComponent(float InDeltaTime, ELevelTick InT
 
 bool UInventoryNetworkComponent::BindOwner(const FGuid& InPlayerId, const FGuid& InInventoryId)
 {
-    UInventoryWorldSubsystem* World = WorldSubsystem.Get();
+    UInventoryModule* World = InventoryModule.Get();
     if(bResettingConnection || !World || !GetOwner() || !GetOwner()->HasAuthority() || !World->IsReady() || !InPlayerId.IsValid())
     {
         return false;
@@ -446,7 +477,7 @@ bool UInventoryNetworkComponent::BindOwner(const FGuid& InPlayerId, const FGuid&
     {
         return false;
     }
-    UnbindOwner();
+    if (!UnbindOwner() || ConnectionId.IsValid() || !ClientResetBatches.IsEmpty() || !DeferredClientBegins.IsEmpty()) return false;
     PlayerId = InPlayerId;
     OwnerInventoryId = InInventoryId;
     ConnectionId = FGuid::NewGuid();
@@ -464,7 +495,8 @@ bool UInventoryNetworkComponent::BindOwner(const FGuid& InPlayerId, const FGuid&
 
 bool UInventoryNetworkComponent::RegisterAction(FName InAction, FInventoryClientActionHandler InHandler)
 {
-    if(InAction.IsNone() || !InHandler || Actions.Contains(InAction) || !GetOwner() || !GetOwner()->HasAuthority())
+    UInventoryModule* World = InventoryModule.Get();
+    if(!World || !World->IsRuntimeBusinessOpen() || InAction.IsNone() || !InHandler || Actions.Contains(InAction) || !GetOwner() || !GetOwner()->HasAuthority())
     {
         return false;
     }
@@ -479,7 +511,8 @@ void UInventoryNetworkComponent::UnregisterAction(FName InAction)
 
 uint64 UInventoryNetworkComponent::SubmitRequest(FInventoryClientRequest InRequest)
 {
-    const UInventoryWorldSubsystem* World = WorldSubsystem.Get();
+    const UInventoryModule* World = InventoryModule.Get();
+    if (!World || !World->IsRuntimeBusinessOpen()) return 0;
     if(!ConnectionId.IsValid() || !ConnectionStoreId.IsValid() || !WorldEpoch.IsValid() || NextRequestId == MAX_uint64 || Pending.Num() >= 64 ||
        (GetOwner() && GetOwner()->HasAuthority() && World && World->IsArchiveFrozen()))
     {
@@ -537,10 +570,9 @@ uint64 UInventoryNetworkComponent::SubmitRequest(FInventoryClientRequest InReque
     Entry.Request = MoveTemp(InRequest);
     Entry.Attempts = 0;
     const uint64 RequestId = Entry.Request.RequestId;
-    const FInventoryClientRequest Queued = Entry.Request;
     Pending.Add(RequestId, MoveTemp(Entry));
-    OnRequestQueued.Broadcast(Queued);
-    return ConnectionId == Queued.ConnectionId && ConnectionStoreId == Queued.StoreId && WorldEpoch == Queued.WorldEpoch ? RequestId : 0;
+	QueuedRequestNotifications.Add(RequestId);
+    return RequestId;
 }
 
 TArray<FInventoryClientRequest> UInventoryNetworkComponent::GetPendingRequests() const
@@ -666,7 +698,7 @@ bool UInventoryNetworkComponent::ConsumeBudget(double InCost)
 
 void UInventoryNetworkComponent::ServerOpen_Implementation(FGuid InConnectionId, FGuid InStoreId, FGuid InInventoryId, uint32 InGeneration)
 {
-    UInventoryWorldSubsystem* World = WorldSubsystem.Get();
+    UInventoryModule* World = InventoryModule.Get();
     APlayerController* Controller = Cast<APlayerController>(GetOwner());
     if(!World || !InConnectionId.IsValid() || InConnectionId != ConnectionId || InStoreId != ConnectionStoreId ||
        InStoreId != World->GetStoreId() || WorldEpoch != World->GetWorldEpoch())
@@ -726,7 +758,7 @@ void UInventoryNetworkComponent::ServerClose_Implementation(FGuid InSessionId)
 
 void UInventoryNetworkComponent::ServerResync_Implementation(FGuid InInventoryId, FGuid InSessionId)
 {
-    UInventoryWorldSubsystem* World = WorldSubsystem.Get();
+    UInventoryModule* World = InventoryModule.Get();
     const FServerSession* Session = Sessions.Find(InInventoryId);
     if(!World || !Session || Session->SessionId != InSessionId || !ConsumeBudget(4.0))
     {
@@ -748,7 +780,7 @@ bool UInventoryNetworkComponent::BuildIdentity(const FInventoryClientRequest& In
 void UInventoryNetworkComponent::ServerSubmit_Implementation(const FInventoryClientRequest& InRequest)
 {
     // 旧分支请求在更新限流和请求水位之前拒绝，不能占用新连接的回执编号。
-    const UInventoryWorldSubsystem* World = WorldSubsystem.Get();
+    const UInventoryModule* World = InventoryModule.Get();
     if(!World || !InRequest.ConnectionId.IsValid() || InRequest.ConnectionId != ConnectionId ||
        InRequest.StoreId != ConnectionStoreId || InRequest.StoreId != World->GetStoreId() ||
        InRequest.WorldEpoch != WorldEpoch || InRequest.WorldEpoch != World->GetWorldEpoch())
@@ -829,7 +861,7 @@ FInventoryCommandResult UInventoryNetworkComponent::ExecuteRequest(const FInvent
     FInventoryCommandResult Result;
     Result.RequestId = InRequest.RequestId;
     Result.Code = EInventoryResultCode::InvalidRequest;
-    UInventoryWorldSubsystem* World = WorldSubsystem.Get();
+    UInventoryModule* World = InventoryModule.Get();
     APlayerController* Controller = Cast<APlayerController>(GetOwner());
     if(!World || !World->IsReady() || World->IsArchiveFrozen() || InRequest.ConnectionId != ConnectionId ||
        InRequest.StoreId != ConnectionStoreId || InRequest.StoreId != World->GetStoreId() ||
@@ -952,7 +984,7 @@ void UInventoryNetworkComponent::DeliverResult(FInventoryCommandResult InResult)
 void UInventoryNetworkComponent::SendSnapshot(const FServerSession& InSession)
 {
     const FServerSession Session = InSession;
-    UInventoryWorldSubsystem* World = WorldSubsystem.Get();
+    UInventoryModule* World = InventoryModule.Get();
     if(!World)
     {
         return;
@@ -1012,7 +1044,7 @@ void UInventoryNetworkComponent::CloseServerSession(const FGuid& InInventoryId, 
     }
     const FGuid SessionId = Existing->SessionId;
     Sessions.Remove(InventoryId);
-    if(UInventoryWorldSubsystem* World = WorldSubsystem.Get())
+    if(UInventoryModule* World = InventoryModule.Get())
     {
         World->ReleaseLease(InventoryId);
     }
@@ -1021,7 +1053,7 @@ void UInventoryNetworkComponent::CloseServerSession(const FGuid& InInventoryId, 
 
 void UInventoryNetworkComponent::HandleCommit(const FInventoryChangeSet& InChanges)
 {
-    UInventoryWorldSubsystem* World = WorldSubsystem.Get();
+    UInventoryModule* World = InventoryModule.Get();
     if(!World)
     {
         return;
@@ -1078,15 +1110,16 @@ void UInventoryNetworkComponent::HandleDeleted(const FGuid& InInventoryId)
     CloseServerSession(InInventoryId, EInventoryResultCode::InventoryGone);
 }
 
-void UInventoryNetworkComponent::UnbindOwner()
+bool UInventoryNetworkComponent::UnbindOwner()
 {
     if(bResettingConnection)
     {
-        return;
+        return false;
     }
+    ON_SCOPE_EXIT { ApplyDeferredClientBegins(); };
     TGuardValue<bool> ResetGuard(bResettingConnection, true);
     const FGuid OldConnection = ConnectionId;
-    UInventoryWorldSubsystem* World = WorldSubsystem.Get();
+    UInventoryModule* World = InventoryModule.Get();
     const EInventoryResultCode Reason = World && World->IsQuarantined() ? EInventoryResultCode::ConfirmationPending : EInventoryResultCode::WorldNotReady;
     TArray<FGuid> InventoryIds;
     Sessions.GetKeys(InventoryIds);
@@ -1116,6 +1149,7 @@ void UInventoryNetworkComponent::UnbindOwner()
     RequestHighWaterMark = 0;
     NextRequestId = 1;
     SessionCheckAccumulator = 0;
+    return true;
 }
 
 void UInventoryNetworkComponent::HandleClosing()
@@ -1133,17 +1167,38 @@ void UInventoryNetworkComponent::HandleStoreAdopted()
 
 void UInventoryNetworkComponent::ClientReset_Implementation(FGuid InConnectionId, EInventoryResultCode InReason)
 {
-    if(InConnectionId != ConnectionId)
+    if(!InConnectionId.IsValid() || InConnectionId != ConnectionId)
     {
         return;
     }
-    const FGuid PreviousStore = ConnectionStoreId;
-    const FGuid PreviousEpoch = WorldEpoch;
-    const uint64 Revision = ++ClientContextRevision;
-    TArray<FGuid> Existing;
-    Views.GetKeys(Existing);
-    TMap<uint64, FPendingRequest> Cancelled = MoveTemp(Pending);
-    Pending.Reset();
+    FClientResetBatch Batch;
+    Batch.Connection = InConnectionId;
+    Batch.Store = ConnectionStoreId;
+    Batch.Epoch = WorldEpoch;
+    Batch.Reason = InReason;
+    Views.GetKeys(Batch.ClosedInventories);
+	TArray<uint64> CapturedRequests;
+    for (const TPair<uint64, FPendingRequest>& Pair : Pending)
+    {
+		if (Pair.Value.Request.RequestId != Pair.Key || Pair.Value.Request.ConnectionId != InConnectionId ||
+			Pair.Value.Request.StoreId != Batch.Store || Pair.Value.Request.WorldEpoch != Batch.Epoch)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Inventory request %llu has a different original identity; retaining it for explicit retirement."), Pair.Key);
+			continue;
+		}
+        FInventoryCommandResult Result;
+        Result.RequestId = Pair.Key;
+        Result.Code = Pair.Value.Attempts > 0 ? EInventoryResultCode::ConfirmationPending : InReason;
+		if (!Pair.Value.bUnconfirmed) Batch.Results.Add(Result);
+		RecordClientReceipt(Pair.Value.Request, Result);
+		CapturedRequests.Add(Pair.Key);
+    }
+    ++ClientContextRevision;
+	for (uint64 RequestId : CapturedRequests)
+	{
+		Pending.Remove(RequestId);
+		QueuedRequestNotifications.Remove(RequestId);
+	}
     Views.Reset();
     LocallyClosedSessions.Reset();
     Assemblies.Reset();
@@ -1153,40 +1208,172 @@ void UInventoryNetworkComponent::ClientReset_Implementation(FGuid InConnectionId
     WorldEpoch.Invalidate();
     OwnerInventoryId.Invalidate();
     NextRequestId = 1;
-    OnConnectionReset.Broadcast(PreviousStore, PreviousEpoch, InReason);
-    if (Revision != ClientContextRevision) return;
-    for(const TPair<uint64, FPendingRequest>& Pair : Cancelled)
+    ClientResetBatches.Add(MoveTemp(Batch));
+    if (bDrainingClientResets || ActiveClientResultNotifications != 0) return;
+    FString Error;
+    if (DrainClientResets(Error)) ApplyDeferredClientBegins();
+}
+
+void UInventoryNetworkComponent::RecordClientReceipt(const FInventoryClientRequest& InRequest, const FInventoryCommandResult& InResult)
+{
+	if (!bClientReceiptLedgerSessionOwned)
+	{
+		APlayerController* Controller = Cast<APlayerController>(GetOwner());
+		ULocalPlayer* LocalPlayer = Controller ? Controller->GetLocalPlayer() : nullptr;
+		UWorld* OriginalWorld = GetWorld();
+		UWHGameInstance* Instance = OriginalWorld ? Cast<UWHGameInstance>(OriginalWorld->GetGameInstance()) : nullptr;
+		if (Instance && LocalPlayer)
+		{
+			const auto SessionLedger = Instance->GetInventoryReceiptLedger(LocalPlayer);
+			if (SessionLedger)
+			{
+				if (ClientReceiptLedger)
+					for (const FInventoryClientRequestReceipt& Receipt : ClientReceiptLedger->GetReceipts()) SessionLedger->Record(Receipt);
+				ClientReceiptLedger = SessionLedger;
+				bClientReceiptLedgerSessionOwned = true;
+			}
+		}
+	}
+	if (!ClientReceiptLedger)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Inventory receipt has no local player session owner; retaining it on the original component."));
+		ClientReceiptLedger = MakeShared<FInventoryClientReceiptLedger, ESPMode::ThreadSafe>();
+	}
+	FInventoryClientRequestReceipt Receipt;
+	Receipt.ConnectionId = InRequest.ConnectionId;
+	Receipt.StoreId = InRequest.StoreId;
+	Receipt.WorldEpoch = InRequest.WorldEpoch;
+	Receipt.SourceInventoryId = InRequest.SourceInventoryId;
+	Receipt.DomainAction = InRequest.DomainAction;
+	Receipt.Result = InResult;
+	ClientReceiptLedger->Record(Receipt);
+}
+
+bool UInventoryNetworkComponent::PublishClientResult(const FGuid& InConnectionId, const FInventoryCommandResult& InResult)
+{
+	{
+		TGuardValue<int32> Publishing(ActiveClientResultNotifications, ActiveClientResultNotifications + 1);
+		TGuardValue<FGuid> Notifying(DispatchingResultConnectionId, InConnectionId);
+		OnResult.Broadcast(InResult);
+	}
+	if (ActiveClientResultNotifications == 0 && !bDrainingClientResets && !ClientResetBatches.IsEmpty())
+	{
+		FString Error;
+		if (!DrainClientResets(Error)) return false;
+	}
+	ApplyDeferredClientBegins();
+	return !bClientResetDeliveryClosed;
+}
+
+bool UInventoryNetworkComponent::DrainClientResets(FString& OutError)
+{
+    if (bDrainingClientResets)
     {
-        FInventoryCommandResult Result;
-        Result.RequestId = Pair.Key;
-        Result.Code = Pair.Value.Attempts > 0 ? EInventoryResultCode::ConfirmationPending : InReason;
-        OnResult.Broadcast(Result);
-        if (Revision != ClientContextRevision) return;
+        OutError = TEXT("Inventory connection reset callbacks are still executing");
+        return false;
     }
-    for(const FGuid& InventoryId : Existing)
+    TGuardValue<bool> Draining(bDrainingClientResets, true);
+    while (!ClientResetBatches.IsEmpty())
     {
-        OnSessionClosed.Broadcast(InventoryId, InReason);
-        if (Revision != ClientContextRevision) return;
+        FClientResetBatch& Batch = ClientResetBatches[0];
+        if (Batch.NextResult < Batch.Results.Num())
+        {
+			const FGuid ResultConnection = Batch.Connection;
+            const FInventoryCommandResult Result = Batch.Results[Batch.NextResult++];
+			TGuardValue<FGuid> Notifying(DispatchingRetiredResultConnectionId, ResultConnection);
+			TGuardValue<FGuid> NotifyingResult(DispatchingResultConnectionId, ResultConnection);
+            OnResult.Broadcast(Result);
+        }
+        else if (!Batch.bResetBroadcast)
+        {
+			const FGuid ResetConnection = Batch.Connection;
+            const FGuid Store = Batch.Store;
+            const FGuid Epoch = Batch.Epoch;
+            const EInventoryResultCode Reason = Batch.Reason;
+            Batch.bResetBroadcast = true;
+			TGuardValue<FGuid> Notifying(DispatchingResetConnectionId, ResetConnection);
+            OnConnectionReset.Broadcast(Store, Epoch, Reason);
+        }
+        else if (Batch.NextInventory < Batch.ClosedInventories.Num())
+        {
+            const FGuid InventoryId = Batch.ClosedInventories[Batch.NextInventory++];
+            const EInventoryResultCode Reason = Batch.Reason;
+            OnSessionClosed.Broadcast(InventoryId, Reason);
+        }
+        else
+        {
+            ClientResetBatches.RemoveAt(0);
+            continue;
+        }
+    }
+    if (!ConnectionId.IsValid() && !Pending.IsEmpty())
+    {
+        OutError = TEXT("Inventory component retains requests without a matching reset connection");
+        return false;
+    }
+    OutError.Reset();
+    return true;
+}
+
+void UInventoryNetworkComponent::ApplyDeferredClientBegins()
+{
+    if (bApplyingDeferredClientBegins || bDrainingClientResets || bResettingConnection || ActiveClientResultNotifications != 0) return;
+    TGuardValue<bool> Applying(bApplyingDeferredClientBegins, true);
+    while (!DeferredClientBegins.IsEmpty())
+    {
+        UInventoryModule* const Module = InventoryModule.Get();
+        if (bClientResetDeliveryClosed || (Module && !Module->IsRuntimeBusinessOpen()))
+        {
+            DeferredClientBegins.Reset();
+            return;
+        }
+		if (!Module) return;
+        if (ConnectionId.IsValid()) ClientReset_Implementation(ConnectionId, EInventoryResultCode::GenerationChanged);
+        if (!ClientResetBatches.IsEmpty())
+        {
+            FString Error;
+            if (!DrainClientResets(Error)) return;
+        }
+        const FDeferredClientBegin Begin = DeferredClientBegins[0];
+        DeferredClientBegins.RemoveAt(0);
+        ++ClientContextRevision;
+        ConnectionId = Begin.Connection;
+        ConnectionWorldId = Begin.World;
+        ConnectionStoreId = Begin.Store;
+        WorldEpoch = Begin.Epoch;
+        OwnerInventoryId = Begin.OwnerInventory;
+        NextRequestId = 1;
     }
 }
 
 void UInventoryNetworkComponent::ClientBegin_Implementation(FGuid InConnectionId, FGuid InWorldId, FGuid InStoreId, FGuid InWorldEpoch, FGuid InOwnerInventoryId)
 {
-    const uint64 PreviousRevision = ClientContextRevision;
-    ClientReset_Implementation(ConnectionId, EInventoryResultCode::GenerationChanged);
-    if (ClientContextRevision != PreviousRevision + 1) return;
-    ++ClientContextRevision;
-    ConnectionId = InConnectionId;
-    ConnectionWorldId = InWorldId;
-    ConnectionStoreId = InStoreId;
-    WorldEpoch = InWorldEpoch;
-    OwnerInventoryId = InOwnerInventoryId;
-    NextRequestId = 1;
+    if (bClientResetDeliveryClosed || !InConnectionId.IsValid()) return;
+    DeferredClientBegins.Add({InConnectionId, InWorldId, InStoreId, InWorldEpoch, InOwnerInventoryId});
+    ApplyDeferredClientBegins();
+}
+
+bool UInventoryNetworkComponent::GetRecordedRequestResult(const FGuid& InConnectionId, uint64 InRequestId, FInventoryCommandResult& OutResult) const
+{
+	check(IsInGameThread());
+    FInventoryClientRequestReceipt Receipt;
+    if (!ClientReceiptLedger || !ClientReceiptLedger->Find(InConnectionId, InRequestId, Receipt)) return false;
+    OutResult = Receipt.Result;
+    return true;
+}
+
+bool UInventoryNetworkComponent::ConsumeRecordedRequestResult(const FGuid& InConnectionId, uint64 InRequestId, FInventoryCommandResult& OutResult)
+{
+	check(IsInGameThread());
+    FInventoryClientRequestReceipt Receipt;
+    if (!ClientReceiptLedger || !ClientReceiptLedger->Consume(InConnectionId, InRequestId, Receipt)) return false;
+    OutResult = Receipt.Result;
+    return true;
 }
 
 void UInventoryNetworkComponent::ClientSnapshot_Implementation(const FInventorySnapshotChunk& InChunk)
 {
-    UInventoryWorldSubsystem* World = WorldSubsystem.Get();
+    UInventoryModule* World = InventoryModule.Get();
     if(!World || !ConnectionId.IsValid() || InChunk.ConnectionId != ConnectionId || InChunk.StoreId != ConnectionStoreId ||
        InChunk.WorldEpoch != WorldEpoch || !InChunk.SessionId.IsValid() || LocallyClosedSessions.Contains(InChunk.SessionId) || !InChunk.TransferId.IsValid() ||
        InChunk.TotalBytes < 1 || InChunk.TotalBytes > FInventorySnapshotCodec::MaximumBytes || InChunk.Count < 1 ||
@@ -1317,7 +1504,7 @@ void UInventoryNetworkComponent::ClientDelta_Implementation(const FInventoryDelt
     {
         return;
     }
-    UInventoryWorldSubsystem* World = WorldSubsystem.Get();
+    UInventoryModule* World = InventoryModule.Get();
     FClientView* View = Views.Find(InDelta.InventoryId);
     if(!World || !View || View->SessionId != InDelta.SessionId || View->Snapshot.Generation != InDelta.Generation)
     {
@@ -1378,7 +1565,8 @@ void UInventoryNetworkComponent::ClientDelta_Implementation(const FInventoryDelt
 void UInventoryNetworkComponent::ClientResult_Implementation(FGuid InConnectionId, const FInventoryCommandResult& InResult)
 {
     FPendingRequest* Entry = Pending.Find(InResult.RequestId);
-    if(InConnectionId == ConnectionId && Entry)
+    if(InConnectionId == ConnectionId && Entry && Entry->Request.ConnectionId == InConnectionId &&
+		Entry->Request.StoreId == ConnectionStoreId && Entry->Request.WorldEpoch == WorldEpoch)
     {
         if (InResult.Code == EInventoryResultCode::ConfirmationPending)
         {
@@ -1386,11 +1574,9 @@ void UInventoryNetworkComponent::ClientResult_Implementation(FGuid InConnectionI
             Entry->bUnconfirmed = true;
             Entry->Attempts = 4;
         }
-        else
-        {
-            Pending.Remove(InResult.RequestId);
-        }
-        OnResult.Broadcast(InResult);
+		RecordClientReceipt(Entry->Request, InResult);
+		if (InResult.Code != EInventoryResultCode::ConfirmationPending) Pending.Remove(InResult.RequestId);
+		PublishClientResult(InConnectionId, InResult);
     }
 }
 
@@ -1453,7 +1639,7 @@ void UInventoryNetworkComponent::ClientClosed_Implementation(FGuid InConnectionI
         Result.RequestId = RequestId;
         Result.Code = bSent ? EInventoryResultCode::ConfirmationPending : InReason;
         if (!bSent && Result.IsSuccess()) Result.Code = EInventoryResultCode::InvalidState;
-        OnResult.Broadcast(Result);
+		if (!PublishClientResult(InConnectionId, Result)) return;
     }
     if (ConnectionId == InConnectionId && ClientContextRevision == ContextRevision && !bLocallyClosed) OnSessionClosed.Broadcast(InInventoryId, InReason);
 }

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Type/NativeTypeIdentity.h"
 #include "Platform/PlatformManager.h"
 
 class WHFRAMEWORKCORE_API FLinuxPlatformManager : public FPlatformManager

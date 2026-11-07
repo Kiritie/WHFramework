@@ -1,7 +1,7 @@
 #pragma once
 
+#include "Ability/AbilityAttributeAccessors.h"
 #include "AbilitySystemComponent.h"
-#include "Ability/AbilityModuleTypes.h"
 #include "Ability/Attributes/AttributeSetBase.h"
 
 #include "ActorAttributeSetBase.generated.h"

@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Common/InteractionTypes.h"
 #include "Common/Interaction/InteractionActionBase.h"
 #include "DialogueEventBase.generated.h"
 

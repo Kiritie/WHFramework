@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 
 class FInventoryJournal;
-class UInventoryWorldSubsystem;
+class UInventoryModule;
 
 // 完整经济边界是可独立复制的值；逻辑世界身份与持久目录身份分别保存。
 struct WHFRAMEWORK_API FInventoryArchiveSnapshot
@@ -56,5 +56,5 @@ private:
     bool bAdopted = false;
 
     friend class FInventoryJournal;
-    friend class UInventoryWorldSubsystem;
+    friend class UInventoryModule;
 };

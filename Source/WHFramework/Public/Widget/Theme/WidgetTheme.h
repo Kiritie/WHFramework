@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CommonButtonBase.h"
+#include "Setting/SettingPresentationTypes.h"
 #include "CommonTextBlock.h"
 #include "Engine/DataAsset.h"
 #include "CommonBorder.h"

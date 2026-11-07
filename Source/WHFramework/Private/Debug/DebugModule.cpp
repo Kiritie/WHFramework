@@ -2,6 +2,8 @@
 
 
 #include "Debug/DebugModule.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Common/LifecycleTypes.h"
 
 #include "Common/CommonModuleStatics.h"
 #include "Debug/DebugManager.h"
@@ -24,7 +26,6 @@ UDebugModule::UDebugModule()
 
 UDebugModule::~UDebugModule()
 {
-	TERMINATION_MODULE(UDebugModule)
 }
 
 #if WITH_EDITOR
@@ -37,7 +38,6 @@ void UDebugModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UDebugModule)
 }
 #endif
 

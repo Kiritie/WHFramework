@@ -1,9 +1,9 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Spawner/AbilityItemSpawner.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 
 #include "Ability/AbilityModuleStatics.h"
-#include "Ability/AbilityModuleTypes.h"
 #include "Ability/Item/AbilityItemBase.h"
 #include "Components/CapsuleComponent.h"
 
@@ -14,7 +14,7 @@ AAbilityItemSpawner::AAbilityItemSpawner()
 
 AActor* AAbilityItemSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbilityItem)
 {
-	return UAbilityModuleStatics::SpawnAbilityItem(InAbilityItem, GetActorLocation(), GetActorRotation());
+	return UAbilityModuleStatics::SpawnAbilityItem(GetWorld(), InAbilityItem, GetActorLocation(), GetActorRotation());
 }
 
 void AAbilityItemSpawner::DestroyImpl_Implementation(AActor* InAbilityActor)

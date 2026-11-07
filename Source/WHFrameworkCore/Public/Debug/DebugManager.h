@@ -2,6 +2,7 @@
 
 #pragma once
 #include "DebugTypes.h"
+#include "Type/NativeTypeIdentity.h"
 #include "WHFrameworkCoreTypes.h"
 #include "Main/MainTypes.h"
 #include "Main/Base/ManagerBase.h"

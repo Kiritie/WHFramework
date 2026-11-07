@@ -1,5 +1,6 @@
 #pragma once
 #include "Camera/Feature/CameraFeatureBase.h"
+#include "Camera/CameraViewTypes.h"
 #include "AutoOrbitCameraFeature.generated.h"
 UCLASS()
 class WHFRAMEWORK_API UAutoOrbitCameraFeature : public UCameraFeatureBase

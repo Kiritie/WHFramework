@@ -5,7 +5,10 @@
 
 #include "AnimationModule.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "LatentActions.h"
 #include "AnimationModuleStatics.generated.h"
+
+class APlayerController;
 
 /**
  * 
@@ -16,10 +19,10 @@ class WHFRAMEWORK_API UAnimationModuleStatics : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, meta=(Latent, LatentInfo= "LatentInfo", Duration="0.2", ExpandEnumAsExecs= "CancelableDelayAction", Keywords="sleep", UnsafeDuringActorConstruction = "true"), Category="AnimationModuleStatics")
-	static void	CancelableDelay(float Duration, TEnumAsByte<ECancelableDelayAction::Type> CancelableDelayAction, FLatentActionInfo LatentInfo);
+	UFUNCTION(BlueprintCallable, meta=(WorldContext="WorldContextObject", Latent, LatentInfo="LatentInfo", Duration="0.2", ExpandEnumAsExecs="CancelableDelayAction", Keywords="sleep", UnsafeDuringActorConstruction="true"), Category="AnimationModuleStatics")
+	static void CancelableDelay(const UObject* WorldContextObject, float Duration, TEnumAsByte<ECancelableDelayAction::Type> CancelableDelayAction, FLatentActionInfo LatentInfo);
 
-	static void ExecuteWithDelay(float Duration, TFunction<void()> OnFinish);
+	static FGuid ExecuteWithDelay(const UObject* WorldContextObject, UObject* InOwner, float Duration, TFunction<void()> OnFinish, TFunction<void()> OnCancel = {});
 
-	static void ExecuteWithTransition(float Duration, TFunction<void()> OnFinish);
+	static FGuid ExecuteWithTransition(const UObject* WorldContextObject, APlayerController* InPlayer, UObject* InOwner, float Duration, TFunction<void()> OnFinish, TFunction<void()> OnCancel = {});
 };

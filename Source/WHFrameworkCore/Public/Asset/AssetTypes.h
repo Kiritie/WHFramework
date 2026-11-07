@@ -1,5 +1,6 @@
 #pragma once
 #include "WHFrameworkCoreTypes.h"
+#include "Type/NativeTypeIdentity.h"
 #include "Templates/MaxSizeof.h"
 
 //////////////////////////////////////////////////////////////////////////

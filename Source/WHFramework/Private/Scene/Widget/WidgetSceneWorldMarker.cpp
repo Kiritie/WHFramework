@@ -1,4 +1,6 @@
 #include "Scene/Widget/WidgetSceneWorldMarker.h"
+#include "Widget/WorldWidgetTypes.h"
+#include "Scene/SceneMarkerTypes.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanelSlot.h"

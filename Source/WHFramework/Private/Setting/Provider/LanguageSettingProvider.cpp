@@ -1,4 +1,7 @@
 #include "Setting/Provider/LanguageSettingProvider.h"
+#include "Common/LanguageTypes.h"
+#include "Setting/SettingPresentationTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "Widget/WidgetModule.h"
 

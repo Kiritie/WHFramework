@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common/LifecycleTypes.h"
 #include "Event/Events/Common/Game/Event_GameExited.h"
 #include "Event/Events/Common/Game/Event_GameInited.h"
 #include "Event/Events/Common/Game/Event_GameStarted.h"

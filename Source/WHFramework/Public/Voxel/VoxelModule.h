@@ -1,4 +1,10 @@
 #pragma once
+
+#include "Voxel/VoxelSaveSuspension.h"
+#include "Common/LifecycleTypes.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventoryCommandTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "Voxel/Navigation/VoxelNavigationPresenter.h"
 
 #include "CoreMinimal.h"
@@ -76,6 +82,16 @@ struct WHFRAMEWORK_API FVoxelModuleSaveCapture
 class FVoxelInventoryDomainBridge;
 using FInventoryVoxelContribution = TFunction<bool(FVoxelInteractionPlan&, AActor*, FInventoryBatchRequest&, FString&)>;
 
+enum class EVoxelRetirementStatus : uint8
+{
+	None,
+	AwaitingSettlement,
+	AwaitingPersistence,
+	RetiredWithoutUnpersistedChanges,
+	ExplicitlyDiscarded,
+};
+
+
 UCLASS()
 class WHFRAMEWORK_API UVoxelModule : public UModuleBase
 {
@@ -127,6 +143,9 @@ public:
 	bool CreateWorldFromProfile(int32 InSeed, FString& OutError, EVoxelTerrainType InTerrainType = EVoxelTerrainType::Default);
 	bool StartWorld(const FVoxelWorldManifest& InManifest, bool bInRemote, FString& OutError);
 	bool StopWorld(bool bDiscardDirty, FString& OutError);
+	bool CanStopWorld(FString& OutError) const;
+	EVoxelRetirementStatus GetRetirementStatus() const { return RetirementStatus; }
+	const FString& GetRetirementError() const { return RetirementError; }
 	bool ValidateWorldData(const FParameter& InData, FString& OutError) const;
 	bool ValidateNewWorldData(const FParameter& InData, FString& OutError) const;
 
@@ -286,9 +305,11 @@ public:
 	bool BeginWorldSaveSuspension(const FGuid& InOwnerToken, FString& OutError);
 	bool EndWorldSaveSuspension(const FGuid& InOwnerToken, FString& OutError);
 	bool AdvanceSuspendedWorldSave(const FGuid& InOwnerToken, FString& OutError);
-	bool IsWorldSaveSuspended() const { return WorldSaveSuspensionToken.IsValid(); }
+	bool IsWorldSaveSuspended() const { return WorldSaveSuspension && WorldSaveSuspension->IsActive(); }
+	TSharedPtr<FVoxelSaveSuspension, ESPMode::ThreadSafe> GetWorldSaveSuspension() const { return WorldSaveSuspension; }
 	void PublishProjectEdit(const FVoxelEditBatch& InBatch);
-	void BindInventoryBridge(TSharedRef<FVoxelInventoryDomainBridge> InBridge, FInventoryVoxelContribution InContribution);
+	bool BindInventoryBridge(TSharedRef<FVoxelInventoryDomainBridge> InBridge, FInventoryVoxelContribution InContribution);
+	bool UnbindInventoryBridge(const TSharedPtr<FVoxelInventoryDomainBridge>& InBridge);
 	bool ExecuteInventoryWorldEdit(FVoxelInteractionPlan& InOutPlan, AActor* InSource, FInventoryBatchRequest& InOutRequest, const FInventoryAuthorityContext& InAuthority, FInventoryCommandResult& OutResult, FString& OutError);
 	bool IsProjectSceneSimulationEnabled() const;
 	AActor* FindSceneActor(const FGuid& InId) const;
@@ -323,6 +344,7 @@ public:
 	EVoxelWorldState GetWorldState() const;
 	virtual void OnBeforeSaveData() override;
 	virtual void OnAfterSaveData(bool bInSuccess) override;
+	virtual void OnSaveCaptureAbandoned() override;
 	EVoxelSceneCaptureStep GetSaveCaptureState(FString& OutError) const;
 	void AdvanceSaveCapture();
 	double GetMaximumSceneCaptureStepMilliseconds() const;
@@ -344,7 +366,10 @@ public:
 protected:
 	virtual TSoftObjectPtr<UVoxelMaterialSet> ResolveMaterialSetAsset() const;
 	virtual uint64 GetSceneProjectCaptureRevision() const;
-	virtual void OnWorldStopping();
+	virtual bool CanRetireWorld(FString& OutError) const;
+	bool StopWorldInternal(bool bDiscardDirty, FString& OutError);
+	bool RetirePartialWorldStart(FString& OutError);
+	virtual bool OnWorldStopping(FString& OutError);
 	virtual void OnSimulationResidencyChanged(const FVoxelSimulationResidencyDelta& InDelta);
 	virtual bool BuildInteractionPlan(
 		const FVoxelTraceResult& InHit,
@@ -503,6 +528,11 @@ private:
 	TUniquePtr<FVoxelEmergeManager> EmergeManager;
 	TUniquePtr<FVoxelResidencyManager> ResidencyManager;
 	TUniquePtr<FVoxelTaskScheduler> Scheduler;
+	bool bWorldStartInProgress = false;
+	bool bPartialWorldStartNeedsRetirement = false;
+	bool bPartialWorldRetirementInProgress = false;
+	int32 PartialWorldNetworkCursor = 0;
+	TArray<TWeakObjectPtr<UVoxelModuleNetworkComponent>> PartialWorldNetworks;
 	TSharedPtr<FVoxelTerrainResources, ESPMode::ThreadSafe> PendingTerrainFactResources;
 	FVoxelGenerationConsumerKey PendingTerrainFactControl;
 	TUniquePtr<FVoxelOverlayReplica> OverlayReplica;
@@ -553,8 +583,7 @@ private:
 	uint64 FailedInterestSourceRevision = MAX_uint64;
 	uint64 FailedInterestEpoch = 0;
 	uint64 SafetyCaptureSerial = 0;
-	FGuid WorldSaveSuspensionToken;
-	uint64 WorldSaveSuspensionEpoch = 0;
+	TSharedPtr<FVoxelSaveSuspension, ESPMode::ThreadSafe> WorldSaveSuspension;
 	FGuid TerrainPlanningOwnerId = FGuid::NewGuid();
 	uint64 LastPlannedRenderCoverageSerial = 0;
 	uint64 LastPlannedPhysicsCoverageSerial = 0;
@@ -594,4 +623,12 @@ private:
 	bool bMutating = false;
 	bool bWorldLoadRejected = false;
 	bool bPersistenceEnabledForCurrentWorld = false;
+	bool bWorldRetirementStarted = false;
+	bool bWorldRetirementDiscarded = false;
+	uint8 WorldRetirementStage = 0;
+	TSet<FIntVector> RetiredSceneRegions;
+	EVoxelRetirementStatus RetirementStatus = EVoxelRetirementStatus::None;
+	FString RetirementError;
+	bool HasUnpersistedRetirementState() const;
+	void RecordRetirementFailure(const FString& InError);
 };

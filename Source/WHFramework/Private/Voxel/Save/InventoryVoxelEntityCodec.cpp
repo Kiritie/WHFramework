@@ -1,4 +1,5 @@
 #include "Voxel/Save/InventoryVoxelEntityCodec.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 
 #include "Misc/Crc.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"

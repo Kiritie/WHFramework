@@ -1,4 +1,5 @@
 #include "Ability/Abilities/ItemAbilityBase.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Inventory/InventoryAbilitySource.h"

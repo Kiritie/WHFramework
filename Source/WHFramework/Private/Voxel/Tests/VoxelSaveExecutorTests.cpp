@@ -1,3 +1,5 @@
+#include "SaveGame/SaveOperationTypes.h"
+#include "SaveGame/SaveManifestTypes.h"
 #include "CoreMinimal.h"
 
 #if WITH_DEV_AUTOMATION_TESTS

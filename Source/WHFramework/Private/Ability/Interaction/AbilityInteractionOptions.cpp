@@ -1,4 +1,6 @@
 #include "Ability/Interaction/AbilityInteractionOptions.h"
+#include "Common/InteractionTags.h"
+#include "Common/InteractionTypes.h"
 
 #include "Ability/Inventory/InventoryPickupActor.h"
 #include "Ability/Inventory/InventoryNetworkComponent.h"

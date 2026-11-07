@@ -1,7 +1,8 @@
 #pragma once
 
+#include "Common/LifecycleTypes.h"
 #include "Common/Base/WHObject.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 
 #include "EventManagerBase.generated.h"
 

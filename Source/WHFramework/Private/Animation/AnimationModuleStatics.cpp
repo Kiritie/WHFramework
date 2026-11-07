@@ -2,18 +2,26 @@
 
 
 #include "Animation/AnimationModuleStatics.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
 
-void UAnimationModuleStatics::CancelableDelay(float Duration, TEnumAsByte<ECancelableDelayAction::Type> CancelableDelayAction, FLatentActionInfo LatentInfo)
+void UAnimationModuleStatics::CancelableDelay(const UObject* WorldContextObject, float Duration, TEnumAsByte<ECancelableDelayAction::Type> CancelableDelayAction, FLatentActionInfo LatentInfo)
 {
-	UAnimationModule::Get().CancelableDelay(Duration, CancelableDelayAction, LatentInfo);
+	UWorld* World = GEngine && WorldContextObject ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	if (UAnimationModule* Module = World ? UAnimationModule::GetPtr(World) : nullptr)
+		Module->CancelableDelay(Duration, CancelableDelayAction, LatentInfo);
 }
 
-void UAnimationModuleStatics::ExecuteWithDelay(float Duration, TFunction<void()> OnFinish)
+FGuid UAnimationModuleStatics::ExecuteWithDelay(const UObject* WorldContextObject, UObject* InOwner, float Duration, TFunction<void()> OnFinish, TFunction<void()> OnCancel)
 {
-	UAnimationModule::Get().ExecuteWithDelay(Duration, OnFinish);
+	UWorld* World = GEngine && WorldContextObject ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	UAnimationModule* Module = World ? UAnimationModule::GetPtr(World) : nullptr;
+	return Module ? Module->ExecuteWithDelay(InOwner, Duration, MoveTemp(OnFinish), MoveTemp(OnCancel)) : FGuid();
 }
 
-void UAnimationModuleStatics::ExecuteWithTransition(float Duration, TFunction<void()> OnFinish)
+FGuid UAnimationModuleStatics::ExecuteWithTransition(const UObject* WorldContextObject, APlayerController* InPlayer, UObject* InOwner, float Duration, TFunction<void()> OnFinish, TFunction<void()> OnCancel)
 {
-	UAnimationModule::Get().ExecuteWithTransition(Duration, OnFinish);
+	UWorld* World = GEngine && WorldContextObject ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	UAnimationModule* Module = World ? UAnimationModule::GetPtr(World) : nullptr;
+	return Module ? Module->ExecuteWithTransition(InPlayer, InOwner, Duration, MoveTemp(OnFinish), MoveTemp(OnCancel)) : FGuid();
 }

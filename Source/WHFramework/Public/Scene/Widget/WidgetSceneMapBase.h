@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Scene/SceneMapTypes.h"
+#include "Scene/SceneMarkerTypes.h"
 #include "Blueprint/UserWidget.h"
 #include "Scene/SceneModuleTypes.h"
 #include "WidgetSceneMapBase.generated.h"

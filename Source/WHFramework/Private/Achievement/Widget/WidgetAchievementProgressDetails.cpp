@@ -12,9 +12,10 @@ void UWidgetAchievementProgressDetails::UpdateDetails()
 	AchievementProgressBar->SetFillColorAndOpacity(ProgressBarColour);
 	Title->SetVisibility(TitleText.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 
-	int32 TotalAchieved = UAchievementModule::Get().GetAchievedAchievementCount();
-	int32 Total = UAchievementModule::Get().Achievements.Num();
-	float Progress = (float)TotalAchieved / (float)Total;
+	const UAchievementModule* Module = UAchievementModule::GetPtr(GetWorld());
+	const int32 TotalAchieved = Module ? Module->GetAchievedAchievementCount() : 0;
+	const int32 Total = Module ? Module->Achievements.Num() : 0;
+	const float Progress = Total > 0 ? static_cast<float>(TotalAchieved) / Total : 0.f;
 
 	FString ProgressString = UKismetTextLibrary::Conv_DoubleToText(Progress * 100, ERoundingMode::HalfFromZero, false, false, 1, 324, 0, TotalProgressMaxDecimalPlaces).ToString();
 

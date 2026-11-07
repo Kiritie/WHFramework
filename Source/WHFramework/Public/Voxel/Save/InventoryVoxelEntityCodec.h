@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 #include "CoreMinimal.h"
 #include "Ability/Inventory/InventorySnapshotCodec.h"
 #include "Voxel/Save/VoxelDeltaTypes.h"

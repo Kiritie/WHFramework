@@ -1,5 +1,14 @@
 #pragma once
 
+#include "Widget/WorldWidgetTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Scene/SceneMapTypes.h"
+#include "Scene/SceneAreaTypes.h"
+#include "Scene/SceneMarkerTypes.h"
+#include "Scene/SceneStreamingTypes.h"
+#include "Main/MainModuleAccess.h"
+#include "HAL/CriticalSection.h"
+#include "TimerManager.h"
 #include "SceneModuleTypes.h"
 #include "Container/SceneContainerInterface.h"
 
@@ -17,12 +26,50 @@ struct FEventSetActorVisible;
 struct FEventSetDataLayerOwnerPlayer;
 class ATargetPoint;
 class AMiniMapCapture;
+class ULocalPlayer;
 struct FEventSetDataLayerRuntimeState;
 class UWorldWeather;
 class UWorldTimer;
 class UWidgetSceneWorldMarker;
 class UWidgetSceneMapBase;
 class ACameraStreamingBridge;
+class ULevel;
+class UPrimitiveComponent;
+
+USTRUCT()
+struct FScenePlayerWorldMarkers
+{
+	GENERATED_BODY()
+	UPROPERTY(Transient)
+	TMap<FGuid, TObjectPtr<UWidgetSceneWorldMarker>> Widgets;
+};
+
+struct FDeferredSceneActorRegistration
+{
+	FGuid ExpectedId;
+	FGuid PreviousId;
+	uint64 Serial = 0;
+};
+struct FSceneOwnerComponentOverride
+{
+	bool bOriginalOnlyOwnerSee = false;
+	bool bLastOnlyOwnerSee = false;
+	bool bManaged = false;
+	bool bOriginalVisible = false;
+	bool bLastVisible = false;
+	bool bVisibilityManaged = false;
+};
+
+struct FSceneOwnerActorOverride
+{
+	TWeakObjectPtr<AActor> OriginalOwner;
+	TWeakObjectPtr<AActor> LastOwner;
+	bool bManaged = false;
+	bool bConflict = false;
+	bool bOwnerRetry = false;
+	TMap<TWeakObjectPtr<UPrimitiveComponent>, FSceneOwnerComponentOverride> Components;
+};
+
 /** 场景模块 */
 UCLASS()
 class WHFRAMEWORK_API USceneModule : public UModuleBase, public ISceneContainerInterface, public IDebuggerInterface
@@ -50,6 +97,8 @@ public:
 
 	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
 
+	virtual void OnControlRefresh(float RealDeltaSeconds) override;
+
 	virtual void OnPause() override;
 
 	virtual void OnUnPause() override;
@@ -58,16 +107,26 @@ public:
 	
 protected:
 	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
+	virtual bool WasLoadDataApplied() const override { return bLastSceneLoadSucceeded; }
 
 	virtual FParameter ToData() override;
 
 public:
+	bool LoadSceneSaveData(const FParameter& InData, EPhase InPhase);
+
 	virtual FString GetModuleDebugMessage() override;
 
 	//////////////////////////////////////////////////////////////////////////
 protected:
 	UPROPERTY(Transient)
-	TObjectPtr<ACameraStreamingBridge> CameraStreamingBridge;
+	TMap<TObjectPtr<ULocalPlayer>, TObjectPtr<ACameraStreamingBridge>> CameraStreamingBridges;
+	bool bRefreshingCameraStreamingBridges = false;
+	bool bSceneRuntimeClosing = false;
+	bool bSceneLoadInProgress = false;
+	bool bLastSceneLoadSucceeded = false;
+	uint32 CameraStreamingBridgeGeneration = 0;
+	void RefreshCameraStreamingBridges();
+	void ClearCameraStreamingBridges();
 
 	virtual void OnDrawDebug(UCanvas* InCanvas, APlayerController* InPC) override;
 
@@ -85,28 +144,33 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Coordinate")
 	float SeaLevel;
 	
-	UPROPERTY(VisibleAnywhere, Category = "Coordinate")
-	float Altitude;
-
 public:
 	UFUNCTION(BlueprintPure)
 	float GetSeaLevel() const { return SeaLevel; }
 	
 	UFUNCTION(BlueprintCallable)
-	void SetSeaLevel(float InSeaLevel) { SeaLevel = InSeaLevel; }
+	void SetSeaLevel(float InSeaLevel)
+	{
+		if (IsBusinessAdmissionOpen()) SeaLevel = InSeaLevel;
+	}
 
 	UFUNCTION(BlueprintPure)
-	float GetAltitude(bool bUnsigned = false, bool bRefresh = false) const;
+	float GetAltitude(APlayerController* InPlayer, bool bUnsigned = false) const;
 	
 	//////////////////////////////////////////////////////////////////////////
 private:
 	void RefreshMiniMapCapture();
 	void UpdateMiniMapCapture();
-	FSceneMapView ResolveMiniMapView(FVector* OutLocation = nullptr) const;
+	void ClearMiniMapCaptures();
+	FSceneMapView ResolveMiniMapView(APlayerController* InPlayer, FVector* OutLocation = nullptr) const;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Transient, Category = "MiniMap")
-	AMiniMapCapture* MiniMapCapture;
+	UPROPERTY(Transient)
+	TMap<TObjectPtr<ULocalPlayer>, TObjectPtr<AMiniMapCapture>> MiniMapCaptures;
+
+	UPROPERTY(Transient)
+	TMap<TObjectPtr<ULocalPlayer>, TObjectPtr<UTextureRenderTarget2D>> MiniMapTargets;
+	bool bRefreshingMiniMapCaptures = false;
 
 	UPROPERTY(EditAnywhere, Category = "MiniMap")
 	bool bMiniMapRotatable;
@@ -139,7 +203,7 @@ public:
 	FSimpleMulticastDelegate OnMapPresentationChanged;
 
 	UFUNCTION(BlueprintPure)
-	AMiniMapCapture* GetMiniMapCapture() const { return MiniMapCapture; }
+	AMiniMapCapture* GetMiniMapCapture(APlayerController* InPlayer) const;
 
 	UFUNCTION(BlueprintPure)
 	EWorldMiniMapSource GetMiniMapSource() const { return MiniMapSource; }
@@ -163,13 +227,19 @@ public:
 	FTransform GetMiniMapPoint() const { return MiniMapPoint; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetMiniMapPoint(const FTransform& InMiniMapPoint) { MiniMapPoint = InMiniMapPoint; }
+	void SetMiniMapPoint(const FTransform& InMiniMapPoint)
+	{
+		if (IsBusinessAdmissionOpen()) MiniMapPoint = InMiniMapPoint;
+	}
 
 	UFUNCTION(BlueprintPure)
 	float GetMiniMapRange() const { return MiniMapRange; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetMiniMapRange(float InMiniMapRange) { MiniMapRange = FMath::Clamp(InMiniMapRange, MiniMapMinRange, MiniMapMaxRange != -1.f ? MiniMapMaxRange : InMiniMapRange); }
+	void SetMiniMapRange(float InMiniMapRange)
+	{
+		if (IsBusinessAdmissionOpen()) MiniMapRange = FMath::Clamp(InMiniMapRange, MiniMapMinRange, MiniMapMaxRange != -1.f ? MiniMapMaxRange : InMiniMapRange);
+	}
 
 	UFUNCTION(BlueprintPure)
 	UTextureRenderTarget2D* GetMiniMapTexture() const { return MiniMapTexture; }
@@ -192,21 +262,32 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "WorldMap")
 	float WorldMapMaxRange;
 
+	TMap<TWeakObjectPtr<ULocalPlayer>, FSceneMapView> PlayerWorldMapViews;
+
 public:
 	UFUNCTION(BlueprintPure)
 	FVector2D GetWorldMapCenter() const { return WorldMapCenter; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetWorldMapCenter(FVector2D InCenter) { WorldMapCenter = InCenter; }
+	void SetWorldMapCenter(FVector2D InCenter)
+	{
+		if (IsBusinessAdmissionOpen()) WorldMapCenter = InCenter;
+	}
 
 	UFUNCTION(BlueprintPure)
 	float GetWorldMapRange() const { return WorldMapRange; }
 
 	UFUNCTION(BlueprintCallable)
-	void SetWorldMapRange(float InRange) { WorldMapRange = FMath::Clamp(InRange, WorldMapMinRange, WorldMapMaxRange); }
+	void SetWorldMapRange(float InRange)
+	{
+		if (IsBusinessAdmissionOpen()) WorldMapRange = FMath::Clamp(InRange, WorldMapMinRange, WorldMapMaxRange);
+	}
 
 	UFUNCTION(BlueprintPure)
-	FSceneMapView GetMapView(ESceneMarkerChannel InChannel) const;
+	FSceneMapView GetMapView(ESceneMarkerChannel InChannel, APlayerController* InPlayer) const;
+
+	UFUNCTION(BlueprintCallable)
+	void SetPlayerWorldMapView(APlayerController* InPlayer, const FSceneMapView& InView);
 
 	//////////////////////////////////////////////////////////////////////////
 protected:
@@ -214,6 +295,7 @@ protected:
 	TArray<FSceneArea> SceneAreas;
 
 	TQueue<FSceneArea, EQueueMode::Mpsc> PendingSceneAreas;
+	FCriticalSection PendingSceneAreasMutex;
 
 	UPROPERTY(EditAnywhere, Category = "SceneArea")
 	bool bDrawSceneArea;
@@ -259,12 +341,14 @@ protected:
 	TMap<FGuid, FSceneMarker> Markers;
 
 	UPROPERTY(VisibleAnywhere, Category = "Marker")
-	FGuid TrackedMarkerID;
+	TMap<FGuid, FGuid> PlayerTrackedMarkers;
 
 	UPROPERTY(Transient)
-	TMap<FGuid, UWidgetSceneWorldMarker*> WorldMarkerWidgets;
+	TMap<TObjectPtr<ULocalPlayer>, FScenePlayerWorldMarkers> WorldMarkerWidgets;
 
 	bool bWorldMarkerWidgetsDirty;
+	bool bRefreshingWorldMarkerWidgets = false;
+	uint32 WorldMarkerWidgetsGeneration = 0;
 
 public:
 	UPROPERTY(BlueprintAssignable)
@@ -289,19 +373,22 @@ public:
 	FSceneMarker GetMarker(FGuid InMarkerID) const;
 
 	UFUNCTION(BlueprintPure)
-	FSceneMarkerView GetMarkerView(FGuid InMarkerID, FVector InViewLocation, float InViewYaw = 0.f) const;
+	FSceneMarkerView GetMarkerView(FGuid InPlayerID, FGuid InMarkerID, FVector InViewLocation, float InViewYaw = 0.f) const;
 
 	UFUNCTION(BlueprintPure)
-	TArray<FSceneMarkerView> GetMarkerViews(ESceneMarkerChannel InChannel, FVector InViewLocation, float InViewYaw = 0.f, bool bFilterByDistance = true) const;
+	TArray<FSceneMarkerView> GetMarkerViews(FGuid InPlayerID, ESceneMarkerChannel InChannel, FVector InViewLocation, float InViewYaw = 0.f, bool bFilterByDistance = true) const;
 
 	UFUNCTION(BlueprintCallable)
-	bool SetTrackedMarker(FGuid InMarkerID);
+	bool SetTrackedMarker(FGuid InPlayerID, FGuid InMarkerID);
 
 	UFUNCTION(BlueprintPure)
-	FGuid GetTrackedMarker() const { return TrackedMarkerID; }
+	FGuid GetTrackedMarker(FGuid InPlayerID) const { return PlayerTrackedMarkers.FindRef(InPlayerID); }
+
+	static FGuid GetPlayerMarkerOwnerId(APlayerController* InPlayer);
 
 private:
-	FSceneMarkerView ResolveMarker(const FSceneMarker& InMarker, const FVector& InViewLocation, float InViewYaw) const;
+	FSceneMarkerView ResolveMarker(FGuid InPlayerID, const FSceneMarker& InMarker, const FVector& InViewLocation, float InViewYaw) const;
+	bool IsMarkerVisibleToPlayer(FGuid InPlayerID, const FSceneMarker& InMarker, ESceneMarkerChannel InChannel) const;
 	void NotifySceneMarkersChanged();
 	void RefreshWorldMarkerWidgets();
 	void ClearWorldMarkerWidgets();
@@ -314,6 +401,8 @@ public:
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
 	UWorldTimer* GetWorldTimer(TSubclassOf<UWorldTimer> InClass = nullptr) const;
 
+	static int64 GetWorldTicks(UWorld* InWorld);
+
 	//////////////////////////////////////////////////////////////////////////
 protected:
 	UPROPERTY(EditAnywhere, Instanced, Category = "WorldWeather")
@@ -325,16 +414,36 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 protected:
-	UPROPERTY(EditAnywhere, Category = "DataLayer")
-	TMap<UDataLayerAsset*, int32> DataLayerPlayerMappings;
+	UPROPERTY(Transient)
+	TMap<TObjectPtr<UDataLayerAsset>, TWeakObjectPtr<APlayerController>> DataLayerPlayerMappings;
 	
-	UPROPERTY(EditAnywhere, Category = "DataLayer")
-	TMap<FName, int32> LevelPlayerMappings;
+	UPROPERTY(Transient)
+	TMap<FName, TWeakObjectPtr<APlayerController>> LevelPlayerMappings;
 
-	void ApplyOwnerPlayerToActors(const TArray<AActor*>& InActors, int32 InPlayerIndex) const;
-	void ApplyDataLayerOwnerPlayer(UDataLayerAsset* InDataLayer) const;
-	void ApplyLevelOwnerPlayer(FName InLevelPath) const;
-	void ApplyAllOwnerPlayerMappings() const;
+	TMap<TWeakObjectPtr<AActor>, FSceneOwnerActorOverride> OwnerMappingOverrides;
+	TMap<TWeakObjectPtr<APlayerController>, TWeakObjectPtr<AActor>> OwnerMappingViewTargets;
+	TSet<TWeakObjectPtr<AActor>> PendingOwnerMappingActors;
+	TArray<FTimerHandle> SceneSequenceTimers;
+	TWeakObjectPtr<UWorld> OwnerMappingWorld;
+	FDelegateHandle OwnerMappingSpawnHandle;
+	FDelegateHandle OwnerMappingLevelAddedHandle;
+	FDelegateHandle OwnerMappingLevelRemovedHandle;
+	bool bOwnerMappingFullRefresh = false;
+	bool bReconcilingOwnerMappings = false;
+
+	void BeginOwnerMappingMonitoring();
+	void EndOwnerMappingMonitoring();
+	void OnOwnerMappingActorSpawned(AActor* Actor);
+	void OnOwnerMappingLevelChanged(ULevel* Level, UWorld* World);
+	void OnOwnerMappingLevelRemoved(ULevel* Level, UWorld* World);
+	void RequestOwnerMappingRefresh();
+	void ApplyAllOwnerPlayerMappings();
+	void ClearMarkersInternal(bool bIncludePersistent);
+	void RefreshOwnerPlayerMappings();
+	void ReconcileOwnerPlayerMappings();
+	void ReleaseOwnerMappingActor(AActor* Actor, UWorld* World);
+	void ReleaseOwnerMappingComponent(AActor* PreviousOwner, UPrimitiveComponent* Component,
+		const FSceneOwnerComponentOverride& State, UWorld* World);
 	
 protected:
 	UFUNCTION()
@@ -386,6 +495,14 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "SceneActor")
 	TMap<FGuid, AActor*> SceneActorMap;
+	// Explicit IDs assigned to deferred actors are reserved until their registration or release.
+	TMap<FGuid, TWeakObjectPtr<AActor>> SceneActorReservations;
+	TSet<TWeakObjectPtr<AActor>> PendingSceneActorRegistrations;
+	TMap<TWeakObjectPtr<AActor>, FDeferredSceneActorRegistration> DeferredSceneActorRegistrations;
+	uint64 SceneActorRegistrationSerial = 0;
+	bool bRetryingSceneActorRegistrations = false;
+	bool TryAddSceneActor(AActor* InActor, bool bReportConflict, const FGuid* ExpectedId = nullptr, bool bNotifyMarkers = true);
+	void RetrySceneActorRegistrations();
 
 	UPROPERTY(Transient)
 	TSet<FGuid> DestroyedSceneActorIds;
@@ -408,6 +525,10 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual bool RemoveSceneActor(AActor* InActor) override;
+
+	/** Atomically rekeys this World's registration; ApplyIdentity must only assign the native ID field. */
+	bool ReassignSceneActorIdentity(AActor* InActor, const FGuid& OldId, const FGuid& NewId, TFunctionRef<void()> ApplyIdentity);
+	bool QueueSceneActorRegistration(AActor* InActor, const FGuid& ExpectedId);
 
 	void MarkSceneActorDestroyed(AActor* InActor);
 
@@ -533,23 +654,19 @@ public:
 	UFUNCTION(BlueprintPure)
 	float GetAsyncUnloadLevelProgressByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr) const;
 
-protected:
-	UFUNCTION(BlueprintCallable)
-	void AsyncLoadLevelInternal(FAsyncLoadLevelTask& InTask);
-
-	UFUNCTION(BlueprintCallable)
-	void AsyncUnloadLevelInternal(FAsyncLoadLevelTask& InTask);
-
-	UFUNCTION()
-	void OnAsyncLoadLevelFinished(FAsyncLoadLevelTask InTask);
-
-	UFUNCTION()
-	void OnAsyncUnloadLevelFinished(FAsyncLoadLevelTask InTask);
-
 private:
-	UFUNCTION()
-	void OnHandleAsyncLoadLevelFinish();
-	
-	UFUNCTION()
-	void OnHandleAsyncUnloadLevelFinish();
+    int32 NextLevelOperationId = 0;
+    bool bLevelOperationsClosing = false;
+    float LevelFinishRemaining = 0.f;
+    bool bWaitingLevelFinish = false;
+
+    void StartLevelOperation(FAsyncLoadLevelTask& Task);
+    void RefreshLevelOperationWidgets(int32 OperationId);
+    void HandlePackageLoaded(int32 OperationId, TWeakObjectPtr<UWorld> OperationWorld, bool bSucceeded);
+    void BeginStreamLevel(int32 OperationId);
+    void CompleteLevelOperation(int32 OperationId, ESceneLevelLoadResult Result);
+    void CancelLevelOperations();
+
+    UFUNCTION()
+    void OnStreamLevelFinished(int32 OperationId);
 };

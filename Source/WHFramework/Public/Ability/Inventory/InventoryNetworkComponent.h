@@ -1,11 +1,15 @@
 #pragma once
 
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
+#include "Ability/Inventory/InventoryCommandTypes.h"
+#include "Ability/Inventory/InventoryClientReceiptLedger.h"
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Ability/Inventory/InventoryDomain.h"
 #include "InventoryNetworkComponent.generated.h"
 
-class UInventoryWorldSubsystem;
+class UInventoryModule;
 class UPackageMap;
 
 USTRUCT(BlueprintType)
@@ -229,19 +233,28 @@ public:
     virtual void TickComponent(float InDeltaTime, ELevelTick InTickType, FActorComponentTickFunction* InTickFunction) override;
 
     bool BindOwner(const FGuid& InPlayerId, const FGuid& InInventoryId);
-    void UnbindOwner();
+    bool UnbindOwner();
     bool RegisterAction(FName InAction, FInventoryClientActionHandler InHandler);
     void UnregisterAction(FName InAction);
     uint64 SubmitRequest(FInventoryClientRequest InRequest);
     TArray<FInventoryClientRequest> GetPendingRequests() const;
     bool GetPendingRequest(uint64 InRequestId, FInventoryClientRequest& OutRequest) const;
     bool IsRequestUnconfirmed(uint64 InRequestId) const;
+	bool GetRecordedRequestResult(const FGuid& InConnectionId, uint64 InRequestId, FInventoryCommandResult& OutResult) const;
+	bool ConsumeRecordedRequestResult(const FGuid& InConnectionId, uint64 InRequestId, FInventoryCommandResult& OutResult);
+	TSharedPtr<FInventoryClientReceiptLedger, ESPMode::ThreadSafe> GetRequestReceiptLedger() const { return ClientReceiptLedger; }
     bool RetryRequest(uint64 InRequestId);
     void OpenInventory(const FGuid& InInventoryId, uint32 InGeneration = 1);
     void CloseInventory(const FGuid& InInventoryId);
     void ResyncInventory(const FGuid& InInventoryId);
     const FInventorySnapshot* FindView(const FGuid& InInventoryId) const;
     FGuid GetOwnerInventoryId() const;
+	FGuid GetConnectionId() const { return ConnectionId; }
+	// 仅在 OnConnectionReset 广播期间有效。
+	FGuid GetDispatchingResetConnectionId() const { return DispatchingResetConnectionId; }
+	// 仅在旧连接回执广播期间有效。
+	FGuid GetDispatchingRetiredResultConnectionId() const { return DispatchingRetiredResultConnectionId; }
+	FGuid GetDispatchingResultConnectionId() const { return DispatchingResultConnectionId; }
     FGuid GetWorldId() const;
     FGuid GetWorldEpoch() const;
     FGuid GetStoreId() const;
@@ -257,6 +270,32 @@ public:
     FInventoryConnectionReset OnConnectionReset;
 
 private:
+	struct FClientResetBatch
+	{
+		FGuid Connection;
+		FGuid Store;
+		FGuid Epoch;
+		EInventoryResultCode Reason = EInventoryResultCode::None;
+		TArray<FInventoryCommandResult> Results;
+		TArray<FGuid> ClosedInventories;
+		int32 NextResult = 0;
+		int32 NextInventory = 0;
+		bool bResetBroadcast = false;
+	};
+
+	struct FDeferredClientBegin
+	{
+		FGuid Connection;
+		FGuid World;
+		FGuid Store;
+		FGuid Epoch;
+		FGuid OwnerInventory;
+	};
+
+	bool DrainClientResets(FString& OutError);
+	bool PublishClientResult(const FGuid& InConnectionId, const FInventoryCommandResult& InResult);
+	void RecordClientReceipt(const FInventoryClientRequest& InRequest, const FInventoryCommandResult& InResult);
+	void ApplyDeferredClientBegins();
     struct FServerSession
     {
         FGuid SessionId;
@@ -294,12 +333,24 @@ private:
         FInventoryCommandResult Result;
     };
 
-    TWeakObjectPtr<UInventoryWorldSubsystem> WorldSubsystem;
+    TWeakObjectPtr<UInventoryModule> InventoryModule;
     TMap<FGuid, FServerSession> Sessions;
     TMap<FGuid, FClientView> Views;
     TSet<FGuid> LocallyClosedSessions;
     TMap<FGuid, FAssembly> Assemblies;
     TMap<uint64, FPendingRequest> Pending;
+	TArray<uint64> QueuedRequestNotifications;
+	TArray<FClientResetBatch> ClientResetBatches;
+	TArray<FDeferredClientBegin> DeferredClientBegins;
+	TSharedPtr<FInventoryClientReceiptLedger, ESPMode::ThreadSafe> ClientReceiptLedger;
+	bool bDrainingClientResets = false;
+	bool bApplyingDeferredClientBegins = false;
+	bool bClientResetDeliveryClosed = false;
+	bool bClientReceiptLedgerSessionOwned = false;
+	FGuid DispatchingResetConnectionId;
+	FGuid DispatchingRetiredResultConnectionId;
+	FGuid DispatchingResultConnectionId;
+	int32 ActiveClientResultNotifications = 0;
     TMap<FName, FInventoryClientActionHandler> Actions;
     TArray<FActionReceipt> Receipts;
     FDelegateHandle CommitHandle;

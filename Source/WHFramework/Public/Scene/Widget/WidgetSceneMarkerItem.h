@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Scene/SceneMarkerTypes.h"
 #include "Scene/SceneModuleTypes.h"
 #include "Widget/Sub/SubWidgetBase.h"
 #include "WidgetSceneMarkerItem.generated.h"

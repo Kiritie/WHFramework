@@ -1,3 +1,5 @@
+#include "SaveGame/SaveOperationTypes.h"
+#include "SaveGame/SaveManifestTypes.h"
 #include "SaveGame/SaveGameAsyncExecutor.h"
 #include "SaveGame/SaveDataSerializer.h"
 #include "SaveGame/SaveGameStorage.h"

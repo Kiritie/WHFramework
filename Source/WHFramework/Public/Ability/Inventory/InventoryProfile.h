@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
-#include "Ability/Inventory/InventoryTypes.h"
 #include "InventoryProfile.generated.h"
 
 class FInventoryItemRegistry;

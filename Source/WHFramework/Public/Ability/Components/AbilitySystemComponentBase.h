@@ -1,7 +1,7 @@
 #pragma once
 
+#include "Ability/AbilityInfoTypes.h"
 #include "AbilitySystemComponent.h"
-#include "Ability/AbilityModuleTypes.h"
 #include "Ability/AbilityActionTypes.h"
 #include "Ability/AbilityGrantTypes.h"
 #include "Ability/Effects/AbilityEffectSaveTypes.h"

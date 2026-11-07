@@ -27,9 +27,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "DebugModuleStatics")
 	static void DebugMessage(const FString& InMessage, EDebugMode InMode = EDM_Screen, EDebugCategory InCategory = EDC_Default, EDebugVerbosity InVerbosity = EDV_Log, const FLinearColor InDisplayColor = FLinearColor(0,255,255), float InDuration = 1.5f, int InKey = -1, bool bNewerOnTop = true);
 
-	UFUNCTION(BlueprintPure, Category = "DebugModuleStatics")
-	static FDebugCategoryState GetDebugCategoryState(EDebugCategory InCategory);
+	UFUNCTION(BlueprintPure, meta=(WorldContext="InWorld"), Category = "DebugModuleStatics")
+	static FDebugCategoryState GetDebugCategoryState(UWorld* InWorld, EDebugCategory InCategory);
 
-	UFUNCTION(BlueprintCallable, Category = "DebugModuleStatics")
-	static void SetDebugCategoryState(EDebugCategory InCategory, FDebugCategoryState InState);
+	UFUNCTION(BlueprintCallable, meta=(WorldContext="InWorld"), Category = "DebugModuleStatics")
+	static void SetDebugCategoryState(UWorld* InWorld, EDebugCategory InCategory, FDebugCategoryState InState);
 };

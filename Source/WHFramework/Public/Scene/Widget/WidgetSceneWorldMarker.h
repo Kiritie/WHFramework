@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Widget/WorldWidgetTypes.h"
+#include "Scene/SceneMarkerTypes.h"
 #include "Scene/SceneModuleTypes.h"
 #include "Widget/World/WorldWidgetBase.h"
 #include "WidgetSceneWorldMarker.generated.h"

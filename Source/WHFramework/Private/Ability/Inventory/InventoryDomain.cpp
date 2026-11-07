@@ -1,4 +1,5 @@
 #include "Ability/Inventory/InventoryDomain.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 
 #include "GameFramework/PlayerController.h"
 

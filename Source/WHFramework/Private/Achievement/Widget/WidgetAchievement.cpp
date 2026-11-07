@@ -11,6 +11,8 @@
 
 void UWidgetAchievement::SetValue(FAchievementData Achievement, FAchievementStates State, bool ShowExactProgress)
 {
+	const UAchievementModule* Module = UAchievementModule::GetPtr(GetWorld());
+	if (!Module) return;
 	Title->SetText(FText::FromString(Achievement.DisplayName));
 	Description->SetText(FText::FromString(Achievement.Description));
 
@@ -36,7 +38,7 @@ void UWidgetAchievement::SetValue(FAchievementData Achievement, FAchievementStat
 		FString Goal;
 		if(!Achievement.IntProgress)
 		{
-			Progress = UKismetTextLibrary::Conv_DoubleToText(DisplayProgress, ERoundingMode::HalfFromZero, false, false, 1, 324, 0, UAchievementModule::Get().MaxDecimalPlaces).ToString();
+			Progress = UKismetTextLibrary::Conv_DoubleToText(DisplayProgress, ERoundingMode::HalfFromZero, false, false, 1, 324, 0, Module->MaxDecimalPlaces).ToString();
 			Goal = FString::SanitizeFloat(Achievement.ProgressGoal);
 		}
 		else
@@ -46,15 +48,15 @@ void UWidgetAchievement::SetValue(FAchievementData Achievement, FAchievementStat
 		
 		}
 	
-		FString ProgressText = Progress + ps + " / " + Goal + ps + (State.Achieved ? " " + UAchievementModule::Get().AchievedWord : "");
+		FString ProgressText = Progress + ps + " / " + Goal + ps + (State.Achieved ? " " + Module->AchievedWord : "");
 
 		PercentText->SetText(FText::FromString(ProgressText));
-		ProgressBar->SetPercent(DisplayProgress / Achievement.ProgressGoal);
+		ProgressBar->SetPercent(Achievement.ProgressGoal > 0.f ? DisplayProgress / Achievement.ProgressGoal : 0.f);
 	}
 	else
 	{
 		ProgressBar->SetPercent(State.Achieved ? 1 : 0);
-		PercentText->SetText(FText::FromString(State.Achieved ? UAchievementModule::Get().AchievedWord : UAchievementModule::Get().UnAchievedWord));
+		PercentText->SetText(FText::FromString(State.Achieved ? Module->AchievedWord : Module->UnAchievedWord));
 	}
 }
 

@@ -1,4 +1,5 @@
 #include "Step/Tests/StepGraphTestTypes.h"
+#include "Common/LifecycleTypes.h"
 
 #include "Step/Base/StepAsset.h"
 #include "Step/Base/StepRuntime.h"

@@ -1,5 +1,9 @@
 #pragma once
 #include "Camera/Mode/CameraModeBase.h"
+#include "Camera/CameraInputTypes.h"
+#include "Camera/CameraViewTypes.h"
+#include "Camera/CameraConfigTypes.h"
+#include "Camera/CameraFeatureTypes.h"
 
 #include "Camera/CameraModuleTypes.h"
 #include "Camera/PlayerCameraManager.h"
@@ -96,12 +100,6 @@ public:
 		return DesiredState.ArmLength;
 	}
 
-	UFUNCTION(BlueprintPure, Category = "CameraModule")
-	int32 GetLocalPlayerIndex() const
-	{
-		return LocalPlayerIndex;
-	}
-
 	ACameraRigBase* GetRuntimeRig() const
 	{
 		return RuntimeRig;
@@ -132,9 +130,6 @@ protected:
 
 	UPROPERTY(Transient)
 	TArray<FCameraConfigOverrideEntry> CameraConfigOverrides;
-
-	UPROPERTY(Transient)
-	int32 LocalPlayerIndex = INDEX_NONE;
 
 private:
 	FCameraRigState TransitionSource;

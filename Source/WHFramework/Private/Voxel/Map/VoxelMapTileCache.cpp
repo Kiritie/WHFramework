@@ -1,4 +1,5 @@
 #include "Voxel/Map/VoxelMapTileCache.h"
+#include "Scene/SceneMapTypes.h"
 
 #include "Engine/Texture2D.h"
 #include "Voxel/Generation/VoxelGenerationBinding.h"

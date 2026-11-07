@@ -1,4 +1,5 @@
 #include "Voxel/Voxels/Data/VoxelData.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "Ability/Inventory/InventoryPickupActor.h"
 #include "Voxel/Save/VoxelBlockEntityCodec.h"
 #include "Voxel/Geometry/VoxelShapeRegistry.h"

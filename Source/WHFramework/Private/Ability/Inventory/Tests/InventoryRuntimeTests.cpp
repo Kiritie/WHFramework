@@ -1,8 +1,11 @@
 #include "Ability/Inventory/InventoryBinaryArchive.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
+#include "Ability/Inventory/InventoryCommandTypes.h"
 #include "Ability/Inventory/InventoryJournal.h"
 #include "Ability/Inventory/InventoryNetworkComponent.h"
 #include "Ability/Inventory/InventorySnapshotCodec.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -15,6 +18,7 @@
 #include "GameFramework/PlayerController.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
+#include "Main/MainModule.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/Crc.h"
 #include "Misc/FileHelper.h"
@@ -479,7 +483,7 @@ namespace InventoryRuntimeTests
         FTemporaryDirectory Directory;
         FData Data;
         UWorld* World = nullptr;
-        UInventoryWorldSubsystem* Store = nullptr;
+        UInventoryModule* Store = nullptr;
         FString Error;
 
         ~FWorldFixture()
@@ -506,9 +510,14 @@ namespace InventoryRuntimeTests
             UWorld::InitializationValues Values;
             Values.AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false);
             const FName Name(*FString::Printf(TEXT("InventoryTest_%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits)));
-            // Editor 世界保留 WorldSubsystem，同时隔离项目的 Game/PIE 启动资产配置。
+            // 使用隔离的编辑器世界与显式模块宿主。
             World = UWorld::CreateWorld(EWorldType::Editor, false, Name, nullptr, true, ERHIFeatureLevel::SM5, &Values);
-            Store = World ? World->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+            AMainModule* Owner = World ? World->SpawnActor<AMainModule>() : nullptr;
+            Store = Owner ? NewObject<UInventoryModule>(Owner) : nullptr;
+            if (Store)
+            {
+                Owner->RegisterModule(Store);
+            }
             const TArray<FInventoryProfileDefinition> Profiles = { Data.Profile };
             if(!Store || !Store->Configure(Data.Items, Profiles, nullptr, Error) ||
                !Store->RegisterRecordDomain(CounterDomain, 4, ValidateCounter, Error))
@@ -1432,7 +1441,7 @@ bool FInventoryArchiveFreezeTest::RunTest(const FString& Parameters)
     FInventoryArchiveSnapshot Frozen;
     if(!TestTrue(TEXT("持原世界边界冻结所有经济写入"), Fixture.Store->FreezeArchive(OperationId, Frozen, Fixture.Error))) return false;
     TestTrue(TEXT("冻结期间读服务保持可用"), Fixture.Store->IsReady() && Fixture.Store->IsArchiveFrozen() && Fixture.Read(Initial.InventoryId) == Before);
-    Fixture.Store->Tick(.1f);
+    Fixture.Store->OnRefresh(.1f, false);
     TestEqual(TEXT("冻结之前的排队事务暂不执行"), *ExistingCompletions, 0);
     TestTrue(TEXT("普通增删命令被冻结拒绝"), Fixture.Store->ExecuteAuthorizedBatch(Grant, Authority).Code == EInventoryResultCode::WorldNotReady);
     FInventoryBatchRequest CreateDuringFreeze;
@@ -1467,11 +1476,11 @@ bool FInventoryArchiveFreezeTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("重复取消已经不存在的目标幂等成功"), FInventoryJournal::DiscardPrepared(TargetDirectory.Path, Fixture.Data.WorldId, TargetStoreId, OperationId, Fixture.Error));
     if(!TestTrue(TEXT("取消发布后释放原操作冻结"), Fixture.Store->ReleaseArchive(OperationId, Fixture.Error))) return false;
     TestTrue(TEXT("取消未替换存储身份或源内容"), !Fixture.Store->IsArchiveFrozen() && Fixture.Store->GetStoreId() == Fixture.Data.StoreId && Fixture.Read(Initial.InventoryId) == Before);
-    Fixture.Store->Tick(.1f);
+    Fixture.Store->OnRefresh(.1f, false);
     TestTrue(TEXT("原队列在同一源分支恢复执行一次"), *ExistingCompletions == 1 && *ExistingResult == EInventoryResultCode::Success);
     TestEqual(TEXT("只执行原已排队的一次加物品"), Fixture.Read(Initial.InventoryId).Slots[0].Item.Count, 4);
     const FGuid DuringDrainOperation = FGuid::NewGuid();
-    const TWeakObjectPtr<UInventoryWorldSubsystem> WeakStore = Fixture.Store;
+    const TWeakObjectPtr<UInventoryModule> WeakStore = Fixture.Store;
     const auto LaterCompletions = MakeShared<int32>(0);
     Fixture.Store->EnqueueAuthorizedBatch(Grant, Authority, [WeakStore, DuringDrainOperation, this](const FInventoryCommandResult& Result)
     {
@@ -1480,10 +1489,10 @@ bool FInventoryArchiveFreezeTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("队列回调可以在完整事务之间取得冻结边界"), Result.IsSuccess() && WeakStore.IsValid() && WeakStore->FreezeArchive(DuringDrainOperation, Cut, Error));
     });
     Fixture.Store->EnqueueAuthorizedBatch(Grant, Authority, [LaterCompletions](const FInventoryCommandResult&) { ++(*LaterCompletions); });
-    Fixture.Store->Tick(.1f);
+    Fixture.Store->OnRefresh(.1f, false);
     TestTrue(TEXT("当前Tick已取出的剩余队列同样暂停"), Fixture.Store->IsArchiveFrozen() && *LaterCompletions == 0 && Fixture.Read(Initial.InventoryId).Slots[0].Item.Count == 5);
     if(!TestTrue(TEXT("中途冻结可取消回原分支"), Fixture.Store->ReleaseArchive(DuringDrainOperation, Fixture.Error))) return false;
-    Fixture.Store->Tick(.1f);
+    Fixture.Store->OnRefresh(.1f, false);
     TestTrue(TEXT("恢复保留原队列顺序且不会丢失请求"), *LaterCompletions == 1 && Fixture.Read(Initial.InventoryId).Slots[0].Item.Count == 6);
     Fixture.Shutdown();
     return true;
@@ -1522,7 +1531,7 @@ bool FInventoryArchiveAdoptionTest::RunTest(const FString& Parameters)
     UInventoryNetworkComponent* Network = NewObject<UInventoryNetworkComponent>(Controller);
     Controller->AddInstanceComponent(Network);
     Network->RegisterComponent();
-    Network->WorldSubsystem = Fixture.Store;
+    Network->InventoryModule = Fixture.Store;
     Network->AdoptedHandle = Fixture.Store->OnStoreAdopted.AddUObject(Network, &UInventoryNetworkComponent::HandleStoreAdopted);
     if(!TestTrue(TEXT("初始owner快照与会话绑定"), Network->BindOwner(Fixture.Data.OwnerId, Initial.InventoryId))) return false;
     const FGuid OriginalConnection = Network->ConnectionId;
@@ -1671,12 +1680,12 @@ bool FInventoryNetworkReplicaTest::RunTest(const FString& Parameters)
         return false;
     }
     TStrongObjectPtr<UWorld> World(NewObject<UWorld>());
-    TStrongObjectPtr<UInventoryWorldSubsystem> Store(NewObject<UInventoryWorldSubsystem>(World.Get()));
+    TStrongObjectPtr<UInventoryModule> Store(NewObject<UInventoryModule>(World.Get()));
     const TArray<FInventoryProfileDefinition> Profiles = { Data.Profile };
     FString Error;
     TestTrue(TEXT("客户端只配置codec定义"), Store->Configure(Data.Items, Profiles, nullptr, Error));
     TStrongObjectPtr<UInventoryNetworkComponent> Network(NewObject<UInventoryNetworkComponent>());
-    Network->WorldSubsystem = Store.Get();
+    Network->InventoryModule = Store.Get();
     const FGuid Connection = FGuid::NewGuid();
     const FGuid Epoch = FGuid::NewGuid();
     FInventorySnapshot Snapshot = Data.State(1);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Setting/Provider/SettingProviderBase.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "LanguageSettingProvider.generated.h"
 

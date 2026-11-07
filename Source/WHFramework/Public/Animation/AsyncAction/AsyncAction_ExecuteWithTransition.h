@@ -3,9 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Common/CommonModuleTypes.h"
 #include "Kismet/BlueprintAsyncActionBase.h"
 #include "AsyncAction_ExecuteWithTransition.generated.h"
+
+class UAnimationModule;
+class APlayerController;
 
 UCLASS()
 class WHFRAMEWORK_API UAsyncAction_ExecuteWithTransition : public UBlueprintAsyncActionBase
@@ -15,9 +17,24 @@ class WHFRAMEWORK_API UAsyncAction_ExecuteWithTransition : public UBlueprintAsyn
 public:
 	UAsyncAction_ExecuteWithTransition(const FObjectInitializer& ObjectInitializer);
 
-	UFUNCTION(BlueprintCallable)
-	static UAsyncAction_ExecuteWithTransition* ExecuteWithTransition(float Duration);
+	UFUNCTION(BlueprintCallable, meta=(WorldContext="WorldContextObject", BlueprintInternalUseOnly="true"))
+	static UAsyncAction_ExecuteWithTransition* ExecuteWithTransition(const UObject* WorldContextObject, APlayerController* InPlayer, float Duration);
+	virtual void Activate() override;
+	virtual void BeginDestroy() override;
+	UFUNCTION(BlueprintCallable, Category="Animation")
+	void Cancel();
 
 	UPROPERTY(BlueprintAssignable)
 	FSimpleDynamicMulticastDelegate OnFinish;
+	UPROPERTY(BlueprintAssignable)
+	FSimpleDynamicMulticastDelegate OnCanceled;
+
+private:
+	TWeakObjectPtr<UWorld> RequestWorld;
+	TWeakObjectPtr<UAnimationModule> RequestModule;
+	TWeakObjectPtr<APlayerController> RequestPlayer;
+	FGuid RequestId;
+	float RequestDuration = 0.f;
+	bool bActivated = false;
+	bool bCanceled = false;
 };

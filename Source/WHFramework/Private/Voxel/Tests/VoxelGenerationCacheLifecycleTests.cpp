@@ -1,3 +1,4 @@
+#include "Common/LifecycleTypes.h"
 #include "CoreMinimal.h"
 
 #if WITH_DEV_AUTOMATION_TESTS

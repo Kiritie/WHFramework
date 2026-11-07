@@ -2,11 +2,16 @@
 
 #pragma once
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "Main/Base/ModuleBase.h"
 #include "Animation/AnimationModuleTypes.h"
 #include "AnimationModule.generated.h"
 
 class ATargetPoint;
+class UAnimationRequest;
+class APlayerController;
+struct FLatentActionInfo;
 /**
  * 
  */
@@ -48,18 +53,26 @@ public:
 public:
 	void CancelableDelay(float Duration, ECancelableDelayAction::Type CancelableDelayAction, const FLatentActionInfo& LatentInfo);
 
-	void ExecuteWithDelay(float Duration, TFunction<void()> OnFinish);
+	FGuid ExecuteWithDelay(UObject* InOwner, float InDuration, TFunction<void()> InFinish, TFunction<void()> InCancel = {});
+	FGuid ExecuteWithTransition(APlayerController* InPlayer, UObject* InOwner, float InDuration, TFunction<void()> InFinish, TFunction<void()> InCancel = {});
+	bool CancelRequest(const FGuid& InRequestId);
 
-	void ExecuteWithTransition(float Duration, TFunction<void()> OnFinish);
-
-protected:
-	UFUNCTION()
-	void OnExecuteWithDelayFinish();
-
-	UFUNCTION()
-	void OnExecuteWithTransitionFinish();
-
-protected:
-	TFunction<void()> _OnExecuteWithDelayFinish;
-	TFunction<void()> _OnExecuteWithTransitionFinish;
+private:
+	friend class UAnimationRequest;
+	FGuid StartRequest(UObject* InOwner, float InDuration, APlayerController* InTransitionPlayer, TFunction<void()> InFinish, TFunction<void()> InCancel);
+	bool QueueRequestCompletion(const FGuid& InRequestId, UAnimationRequest* InRequest);
+	void FinishRequest(const FGuid& InRequestId, UAnimationRequest* InRequest);
+	UPROPERTY(Transient)
+	TMap<FGuid, TObjectPtr<UAnimationRequest>> Requests;
+	UPROPERTY(Transient)
+	TMap<FGuid, TObjectPtr<UAnimationRequest>> PendingDispatch;
+	struct FBlueprintDelay
+	{
+		TWeakObjectPtr<UObject> Target;
+		int32 UUID = 0;
+		FGuid RequestId;
+	};
+	TArray<FBlueprintDelay> BlueprintDelays;
+	int32 NextLatentId = 1;
+	bool bAcceptingRequests = false;
 };

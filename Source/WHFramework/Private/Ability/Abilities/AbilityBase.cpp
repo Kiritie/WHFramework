@@ -1,9 +1,12 @@
 #include "Ability/Abilities/AbilityBase.h"
+#include "Ability/AbilityExecutionTypes.h"
+#include "Ability/AbilityTargetTypes.h"
+#include "Ability/AbilityEffectTypes.h"
 
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Components/AbilityControlComponent.h"
 #include "Ability/Effects/EffectBase.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
+#include "Ability/Inventory/InventoryCommandTypes.h"
 #include "CoreMinimal.h"
 #include "Widget/Sub/SubWidgetBase.h"
 #include "Ability/Inventory/InventoryNetworkComponent.h"

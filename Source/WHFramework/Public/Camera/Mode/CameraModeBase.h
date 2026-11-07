@@ -1,6 +1,10 @@
 #pragma once
 
 #include "Camera/CameraModuleTypes.h"
+#include "Camera/CameraInputTypes.h"
+#include "Camera/CameraViewTypes.h"
+#include "Camera/CameraConfigTypes.h"
+#include "Camera/CameraFeatureTypes.h"
 #include "CameraModeBase.generated.h"
 
 class ACameraManagerBase;

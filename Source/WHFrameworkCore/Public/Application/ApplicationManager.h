@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Main/MainTypes.h"
+#include "Type/NativeTypeIdentity.h"
 #include "Main/Base/ManagerBase.h"
 
 class WHFRAMEWORKCORE_API FApplicationManager : public FManagerBase

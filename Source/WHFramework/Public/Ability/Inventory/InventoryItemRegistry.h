@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "CoreMinimal.h"
 #include "UObject/SoftObjectPath.h"
-#include "Ability/Inventory/InventoryTypes.h"
 #include "InventoryItemRegistry.generated.h"
 
 USTRUCT(BlueprintType)

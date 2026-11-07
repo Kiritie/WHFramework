@@ -2,6 +2,10 @@
 
 
 #include "Ability/AbilityModuleStatics.h"
+#include "Scene/Container/SceneContainerInterface.h"
+#include "Ability/AbilityAttributeAccessors.h"
+#include "Ability/AbilityInfoTypes.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 
 #include "GameplayModMagnitudeCalculation.h"
 #include "Ability/AbilityModule.h"
@@ -90,28 +94,36 @@ FEffectInfo UAbilityModuleStatics::GetEffectInfoByClass(TSubclassOf<UEffectBase>
 	return EffectInfo;
 }
 
-FLinearColor UAbilityModuleStatics::GetAttributeColor(const FGameplayAttribute& InAttribute)
+FLinearColor UAbilityModuleStatics::GetAttributeColor(UWorld* InWorld, const FGameplayAttribute& InAttribute)
 {
-	return UAbilityModule::Get().GetAttributeColor(InAttribute);
+	const UAbilityModule* Module = UAbilityModule::GetPtr(InWorld);
+	return Module ? Module->GetAttributeColor(InAttribute) : FLinearColor::White;
 }
 
-void UAbilityModuleStatics::SetAttributeColor(const FGameplayAttribute& InAttribute, const FLinearColor& InColor)
+void UAbilityModuleStatics::SetAttributeColor(UWorld* InWorld, const FGameplayAttribute& InAttribute, const FLinearColor& InColor)
 {
-	UAbilityModule::Get().SetAttributeColor(InAttribute, InColor);
+	if (UAbilityModule* Module = UAbilityModule::GetPtr(InWorld)) Module->SetAttributeColor(InAttribute, InColor);
 }
 
-AAbilityItemBase* UAbilityModuleStatics::SpawnAbilityItem(FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer)
+AAbilityItemBase* UAbilityModuleStatics::SpawnAbilityItem(UWorld* InWorld, FAbilityItem InItem, FVector InLocation, FRotator InRotation, ISceneContainerInterface* InContainer)
 {
-	return UAbilityModule::Get().SpawnAbilityItem(InItem, InLocation, InRotation, InContainer);
+	UAbilityModule* Module = UAbilityModule::GetPtr(InWorld);
+	UObject* Container = InContainer ? InContainer->_getUObject() : nullptr;
+	return Module && (!InContainer || (Container && Container->GetWorld() == InWorld))
+		? Module->SpawnAbilityItem(InItem, InLocation, InRotation, InContainer) : nullptr;
 }
 
-AAbilityItemBase* UAbilityModuleStatics::SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor)
+AAbilityItemBase* UAbilityModuleStatics::SpawnAbilityItem(UWorld* InWorld, FAbilityItem InItem, AActor* InOwnerActor)
 {
-	return UAbilityModule::Get().SpawnAbilityItem(InItem, InOwnerActor);
+	UAbilityModule* Module = UAbilityModule::GetPtr(InWorld);
+	return Module && (!InOwnerActor || InOwnerActor->GetWorld() == InWorld) ? Module->SpawnAbilityItem(InItem, InOwnerActor) : nullptr;
 }
 
 
-AActor* UAbilityModuleStatics::SpawnAbilityActor(const FParameter& InSaveData, ISceneContainerInterface* InContainer)
+AActor* UAbilityModuleStatics::SpawnAbilityActor(UWorld* InWorld, const FParameter& InSaveData, ISceneContainerInterface* InContainer)
 {
-	return UAbilityModule::Get().SpawnAbilityActor(InSaveData, InContainer);
+	UAbilityModule* Module = UAbilityModule::GetPtr(InWorld);
+	UObject* Container = InContainer ? InContainer->_getUObject() : nullptr;
+	return Module && (!InContainer || (Container && Container->GetWorld() == InWorld))
+		? Module->SpawnAbilityActor(InSaveData, InContainer) : nullptr;
 }

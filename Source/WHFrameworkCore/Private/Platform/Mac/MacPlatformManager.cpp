@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Platform/Mac/MacPlatformManager.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "Mac/MacApplication.h"
 #include "Misc/FeedbackContextMarkup.h"

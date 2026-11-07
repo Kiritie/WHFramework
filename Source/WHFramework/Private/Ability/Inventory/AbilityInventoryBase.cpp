@@ -1,6 +1,8 @@
 #include "Ability/Inventory/AbilityInventoryBase.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
+#include "Ability/Inventory/InventoryQueryTypes.h"
 
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 
 FGuid UAbilityInventoryBase::GetInventoryId() const
 {
@@ -25,7 +27,7 @@ const FInventorySlotState* UAbilityInventoryBase::FindSlot(const FInventorySlotK
 FInventoryQueryResult UAbilityInventoryBase::Query(const FInventoryQueryRequest& InRequest) const
 {
     FInventoryQueryResult Result;
-    const UInventoryWorldSubsystem* Owner = OwnerSubsystem.Get();
+    const UInventoryModule* Owner = OwnerModule.Get();
     if(!Owner || !Owner->IsReady())
     {
         return Result;

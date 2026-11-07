@@ -1,9 +1,10 @@
 #pragma once
 
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 #include "CoreMinimal.h"
 #include "Blueprint/DragDropOperation.h"
 #include "Blueprint/UserWidget.h"
-#include "Ability/Inventory/InventoryTypes.h"
 #include "WidgetAbilityInventorySlotBase.generated.h"
 
 class UCommonImageN;

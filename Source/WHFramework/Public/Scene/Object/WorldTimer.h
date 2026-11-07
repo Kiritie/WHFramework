@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "Common/LifecycleTypes.h"
+#include "Scene/WorldTimerTypes.h"
 #include "Common/Base/WHObject.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Scene/SceneModuleTypes.h"

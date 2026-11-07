@@ -1,0 +1,15 @@
+#pragma once
+
+#include "NativeGameplayTags.h"
+
+namespace GameplayTags
+{
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Interact);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_UnInteract);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Revive);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Fight);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_PickUp);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Dialogue);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Transaction);
+	WHFRAMEWORK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Interaction_Option_Task);
+}

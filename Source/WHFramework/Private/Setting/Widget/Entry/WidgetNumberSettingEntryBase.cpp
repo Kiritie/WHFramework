@@ -1,4 +1,5 @@
 #include "Setting/Widget/Entry/WidgetNumberSettingEntryBase.h"
+#include "Setting/SettingPresentationTypes.h"
 
 #include "Setting/SettingEntry.h"
 #include "Widget/Common/CommonRange.h"

@@ -1,4 +1,5 @@
 #include "Voxel/Generation/Hydrology/VoxelHydrologyDryWitness.h"
+#include "Common/LifecycleTypes.h"
 
 #include "HAL/PlatformTime.h"
 #include "Misc/ScopeExit.h"

@@ -1,6 +1,7 @@
 // Copyright Underflow Studios 2017
 
 #include "Dialogue/Base/DialogueConditionBase.h"
+#include "Common/InteractionTypes.h"
 #include "Dialogue/Base/DialogueAsset.h"
 
 UDialogueConditionBase::UDialogueConditionBase() {}

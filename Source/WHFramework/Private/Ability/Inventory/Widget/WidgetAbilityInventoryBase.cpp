@@ -1,7 +1,10 @@
 #include "Ability/Inventory/Widget/WidgetAbilityInventoryBase.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
+#include "Ability/Inventory/InventoryCommandTypes.h"
 
 #include "Ability/Inventory/InventoryItemAssetCatalog.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Ability/Inventory/Widget/WidgetAbilityInventorySlotBase.h"
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Blueprint/WidgetTree.h"
@@ -496,7 +499,7 @@ void UWidgetAbilityInventoryBase::RefreshSlot(const FGuid& InInventoryId, const 
     {
         return;
     }
-    UInventoryWorldSubsystem* System = GetWorld()->GetSubsystem<UInventoryWorldSubsystem>();
+    UInventoryModule* System = UInventoryModule::GetPtr(GetWorld());
     const UInventoryItemAssetCatalog* Assets = System ? System->GetItemAssets() : nullptr;
     const UAbilityItemDataBase* Definition = Assets ? Assets->Find(InSlot.Item.ItemId) : nullptr;
     const FText Name = Definition ? Definition->Name : FText::FromString(InSlot.Item.ItemId.ToString());

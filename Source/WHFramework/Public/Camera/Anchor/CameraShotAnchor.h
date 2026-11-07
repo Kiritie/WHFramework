@@ -1,5 +1,6 @@
 #pragma once
 #include "Camera/Mode/CameraModeBase.h"
+#include "Camera/CameraConfigTypes.h"
 
 #include "Camera/CameraModuleTypes.h"
 #include "GameFramework/Actor.h"

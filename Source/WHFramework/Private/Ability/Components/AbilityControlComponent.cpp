@@ -1,4 +1,5 @@
 #include "Ability/Components/AbilityControlComponent.h"
+#include "Ability/AbilityTags.h"
 
 #include "Ability/AbilityActionTypes.h"
 #include "Ability/Abilities/AbilityBase.h"
@@ -8,7 +9,7 @@
 #include "Ability/Vitality/AbilityVitalityInterface.h"
 #include "AIController.h"
 #include "Character/Components/CharacterMovementComponentBase.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PawnMovementComponent.h"

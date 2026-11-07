@@ -1,11 +1,15 @@
 #include "Ability/Inventory/InventoryCommitCoordinator.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
+#include "Ability/Inventory/InventoryCommandTypes.h"
+#include "Ability/Inventory/InventoryPlanTypes.h"
 
 #include "Ability/Inventory/AbilityInventoryBase.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Ability/Inventory/InventorySnapshotCodec.h"
 #include "Misc/ScopeExit.h"
 
-FInventoryCommitCoordinator::FInventoryCommitCoordinator(UInventoryWorldSubsystem& InWorld)
+FInventoryCommitCoordinator::FInventoryCommitCoordinator(UInventoryModule& InWorld)
     : World(InWorld)
 {
 }

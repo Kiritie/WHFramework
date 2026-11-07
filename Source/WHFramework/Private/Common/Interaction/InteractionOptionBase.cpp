@@ -1,4 +1,5 @@
 #include "Common/Interaction/InteractionOptionBase.h"
+#include "Common/InteractionTypes.h"
 
 bool UInteractionOptionBase::IsVisible(const FInteractionContext& InContext) const
 {

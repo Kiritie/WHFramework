@@ -1,4 +1,5 @@
 #include "Ability/Item/AbilityTransItemDataBase.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 
 UAbilityTransItemDataBase::UAbilityTransItemDataBase()
 {

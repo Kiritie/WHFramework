@@ -3,6 +3,8 @@
 #pragma once
 
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "FSMModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
 

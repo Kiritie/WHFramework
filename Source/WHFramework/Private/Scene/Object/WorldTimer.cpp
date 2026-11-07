@@ -1,6 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Scene/Object/WorldTimer.h"
+#include "Common/LifecycleTypes.h"
+#include "Scene/WorldTimerTypes.h"
 
 #include "Engine/World.h"
 #include "Scene/SceneModuleTypes.h"

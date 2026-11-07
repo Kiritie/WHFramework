@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Scene/SceneStreamingTypes.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "Scene/SceneModuleTypes.h"
 #include "Event/EventModuleTypes.h"

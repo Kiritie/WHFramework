@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Widget/Sub/SubActivatableWidgetBase.h"
+#include "Setting/SettingPresentationTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
 #include "Widget/Style/CommonStyleTypes.h"
 
 #include "WidgetSettingPageBase.generated.h"

@@ -1,8 +1,9 @@
 #pragma once
 
+#include "Ability/AbilityAttributeAccessors.h"
+#include "Ability/AbilityHandleTypes.h"
 #include "AbilitySystemComponent.h"
 #include "ActorAttributeSetBase.h"
-#include "Ability/AbilityModuleTypes.h"
 
 #include "VitalityAttributeSetBase.generated.h"
 

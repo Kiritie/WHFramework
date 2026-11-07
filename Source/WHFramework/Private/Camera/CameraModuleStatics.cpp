@@ -1,75 +1,63 @@
 #include "Camera/CameraModuleStatics.h"
+
 #include "Camera/CameraModule.h"
 #include "Camera/Manager/CameraManagerBase.h"
+#include "GameFramework/PlayerController.h"
 
-ACameraManagerBase* UCameraModuleStatics::GetCameraManager(int32 Index)
+ACameraManagerBase* UCameraModuleStatics::GetCameraManager(APlayerController* Player)
 {
-	return UCameraModule::Get().GetCameraManager(Index);
+	UCameraModule* Module = Player ? UCameraModule::GetPtr(Player->GetWorld()) : nullptr;
+	return Module ? Module->GetCameraManagerForPlayer(Player) : nullptr;
 }
 
-FCameraViewSnapshot UCameraModuleStatics::GetViewSnapshot(int32 Index)
+FCameraViewSnapshot UCameraModuleStatics::GetViewSnapshot(APlayerController* Player)
 {
-	const ACameraManagerBase* Manager = GetCameraManager(Index);
+	const ACameraManagerBase* Manager = GetCameraManager(Player);
 	return Manager ? Manager->GetFinalView() : FCameraViewSnapshot();
 }
 
-FTransform UCameraModuleStatics::GetViewTransform(int32 Index)
+FTransform UCameraModuleStatics::GetViewTransform(APlayerController* Player)
 {
-	return GetViewSnapshot(Index).Transform;
+	return GetViewSnapshot(Player).Transform;
 }
 
-FVector UCameraModuleStatics::GetViewLocation(int32 Index)
+FVector UCameraModuleStatics::GetViewLocation(APlayerController* Player)
 {
-	return GetViewTransform(Index).GetLocation();
+	return GetViewTransform(Player).GetLocation();
 }
 
-FRotator UCameraModuleStatics::GetViewRotation(int32 Index)
+FRotator UCameraModuleStatics::GetViewRotation(APlayerController* Player)
 {
-	return GetViewTransform(Index).Rotator();
+	return GetViewTransform(Player).Rotator();
 }
 
-float UCameraModuleStatics::GetViewFOV(int32 Index)
+float UCameraModuleStatics::GetViewFOV(APlayerController* Player)
 {
-	return GetViewSnapshot(Index).FOV;
+	return GetViewSnapshot(Player).FOV;
 }
 
-void UCameraModuleStatics::SetCameraMode(TSubclassOf<UCameraModeBase> Class, const FCameraModeContext& Context, int32 Index)
+void UCameraModuleStatics::SetCameraMode(APlayerController* Player, TSubclassOf<UCameraModeBase> Class, const FCameraModeContext& Context)
 {
-	if(ACameraManagerBase* Manager = GetCameraManager(Index))
-	{
-		Manager->SetMode(Class, Context);
-	}
+	if (ACameraManagerBase* Manager = GetCameraManager(Player)) Manager->SetMode(Class, Context);
 }
 
-FCameraFeatureHandle UCameraModuleStatics::PushFeature(TSubclassOf<UCameraFeatureBase> Class, const FCameraFeatureContext& Context, int32 Index)
+FCameraFeatureHandle UCameraModuleStatics::PushFeature(APlayerController* Player, TSubclassOf<UCameraFeatureBase> Class, const FCameraFeatureContext& Context)
 {
-	if(ACameraManagerBase* Manager = GetCameraManager(Index))
-	{
-		return Manager->PushFeature(Class, Context);
-	}
+	if (ACameraManagerBase* Manager = GetCameraManager(Player)) return Manager->PushFeature(Class, Context);
 	return {};
 }
 
-void UCameraModuleStatics::PopFeature(FCameraFeatureHandle Handle, int32 Index)
+void UCameraModuleStatics::PopFeature(APlayerController* Player, FCameraFeatureHandle Handle)
 {
-	if(ACameraManagerBase* Manager = GetCameraManager(Index))
-	{
-		Manager->PopFeature(Handle);
-	}
+	if (ACameraManagerBase* Manager = GetCameraManager(Player)) Manager->PopFeature(Handle);
 }
 
-void UCameraModuleStatics::StartDirector(TSubclassOf<UCameraDirectorBase> Class, int32 Index)
+void UCameraModuleStatics::StartDirector(APlayerController* Player, TSubclassOf<UCameraDirectorBase> Class)
 {
-	if(ACameraManagerBase* Manager = GetCameraManager(Index))
-	{
-		Manager->StartDirector(Class);
-	}
+	if (ACameraManagerBase* Manager = GetCameraManager(Player)) Manager->StartDirector(Class);
 }
 
-void UCameraModuleStatics::StopDirector(int32 Index)
+void UCameraModuleStatics::StopDirector(APlayerController* Player)
 {
-	if(ACameraManagerBase* Manager = GetCameraManager(Index))
-	{
-		Manager->StopDirector();
-	}
+	if (ACameraManagerBase* Manager = GetCameraManager(Player)) Manager->StopDirector();
 }

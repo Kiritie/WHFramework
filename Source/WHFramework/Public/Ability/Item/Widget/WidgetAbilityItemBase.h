@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Ability/AbilityModuleTypes.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "Widget/Sub/SubButtonWidgetBase.h"
 #include "WidgetAbilityItemBase.generated.h"
 

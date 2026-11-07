@@ -3,7 +3,9 @@
 #pragma once
 
 #include "AssetManagerBase.h"
+#include "Common/CommonTypes.h"
 #include "AssetModule.h"
+#include "Asset/AssetMappingTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Asset/Primary/PrimaryAssetBase.h"
 #include "Primary/PrimaryEntityInterface.h"
@@ -21,185 +23,196 @@ class WHFRAMEWORK_API UAssetModuleStatics : public UBlueprintFunctionLibrary
 	//////////////////////////////////////////////////////////////////////////
 	/// Classes
 public:
-	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")
-	static void AddStaticClass(const FName InName, const FStaticClass& InStaticClass);
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void AddStaticClass(const UObject* WorldContextObject, const FName InName, const FStaticClass& InStaticClass);
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleStatics")
-	static UClass* GetStaticClass(const FName InName);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject"), Category = "AssetModuleStatics")
+	static UClass* GetStaticClass(const UObject* WorldContextObject, const FName InName);
 
-	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics")
-	static UClass* FindClass(const FString& InName, bool bExactClass = false);
+	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static UClass* FindClass(const UObject* WorldContextObject, const FString& InName, bool bExactClass = false);
 
 	template<class T> 
-	static UClass* LoadClass(const FString& InName)
+	static UClass* LoadClass(const UObject* WorldContextObject, const FString& InName)
 	{
-		return LoadClass(T::StaticClass(), InName);
+		return LoadClass(WorldContextObject, T::StaticClass(), InName);
 	}
 
-	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics")
-	static UClass* LoadClass(UClass* InClass, const FString& InName);
+	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static UClass* LoadClass(const UObject* WorldContextObject, UClass* InClass, const FString& InName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Objects
 public:
-	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")
-	static void AddStaticObject(const FName InName, const FStaticObject& InStaticObject);
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void AddStaticObject(const UObject* WorldContextObject, const FName InName, const FStaticObject& InStaticObject);
 
 	template<class T> 
-	static T* GetStaticObject(const FName InName)
+	static T* GetStaticObject(const UObject* WorldContextObject, const FName InName)
 	{
-		return Cast<T>(GetStaticObject(T::StaticClass(), InName));
+		return Cast<T>(GetStaticObject(WorldContextObject, T::StaticClass(), InName));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleStatics")
-	static UObject* GetStaticObject(UClass* InClass, const FName InName);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "AssetModuleStatics")
+	static UObject* GetStaticObject(const UObject* WorldContextObject, UClass* InClass, const FName InName);
 
 	template<class T> 
-	static T* FindObject(const FString& InName, bool bExactClass = false)
+	static T* FindObject(const UObject* WorldContextObject, const FString& InName, bool bExactClass = false)
 	{
-		return Cast<T>(FindObject(T::StaticClass(), InName, bExactClass));
+		return Cast<T>(FindObject(WorldContextObject, T::StaticClass(), InName, bExactClass));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleStatics")
-	static UObject* FindObject(UClass* InClass, const FString& InName, bool bExactClass = false);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "AssetModuleStatics")
+	static UObject* FindObject(const UObject* WorldContextObject, UClass* InClass, const FString& InName, bool bExactClass = false);
 
 	template<class T> 
-	static T* LoadObject(const FString& InName)
+	static T* LoadObject(const UObject* WorldContextObject, const FString& InName)
 	{
-		return Cast<T>(LoadObject(T::StaticClass(), InName));
+		return Cast<T>(LoadObject(WorldContextObject, T::StaticClass(), InName));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "AssetModuleStatics")
-	static UObject* LoadObject(UClass* InClass, const FString& InName);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "AssetModuleStatics")
+	static UObject* LoadObject(const UObject* WorldContextObject, UClass* InClass, const FString& InName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// 本地化文本
 public:
-	UFUNCTION(BlueprintPure)
-	static FText GetLocalizedText(FName InNamespace, const FString& InKey);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject"))
+	static FText GetLocalizedText(const UObject* WorldContextObject, FName InNamespace, const FString& InKey);
 
-	UFUNCTION(BlueprintPure)
-	static FName GetRandomTextKey(FName InNamespace, const FString& InPrefix, int32 InSeed);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject"))
+	static FName GetRandomTextKey(const UObject* WorldContextObject, FName InNamespace, const FString& InPrefix, int32 InSeed);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Enums
 public:
-	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics")
-	static UEnum* FindEnumByValue(const FString& InEnumName, int32 InEnumValue, bool bExactClass = false);
+	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static UEnum* FindEnumByValue(const UObject* WorldContextObject, const FString& InEnumName, int32 InEnumValue, bool bExactClass = false);
 
-	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics")
-	static UEnum* FindEnumByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName, bool bExactClass = false);
+	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static UEnum* FindEnumByAuthoredName(const UObject* WorldContextObject, const FString& InEnumName, const FString& InEnumAuthoredName, bool bExactClass = false);
 
-	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics")
-	static UEnum* FindEnumByDisplayName(const FString& InEnumName, const FString& InEnumDisplayName, bool bExactClass = false);
+	UFUNCTION(BlueprintPure, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static UEnum* FindEnumByDisplayName(const UObject* WorldContextObject, const FString& InEnumName, const FString& InEnumDisplayName, bool bExactClass = false);
 
-	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")
-	static void AddEnumMapping(const FString& InEnumName, const FString& InOtherName);
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void AddEnumMapping(const UObject* WorldContextObject, const FString& InEnumName, const FString& InOtherName);
 
-	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")
-	static void RemoveEnumMapping(const FString& InEnumName, const FString& InOtherName);
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void RemoveEnumMapping(const UObject* WorldContextObject, const FString& InEnumName, const FString& InOtherName);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// DataAsset
 public:
-	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"), Category = "AssetModuleStatics")
-	static bool HasDataAsset(const FGameplayTag& InTag);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", AutoCreateRefTerm = "InTag"), Category = "AssetModuleStatics")
+	static bool HasDataAsset(const UObject* WorldContextObject, const FGameplayTag& InTag);
 
 	template<class T>
-	static T* GetDataAsset(const FGameplayTag& InTag = FGameplayTag())
+	static T* GetDataAsset(const UObject* WorldContextObject, const FGameplayTag& InTag = FGameplayTag())
 	{
-		return UAssetModule::Get().GetDataAsset<T>(InTag);
+		UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+		return Module ? Module->GetDataAsset<T>(InTag) : nullptr;
 	}
 	
 	template<class T>
-	static T& GetDataAssetRef(const FGameplayTag& InTag = FGameplayTag())
+	static T& GetDataAssetRef(const UObject* WorldContextObject, const FGameplayTag& InTag = FGameplayTag())
 	{
-		return UAssetModule::Get().GetDataAssetRef<T>(InTag);
+		return UAssetModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).GetDataAssetRef<T>(InTag);
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InTag"), Category = "AssetModuleStatics")
-	static UDataAssetBase* GetDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag = FGameplayTag());
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass", AutoCreateRefTerm = "InTag"), Category = "AssetModuleStatics")
+	static UDataAssetBase* GetDataAsset(const UObject* WorldContextObject, TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag = FGameplayTag());
 
 	template<class T>
-	static T* CreateDataAsset(const FGameplayTag& InTag = FGameplayTag())
+	static T* CreateDataAsset(const UObject* WorldContextObject, const FGameplayTag& InTag = FGameplayTag())
 	{
-		return UAssetModule::Get().CreateDataAsset<T>(InTag);
+		UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+		return Module ? Module->CreateDataAsset<T>(InTag) : nullptr;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InTag"), Category = "AssetModuleStatics")
-	static UDataAssetBase* CreateDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag = FGameplayTag());
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass", AutoCreateRefTerm = "InTag"), Category = "AssetModuleStatics")
+	static UDataAssetBase* CreateDataAsset(const UObject* WorldContextObject, TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag = FGameplayTag());
 
 	template<class T>
-	static bool RemoveDataAsset(const FGameplayTag& InTag = FGameplayTag())
+	static bool RemoveDataAsset(const UObject* WorldContextObject, const FGameplayTag& InTag = FGameplayTag())
 	{
-		return UAssetModule::Get().RemoveDataAsset<T>(InTag);
+		UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+		return Module ? Module->RemoveDataAsset<T>(InTag) : false;
 	}
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InTag"), Category = "AssetModuleStatics")
-	static bool RemoveDataAsset(TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag = FGameplayTag());
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject", AutoCreateRefTerm = "InTag"), Category = "AssetModuleStatics")
+	static bool RemoveDataAsset(const UObject* WorldContextObject, TSubclassOf<UDataAssetBase> InClass, const FGameplayTag& InTag = FGameplayTag());
 
-	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")
-	static void RemoveAllDataAsset();
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void RemoveAllDataAsset(const UObject* WorldContextObject);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// DataTable
 public:
-	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")
-	static bool AddDataTable(UDataTable* InDataTable);
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static bool AddDataTable(const UObject* WorldContextObject, UDataTable* InDataTable);
 
-	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")
-	static bool RemoveDataTable(UDataTable* InDataTable);
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static bool RemoveDataTable(const UObject* WorldContextObject, UDataTable* InDataTable);
 
 	template<class T>
-	static bool GetDataTableRow(int32 InRowIndex, T& OutRow)
+	static bool GetDataTableRow(const UObject* WorldContextObject, int32 InRowIndex, T& OutRow)
 	{
-		return UAssetModule::Get().GetDataTableRow<T>(InRowIndex, OutRow);
+		UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+		return Module ? Module->GetDataTableRow<T>(InRowIndex, OutRow) : false;
 	}
 
 	template<class T>
-	static bool GetDataTableRow(FName InRowName, T& OutRow)
+	static bool GetDataTableRow(const UObject* WorldContextObject, FName InRowName, T& OutRow)
 	{
-		return UAssetModule::Get().GetDataTableRow<T>(InRowName, OutRow);
+		UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+		return Module ? Module->GetDataTableRow<T>(InRowName, OutRow) : false;
 	}
 
 	template<class T>
-	static bool GetDataTableRow(UDataTable* InDataTable, int32 InRowIndex, T& OutRow)
+	static bool GetDataTableRow(const UObject* WorldContextObject, UDataTable* InDataTable, int32 InRowIndex, T& OutRow)
 	{
-		return UAssetModule::Get().GetDataTableRow<T>(InDataTable, InRowIndex, OutRow);
+		UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+		return Module ? Module->GetDataTableRow<T>(InDataTable, InRowIndex, OutRow) : false;
 	}
 
 	template<class T>
-	static bool GetDataTableRow(UDataTable* InDataTable, FName InRowName, T& OutRow)
+	static bool GetDataTableRow(const UObject* WorldContextObject, UDataTable* InDataTable, FName InRowName, T& OutRow)
 	{
-		return UAssetModule::Get().GetDataTableRow<T>(InDataTable, InRowName, OutRow);
+		UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+		return Module ? Module->GetDataTableRow<T>(InDataTable, InRowName, OutRow) : false;
 	}
 
 	template<class T>
-	static bool ReadDataTable(TArray<T>& OutRows)
+	static bool ReadDataTable(const UObject* WorldContextObject, TArray<T>& OutRows)
 	{
-		return UAssetModule::Get().ReadDataTable<T>(OutRows);
+		UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+		return Module ? Module->ReadDataTable<T>(OutRows) : false;
 	}
 
 	template<class T>
-	static bool ReadDataTable(UDataTable* InDataTable, TArray<T>& OutRows)
+	static bool ReadDataTable(const UObject* WorldContextObject, UDataTable* InDataTable, TArray<T>& OutRows)
 	{
-		return UAssetModule::Get().ReadDataTable<T>(InDataTable, OutRows);
+		UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+		return Module ? Module->ReadDataTable<T>(InDataTable, OutRows) : false;
 	}
 
 	template<class T>
-	static bool ReadDataTable(TMap<FName, T>& OutRows)
+	static bool ReadDataTable(const UObject* WorldContextObject, TMap<FName, T>& OutRows)
 	{
-		return UAssetModule::Get().ReadDataTable<T>(OutRows);
+		UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+		return Module ? Module->ReadDataTable<T>(OutRows) : false;
 	}
 
 	template<class T>
-	static bool ReadDataTable(UDataTable* InDataTable, TMap<FName, T>& OutRows)
+	static bool ReadDataTable(const UObject* WorldContextObject, UDataTable* InDataTable, TMap<FName, T>& OutRows)
 	{
-		return UAssetModule::Get().ReadDataTable<T>(InDataTable, OutRows);
+		UAssetModule* Module = UAssetModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+		return Module ? Module->ReadDataTable<T>(InDataTable, OutRows) : false;
 	}
 
-	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics")
-	static void RemoveAllDataTable();
+	UFUNCTION(BlueprintCallable, Category = "AssetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void RemoveAllDataTable(const UObject* WorldContextObject);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// PrimaryAsset

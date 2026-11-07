@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Ability/AbilityModuleTypes.h"
+#include "Ability/AbilityItemTypes.h"
 #include "Ability/Item/AbilityTransItemDataBase.h"
 
 #include "AbilitySkillDataBase.generated.h"

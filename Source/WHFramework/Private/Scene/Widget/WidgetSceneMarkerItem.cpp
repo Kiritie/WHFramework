@@ -1,4 +1,5 @@
 #include "Scene/Widget/WidgetSceneMarkerItem.h"
+#include "Scene/SceneMarkerTypes.h"
 
 #include "Components/Image.h"
 #include "Components/HorizontalBox.h"

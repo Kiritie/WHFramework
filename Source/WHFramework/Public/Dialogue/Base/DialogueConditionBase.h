@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "Common/InteractionTypes.h"
 #include "Common/Interaction/InteractionConditionBase.h"
 #include "DialogueConditionBase.generated.h"
 

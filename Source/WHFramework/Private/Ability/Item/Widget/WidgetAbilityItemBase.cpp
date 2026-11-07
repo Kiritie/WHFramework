@@ -1,7 +1,9 @@
 #include "Ability/Item/Widget/WidgetAbilityItemBase.h"
+#include "Ability/AbilityWidgetTypes.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 
 #include "Ability/Inventory/InventoryItemAssetCatalog.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Engine/World.h"
 
 UWidgetAbilityItemBase::UWidgetAbilityItemBase(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -54,8 +56,8 @@ void UWidgetAbilityItemBase::SetItem(const FAbilityItem& InItem)
 
 const UAbilityItemDataBase* UWidgetAbilityItemBase::FindItemData() const
 {
-    const UWorld* World = GetWorld();
-    const UInventoryWorldSubsystem* System = World ? World->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+    UWorld* World = GetWorld();
+    const UInventoryModule* System = World ? UInventoryModule::GetPtr(World) : nullptr;
     const UInventoryItemAssetCatalog* Assets = System ? System->GetItemAssets() : nullptr;
     return Assets && !Item.IsEmpty() ? Assets->Find(Item.ItemId) : nullptr;
 }
