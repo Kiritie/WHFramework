@@ -1668,10 +1668,12 @@ void FVoxelTaskScheduler::LogAdmissionStall(const double InNow)
 	for (const auto& Request : Pending)
 	{
 		if (Printed++ == 8) break;
-		UE_LOG(LogTemp, Warning, TEXT("Voxel stalled task: kind=%d epoch=%llu owner=%08x%08x%08x%08x token=%llu section=(%d,%d,%d) blocked=%u ageSeconds=%.3f input=%llu unleasedResult=%llu bindingInput=%llu requiredInput=%llu requiredLeases=%d receiptWait=%d receiptVersion=%llu"),
+		UE_LOG(LogTemp, Warning, TEXT("Voxel stalled task: kind=%d epoch=%llu owner=%08x%08x%08x%08x token=%llu section=(%d,%d,%d) blocked=%u queuedSeconds=%.3f runnableWaitSeconds=%.3f input=%llu unleasedResult=%llu bindingInput=%llu requiredInput=%llu requiredLeases=%d receiptWait=%d receiptVersion=%llu"),
 			int32(Request.Kind), Request.Stamp.WorldEpoch, Request.Stamp.OwnerId.A, Request.Stamp.OwnerId.B, Request.Stamp.OwnerId.C, Request.Stamp.OwnerId.D,
 			Request.Stamp.Token, Request.Stamp.Section.X, Request.Stamp.Section.Y, Request.Stamp.Section.Z, uint32(Request.Blocked),
-			FMath::Max(0.0, InNow - Request.FirstRunnableSeconds), Request.InputBytes, Request.ReservedBytes,
+			FMath::Max(0.0, InNow - Request.QueuedAt),
+			Request.FirstRunnableSeconds >= 0.0 ? FMath::Max(0.0, InNow - Request.FirstRunnableSeconds) : -1.0,
+			Request.InputBytes, Request.ReservedBytes,
 			Request.GetBindingBytes(), Request.GetRequiredBindingInputBytes(), Request.GetRequiredBindingInputLeaseCount(),
 			Request.bReceiptCapacityBlocked, Request.ReceiptCapacityVersion);
 	}
