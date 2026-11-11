@@ -3,7 +3,6 @@
 #pragma once
 
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "Parameter/ParameterModuleTypes.h"
 
 #include "NetworkModuleStatics.generated.h"
 
@@ -17,57 +16,37 @@ class WHFRAMEWORK_API UNetworkModuleStatics : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleStatics")
-	static bool IsNetworkLocalMode();
+	UFUNCTION(BlueprintPure, Category = "NetworkModule", meta = (WorldContext = "WorldContextObject"))
+	static bool IsNetworkLocalMode(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "NetworkRequestModuleStatics")
-	static void SetNetworkLocalMode(bool bInLocalMode);
+	UFUNCTION(BlueprintCallable, Category = "NetworkModule", meta = (WorldContext = "WorldContextObject"))
+	static void SetNetworkLocalMode(const UObject* WorldContextObject, bool bInLocalMode);
 
-	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleStatics")
-	static FString GetNetworkServerURL();
+	UFUNCTION(BlueprintPure, Category = "NetworkModule", meta = (WorldContext = "WorldContextObject"))
+	static FString GetNetworkServerURL(const UObject* WorldContextObject);
 	
-	UFUNCTION(BlueprintCallable, Category = "NetworkRequestModuleStatics")
-	static void SetNetworkServerURL(const FString& InServerURL);
+	UFUNCTION(BlueprintCallable, Category = "NetworkModule", meta = (WorldContext = "WorldContextObject"))
+	static void SetNetworkServerURL(const UObject* WorldContextObject, const FString& InServerURL);
 
-	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleStatics")
-	static int32 GetNetworkServerPort();
+	UFUNCTION(BlueprintPure, Category = "NetworkModule", meta = (WorldContext = "WorldContextObject"))
+	static int32 GetNetworkServerPort(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "NetworkRequestModuleStatics")
-	static void SetNetworkServerPort(int32 InServerPort);
+	UFUNCTION(BlueprintCallable, Category = "NetworkModule", meta = (WorldContext = "WorldContextObject"))
+	static void SetNetworkServerPort(const UObject* WorldContextObject, int32 InServerPort);
 
-	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleStatics")
-	static FString GetServerLocalURL();
+	UFUNCTION(BlueprintPure, Category = "NetworkModule", meta = (WorldContext = "WorldContextObject"))
+	static FString GetServerLocalURL(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleStatics")
-	static FString GetServerLocalIP();
+	UFUNCTION(BlueprintPure, Category = "NetworkModule", meta = (WorldContext = "WorldContextObject"))
+	static FString GetServerLocalIP(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintPure, Category = "NetworkRequestModuleStatics")
-	static int32 GetServerLocalPort();
+	UFUNCTION(BlueprintPure, Category = "NetworkModule", meta = (WorldContext = "WorldContextObject"))
+	static int32 GetServerLocalPort(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "NetworkRequestModuleStatics")
-	static bool ConnectNetworkServer(const FString& InServerURL = TEXT(""), int32 InServerPort = -1, const FString& InOptions = FString(TEXT("")));
+	UFUNCTION(BlueprintCallable, Category = "NetworkModule", meta = (WorldContext = "WorldContextObject"))
+	static bool ConnectNetworkServer(const UObject* WorldContextObject, const FString& InServerURL = TEXT(""), int32 InServerPort = -1, const FString& InOptions = FString(TEXT("")));
 
-	UFUNCTION(BlueprintCallable, Category = "NetworkRequestModuleStatics")
-	static bool DisconnectNetworkServer(const FString& InLevelName);
+	UFUNCTION(BlueprintCallable, Category = "NetworkModule", meta = (WorldContext = "WorldContextObject"))
+	static bool DisconnectNetworkServer(const UObject* WorldContextObject, const FString& InLevelName);
 
-	//////////////////////////////////////////////////////////////////////////
-	/// Execute Actor Func
-public:
-	UFUNCTION(BlueprintCallable, Category = "NetworkModuleStatics")
-	static void ServerExecuteActorFunc(AActor* InActor, FName InFuncName);
-
-	UFUNCTION(BlueprintCallable, Category = "NetworkModuleStatics")
-	static void ServerExecuteActorFuncOneParam(AActor* InActor, FName InFuncName, FParameter InParam);
-
-	UFUNCTION(BlueprintCallable, Category = "NetworkModuleStatics")
-	static void ServerExecuteActorFuncTwoParam(AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2);
-
-	UFUNCTION(BlueprintCallable, Category = "NetworkModuleStatics")
-	static void ServerExecuteActorFuncThreeParam(AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2, FParameter InParam3);
-
-	UFUNCTION(BlueprintCallable, Category = "NetworkModuleStatics")
-	static void ServerExecuteActorFuncFourParam(AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2, FParameter InParam3, FParameter InParam4);
-
-	UFUNCTION(BlueprintCallable, Category = "NetworkModuleStatics")
-	static void ServerExecuteActorFuncFiveParam(AActor* InActor, FName InFuncName, FParameter InParam1, FParameter InParam2, FParameter InParam3, FParameter InParam4, FParameter InParam5);
 };

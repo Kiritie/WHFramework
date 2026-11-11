@@ -19,10 +19,4 @@ public:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TArray<FAbilityItem> Prices;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<FAbilityItem> Upgrades;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TArray<FAbilityItem> Splits;
 };

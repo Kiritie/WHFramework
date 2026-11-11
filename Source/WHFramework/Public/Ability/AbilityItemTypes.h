@@ -32,7 +32,9 @@ enum class EAbilityItemType : uint8
 	// 角色
 	Character,
 	// 混杂
-	Misc
+	Misc,
+	// 物件
+	Object
 };
 
 /**

@@ -67,7 +67,7 @@ void AWorldWidgetActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
-	if(!GIsPlaying && UCommonModuleStatics::GetWorldContext(true))
+	if(GetWorld() && GetWorld()->IsEditorWorld() && !GetWorld()->IsGameWorld())
 	{
 		if(bShowInEditor)
 		{
@@ -84,7 +84,7 @@ void AWorldWidgetActor::Destroyed()
 {
 	Super::Destroyed();
 
-	if(!GIsPlaying && UCommonModuleStatics::GetWorldContext(true) && bShowInEditor)
+	if(GetWorld() && GetWorld()->IsEditorWorld() && !GetWorld()->IsGameWorld() && bShowInEditor)
 	{
 		DestroyWorldWidget(EObjectDespawnMode::Destroy, true);
 	}
@@ -93,7 +93,7 @@ void AWorldWidgetActor::Destroyed()
 #if WITH_EDITOR
 void AWorldWidgetActor::OnRefreshWorldWidget()
 {
-	if(!GIsPlaying && UCommonModuleStatics::GetWorldContext(true) && bShowInEditor)
+	if(GetWorld() && GetWorld()->IsEditorWorld() && !GetWorld()->IsGameWorld() && bShowInEditor)
 	{
 		CreateWorldWidget(true);
 	}

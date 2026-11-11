@@ -11,26 +11,26 @@ class WHFRAMEWORK_API UParameterModuleStatics : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 public:
-	UFUNCTION(BlueprintPure, Category = "ParameterModule")
-	static bool HasGlobalParameter(FName InName, bool bEnsured = true);
+	UFUNCTION(BlueprintPure, meta=(WorldContext="InWorld"), Category = "ParameterModule")
+	static bool HasGlobalParameter(UWorld* InWorld, FName InName, bool bEnsured = true);
 
-	UFUNCTION(BlueprintCallable, Category = "ParameterModule")
-	static void SetGlobalParameter(FName InName, FParameter InParam);
+	UFUNCTION(BlueprintCallable, meta=(WorldContext="InWorld"), Category = "ParameterModule")
+	static void SetGlobalParameter(UWorld* InWorld, FName InName, FParameter InParam);
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModule")
-	static FParameter GetGlobalParameter(FName InName, bool bEnsured = true);
+	UFUNCTION(BlueprintPure, meta=(WorldContext="InWorld"), Category = "ParameterModule")
+	static FParameter GetGlobalParameter(UWorld* InWorld, FName InName, bool bEnsured = true);
 
-	UFUNCTION(BlueprintPure, Category = "ParameterModule")
-	static TArray<FParameter> GetGlobalParameters(FName InName, bool bEnsured = true);
+	UFUNCTION(BlueprintPure, meta=(WorldContext="InWorld"), Category = "ParameterModule")
+	static TArray<FParameter> GetGlobalParameters(UWorld* InWorld, FName InName, bool bEnsured = true);
 
-	UFUNCTION(BlueprintCallable, Category = "ParameterModule")
-	static void RemoveGlobalParameter(FName InName);
+	UFUNCTION(BlueprintCallable, meta=(WorldContext="InWorld"), Category = "ParameterModule")
+	static void RemoveGlobalParameter(UWorld* InWorld, FName InName);
 
-	UFUNCTION(BlueprintCallable, Category = "ParameterModule")
-	static void RemoveGlobalParameters(FName InName);
+	UFUNCTION(BlueprintCallable, meta=(WorldContext="InWorld"), Category = "ParameterModule")
+	static void RemoveGlobalParameters(UWorld* InWorld, FName InName);
 
-	UFUNCTION(BlueprintCallable, Category = "ParameterModule")
-	static void ClearAllGlobalParameter();
+	UFUNCTION(BlueprintCallable, meta=(WorldContext="InWorld"), Category = "ParameterModule")
+	static void ClearAllGlobalParameter(UWorld* InWorld);
 
 	UFUNCTION(BlueprintPure, CustomThunk, meta = (BlueprintInternalUseOnly = "true", CustomStructureParam = "Value", AdvancedDisplay = "Description", AutoCreateRefTerm = "Description"), Category = "ParameterModule")
 	static FParameter MakeParameter(const int32& Value, const FText& Description = FText::GetEmpty());

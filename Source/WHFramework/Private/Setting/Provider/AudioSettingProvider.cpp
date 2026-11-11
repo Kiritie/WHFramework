@@ -1,7 +1,9 @@
 #include "Setting/Provider/AudioSettingProvider.h"
+#include "Setting/SettingPresentationTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "Audio/AudioModule.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 
 namespace
 {
@@ -53,7 +55,13 @@ void UAudioSettingProvider::BeginEdit(const TArray<FSettingDefinition>& InDefini
 {
 	Super::BeginEdit(InDefinitions);
 	UAudioModule* Audio = UAudioModule::GetPtr(GetWorld());
-	AppliedData = Audio ? Audio->GetSaveData(true).GetRef<FAudioModuleSaveData>() : FAudioModuleSaveData();
+	const FParameter Data = Audio ? Audio->GetSaveData(true) : FParameter();
+	if (!Data.Is<FAudioModuleSaveData>())
+	{
+		UE_LOG(LogTemp, Error, TEXT("无法读取当前世界的音频设置。"));
+		return;
+	}
+	AppliedData = Data.GetRef<FAudioModuleSaveData>();
 	PendingData = AppliedData;
 	DefaultData = FAudioModuleSaveData();
 }
@@ -93,7 +101,6 @@ bool UAudioSettingProvider::Apply(const FSettingDefinition& InDefinition, const 
 		return false;
 	}
 
-	const FScopedWorldContext WorldContext(GetWorld());
 	if(InDefinition.SettingId.Name == MasterVolumeId)
 	{
 		Audio->SetGlobalSoundVolume(Value);
@@ -117,11 +124,12 @@ bool UAudioSettingProvider::Apply(const FSettingDefinition& InDefinition, const 
 	return true;
 }
 
-void UAudioSettingProvider::Rollback(const FSettingDefinition& InDefinition)
+bool UAudioSettingProvider::Rollback(const FSettingDefinition& InDefinition)
 {
 	const FParameter AppliedValue(ResolveVolume(AppliedData, InDefinition.SettingId.Name));
-	Apply(InDefinition, AppliedValue);
+	if (!Apply(InDefinition, AppliedValue)) return false;
 	ResolveVolume(PendingData, InDefinition.SettingId.Name) = AppliedValue.Get<float>();
+	return true;
 }
 
 void UAudioSettingProvider::Commit()

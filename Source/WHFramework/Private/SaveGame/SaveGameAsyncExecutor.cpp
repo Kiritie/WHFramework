@@ -1,9 +1,13 @@
-﻿#include "SaveGame/SaveGameAsyncExecutor.h"
+#include "SaveGame/SaveGameAsyncExecutor.h"
+#include "SaveGame/SaveOperationTypes.h"
+#include "SaveGame/SaveManifestTypes.h"
 #include "SaveGame/SaveGameStorage.h"
 #include "Misc/Paths.h"
 #include "Voxel/Task/VoxelBoundedAllocation.h"
 #include "Voxel/Rendering/VoxelTerrainFrameContext.h"
 #include "Misc/ScopeExit.h"
+#include "HAL/PlatformProcess.h"
+#include "Common/NativeTaskRetirement.h"
 
 struct FSaveGameAsyncExecutor::FWorker
 {
@@ -19,8 +23,18 @@ struct FSaveGameAsyncExecutor::FWorker
 		{
 			if (State->Cancel.load())
 			{
-				State->Result = FSaveOperationResult::Failed(ESaveResultCode::Busy,
-					FText::FromString(TEXT("Save canceled before acquiring write ownership; the slot directory was retained")));
+				if (Plan.Voxel.IsSet() && Plan.Voxel->Voxels.Completion)
+					Plan.Voxel->Voxels.Completion->TargetReadLease.Reset();
+				State->Result = FSaveOperationResult::Failed(ESaveResultCode::Cancelled,
+					FText::FromString(TEXT("Save canceled before acquiring write ownership")));
+				if (Plan.ExternalOperation)
+				{
+					FString Error;
+					if (Plan.ExternalOperation->Store) Plan.ExternalOperation->Store->CloseNative();
+					if (!Storage.AbortPendingWorld(Plan.ExternalOperation->PendingLease, Error))
+						State->Result = FSaveOperationResult::Failed(ESaveResultCode::ConfirmationPending,
+							FText::FromString(TEXT("Cancelled save retains its original recovery intent: ") + Error));
+				}
 			}
 			else
 			{
@@ -53,8 +67,11 @@ struct FSaveGameAsyncExecutor::FWorker
             else
             {
                 Plan.ExternalOperation->Store->CloseNative();
-                if (!Storage.AbortPendingWorld(Plan.ExternalOperation->PendingLease, Error))
-                    State->Result.Message = FText::FromString(State->Result.Message.ToString() + TEXT("; ") + Error);
+				if (!Storage.AbortPendingWorld(Plan.ExternalOperation->PendingLease, Error))
+				{
+					State->Result.Code = ESaveResultCode::ConfirmationPending;
+					State->Result.Message = FText::FromString(State->Result.Message.ToString() + TEXT("; ") + Error);
+				}
             }
         }
         else if (bTerminal && !State->Result && Plan.bDeleteCreatedSlotOnFailure)
@@ -67,14 +84,24 @@ struct FSaveGameAsyncExecutor::FWorker
 	}
 };
 
+struct FSaveGameAsyncExecutor::FWorkerCompletion
+{
+	TSharedPtr<FEventRef, ESPMode::ThreadSafe> NativeExit;
+	void operator()() const { (*NativeExit)->Trigger(); }
+};
+
 struct FSaveGameAsyncExecutor::FReclaimer
 {
 	TSharedPtr<FState, ESPMode::ThreadSafe> State;
 	UE::Tasks::FTask NativeTask;
+	UE::Tasks::FTask CompletionTask;
+	bool bHasCompletion = false;
 	void operator()() const
 	{
 		check(NativeTask.IsCompleted());
-		// 原生任务真正退出后才释放持有它的控制根，且不在 GT 等待。
+		if (bHasCompletion) CompletionTask.Wait();
+		if (State->Cancel.load() && (State->Result.Code == ESaveResultCode::CapacityBlocked || State->Result.Code == ESaveResultCode::SlotBusy))
+			FWorker{State}();
 	}
 };
 
@@ -87,12 +114,27 @@ FSaveGameAsyncExecutor::~FSaveGameAsyncExecutor()
 			State->Result.Code == ESaveResultCode::SlotBusy))
 		{
 			Task = {};
-			Task = UE::Tasks::Launch(UE_SOURCE_LOCATION, FWorker{State});
+			Task = UE::Tasks::Launch(UE_SOURCE_LOCATION, FWorker{State}, UE::Tasks::ETaskPriority::BackgroundNormal,
+				UE::Tasks::EExtendedTaskPriority::None, UE::Tasks::ETaskFlags::DoNotRunInsideBusyWait);
 		}
 		const UE::Tasks::FTask NativeTask = Task;
-		UE::Tasks::Launch(UE_SOURCE_LOCATION, FReclaimer{MoveTemp(State), MoveTemp(Task)},
-			UE::Tasks::Prerequisites(NativeTask));
+		TSharedPtr<void, ESPMode::ThreadSafe> RetirementLease = State->MetadataLease;
+		UE::Tasks::FTask Retired = UE::Tasks::Launch(UE_SOURCE_LOCATION,
+			FReclaimer{MoveTemp(State), MoveTemp(Task), MoveTemp(CompletionTask), NativeExit.IsValid()},
+			UE::Tasks::Prerequisites(NativeTask), UE::Tasks::ETaskPriority::BackgroundNormal,
+			UE::Tasks::EExtendedTaskPriority::None, UE::Tasks::ETaskFlags::DoNotRunInsideBusyWait);
+		FNativeTaskRetirement::Track(Retired, MoveTemp(RetirementLease));
 	}
+}
+
+void FSaveGameAsyncExecutor::DrainRetiredTasks()
+{
+	FNativeTaskRetirement::Drain();
+}
+
+void FSaveGameAsyncExecutor::TrackNativeRetirement(const UE::Tasks::FTask& InTask, TSharedPtr<void, ESPMode::ThreadSafe> InLifetime)
+{
+	FNativeTaskRetirement::Track(InTask, MoveTemp(InLifetime));
 }
 bool FSaveGameAsyncExecutor::Start(FSaveGenerationPlan&& P, FString* OutError)
 {
@@ -114,8 +156,11 @@ bool FSaveGameAsyncExecutor::Start(FSaveGenerationPlan&& P, FString* OutError)
 	if (P.Voxel.IsSet() && P.Voxel->Voxels.Journal.Resources)
 	{
 		const auto& Capture = P.Voxel->Voxels;
-		const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FState>() +
-			VoxelBoundedAllocation::TaskBytes<FWorker>() + VoxelBoundedAllocation::TaskBytes<FReclaimer>();
+		const uint64 Bytes = VoxelBoundedAllocation::WorkerSharedBytes<FState>() + 2 * VoxelBoundedAllocation::WorkerSharedBytes<FEventRef>() +
+			VoxelBoundedAllocation::TaskBytes<FWorker>() + VoxelBoundedAllocation::TaskBytes<FWorkerCompletion>() +
+			VoxelBoundedAllocation::TaskBytes<FReclaimer>() + VoxelBoundedAllocation::TaskBytes<FNativeTaskRetirementSignal>() +
+			VoxelBoundedAllocation::ArrayBytes<uint8>(65536) + VoxelBoundedAllocation::ArrayBytes<ANSICHAR>(40960) +
+			VoxelBoundedAllocation::ArrayBytes<TCHAR>(32769);
 		if (!Capture.Journal.Resources->Acquire(FVoxelGenerationConsumerKey::Section(Capture.WorldEpoch,
 			Capture.TransactionId, 1, {}, 6), EVoxelTerrainResourcePool::Input, Bytes, Lease))
 		{
@@ -132,14 +177,14 @@ bool FSaveGameAsyncExecutor::Start(FSaveGenerationPlan&& P, FString* OutError)
 		State->Consumer = FVoxelGenerationConsumerKey::Section(P.Voxel->Voxels.WorldEpoch, P.Voxel->Voxels.TransactionId, 1, {}, 6);
 	}
 	State->Plan = MoveTemp(P);
-	Task = UE::Tasks::Launch(UE_SOURCE_LOCATION, FWorker{State});
+	LaunchWorker();
 	if (OutError) OutError->Reset();
 	return true;
 }
 bool FSaveGameAsyncExecutor::Poll(FSaveOperationResult& O, FVoxelTerrainFrameContext* InFrame, const bool bForceNativeControl)
 {
 	check(IsInGameThread());
-	if (!State || !Task.IsCompleted())
+	if (!State || !Task.IsCompleted() || (NativeExit && !CompletionTask.IsCompleted()))
 		return false;
 	const bool bSlotRetry = State->Result.Code == ESaveResultCode::SlotBusy;
 	const bool bCapacityRetry = State->Result.Code == ESaveResultCode::CapacityBlocked;
@@ -173,7 +218,7 @@ bool FSaveGameAsyncExecutor::Poll(FSaveOperationResult& O, FVoxelTerrainFrameCon
 	if (bRetry)
 	{
 		Task = {};
-		Task = UE::Tasks::Launch(UE_SOURCE_LOCATION, FWorker{State});
+		LaunchWorker();
 		return false;
 	}
 	O = State->Result;
@@ -181,6 +226,36 @@ bool FSaveGameAsyncExecutor::Poll(FSaveOperationResult& O, FVoxelTerrainFrameCon
 	State.Reset();
 	return true;
 }
+void FSaveGameAsyncExecutor::LaunchWorker()
+{
+	CompletionTask = {};
+	NativeExit.Reset();
+	Task = UE::Tasks::Launch(UE_SOURCE_LOCATION, FWorker{State}, UE::Tasks::ETaskPriority::BackgroundNormal,
+		UE::Tasks::EExtendedTaskPriority::None, UE::Tasks::ETaskFlags::DoNotRunInsideBusyWait);
+}
+
+bool FSaveGameAsyncExecutor::WaitForNativeExit(uint32 TimeoutMilliseconds) const
+{
+	check(IsInGameThread());
+	if (!State) return true;
+	const double Deadline = FPlatformTime::Seconds() + static_cast<double>(TimeoutMilliseconds) / 1000.0;
+	if (!Task.IsCompleted() && !NativeExit)
+	{
+		NativeExit = MakeShared<FEventRef, ESPMode::ThreadSafe>(EEventMode::ManualReset);
+		CompletionTask = UE::Tasks::Launch(UE_SOURCE_LOCATION, FWorkerCompletion{NativeExit}, UE::Tasks::Prerequisites(Task));
+	}
+	if (NativeExit && !CompletionTask.IsCompleted())
+	{
+		if (!(*NativeExit)->Wait(TimeoutMilliseconds)) return false;
+	}
+	while (!Task.IsCompleted() || (NativeExit && !CompletionTask.IsCompleted()))
+	{
+		if (FPlatformTime::Seconds() >= Deadline) return false;
+		FPlatformProcess::SleepNoStats(0.001f);
+	}
+	return true;
+}
+
 void FSaveGameAsyncExecutor::RequestCancel()
 {
 	if (State)
@@ -206,7 +281,7 @@ FSaveOperationResult FSaveGameAsyncExecutor::Execute(const FSaveGenerationPlan& 
 	{
 		return FSaveOperationResult::Failed(C, FText::FromString(T));
 	};
-	if (Cancel.load()) return Fail(ESaveResultCode::Busy, TEXT("Save canceled before write"));
+	if (Cancel.load()) return Fail(ESaveResultCode::Cancelled, TEXT("Save canceled before write"));
     const TSharedPtr<FSavePendingWorldLease, ESPMode::ThreadSafe> PendingLease = P.ExternalOperation ?
         P.ExternalOperation->PendingLease : TSharedPtr<FSavePendingWorldLease, ESPMode::ThreadSafe>();
     FSaveManifest Current;
@@ -222,7 +297,7 @@ FSaveOperationResult FSaveGameAsyncExecutor::Execute(const FSaveGenerationPlan& 
             P.ExternalOperation->Context.TargetGeneration != 1)))
         return Fail(ESaveResultCode::CommitFailed, TEXT("目标存档代次已变化，不能覆盖另一个已提交世界。"));
 	if (Cancel.load())
-		return Fail(ESaveResultCode::Busy, TEXT("Save canceled before write"));
+		return Fail(ESaveResultCode::Cancelled, TEXT("Save canceled before write"));
 	if (Current.CurrentGeneration == MAX_int32)
 		return Fail(ESaveResultCode::CommitFailed, TEXT("Generation counter exhausted"));
 	const int32 Next = Current.CurrentGeneration + 1;
@@ -271,7 +346,7 @@ FSaveOperationResult FSaveGameAsyncExecutor::Execute(const FSaveGenerationPlan& 
 	for (const auto& M : P.Modules)
 	{
 		if (Cancel.load())
-			return Fail(ESaveResultCode::Busy, TEXT("Save canceled before commit"));
+			return Fail(ESaveResultCode::Cancelled, TEXT("Save canceled before commit"));
 		if (!Storage.WriteBinary(Storage.GetTempModuleFilePath(P.SaveId, Next, M.ModuleName), M.Bytes))
 			return Fail(ESaveResultCode::WriteFailed, TEXT("Module file write failed"));
 	}
@@ -283,12 +358,12 @@ FSaveOperationResult FSaveGameAsyncExecutor::Execute(const FSaveGenerationPlan& 
 				ESaveResultCode::CapacityBlocked : ESaveResultCode::WriteFailed, FText::FromString(E));
 	}
 	if (Cancel.load())
-		return Fail(ESaveResultCode::Busy, TEXT("Save canceled before commit"));
+		return Fail(ESaveResultCode::Cancelled, TEXT("Save canceled before commit"));
 	if (!Storage.FlushTempGeneration(P.SaveId, Next))
 		return Fail(ESaveResultCode::WriteFailed, TEXT("Generation file flush failed"));
 	if (P.Voxel.IsSet()) P.Voxel->Voxels.Completion->bFilesFlushed = true;
 	if (Cancel.load())
-		return Fail(ESaveResultCode::Busy, TEXT("Save canceled after file flush"));
+		return Fail(ESaveResultCode::Cancelled, TEXT("Save canceled after file flush"));
 	if (P.Voxel.IsSet())
 	{
 		const auto& Capture = P.Voxel->Voxels;
@@ -314,7 +389,7 @@ FSaveOperationResult FSaveGameAsyncExecutor::Execute(const FSaveGenerationPlan& 
             return FSaveOperationResult::Failed(ESaveResultCode::WriteFailed, FText::FromString(Error.IsEmpty() ?
                 TEXT("外部世界存储没有完成持久准备。") : Error));
     }
-	if (Cancel.load()) return Fail(ESaveResultCode::Busy, TEXT("Save canceled before generation publication"));
+	if (Cancel.load()) return Fail(ESaveResultCode::Cancelled, TEXT("Save canceled before generation publication"));
 	if (!Storage.CommitGeneration(P.SaveId, Next))
 		return Fail(ESaveResultCode::CommitFailed, TEXT("Generation commit failed"));
 	// 文件代已发布后继续完成 manifest，取消不能把仅 rename 的目录当作提交成功。

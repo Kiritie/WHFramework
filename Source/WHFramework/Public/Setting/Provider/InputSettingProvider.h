@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Setting/Provider/SettingProviderBase.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "InputSettingProvider.generated.h"
 
@@ -28,7 +29,9 @@ public:
 
 	virtual bool Apply(const FSettingDefinition& InDefinition, const FParameter& InValue) override;
 
-	virtual void Rollback(const FSettingDefinition& InDefinition) override;
+	virtual bool Rollback(const FSettingDefinition& InDefinition) override;
+	virtual bool RollbackForHostTermination(const FSettingDefinition& InDefinition, UWHLocalPlayer* InPlayer) override;
+	virtual bool CanRollbackForHostTermination(const FSettingDefinition& InDefinition, const UWHLocalPlayer* InPlayer) const override;
 
 	virtual void Commit() override;
 

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AI/AIModuleTypes.h"
+#include "AI/AIBlackboardTypes.h"
+#include "AI/AIBlackboardAccessors.h"
 #include "AI/Base/AIBlackboardBase.h"
 #include "AI/Base/AIAgentInterface.h"
 #include "AI/Base/AIControllerBase.h"

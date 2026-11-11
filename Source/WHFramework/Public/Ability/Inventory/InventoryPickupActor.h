@@ -10,8 +10,7 @@
 class USphereComponent;
 class UMaterialBillboardComponent;
 class UWidgetComponent;
-class UStaticMeshComponent;
-class USkeletalMeshComponent;
+class UMeshComponent;
 class UInventoryModule;
 class UInteractionComponent;
 
@@ -69,11 +68,8 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     TObjectPtr<UMaterialBillboardComponent> MaterialIconPresentation;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    TObjectPtr<UStaticMeshComponent> StaticPresentation;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    TObjectPtr<USkeletalMeshComponent> SkeletalPresentation;
+    UPROPERTY(Transient, VisibleAnywhere, BlueprintReadOnly)
+    TObjectPtr<UMeshComponent> MeshPresentation;
 
 private:
     UPROPERTY(ReplicatedUsing=OnRep_Presentation)
@@ -98,6 +94,7 @@ private:
     FDelegateHandle CommitHandle;
     FDelegateHandle DeleteHandle;
     FTimerHandle PresentationRetry;
+    FPrimaryAssetId PresentationItemId;
     double PresentationDeadline = 0.0;
     void HandleCommit(const FInventoryChangeSet& InChanges);
     void HandleDeleted(const FGuid& InInventoryId);

@@ -20,7 +20,7 @@ void AWHGameManager::OnInitialize_Implementation()
 {
 	AWHActor::OnInitialize_Implementation();
 
-	if(AWHGameMode* GameMode = UCommonModuleStatics::GetGameMode<AWHGameMode>())
+	if(AWHGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AWHGameMode>() : nullptr)
 	{
 		GameMode->AddManagerToList(this);
 	}
@@ -40,7 +40,7 @@ void AWHGameManager::OnTermination_Implementation()
 {
 	AWHActor::OnTermination_Implementation();
 
-	if(AWHGameMode* GameMode = UCommonModuleStatics::GetGameMode<AWHGameMode>())
+	if(AWHGameMode* GameMode = GetWorld() ? GetWorld()->GetAuthGameMode<AWHGameMode>() : nullptr)
 	{
 		GameMode->RemoveManagerFromList(this);
 	}

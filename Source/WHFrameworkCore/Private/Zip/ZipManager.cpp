@@ -1,17 +1,26 @@
 ﻿#include "Zip/ZipManager.h"
+#include "Zip/zip.h"
+#include "Type/NativeTypeIdentity.h"
+#include "Misc/ScopeExit.h"
 
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFilemanager.h"
 #include "Misc/Paths.h"
 #include "Async/Async.h"
-#include "Debug/DebugTypes.h"
 #include "Main/MainManager.h"
 #if PLATFORM_WINDOWS
 #include <windows.h>
 #endif
 
-#define ZIP_THREAD_MAX 10
 #define ZIP_BUFFER_MAX 1024
+
+namespace
+{
+bool ZipDestinationsOverlap(const FString& A, const FString& B)
+{
+    return FPaths::IsSamePath(A, B) || FPaths::IsUnderDirectory(A, B) || FPaths::IsUnderDirectory(B, A);
+}
+}
 
 const FUniqueType FZipManager::Type = FUniqueType(&FManagerBase::Type);
 
@@ -23,164 +32,118 @@ FZipManager::FZipManager() : FManagerBase(Type)
 
 FZipManager::~FZipManager()
 {
+    OnTermination();
 }
 
-bool FZipManager::Pack(const FString& InZipFile, const FString& InOriginDirectory, const FString& InIgnoreFile)
+void FZipManager::RetireCompletedTasks()
 {
-    static IPlatformFile& pf = FPlatformFileManager::Get().GetPlatformFile();
-    if (pf.FileExists(*InZipFile))
-    {
-        WHLog(FString::Printf(TEXT("zip pack failed! zip path already exist! %s"), *InZipFile), EDC_Zip, EDV_Error);
-        return false;
-    }
-    int err;
-    zip* Archive = zip_open(TCHAR_TO_UTF8(*InZipFile), ZIP_CREATE, &err);
-    if (!Archive)
-    {
-        WHLog(FString::Printf(TEXT("zip pack failed! zip_open failed(%d): %s"), err, *InZipFile), EDC_Zip, EDV_Error);
-        return false;
-    }
-    const FString d = InOriginDirectory / FString();
-    TArray<TSharedPtr<EStatus>> ss;
-    bool r = Pack(Archive, d, d, ss);
-    Recheck:
-        for(auto v : ss)
-        {
-            if(*v.Get() == EStatus::Doing)
-            {
-                FPlatformProcess::SleepNoStats(0.03f);
-                goto Recheck;
-            }
-        }
-    for(auto v : ss)
-    {
-        if(*v.Get() == EStatus::Failed)
-        {
-            //有异步执行失败
-            r = false;
-        }
-    }
-    err = zip_close(Archive);
-    if (err != 0)
-    {
-        WHLog(FString::Printf(TEXT("zip pack warning! zip_close failed(%d): %s"), err, *InZipFile), EDC_Zip, EDV_Error);
-        //return false; //暂时不处理关闭问题
-    }
-    return r;
+    RunningTasks.RemoveAll([](const FRunningTask& Task) { return Task.Future.IsReady(); });
 }
 
-bool FZipManager::Unpack(const FString& InZipFile, const FString& InDestDirectory)
+void FZipManager::OnTermination()
 {
-    TRACE_CPUPROFILER_EVENT_SCOPE_TEXT("MW_Uzip_Unpack")
-    static IPlatformFile& pf = FPlatformFileManager::Get().GetPlatformFile();
-    if(!pf.FileExists(*InZipFile))
-    {
-        WHLog(FString::Printf(TEXT("zip unpack failed! zipfile(%s) not exist!"), *InZipFile), EDC_Zip, EDV_Error);
-        return false;
-    }
-    if (!pf.DirectoryExists(*InDestDirectory))
-    {
-        pf.CreateDirectoryTree(*InDestDirectory);
-    }
-#if 1//UE_SERVER //Linux下可能需要Root权限才能申请到线程。否则报 invalid attempt to read memory at address 0x0000000000000000
-    return Unpack(InZipFile, InDestDirectory, 0, 1);
-#else//暂时关闭多线程解压,部分手机结果不理想
-    TArray<TSharedPtr<EStatus>> ss;
-    for (int i = 0; i < ZIP_THREAD_MAX; i++)
-    {
-        TSharedPtr<EStatus> h = MakeShared<EStatus>();
-        ss.Add(h);
-        Async(EAsyncExecution::ThreadPool, [=]()
-        {
-            if (Unpack(InZipFile, InDestDirectory, i,ZIP_THREAD_MAX))
-            {
-                *h.Get() = EStatus::Succeeded;
-            }
-            else
-            {
-                *h.Get() = EStatus::Failed;
-            }
-        });
-    }
-    Recheck:
-        for (const auto& s : ss)
-        {
-            if (*s.Get() == EStatus::Doing)
-            {
-                FPlatformProcess::SleepNoStats(0.03f);
-                goto Recheck;
-            }
-        }
-    for (const auto& s : ss)
-    {
-        if (*s.Get() == EStatus::Failed)
-        {
-            return false;
-        }
-    }
-    return true;
-#endif
+    if (bStopping) return;
+    bStopping = true;
+    for (FRunningTask& Task : RunningTasks) Task.Handle->Cancel();
+    // The futures signal only after native I/O and the archive are closed.
+    // A library or filesystem call is not interruptible and can delay shutdown.
+    for (FRunningTask& Task : RunningTasks) Task.Future.Wait();
+    RunningTasks.Empty();
+    FManagerBase::OnTermination();
 }
 
-bool FZipManager::Pack(const FString& InZipFile, const TArray<FString>& InOriginFiles, const FString& InRootDirectory)
+TSharedPtr<FZipTask, ESPMode::ThreadSafe> FZipManager::StartPack(const FString& InZipFile, const FString& InOriginDirectory, const FString& InIgnoreFile)
 {
-    static IFileManager& fm = IFileManager::Get();
-    if(fm.FileExists(*InZipFile))
+    if (!IsInGameThread() || bStopping) return nullptr;
+    RetireCompletedTasks();
+    const FString Destination = FPaths::ConvertRelativePathToFull(InZipFile);
+    const FString Origin = FPaths::ConvertRelativePathToFull(InOriginDirectory);
+    const FString Ignored = InIgnoreFile.IsEmpty() ? FString() : FPaths::ConvertRelativePathToFull(InIgnoreFile);
+    if (RunningTasks.ContainsByPredicate([&](const FRunningTask& Active) { return ZipDestinationsOverlap(Active.Destination, Destination); })) return nullptr;
+    TSharedRef<FZipTask, ESPMode::ThreadSafe> Task = MakeShared<FZipTask, ESPMode::ThreadSafe>();
+    FRunningTask& Running = RunningTasks.AddDefaulted_GetRef();
+    Running.Handle = Task;
+    Running.Destination = Destination;
+    Running.Future = Async(EAsyncExecution::ThreadPool, [Task, Destination, Origin, Ignored]()
     {
-        WHLog(FString::Printf(TEXT("zip create failed: zip path already exist! %s"), *InZipFile), EDC_Zip, EDV_Error);
+        Task->Status.store(EZipTaskStatus::Running);
+        bool bCancelled = false;
+        const bool bSucceeded = Pack(Destination, Origin, Ignored, *Task, bCancelled);
+        if (!bSucceeded && !bCancelled) Task->FailureMessage = FString::Printf(TEXT("Failed to pack %s into %s."), *Origin, *Destination);
+        Task->Status.store(bSucceeded ? EZipTaskStatus::Succeeded : bCancelled ? EZipTaskStatus::Cancelled : EZipTaskStatus::Failed);
+    });
+    return Task;
+}
+
+TSharedPtr<FZipTask, ESPMode::ThreadSafe> FZipManager::StartUnpack(const FString& InZipFile, const FString& InDestDirectory)
+{
+    if (!IsInGameThread() || bStopping) return nullptr;
+    RetireCompletedTasks();
+    const FString Destination = FPaths::ConvertRelativePathToFull(InDestDirectory);
+    const FString Archive = FPaths::ConvertRelativePathToFull(InZipFile);
+    if (RunningTasks.ContainsByPredicate([&](const FRunningTask& Active) { return ZipDestinationsOverlap(Active.Destination, Destination); })) return nullptr;
+    TSharedRef<FZipTask, ESPMode::ThreadSafe> Task = MakeShared<FZipTask, ESPMode::ThreadSafe>();
+    FRunningTask& Running = RunningTasks.AddDefaulted_GetRef();
+    Running.Handle = Task;
+    Running.Destination = Destination;
+    Running.Future = Async(EAsyncExecution::ThreadPool, [Task, Archive, Destination]()
+    {
+        Task->Status.store(EZipTaskStatus::Running);
+        bool bCancelled = false;
+        const bool bSucceeded = Unpack(Archive, Destination, *Task, bCancelled);
+        if (!bSucceeded && !bCancelled) Task->FailureMessage = FString::Printf(TEXT("Failed to extract %s into %s; destination may be partially updated."), *Archive, *Destination);
+        Task->Status.store(bSucceeded ? EZipTaskStatus::Succeeded : bCancelled ? EZipTaskStatus::Cancelled : EZipTaskStatus::Failed);
+    });
+    return Task;
+}
+
+bool FZipManager::Pack(const FString& InZipFile, const FString& InOriginDirectory, const FString& InIgnoreFile, FZipTask& InTask, bool& bOutCancelled)
+{
+    IPlatformFile& Platform = FPlatformFileManager::Get().GetPlatformFile();
+    if (InTask.IsCancellationRequested()) { bOutCancelled = true; return false; }
+    if (Platform.FileExists(*InZipFile)) return false;
+    int Error = 0;
+    zip* Archive = zip_open(TCHAR_TO_UTF8(*InZipFile), ZIP_CREATE | ZIP_EXCL, &Error);
+    if (!Archive) return false;
+    const FString Directory = InOriginDirectory / FString();
+    if (!Pack(Archive, Directory, Directory, InIgnoreFile, InTask, bOutCancelled))
+    {
+        zip_discard(Archive);
         return false;
     }
-    int Err;
-    zip* Archive = zip_open(TCHAR_TO_UTF8(*InZipFile), ZIP_CREATE, &Err);
-    if (!Archive)
+    if (InTask.IsCancellationRequested())
     {
-        WHLog(FString::Printf(TEXT("zip open failed(%d): %s"), Err, *InZipFile), EDC_Zip, EDV_Error);
+        bOutCancelled = true;
+        zip_discard(Archive);
         return false;
     }
-    for(FString p : InOriginFiles)
+    if (zip_close(Archive) != 0)
     {
-#if PLATFORM_WINDOWS
-        p = FPaths::ConvertRelativePathToFull(p);
-#endif
-        zip_source_t* Source = zip_source_file(Archive, TCHAR_TO_UTF8(*p), 0, -1);
-        FString z;
-        if (InRootDirectory.IsEmpty())
-        {
-            z = FPaths::GetBaseFilename(p, false);
-        }
-        else
-        {
-            z = p;
-            FPaths::MakePathRelativeTo(z, *InRootDirectory);
-        }
-        if (zip_add(Archive, TCHAR_TO_UTF8(*z), Source) == -1)
-        {
-            zip_source_free(Source);
-            WHLog(FString::Printf(TEXT("zip add entry failed: source_file:%s zip_file:%s"), *p, *z), EDC_Zip, EDV_Error);
-            return false;
-        }
+        zip_discard(Archive);
+        return false;
     }
     return true;
 }
 
-bool FZipManager::Pack(zip* InArchive, const FString& InDirectory, const FString& InRelativePath, TArray<TSharedPtr<EStatus>>& InAsyncStatuses)
+bool FZipManager::Pack(zip* InArchive, const FString& InDirectory, const FString& InRelativePath, const FString& InIgnoreFile, FZipTask& InTask, bool& bOutCancelled)
 {
     static IFileManager& fm = IFileManager::Get();
     if (!fm.DirectoryExists(*InDirectory))
     {
-        WHLog(FString::Printf(TEXT("zip Add failed, directory not exist: %s"), *InDirectory), EDC_Zip, EDV_Error);
+        UE_LOG(LogTemp, Error, TEXT("Zip source directory does not exist: %s"), *InDirectory);
         return false;
     }
     TArray<FString> files;
     const FString dir = InDirectory / TEXT("*");
-    const FString fd = FPaths::GetPath(InRelativePath);
     fm.FindFiles(files, *dir, true, true);
     for (FString f : files)
     {
+        if (InTask.IsCancellationRequested()) { bOutCancelled = true; return false; }
         FString p = InDirectory / f;
+        if (!InIgnoreFile.IsEmpty() && FPaths::IsSamePath(p, InIgnoreFile)) continue;
         if (fm.DirectoryExists(*p))
         {
-            if (!Pack(InArchive, p, InRelativePath, InAsyncStatuses))
+            if (!Pack(InArchive, p, InRelativePath, InIgnoreFile, InTask, bOutCancelled))
             {
                 return false;
             }
@@ -193,11 +156,10 @@ bool FZipManager::Pack(zip* InArchive, const FString& InDirectory, const FString
             p = FPaths::ConvertRelativePathToFull(p);
 #endif
             zip_source_t* Source = zip_source_file(InArchive, TCHAR_TO_UTF8(*p), 0, -1);
-            if (zip_add(InArchive, TCHAR_TO_UTF8(*z), Source) == -1)
+            if (!Source || zip_add(InArchive, TCHAR_TO_UTF8(*z), Source) == -1)
             {
-                zip_source_free(Source);
-                zip_close(InArchive);
-                WHLog(FString::Printf(TEXT("zip add failed: source_file:%s zip_file:%s"), *p, *z), EDC_Zip, EDV_Error);
+                if (Source) zip_source_free(Source);
+                UE_LOG(LogTemp, Error, TEXT("Zip entry could not be added: source=%s entry=%s"), *p, *z);
                 return false;
             }
         }
@@ -205,57 +167,56 @@ bool FZipManager::Pack(zip* InArchive, const FString& InDirectory, const FString
     return true;
 }
 
-bool FZipManager::Unpack(const FString& InZipFile, const FString& InDestDirectory, int InIndex, int InStep)
+bool FZipManager::Unpack(const FString& InZipFile, const FString& InDestDirectory, FZipTask& InTask, bool& bOutCancelled)
 {
-    static IPlatformFile& pf = FPlatformFileManager::Get().GetPlatformFile();
-    int err = 0;
-    zip* z = zip_open(TCHAR_TO_UTF8(*InZipFile), 0, &err);
-    if (!z)
+    IPlatformFile& Platform = FPlatformFileManager::Get().GetPlatformFile();
+    if (InTask.IsCancellationRequested()) { bOutCancelled = true; return false; }
+    if (!Platform.FileExists(*InZipFile)) return false;
+    if (!Platform.DirectoryExists(*InDestDirectory) && !Platform.CreateDirectoryTree(*InDestDirectory)) return false;
+    int Error = 0;
+    zip* Archive = zip_open(TCHAR_TO_UTF8(*InZipFile), ZIP_RDONLY, &Error);
+    if (!Archive) return false;
+    ON_SCOPE_EXIT { zip_discard(Archive); };
+    FString Root = FPaths::ConvertRelativePathToFull(InDestDirectory);
+    FPaths::NormalizeDirectoryName(Root);
+    const int64 Count = zip_get_num_entries(Archive, 0);
+    if (Count < 0) return false;
+    TArray<uint8> Buffer;
+    Buffer.SetNumUninitialized(ZIP_BUFFER_MAX);
+    for (int64 Index = 0; Index < Count; ++Index)
     {
-        WHLog(FString::Printf(TEXT("zip unpack failed! open zip(%s) err(%d)"),*InZipFile, err), EDC_Zip, EDV_Error);
-        return false;
+        if (InTask.IsCancellationRequested()) { bOutCancelled = true; return false; }
+        const char* Name = zip_get_name(Archive, Index, ZIP_FL_ENC_RAW);
+        if (!Name) return false;
+        const FString Relative = IsUTF8(Name) ? UTF8_TO_TCHAR(Name) : ANSIToUTF8ToFString(Name);
+        if (Relative.IsEmpty() || !FPaths::IsRelative(Relative)) return false;
+        FString Destination = FPaths::ConvertRelativePathToFull(Root / Relative);
+        FPaths::NormalizeFilename(Destination);
+        if (!FPaths::CollapseRelativeDirectories(Destination) || !FPaths::IsUnderDirectory(Destination, Root)) return false;
+        if (Relative.EndsWith(TEXT("/")) || Relative.EndsWith(TEXT("\\")))
+        {
+            if (!Platform.DirectoryExists(*Destination) && !Platform.CreateDirectoryTree(*Destination)) return false;
+            continue;
+        }
+        const FString Parent = FPaths::GetPath(Destination);
+        if (!Platform.DirectoryExists(*Parent) && !Platform.CreateDirectoryTree(*Parent)) return false;
+        zip_file* File = zip_fopen_index(Archive, Index, ZIP_FL_UNCHANGED);
+        if (!File) return false;
+        ON_SCOPE_EXIT { if (File) zip_fclose(File); };
+        TUniquePtr<FArchive> Writer(IFileManager::Get().CreateFileWriter(*Destination, FILEWRITE_None));
+        if (!Writer) return false;
+        zip_int64_t Length = 0;
+        while ((Length = zip_fread(File, Buffer.GetData(), Buffer.Num())) > 0)
+        {
+            if (InTask.IsCancellationRequested()) { bOutCancelled = true; return false; }
+            Writer->Serialize(Buffer.GetData(), Length);
+            if (Writer->IsError()) return false;
+        }
+        if (Length < 0 || !Writer->Close()) return false;
+        const int CloseResult = zip_fclose(File);
+        File = nullptr;
+        if (CloseResult != 0) return false;
     }
-    const int num = zip_get_num_files(z);
-    char* b = new char[ZIP_BUFFER_MAX];
-    for (int i = InIndex; i < num; i += InStep)
-    {
-        const char* n = zip_get_name(z, i, ZIP_FL_ENC_RAW);
-        FString d = InDestDirectory / (IsUTF8(n) ? UTF8_TO_TCHAR(n) : ANSIToUTF8ToFString(n));
-        if(d.EndsWith("/") || d.EndsWith("\\"))
-        {
-            if (!pf.DirectoryExists(*d))
-            {
-                pf.CreateDirectoryTree(*d);
-            }
-            continue;
-        }
-        zip_file* f = zip_fopen_index(z, i, ZIP_FL_UNCHANGED);
-        if (!f)
-        {
-            WHLog(FString::Printf(TEXT("zip unpack failed! zip file open(%hs) failed!"), n), EDC_Zip, EDV_Error);
-            continue;
-        }
-        TUniquePtr<FArchive> w(IFileManager::Get().CreateFileWriter(*d, FILEWRITE_None));
-        if(!w.IsValid())
-        {
-            WHLog(FString::Printf(TEXT("zip unpack failed! createfilewriter(%s) failed!"), *d), EDC_Zip, EDV_Error);
-            continue;
-        }
-        zip_int64_t l = zip_fread(f, b, ZIP_BUFFER_MAX);
-        while (l > 0)
-        {
-            w->Serialize(b, l);
-            l = zip_fread(f, b, ZIP_BUFFER_MAX);
-        }
-        if (l < 0)
-        {
-            WHLog(FString::Printf(TEXT("zip unpack failed! zip file read(%hs) failed!"), n), EDC_Zip, EDV_Error);
-        }
-        w->Close();
-        zip_fclose(f);
-    }
-    delete[] b;
-    zip_close(z);
     return true;
 }
 

@@ -3,12 +3,15 @@
 #pragma once
 
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "PawnModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "PawnModule.generated.h"
 
 class APawnBase;
+class APlayerController;
 UCLASS()
 class WHFRAMEWORK_API UPawnModule : public UModuleBase
 {
@@ -61,42 +64,41 @@ protected:
 	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultPawn != nullptr"), Category = "Pawn")
 	bool DefaultInstantSwitch;
 
-	UPROPERTY(VisibleAnywhere, Replicated, Category = "Pawn")
-	APawnBase* CurrentPawn;
-
 private:
 	UPROPERTY(Transient)
 	TMap<FName, APawnBase*> PawnMap;
+	TSet<TWeakObjectPtr<APlayerController>> SwitchingPlayers;
 
 public:
 	template<class T>
-	T* GetCurrentPawn() const
+	T* GetCurrentPawn(APlayerController* InPlayer) const
 	{
-		return Cast<T>(CurrentPawn);
+		return Cast<T>(GetCurrentPawn(InPlayer, T::StaticClass()));
 	}
 
 	UFUNCTION(BlueprintPure)
 	TArray<APawnBase*> GetAllPawn() const { return Pawns; }
 
-	APawnBase* GetCurrentPawn() const;
-
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	APawnBase* GetCurrentPawn(TSubclassOf<APawnBase> InClass) const;
+	APawnBase* GetCurrentPawn(APlayerController* InPlayer, TSubclassOf<APawnBase> InClass) const;
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchPawn(APawnBase* InPawn, bool bResetCamera = true, bool bInstant = false);
+	bool SwitchPawn(APlayerController* InPlayer, APawnBase* InPawn, bool bResetCamera = true, bool bInstant = false);
+
+	UFUNCTION(BlueprintCallable)
+	bool SwitchToDefaultPawn(APlayerController* InPlayer);
 
 	template<class T>
-	void SwitchPawnByClass(bool bResetCamera = true, bool bInstant = false, TSubclassOf<APawnBase> InClass = T::StaticClass())
+	bool SwitchPawnByClass(APlayerController* InPlayer, bool bResetCamera = true, bool bInstant = false, TSubclassOf<APawnBase> InClass = T::StaticClass())
 	{
-		SwitchPawnByClass(InClass, bInstant, bResetCamera);
+		return SwitchPawnByClass(InPlayer, InClass, bResetCamera, bInstant);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchPawnByClass(TSubclassOf<APawnBase> InClass, bool bResetCamera = true, bool bInstant = false);
+	bool SwitchPawnByClass(APlayerController* InPlayer, TSubclassOf<APawnBase> InClass, bool bResetCamera = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchPawnByName(FName InName, bool bResetCamera = true, bool bInstant = false);
+	bool SwitchPawnByName(APlayerController* InPlayer, FName InName, bool bResetCamera = true, bool bInstant = false);
 
 	template<class T>
 	bool HasPawnByClass(TSubclassOf<APawnBase> InClass = T::StaticClass())

@@ -95,8 +95,13 @@ protected:
 
     virtual void RebuildViews();
     virtual void ConfigureSlot(UWidgetAbilityInventorySlotBase* InWidget, const FInventorySlotKey& InSlot) const;
+    virtual bool ShouldDisplaySlot(const FGuid& InInventoryId, const FInventorySlotState& InSlot) const;
+    virtual bool ShouldRebuildOnDelta(const FInventoryDelta& InDelta) const;
     virtual int32 GetInventoryColumns(const FGuid& InInventoryId, const FGameplayTag& InGroup) const;
     virtual UPanelWidget* GetInventoryHost(const FGuid& InInventoryId) const;
+    virtual bool CanSelectSlot(const FInventorySlotKey& InSlot) const;
+    virtual bool ResolveSortTarget(FGuid& OutInventoryId, FGameplayTag& OutGroup) const;
+    const TArray<FGuid>& GetBoundInventoryIds() const { return InventoryIds; }
     void ApplySelection(const FGuid& InInventoryId, const FInventorySlotKey& InSlot);
     bool Submit(FInventoryClientRequest InRequest);
 	virtual bool ShowSplitQuantity(int32 InStackCount);

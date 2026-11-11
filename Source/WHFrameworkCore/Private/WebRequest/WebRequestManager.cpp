@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "WebRequest/WebRequestManager.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "HttpModule.h"
 #include "Debug/DebugTypes.h"
@@ -26,12 +27,14 @@ FWebRequestManager::FWebRequestManager() : FManagerBase(Type)
 
 FWebRequestManager::~FWebRequestManager()
 {
-	
+	OnTermination();
 }
 
 void FWebRequestManager::OnInitialize()
 {
 	FManagerBase::OnInitialize();
+	bStopping = false;
+	Lifetime = MakeShared<uint8>(0);
 }
 
 void FWebRequestManager::OnPreparatory()
@@ -51,23 +54,60 @@ void FWebRequestManager::OnRefresh(float DeltaSeconds)
 	}
 }
 
+void FWebRequestManager::OnTermination()
+{
+    check(IsInGameThread());
+    if (bStopping) return;
+    bStopping = true;
+    Lifetime.Reset();
+    ConnectRequestId.Invalidate();
+    auto Requests = MoveTemp(WebRequestMap);
+    WebRequestMap.Reset();
+    for (auto& Entry : Requests)
+    {
+        if (Entry.Value)
+        {
+            Entry.Value->OnProcessRequestComplete().Unbind();
+            Entry.Value->CancelRequest();
+        }
+    }
+    const auto ActiveDownloaders = MoveTemp(Downloaders);
+    Downloaders.Reset();
+    for (const auto& Downloader : ActiveDownloaders)
+    {
+        if (!Downloader) continue;
+        Downloader->OnProgress.Clear();
+        Downloader->OnComplete.Clear();
+        Downloader->OnDestroy.Clear();
+        Downloader->bAutoDestroy = false;
+        Downloader->CancelDownload();
+    }
+    bConnected = false;
+    FManagerBase::OnTermination();
+}
+
 void FWebRequestManager::ConnectServer()
 {
-	CancelWebRequest(GetServerURL());
+	if (ConnectRequestId.IsValid()) CancelWebRequest(ConnectRequestId);
 	
-	SendWebRequest(GetServerURL(), EWebRequestMethod::Get, {}, {}, [this](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
+	ConnectRequestId = SendWebRequest(GetServerURL(), EWebRequestMethod::Get, {}, {}, [this](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
 	{
 		bConnected = bSuccess;
 	});
 }
 
-bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete)
+FGuid FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete, FGuid InRequestId)
 {
+	check(IsInGameThread());
+	if (bStopping || !Lifetime) return FGuid();
+	const FGuid RequestId = InRequestId.IsValid() ? InRequestId : FGuid::NewGuid();
+	if (WebRequestMap.Contains(RequestId)) return FGuid();
 	const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
+	HttpRequest->SetDelegateThreadPolicy(EHttpRequestDelegateThreadPolicy::CompleteOnGameThread);
 
 	HttpRequest->SetURL((InUrl.StartsWith(TEXT("/")) ? (GetServerURL() + InUrl) : InUrl) + (InContent.ContentType == EWebContentType::Form_Url ? (TEXT("?") + InContent.ToString()) : TEXT("")));
 
-	WebRequestMap.Emplace(HttpRequest->GetURL(), HttpRequest.ToSharedPtr());
+	WebRequestMap.Emplace(RequestId, HttpRequest.ToSharedPtr());
 
 	FString ContentType;
 	switch(InContent.ContentType)
@@ -121,60 +161,64 @@ bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod 
 		}
 	}
 
-	HttpRequest->OnProcessRequestComplete().BindRaw(this, &FWebRequestManager::OnWebRequestComplete, OnComplete);
+	const TWeakPtr<uint8> WeakLifetime = Lifetime;
+	HttpRequest->OnProcessRequestComplete().BindLambda([this, WeakLifetime, RequestId, OnComplete](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSucceeded)
+	{
+		if (WeakLifetime.IsValid()) OnWebRequestComplete(RequestId, Request, Response, bSucceeded, OnComplete);
+	});
 
 	WHLog(TEXT("Start send web request"), EDC_WebRequest);
-	WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest);
 	WHLog(FString::Printf(TEXT("------> Method: %s"), *HttpRequest->GetVerb()), EDC_WebRequest);
-	WHLog(FString::Printf(TEXT("------> Head: %s"), *InHeadMap.ToString()), EDC_WebRequest);
-	WHLog(FString::Printf(TEXT("------> Content: %s"), *InContent.ToString()), EDC_WebRequest);
 
-	return HttpRequest->ProcessRequest();
+	if (!HttpRequest->ProcessRequest())
+	{
+		WebRequestMap.Remove(RequestId);
+		HttpRequest->OnProcessRequestComplete().Unbind();
+		return FGuid();
+	}
+	return RequestId;
 }
 
-bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithText OnComplete)
+FGuid FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithText OnComplete)
 {
 	return SendWebRequest(InUrl, InMethod, InHeadMap, InContent, [OnComplete](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
 	{
-		OnComplete.Execute(bSuccess ? Response->GetContentAsString() : TEXT(""));
+		OnComplete.ExecuteIfBound(bSuccess && Response.IsValid() ? Response->GetContentAsString() : TEXT(""));
 	});
 }
 
-bool FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithJson OnComplete)
+FGuid FWebRequestManager::SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithJson OnComplete)
 {
 	return SendWebRequest(InUrl, InMethod, InHeadMap, InContent, [OnComplete](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
 	{
 		TSharedPtr<FJsonObject> Json;
-		if(bSuccess)
+		if(bSuccess && Response.IsValid())
 		{
 			const TSharedRef<TJsonReader<>> JsonReader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
 			FJsonSerializer::Deserialize(JsonReader, Json);
 		}
-		OnComplete.Execute(Json);
+		OnComplete.ExecuteIfBound(Json);
 	});
 }
 
-bool FWebRequestManager::CancelWebRequest(const FString& InUrl)
+bool FWebRequestManager::CancelWebRequest(const FGuid& RequestId)
 {
-	if(WebRequestMap.Contains(InUrl))
-	{
-		if(TSharedPtr<IHttpRequest> WebRequest = WebRequestMap[InUrl])
-		{
-			WebRequestMap.Remove(InUrl);
-			WebRequest->CancelRequest();
-		}
-		return true;
-	}
-	return false;
+    check(IsInGameThread());
+    TSharedPtr<IHttpRequest> Request;
+    if (!WebRequestMap.RemoveAndCopyValue(RequestId, Request)) return false;
+    if (Request)
+    {
+        Request->OnProcessRequestComplete().Unbind();
+        Request->CancelRequest();
+    }
+    return true;
 }
 
-TSharedPtr<IHttpRequest> FWebRequestManager::GetWebRequest(const FString& InUrl) const
+TSharedPtr<IHttpRequest> FWebRequestManager::GetWebRequest(const FGuid& RequestId) const
 {
-	if(WebRequestMap.Contains(InUrl))
-	{
-		return WebRequestMap[InUrl];
-	}
-	return nullptr;
+    check(IsInGameThread());
+    const TSharedPtr<IHttpRequest>* Found = WebRequestMap.Find(RequestId);
+    return Found ? *Found : nullptr;
 }
 
 void FWebRequestManager::AddDownloader(const TSharedPtr<IFileDownloaderInterface>& Downloader)
@@ -197,15 +241,12 @@ void FWebRequestManager::RemoveDownloader(const TSharedPtr<IFileDownloaderInterf
 	}
 }
 
-void FWebRequestManager::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete)
+void FWebRequestManager::OnWebRequestComplete(FGuid RequestId, FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete)
 {
-	if(!WebRequestMap.Contains(HttpRequest->GetURL()))
-	{
-		WHLog(FString::Printf(TEXT("The web request has be canceled: %s"), *HttpRequest->GetURL()), EDC_WebRequest, EDV_Warning);
-		return;
-	}
-
-	WebRequestMap.Remove(HttpRequest->GetURL());
+	check(IsInGameThread());
+	TSharedPtr<IHttpRequest>* Found = WebRequestMap.Find(RequestId);
+	if (bStopping || !HttpRequest.IsValid() || !Found || *Found != HttpRequest) return;
+	WebRequestMap.Remove(RequestId);
 
 	if(!HttpResponse.IsValid())
 	{
@@ -230,7 +271,7 @@ void FWebRequestManager::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttp
 		}
 	}
 
-	if(EHttpResponseCodes::IsOk(HttpResponse->GetResponseCode()))
+	if(bSucceeded && EHttpResponseCodes::IsOk(HttpResponse->GetResponseCode()))
 	{
 		WHLog(TEXT("Web request successed"), EDC_WebRequest);
 		WHLog(FString::Printf(TEXT("------> URL: %s"), *HttpRequest->GetURL()), EDC_WebRequest);

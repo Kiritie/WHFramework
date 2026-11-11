@@ -86,8 +86,8 @@ int32 UVoxelWorldPreviewCommandlet::Main(const FString& Params)
 	FARFilter Filter;
 	Filter.ClassPaths.Add(UVoxelData::StaticClass()->GetClassPathName());
 	Filter.PackagePaths.Add(TEXT("/WHFramework/Voxel/DataAssets"));
+	Filter.PackagePaths.Add(TEXT("/WHFramework/DataAssets/Voxel"));
 	Filter.PackagePaths.Add(TEXT("/Game/DataAssets/Voxel"));
-	Filter.PackagePaths.Add(TEXT("/Game/VoxelStyle/Blocks"));
 	Filter.bRecursiveClasses = true;
 	Filter.bRecursivePaths = true;
 	TArray<FAssetData> Assets;

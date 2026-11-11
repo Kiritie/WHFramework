@@ -1,4 +1,6 @@
 #include "Step/StepModule.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Common/LifecycleTypes.h"
 
 #include "Step/Base/StepAsset.h"
 #include "Step/Base/StepBase.h"
@@ -40,7 +42,6 @@ UStepModule::UStepModule()
 
 UStepModule::~UStepModule()
 {
-	TERMINATION_MODULE(UStepModule)
 }
 
 #if WITH_EDITOR
@@ -53,7 +54,6 @@ void UStepModule::OnDestroy()
 {
 	ClearRuntimes();
 	Super::OnDestroy();
-	TERMINATION_MODULE(UStepModule)
 }
 #endif
 
@@ -81,7 +81,7 @@ void UStepModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		return;
 	}
 	FStepCallbackScope BatchScope(this);
-	TStrongObjectPtr<UStepRuntime> RuntimeGuard(CurrentRuntime);
+	UStepRuntime* RuntimeGuard = CurrentRuntime;
 	UStepBase* Root = GetCurrentRootStep();
 	if(!Root)
 	{
@@ -92,7 +92,7 @@ void UStepModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		FStepCallbackScope Scope(this);
 		Root->TickRuntime(DeltaSeconds);
 	}
-	if(CurrentRuntime != RuntimeGuard.Get() || !Owns(Root) || StepModuleState != EStepModuleState::Running)
+	if(CurrentRuntime != RuntimeGuard || !Owns(Root) || StepModuleState != EStepModuleState::Running)
 	{
 		return;
 	}
@@ -116,6 +116,21 @@ void UStepModule::OnRefresh(float DeltaSeconds, bool bInEditor)
 		{
 			EndStep(false);
 		}
+	}
+}
+
+void UStepModule::OnControlRefresh(float RealDeltaSeconds)
+{
+	Super::OnControlRefresh(RealDeltaSeconds);
+	if (IsShuttingDown() || bLoadingSteps || !CurrentRuntime) return;
+	FStepCallbackScope Scope(this);
+	UStepRuntime* RuntimeGuard = CurrentRuntime;
+	TArray<TWeakObjectPtr<UStepBase>> Steps;
+	for (const auto& Entry : RuntimeGuard->StepMap) Steps.Add(Entry.Value);
+	for (const TWeakObjectPtr<UStepBase>& Step : Steps)
+	{
+		if (CurrentRuntime != RuntimeGuard || IsShuttingDown()) return;
+		if (Step.IsValid() && Owns(Step.Get())) Step->SyncPlayerCameraActions();
 	}
 }
 
@@ -233,7 +248,6 @@ void UStepModule::RemoveAsset(UStepAsset* InAsset)
 	{
 		return;
 	}
-	TStrongObjectPtr<UStepRuntime> RuntimeGuard(Runtime);
 	if(CurrentRuntime == Runtime)
 	{
 		EndStepInternal(false);
@@ -362,9 +376,9 @@ void UStepModule::StartStep(int32 InRootStepIndex, bool bSkipSteps)
 	}
 	StepModuleState = EStepModuleState::Running;
 	CurrentRootStepIndex = Index;
-	TStrongObjectPtr<UStepRuntime> RuntimeGuard(CurrentRuntime);
+	UStepRuntime* RuntimeGuard = CurrentRuntime;
 	BroadcastStepStarted(Index);
-	if(CurrentRuntime != RuntimeGuard.Get() || IsShuttingDown())
+	if(CurrentRuntime != RuntimeGuard || IsShuttingDown())
 	{
 		return;
 	}
@@ -419,7 +433,6 @@ void UStepModule::EndStepInternal(bool bRestoreSteps)
 		return;
 	}
 	TGuardValue<bool> Guard(bStoppingSteps, true);
-	TStrongObjectPtr<UStepRuntime> RuntimeGuard(CurrentRuntime);
 	const TArray<UStepBase*> Roots = CurrentRuntime ? CurrentRuntime->RootSteps : TArray<UStepBase*>();
 	const bool bWasActive = StepModuleState == EStepModuleState::Running || StepModuleState == EStepModuleState::Paused;
 	StepModuleState = EStepModuleState::Ended;

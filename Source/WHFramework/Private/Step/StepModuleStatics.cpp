@@ -5,7 +5,7 @@
 
 UStepModule* UStepModuleStatics::ResolveModule(const UObject* WorldContextObject)
 {
-	return WorldContextObject ? UStepModule::GetPtr(WorldContextObject->GetWorld()) : UStepModule::GetPtr();
+	return WorldContextObject ? UStepModule::GetPtr(WorldContextObject->GetWorld()) : nullptr;
 }
 
 TArray<UStepAsset*> UStepModuleStatics::GetStepAssets(const UObject* WorldContextObject)

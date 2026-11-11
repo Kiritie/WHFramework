@@ -7,6 +7,7 @@
 #include "Components/TextBlock.h"
 #include "Engine/Texture2D.h"
 #include "Materials/MaterialInterface.h"
+#include "Widget/Common/CommonTextBlockN.h"
 
 void UWidgetInventoryPickupIcon::NativeOnInitialized()
 {
@@ -24,20 +25,28 @@ void UWidgetInventoryPickupIcon::NativeOnInitialized()
     UOverlaySlot* TextSlot = Root->AddChildToOverlay(Label);
     TextSlot->SetHorizontalAlignment(HAlign_Center);
     TextSlot->SetVerticalAlignment(VAlign_Bottom);
+    CountLabel = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass(), TEXT("ItemCount"));
+    UOverlaySlot* CountSlot = Root->AddChildToOverlay(CountLabel);
+    CountSlot->SetHorizontalAlignment(HAlign_Center);
+    CountSlot->SetVerticalAlignment(VAlign_Bottom);
+    if (CountStyleTag.IsValid()) CountLabel->SetStyleTag(CountStyleTag);
     Refresh();
 }
 
-void UWidgetInventoryPickupIcon::SetItemPresentation(UObject* InIcon, const FText& InFallbackName, int32 InCount)
+void UWidgetInventoryPickupIcon::SetItemPresentation(UObject* InIcon, const FText& InFallbackName, int32 InCount,
+    FGameplayTag InCountStyleTag)
 {
     Icon = InIcon;
     ItemName = InFallbackName;
     Count = FMath::Max(0, InCount);
+    CountStyleTag = InCountStyleTag;
+    if (CountLabel && CountStyleTag.IsValid()) CountLabel->SetStyleTag(CountStyleTag);
     Refresh();
 }
 
 void UWidgetInventoryPickupIcon::Refresh()
 {
-    if (!Image || !Label) return;
+    if (!Image || !Label || !CountLabel) return;
     bool bHasIcon = false;
     if (UTexture2D* Texture = Cast<UTexture2D>(Icon))
     {
@@ -50,6 +59,8 @@ void UWidgetInventoryPickupIcon::Refresh()
         bHasIcon = true;
     }
     Image->SetVisibility(bHasIcon ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-    Label->SetText(bHasIcon ? (Count > 1 ? FText::AsNumber(Count) : FText::GetEmpty()) : ItemName);
+    const bool bShowStyledCount = bHasIcon && CountStyleTag.IsValid();
+    Label->SetText(bHasIcon ? (Count > 1 && !bShowStyledCount ? FText::AsNumber(Count) : FText::GetEmpty()) : ItemName);
+    CountLabel->SetText(bShowStyledCount && Count > 1 ? FText::AsNumber(Count) : FText::GetEmpty());
     SetVisibility(ESlateVisibility::HitTestInvisible);
 }

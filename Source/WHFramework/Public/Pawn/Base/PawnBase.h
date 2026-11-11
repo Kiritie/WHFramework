@@ -2,9 +2,14 @@
 
 #pragma once
 
+#include "Containers/Ticker.h"
+
+#include "Common/LifecycleTypes.h"
+#include "Camera/CameraConfigTypes.h"
 #include "PawnInterface.h"
 #include "AI/Base/AIAgentInterface.h"
 #include "Asset/Primary/PrimaryEntityInterface.h"
+#include "Asset/Primary/PrimaryEntityAssetBinding.h"
 #include "GameFramework/Pawn.h"
 #include "Common/Base/WHActor.h"
 #include "Gameplay/WHPlayerInterface.h"
@@ -19,6 +24,7 @@ class UBoxComponent;
 class UAIPerceptionStimuliSourceComponent;
 class UVoxelAgentComponent;
 class UPrimaryAssetBase;
+class APlayerController;
 /**
  *
  */
@@ -79,6 +85,13 @@ public:
 	virtual FParameter ToData() override;
 
 protected:
+	virtual void PostActorCreated() override;
+
+#if WITH_EDITOR
+	virtual void PostDuplicate(EDuplicateMode::Type DuplicateMode) override;
+	virtual void PostEditImport() override;
+#endif
+
 	virtual void BeginPlay() override;
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -99,7 +112,7 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void Switch();
+	void Switch(APlayerController* InPlayer);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	void UnSwitch();
@@ -176,8 +189,15 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Actor
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_ActorID, Category = "SceneActor")
 	FGuid ActorID;
+
+	FTSTicker::FDelegateHandle SceneIdentityRetry;
+	bool bSceneIdentityCommitted = false;
+	bool bSceneRegistrationFailed = false;
+
+	UFUNCTION()
+	virtual void OnRep_ActorID();
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	bool bVisible;
@@ -191,10 +211,7 @@ public:
 		return ActorID;
 	}
 
-	virtual void SetActorID_Implementation(const FString& InID) override
-	{
-		ActorID = FGuid(InID);
-	}
+	virtual bool SetActorID_Implementation(FGuid InID) override;
 
 	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override
 	{
@@ -271,8 +288,14 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Primary Asset
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	UPROPERTY(ReplicatedUsing = OnRep_AssetID, EditDefaultsOnly, BlueprintReadOnly)
 	FPrimaryAssetId AssetID;
+
+	UPROPERTY(Transient)
+	FPrimaryEntityAssetBinding AssetBinding;
+
+	UFUNCTION()
+	virtual void OnRep_AssetID();
 
 public:
 	virtual FPrimaryAssetId GetAssetID_Implementation() const override
@@ -280,17 +303,14 @@ public:
 		return AssetID;
 	}
 
-	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override
+	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override;
+
+	template <class T> const T* GetPawnData() const
 	{
-		AssetID = InID;
+		return Cast<T>(GetPawnData());
 	}
 
-	template <class T> T& GetPawnData() const
-	{
-		return static_cast<T&>(GetPawnData());
-	}
-
-	UPrimaryAssetBase& GetPawnData() const;
+	const UPrimaryAssetBase* GetPawnData() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// AI

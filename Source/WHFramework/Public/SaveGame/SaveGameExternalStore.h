@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "Parameter/ParameterTypes.h"
 #include "SaveGame/SaveGameStorage.h"
 #include <atomic>
@@ -58,10 +58,14 @@ using FSaveWorldStoreTransform = TFunction<bool(const FSaveWorldCaptureContext&,
 using FSaveWorldStoreFinish = TFunction<bool(const FSaveWorldCaptureContext&,
     const TSharedPtr<ISaveWorldExternalStore, ESPMode::ThreadSafe>&, bool, FString&)>;
 using FSaveWorldStoreDelete = TFunction<bool(const FGuid&, FString&)>;
+// 按原操作身份幂等退役；false 必须保留可重试的剩余所有权，true 表示完全释放。
+using FSaveWorldStoreAbandon = TFunction<bool(const FGuid&, FString&)>;
 
 // 一份中央世界存储对应一个参与者；GT 回调在接受请求时复制，不能在完成时改找新 World。
 struct WHFRAMEWORK_API FSaveWorldStoreParticipant
 {
+    TFunction<bool()> IsAvailable;
+    FSaveWorldStoreAbandon Abandon;
     FSaveWorldStoreBegin Begin;
     FSaveWorldStoreTransform Transform;
     FSaveWorldStoreFinish Finish;

@@ -1,6 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-using System;
 using System.IO;
 using UnrealBuildTool;
 
@@ -82,36 +81,12 @@ public class WHFrameworkCore : ModuleRules
 	
 	void AddRuntimeDependencies(string[] DllNames, string LibraryPath, bool DelayLoad)
 	{
-		string binariesDir = Path.GetFullPath(Path.Combine(ModuleDirectory, "..", "..", "Binaries", "Win64"));
-		string engineBinaries = Path.GetFullPath(Path.Combine(EngineDirectory, "Binaries", "Win64"));
-		foreach (string iter in DllNames)
+		foreach (string DllName in DllNames)
 		{
-			if (DelayLoad) PublicDelayLoadDLLs.Add(iter);
-			string dllPath = Path.Combine(LibraryPath, iter);
-			string destDllPath = Path.Combine(binariesDir, iter);
-			string engineDllPath = Path.Combine(engineBinaries, iter);
-			if (!Directory.Exists(binariesDir))
-			{
-				Directory.CreateDirectory(binariesDir);
-			}
-			try
-			{
-				System.IO.File.Delete(destDllPath);
-			}
-			catch (Exception)
-			{
-				// ignored
-			}
-			if (!System.IO.File.Exists(destDllPath) && System.IO.File.Exists(dllPath))
-			{
-				System.IO.File.Copy(dllPath, destDllPath, false);
-			}
-			if (!System.IO.File.Exists(engineDllPath) && System.IO.File.Exists(dllPath))
-			{
-				System.IO.File.Copy(dllPath, engineDllPath, false);
-			}
-			RuntimeDependencies.Add(destDllPath);
-			RuntimeDependencies.Add(Path.Combine("$(TargetOutputDir)", iter), destDllPath);
+			if (DelayLoad) PublicDelayLoadDLLs.Add(DllName);
+			string Source = Path.Combine(LibraryPath, DllName);
+			RuntimeDependencies.Add(Path.Combine("$(PluginDir)", "Binaries", "Win64", DllName), Source);
+			RuntimeDependencies.Add(Path.Combine("$(TargetOutputDir)", DllName), Source);
 		}
 	}
 }

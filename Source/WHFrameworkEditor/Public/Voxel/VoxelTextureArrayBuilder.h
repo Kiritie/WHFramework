@@ -3,7 +3,8 @@
 class UVoxelData;class UVoxelMaterialSet;
 struct FVoxelArrayBuildOptions
 {
-    FString OutputRoot=TEXT("/Game/VoxelGenerated");
+    FString TextureOutputRoot=TEXT("/Game/Textures/Voxel/Baked");
+    FString MaterialOutputRoot=TEXT("/Game/Materials/Voxel/Baked");
     int32 TileSize=16;
     int32 MaxSlicesPerBank=256;
 };

@@ -1,4 +1,5 @@
-﻿#include "SaveGame/SaveGameStorage.h"
+#include "SaveGame/SaveGameStorage.h"
+#include "SaveGame/SaveManifestTypes.h"
 
 #include "HAL/FileManager.h"
 #include "Ability/Inventory/InventoryStoreLock.h"

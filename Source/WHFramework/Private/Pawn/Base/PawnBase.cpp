@@ -1,15 +1,23 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Pawn/Base/PawnBase.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Scene/Actor/SceneActorIdentity.h"
+#include "Scene/SceneModule.h"
+#include "Ability/AbilityActorTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Camera/CameraConfigTypes.h"
+#include "Scene/SceneActorSaveTypes.h"
 
 #include "AIController.h"
 #include "AI/Base/AIControllerBase.h"
 #include "Main/MainModule.h"
 #include "Animation/AnimInstance.h"
-#include "Asset/AssetModuleStatics.h"
+#include "Net/UnrealNetwork.h"
 #include "Components/BoxComponent.h"
 #include "Pawn/PawnModuleNetworkComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "Pawn/PawnModuleStatics.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
@@ -50,27 +58,63 @@ APawnBase::APawnBase(const FObjectInitializer& ObjectInitializer)
 
 	bInitialized = false;
 	bBlockAllInput = false;
-
-	ActorID = FGuid::NewGuid();
 	bVisible = true;
 	Container = nullptr;
 }
 
+void APawnBase::PostActorCreated()
+{
+	Super::PostActorCreated();
+	SceneActorIdentity::InitializeCreated(*this, ActorID);
+}
+
+#if WITH_EDITOR
+void APawnBase::PostDuplicate(EDuplicateMode::Type DuplicateMode)
+{
+	Super::PostDuplicate(DuplicateMode);
+	SceneActorIdentity::InitializeEditorDuplicate(*this, ActorID, DuplicateMode);
+}
+
+void APawnBase::PostEditImport()
+{
+	Super::PostEditImport();
+	SceneActorIdentity::InitializeEditorImport(*this, ActorID);
+}
+#endif
+
+bool APawnBase::SetActorID_Implementation(FGuid InID)
+{
+	if ((Container || bSceneIdentityCommitted) && ActorID != InID) return false;
+	return SceneActorIdentity::Assign(*this, ActorID, InID);
+}
+
+void APawnBase::OnRep_ActorID()
+{
+	SceneActorIdentity::QueueReplication(*this, SceneIdentityRetry);
+}
+
 void APawnBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	USceneModuleStatics::RemoveSceneActor(this);
-
+	if (bSceneRegistrationFailed) return;
 	const FAbilityActorSpawnParameter* Param = InParam.GetPtr<FAbilityActorSpawnParameter>();
-	if (Param && Param->bOverrideActorID)
-	{
-		ActorID = Param->ActorID;
-	}
 	if (Param)
 	{
-		AssetID = Param->AssetID;
+		SetAssetID_Implementation(Param->AssetID);
 	}
-
-	USceneModuleStatics::AddSceneActor(this);
+	else if (AssetID.IsValid()) AssetBinding.Bind(this, AssetID);
+	const bool bRegistered = ActorID.IsValid() && USceneModuleStatics::AddSceneActor(this, this);
+	if (bRegistered) bSceneIdentityCommitted = true;
+	if (!bRegistered && HasAuthority() && Execute_IsUseDefaultLifecycle(this))
+	{
+		bSceneRegistrationFailed = true;
+		bInitialized = false;
+		SetActorHiddenInGame(true);
+		SetActorEnableCollision(false);
+		SetActorTickEnabled(false);
+		UE_LOG(LogTemp, Error, TEXT("场景实体登记失败，停止初始化：%s id=%s"), *GetNameSafe(this), *ActorID.ToString());
+		return;
+	}
+	if (!bRegistered && !HasAuthority() && ActorID.IsValid()) SceneActorIdentity::QueueReplication(*this, SceneIdentityRetry);
 
 	Execute_SetActorVisible(this, true);
 	if (VoxelAgentComponent)
@@ -81,6 +125,7 @@ void APawnBase::OnSpawn_Implementation(const FParameter& InParam)
 
 void APawnBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
+	SceneActorIdentity::CancelReplication(SceneIdentityRetry);
 	if (VoxelAgentComponent)
 	{
 		VoxelAgentComponent->SetAgentEnabled(false);
@@ -90,7 +135,7 @@ void APawnBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 
 	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
 
-	USceneModuleStatics::RemoveSceneActor(this);
+	if (USceneModule* Scene = UMainModuleStatics::GetModuleForCleanup<USceneModule>(GetWorld())) Scene->RemoveSceneActor(this);
 	if (Container)
 	{
 		Container->RemoveSceneActor(this);
@@ -98,6 +143,10 @@ void APawnBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 
 	Container = nullptr;
 	DefaultController = nullptr;
+	AssetBinding.Reset();
+	AssetID = FPrimaryAssetId();
+	bSceneIdentityCommitted = false;
+	if (HasAuthority()) { ActorID.Invalidate(); ForceNetUpdate(); }
 }
 
 UVoxelAgentComponent* APawnBase::GetVoxelAgentComponent() const
@@ -107,11 +156,24 @@ UVoxelAgentComponent* APawnBase::GetVoxelAgentComponent() const
 
 void APawnBase::OnInitialize_Implementation()
 {
+	if (bSceneRegistrationFailed) return;
 	bInitialized = true;
+	if (AssetID.IsValid()) AssetBinding.Bind(this, AssetID);
 
 	Execute_SetActorVisible(this, bVisible);
-
-	USceneModuleStatics::AddSceneActor(this);
+	const bool bRegistered = ActorID.IsValid() && USceneModuleStatics::AddSceneActor(this, this);
+	if (bRegistered) bSceneIdentityCommitted = true;
+	if (!bRegistered && HasAuthority() && Execute_IsUseDefaultLifecycle(this))
+	{
+		bSceneRegistrationFailed = true;
+		bInitialized = false;
+		SetActorHiddenInGame(true);
+		SetActorEnableCollision(false);
+		SetActorTickEnabled(false);
+		UE_LOG(LogTemp, Error, TEXT("场景实体登记失败，停止初始化：%s id=%s"), *GetNameSafe(this), *ActorID.ToString());
+		return;
+	}
+	if (!bRegistered && !HasAuthority() && ActorID.IsValid()) SceneActorIdentity::QueueReplication(*this, SceneIdentityRetry);
 }
 
 void APawnBase::OnPreparatory_Implementation()
@@ -124,16 +186,24 @@ void APawnBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void APawnBase::OnTermination_Implementation()
 {
-	USceneModuleStatics::RemoveSceneActor(this);
+	SceneActorIdentity::CancelReplication(SceneIdentityRetry);
+	if (USceneModule* Scene = UMainModuleStatics::GetModuleForCleanup<USceneModule>(GetWorld())) Scene->RemoveSceneActor(this);
+	AssetBinding.Reset();
 }
 
 void APawnBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
+	if (!InSaveData.GetPtr<FSceneActorSaveData>()) { MarkLoadDataFailed(); return; }
 	auto& SaveData = InSaveData.GetRef<FSceneActorSaveData>();
 
 	if (PHASEC(InPhase, EPhase::Primary))
 	{
-		ActorID = SaveData.ActorID;
+		if (!SetActorID_Implementation(SaveData.ActorID))
+		{
+			MarkLoadDataFailed();
+			UE_LOG(LogTemp, Error, TEXT("无法恢复场景实体身份：%s id=%s"), *GetNameSafe(this), *SaveData.ActorID.ToString());
+			return;
+		}
 		SetActorTransform(SaveData.SpawnTransform);
 	}
 }
@@ -158,12 +228,15 @@ void APawnBase::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
+		if (!Execute_IsInitialized(this)) return;
 		Execute_OnPreparatory(this);
 	}
 }
 
 void APawnBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	SceneActorIdentity::CancelReplication(SceneIdentityRetry);
+	if (USceneModule* Scene = UMainModuleStatics::GetModuleForCleanup<USceneModule>(GetWorld())) Scene->RemoveSceneActor(this);
 	Super::EndPlay(EndPlayReason);
 
 	if (Execute_IsUseDefaultLifecycle(this))
@@ -197,22 +270,22 @@ void APawnBase::OnUnSwitch_Implementation()
 {
 }
 
-void APawnBase::Switch_Implementation()
+void APawnBase::Switch_Implementation(APlayerController* InPlayer)
 {
-	UPawnModuleStatics::SwitchPawn(this);
+	UPawnModuleStatics::SwitchPawn(InPlayer, this);
 }
 
 void APawnBase::UnSwitch_Implementation()
 {
-	if (IsCurrent())
+	if (APlayerController* Player = Cast<APlayerController>(GetController()))
 	{
-		UPawnModuleStatics::SwitchPawn(nullptr);
+		UPawnModuleStatics::SwitchPawn(Player, nullptr);
 	}
 }
 
 bool APawnBase::IsCurrent_Implementation() const
 {
-	return UPawnModuleStatics::GetCurrentPawn() == this;
+	return Cast<APlayerController>(GetController()) != nullptr;
 }
 
 void APawnBase::Turn_Implementation(float InValue)
@@ -285,9 +358,9 @@ void APawnBase::TransformTowards(FTransform InTransform, float InDuration, bool 
 		{
 			MultiTransformTowards(InTransform);
 		}
-		else if (UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>())
+		else if (UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>(Cast<APlayerController>(GetController())))
 		{
-			PawnModuleNetworkComponent->ServerTransformTowardsToMulticast(this, InTransform);
+			PawnModuleNetworkComponent->ServerTransformTowardsToMulticast(PawnModuleNetworkComponent->MaintainLocalWorldRoute(), this, InTransform);
 		}
 		return;
 	}
@@ -307,9 +380,9 @@ void APawnBase::RotationTowards(FRotator InRotation, float InDuration, bool bMul
 		{
 			MultiRotationTowards(InRotation, InDuration);
 		}
-		else if (UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>())
+		else if (UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>(Cast<APlayerController>(GetController())))
 		{
-			PawnModuleNetworkComponent->ServerRotationTowardsMulticast(this, InRotation, InDuration);
+			PawnModuleNetworkComponent->ServerRotationTowardsMulticast(PawnModuleNetworkComponent->MaintainLocalWorldRoute(), this, InRotation, InDuration);
 		}
 		return;
 	}
@@ -329,9 +402,9 @@ void APawnBase::AIMoveTo(FVector InLocation, float InStopDistance, bool bMultica
 		{
 			MultiAIMoveTo(InLocation, InStopDistance);
 		}
-		else if (UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>())
+		else if (UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>(Cast<APlayerController>(GetController())))
 		{
-			PawnModuleNetworkComponent->ServerAIMoveToMulticast(this, InLocation, InStopDistance);
+			PawnModuleNetworkComponent->ServerAIMoveToMulticast(PawnModuleNetworkComponent->MaintainLocalWorldRoute(), this, InLocation, InStopDistance);
 		}
 		return;
 	}
@@ -354,9 +427,9 @@ void APawnBase::StopAIMove(bool bMulticast)
 		{
 			MultiStopAIMove();
 		}
-		else if (UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>())
+		else if (UPawnModuleNetworkComponent* PawnModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UPawnModuleNetworkComponent>(Cast<APlayerController>(GetController())))
 		{
-			PawnModuleNetworkComponent->ServerStopAIMoveMulticast(this);
+			PawnModuleNetworkComponent->ServerStopAIMoveMulticast(PawnModuleNetworkComponent->MaintainLocalWorldRoute(), this);
 		}
 		return;
 	}
@@ -371,9 +444,20 @@ void APawnBase::MultiStopAIMove_Implementation()
 	StopAIMove(false);
 }
 
-UPrimaryAssetBase& APawnBase::GetPawnData() const
+const UPrimaryAssetBase* APawnBase::GetPawnData() const
 {
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(AssetID);
+	return AssetBinding.Get();
+}
+
+void APawnBase::SetAssetID_Implementation(const FPrimaryAssetId& InID)
+{
+	AssetID = InID;
+	AssetBinding.Bind(this, AssetID);
+}
+
+void APawnBase::OnRep_AssetID()
+{
+	AssetBinding.Bind(this, AssetID);
 }
 
 UBehaviorTree* APawnBase::GetBehaviorTreeAsset() const
@@ -402,4 +486,6 @@ FVector APawnBase::GetMoveDirection(bool bIgnoreZ) const
 void APawnBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(APawnBase, ActorID);
+	DOREPLIFETIME(APawnBase, AssetID);
 }

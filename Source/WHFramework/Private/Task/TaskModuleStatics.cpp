@@ -2,135 +2,147 @@
 
 
 #include "Task/TaskModuleStatics.h"
+#include "Task/TaskExecutionTypes.h"
+#include "Task/TaskReferenceTypes.h"
+#include "Task/TaskObjectiveTypes.h"
 
 #include "Task/TaskModule.h"
 
-TArray<UTaskAsset*> UTaskModuleStatics::GetTaskAssets()
+TArray<UTaskAsset*> UTaskModuleStatics::GetTaskAssets(UWorld* InWorld, FGuid InPlayerId)
 {
-	return UTaskModule::Get().GetVisibleAssets();
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) return Module->GetVisibleAssets(InPlayerId);
+    return {};
 }
 
-UTaskBase* UTaskModuleStatics::GetCurrentTask()
+UTaskBase* UTaskModuleStatics::GetCurrentTask(UWorld* InWorld, FGuid InPlayerId)
 {
-	return UTaskModule::Get().GetCurrentTask();
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) return Module->GetCurrentTask(InPlayerId);
+    return {};
 }
 
-void UTaskModuleStatics::SetCurrentTask(UTaskBase* InTask)
+void UTaskModuleStatics::SetCurrentTask(UWorld* InWorld, FGuid InPlayerId, UTaskBase* InTask)
 {
-	UTaskModule::Get().SetCurrentTask(InTask);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->SetCurrentTask(InPlayerId, InTask);
 }
 
-bool UTaskModuleStatics::IsExistTaskByGUID(const FString& InTaskGUID)
+bool UTaskModuleStatics::IsExistTaskByGUID(UWorld* InWorld, const FString& InTaskGUID)
 {
-	return UTaskModule::Get().IsExistTaskByGUID(InTaskGUID);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) return Module->IsExistTaskByGUID(InTaskGUID);
+    return {};
 }
 
-UTaskBase* UTaskModuleStatics::GetTaskByGUID(const FString& InTaskGUID)
+UTaskBase* UTaskModuleStatics::GetTaskByGUID(UWorld* InWorld, const FString& InTaskGUID)
 {
-	return UTaskModule::Get().GetTaskByGUID(InTaskGUID);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) return Module->GetTaskByGUID(InTaskGUID);
+    return {};
 }
 
-UTaskAsset* UTaskModuleStatics::GetTaskAsset(UTaskAsset* InAsset)
+UTaskAsset* UTaskModuleStatics::GetTaskAsset(UWorld* InWorld, UTaskAsset* InAsset)
 {
-	return UTaskModule::Get().GetAsset(InAsset);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) return Module->GetAsset(InAsset);
+    return {};
 }
 
-UTaskAsset* UTaskModuleStatics::AddTaskAsset(UTaskAsset* InAsset)
+UTaskAsset* UTaskModuleStatics::AddTaskAsset(UWorld* InWorld, UTaskAsset* InAsset)
 {
-	return UTaskModule::Get().AddAsset(InAsset);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) return Module->AddAsset(InAsset);
+    return {};
 }
 
-UTaskAsset* UTaskModuleStatics::CreateTaskAsset(UTaskAsset* InAsset, FGuid InAgentID)
+UTaskAsset* UTaskModuleStatics::CreateTaskAsset(UWorld* InWorld, UTaskAsset* InAsset, FGuid InAgentID)
 {
-	return UTaskModule::Get().CreateAsset(InAsset, InAgentID);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) return Module->CreateAsset(InAsset, InAgentID);
+    return {};
 }
 
-void UTaskModuleStatics::RemoveTaskAsset(UTaskAsset* InAsset)
+void UTaskModuleStatics::RemoveTaskAsset(UWorld* InWorld, UTaskAsset* InAsset)
 {
-	UTaskModule::Get().RemoveAsset(InAsset);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->RemoveAsset(InAsset);
 }
 
-void UTaskModuleStatics::RestoreTask(UTaskBase* InTask)
+void UTaskModuleStatics::RestoreTask(UWorld* InWorld, UTaskBase* InTask)
 {
-	UTaskModule::Get().RestoreTask(InTask);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->RestoreTask(InTask);
 }
 
-void UTaskModuleStatics::RestoreTaskByGUID(const FString& InTaskGUID)
+void UTaskModuleStatics::RestoreTaskByGUID(UWorld* InWorld, const FString& InTaskGUID)
 {
-	UTaskModule::Get().RestoreTaskByGUID(InTaskGUID);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->RestoreTaskByGUID(InTaskGUID);
 }
 
-void UTaskModuleStatics::EnterTask(UTaskBase* InTask, bool bSetAsCurrent)
+void UTaskModuleStatics::EnterTask(UWorld* InWorld, UTaskBase* InTask, bool bSetAsCurrent)
 {
-	UTaskModule::Get().EnterTask(InTask, bSetAsCurrent);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->EnterTask(InTask, bSetAsCurrent);
 }
 
-void UTaskModuleStatics::EnterTaskByGUID(const FString& InTaskGUID, bool bSetAsCurrent)
+void UTaskModuleStatics::EnterTaskByGUID(UWorld* InWorld, const FString& InTaskGUID, bool bSetAsCurrent)
 {
-	UTaskModule::Get().EnterTaskByGUID(InTaskGUID, bSetAsCurrent);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->EnterTaskByGUID(InTaskGUID, bSetAsCurrent);
 }
 
-void UTaskModuleStatics::RefreshTask(UTaskBase* InTask)
+void UTaskModuleStatics::RefreshTask(UWorld* InWorld, UTaskBase* InTask)
 {
-	UTaskModule::Get().RefreshTask(InTask);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->RefreshTask(InTask);
 }
 
-void UTaskModuleStatics::RefreshTaskByGUID(const FString& InTaskGUID)
+void UTaskModuleStatics::RefreshTaskByGUID(UWorld* InWorld, const FString& InTaskGUID)
 {
-	UTaskModule::Get().RefreshTaskByGUID(InTaskGUID);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->RefreshTaskByGUID(InTaskGUID);
 }
 
-void UTaskModuleStatics::GuideTask(UTaskBase* InTask)
+void UTaskModuleStatics::GuideTask(UWorld* InWorld, UTaskBase* InTask)
 {
-	UTaskModule::Get().GuideTask(InTask);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->GuideTask(InTask);
 }
 
-void UTaskModuleStatics::GuideTaskByGUID(const FString& InTaskGUID)
+void UTaskModuleStatics::GuideTaskByGUID(UWorld* InWorld, const FString& InTaskGUID)
 {
-	UTaskModule::Get().GuideTaskByGUID(InTaskGUID);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->GuideTaskByGUID(InTaskGUID);
 }
 
-void UTaskModuleStatics::ExecuteTask(UTaskBase* InTask)
+void UTaskModuleStatics::ExecuteTask(UWorld* InWorld, UTaskBase* InTask)
 {
-	UTaskModule::Get().ExecuteTask(InTask);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->ExecuteTask(InTask);
 }
 
-void UTaskModuleStatics::ExecuteTaskByGUID(const FString& InTaskGUID)
+void UTaskModuleStatics::ExecuteTaskByGUID(UWorld* InWorld, const FString& InTaskGUID)
 {
-	UTaskModule::Get().ExecuteTaskByGUID(InTaskGUID);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->ExecuteTaskByGUID(InTaskGUID);
 }
 
-void UTaskModuleStatics::CompleteTask(UTaskBase* InTask, ETaskExecuteResult InTaskExecuteResult)
+void UTaskModuleStatics::CompleteTask(UWorld* InWorld, UTaskBase* InTask, ETaskExecuteResult InTaskExecuteResult)
 {
-	UTaskModule::Get().CompleteTask(InTask, InTaskExecuteResult);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->CompleteTask(InTask, InTaskExecuteResult);
 }
 
-void UTaskModuleStatics::CompleteTaskByGUID(const FString& InTaskGUID, ETaskExecuteResult InTaskExecuteResult)
+void UTaskModuleStatics::CompleteTaskByGUID(UWorld* InWorld, const FString& InTaskGUID, ETaskExecuteResult InTaskExecuteResult)
 {
-	UTaskModule::Get().CompleteTaskByGUID(InTaskGUID, InTaskExecuteResult);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->CompleteTaskByGUID(InTaskGUID, InTaskExecuteResult);
 }
 
-void UTaskModuleStatics::LeaveTask(UTaskBase* InTask)
+void UTaskModuleStatics::LeaveTask(UWorld* InWorld, UTaskBase* InTask)
 {
-	UTaskModule::Get().LeaveTask(InTask);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->LeaveTask(InTask);
 }
 
-void UTaskModuleStatics::LeaveTaskByGUID(const FString& InTaskGUID)
+void UTaskModuleStatics::LeaveTaskByGUID(UWorld* InWorld, const FString& InTaskGUID)
 {
-	UTaskModule::Get().LeaveTaskByGUID(InTaskGUID);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->LeaveTaskByGUID(InTaskGUID);
 }
 
-UTaskBase* UTaskModuleStatics::ResolveTask(const FTaskReference& InReference)
+UTaskBase* UTaskModuleStatics::ResolveTask(UWorld* InWorld, const FTaskReference& InReference)
 {
-	return UTaskModule::Get().ResolveTask(InReference);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) return Module->ResolveTask(InReference);
+    return {};
 }
 
-bool UTaskModuleStatics::TurnInTask(UTaskBase* InTask, AActor* InTarget)
+bool UTaskModuleStatics::TurnInTask(UWorld* InWorld, UTaskBase* InTask, AActor* InTarget)
 {
-	return UTaskModule::Get().TurnInTask(InTask, InTarget);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) return Module->TurnInTask(InTask, InTarget);
+    return {};
 }
 
-void UTaskModuleStatics::ReportTaskEvent(FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount, FPrimaryAssetId InTargetAssetID, FName InTargetName, FGuid InOwnerActorID, ETaskEventScope InScope)
+void UTaskModuleStatics::ReportTaskEvent(UWorld* InWorld, FGameplayTag InEventTag, FGameplayTag InTargetTag, int32 InCount, FPrimaryAssetId InTargetAssetID, FName InTargetName, FGuid InOwnerActorID, ETaskEventScope InScope)
 {
-	UTaskModule::Get().ReportTaskEvent(InEventTag, InTargetTag, InCount, InTargetAssetID, InTargetName, InOwnerActorID, InScope);
+    if (UTaskModule* Module = UTaskModule::GetPtr(InWorld)) Module->ReportTaskEvent(InEventTag, InTargetTag, InCount, InTargetAssetID, InTargetName, InOwnerActorID, InScope);
 }

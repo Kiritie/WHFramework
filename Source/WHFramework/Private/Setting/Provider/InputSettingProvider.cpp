@@ -1,11 +1,23 @@
 #include "Setting/Provider/InputSettingProvider.h"
+#include "Setting/SettingPresentationTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "Input/InputModule.h"
-#include "Common/CommonModuleTypes.h"
+#include "Setting/SettingModule.h"
+#include "Common/CommonTypes.h"
+#include "Gameplay/WHLocalPlayer.h"
+#include "EnhancedInputSubsystems.h"
+#include "UserSettings/EnhancedInputUserSettings.h"
 
 namespace
 {
 	const FName InputProviderName(TEXT("Input"));
+
+	int32 GetEditingPlayerIndex(const UInputSettingProvider& InProvider, const UInputModule& InInput)
+	{
+		const USettingModule* Settings = InProvider.GetTypedOuter<USettingModule>();
+		return Settings ? InInput.FindPlayerRuntimeIndex(Settings->GetEditSessionPlayer()) : INDEX_NONE;
+	}
 
 	FString GetSlotName(EPlayerMappableKeySlot InSlot)
 	{
@@ -146,7 +158,9 @@ FSettingValidationResult UInputSettingProvider::Validate(const FSettingDefinitio
 			return Conflict();
 		}
 	}
-	for(const FPlayerKeyMapping& Mapping : Input->GetAllPlayerKeyMappings())
+	const int32 PlayerIndex = GetEditingPlayerIndex(*this, *Input);
+	if (PlayerIndex == INDEX_NONE) return FSettingValidationResult::Invalid(NSLOCTEXT("WH.InputSettingProvider", "PlayerUnavailable", "编辑输入设置的本地玩家已不可用。"));
+	for(const FPlayerKeyMapping& Mapping : Input->GetAllPlayerKeyMappings(PlayerIndex))
 	{
 		const FSettingId MappingId{FName(*FString::Printf(TEXT("Input.%s.%s"), *Mapping.GetMappingName().ToString(), *GetSlotName(Mapping.GetSlot())))};
 		if (!PendingKeys.Contains(MappingId) && MappingId != InDefinition.SettingId && Mapping.GetCurrentKey() == *Key)
@@ -178,22 +192,47 @@ bool UInputSettingProvider::Apply(const FSettingDefinition& InDefinition, const 
 	}
 
 	FGameplayTagContainer FailureReasons;
-	const FScopedWorldContext WorldContext(GetWorld());
+	const int32 PlayerIndex = GetEditingPlayerIndex(*this, *Input);
+	if (PlayerIndex == INDEX_NONE) return false;
 	return Input->MapPlayerKeyByMappingName(
 		FName(*InDefinition.SourcePath),
 		*Key,
 		GetDefinitionSlot(InDefinition),
-		0,
-		&FailureReasons);
+		PlayerIndex,
+		&FailureReasons,
+		GetTypedOuter<USettingModule>());
 }
 
-void UInputSettingProvider::Rollback(const FSettingDefinition& InDefinition)
+bool UInputSettingProvider::Rollback(const FSettingDefinition& InDefinition)
 {
 	if(const FKey* Key = AppliedKeys.Find(InDefinition.SettingId))
 	{
-		Apply(InDefinition, FParameter(*Key));
+		if (!Apply(InDefinition, FParameter(*Key))) return false;
 		PendingKeys.Add(InDefinition.SettingId, *Key);
+		return true;
 	}
+	return false;
+}
+
+bool UInputSettingProvider::RollbackForHostTermination(const FSettingDefinition& InDefinition, UWHLocalPlayer* InPlayer)
+{
+	const FKey* Key = AppliedKeys.Find(InDefinition.SettingId);
+	UEnhancedInputLocalPlayerSubsystem* Input = ::IsValid(InPlayer) ? InPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr;
+	UEnhancedInputUserSettings* Settings = Input ? Input->GetUserSettings() : nullptr;
+	if (!CanHandle(InDefinition) || !Key || !::IsValid(Settings)) return false;
+	FMapPlayerKeyArgs Args;
+	Args.MappingName = FName(*InDefinition.SourcePath);
+	Args.Slot = GetDefinitionSlot(InDefinition);
+	Args.NewKey = *Key;
+	FGameplayTagContainer FailureReasons;
+	Settings->MapPlayerKey(Args, FailureReasons);
+	return FailureReasons.IsEmpty() && ::IsValid(InPlayer) && ::IsValid(Input) && ::IsValid(Settings) &&
+		InPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() == Input && Input->GetUserSettings() == Settings;
+}
+
+bool UInputSettingProvider::CanRollbackForHostTermination(const FSettingDefinition& InDefinition, const UWHLocalPlayer* InPlayer) const
+{
+	return ::IsValid(InPlayer) && InPlayer->CanRestoreInputSetting(FName(*InDefinition.SourcePath), static_cast<uint8>(GetDefinitionSlot(InDefinition)));
 }
 
 void UInputSettingProvider::Commit()
@@ -213,7 +252,9 @@ FKey UInputSettingProvider::FindCurrentKey(const FSettingDefinition& InDefinitio
 	const UInputModule* Input = UInputModule::GetPtr(GetWorld());
 	if (!Input) return FKey();
 	const EPlayerMappableKeySlot Slot = GetDefinitionSlot(InDefinition);
-	const TArray<FPlayerKeyMapping> Mappings = Input->GetPlayerKeyMappingsByMappingName(FName(*InDefinition.SourcePath));
+	const int32 PlayerIndex = GetEditingPlayerIndex(*this, *Input);
+	if (PlayerIndex == INDEX_NONE) return FKey();
+	const TArray<FPlayerKeyMapping> Mappings = Input->GetPlayerKeyMappingsByMappingName(FName(*InDefinition.SourcePath), PlayerIndex);
 	if(const FPlayerKeyMapping* Mapping = Mappings.FindByPredicate([Slot](const FPlayerKeyMapping& Item)
 	{
 		return Item.GetSlot() == Slot;

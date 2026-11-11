@@ -22,7 +22,9 @@ void UWebRequestHandle_GetTexture::OnDespawn_Implementation(EObjectDespawnMode I
 
 void UWebRequestHandle_GetTexture::Parse(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
 {
-    if ( InResult.bSucceeded && InResult.HttpResponse->GetContentLength() > 0 )
+    bSucceeded = false;
+    Texture = nullptr;
+    if ( InResult.bSucceeded && InResult.HttpResponse.IsValid() && InResult.HttpResponse->GetContentLength() > 0 )
     {
         IImageWrapperModule& ImageWrapperModule = FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
         TSharedPtr<IImageWrapper> ImageWrappers[4] =
@@ -39,13 +41,14 @@ void UWebRequestHandle_GetTexture::Parse(const FWebRequestResult& InResult, cons
             {
                 TArray<uint8> RawData;
                 constexpr ERGBFormat RGBFormat = ERGBFormat::BGRA;
-                constexpr EPixelFormat PixelFormat = EPixelFormat::PF_FloatRGBA;
+				constexpr EPixelFormat PixelFormat = EPixelFormat::PF_B8G8R8A8;
 	            const FPixelFormatInfo& PixelFormatInfo = GPixelFormats[PixelFormat];
                 if ( ImageWrapper->GetRaw(RGBFormat, 8, RawData) )
                 {
                     const int32 SizeX = ImageWrapper->GetWidth();
                     const int32 SizeY = ImageWrapper->GetHeight();
                     if (SizeX > 0 && SizeY > 0 &&
+                        int64(SizeX) * int64(SizeY) <= MAX_int32 / 4 && RawData.Num() == int64(SizeX) * int64(SizeY) * 4 &&
                         (SizeX % PixelFormatInfo.BlockSizeX) == 0 &&
                         (SizeY % PixelFormatInfo.BlockSizeY) == 0)
                     {
@@ -70,7 +73,8 @@ void UWebRequestHandle_GetTexture::Parse(const FWebRequestResult& InResult, cons
                         FMemory::Memcpy(TextureData, RawData.GetData(), RawData.Num());
                         Mip->BulkData.Unlock();
                         
-                        // Texture->UpdateResource(); 
+						Texture->UpdateResource();
+						bSucceeded = true;
                     }
                 }
                 break;

@@ -5,6 +5,7 @@
 #include "Algo/Compare.h"
 
 #include "Engine/World.h"
+#include "UObject/StrongObjectPtr.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Misc/ScopeExit.h"
 #include "Voxel/Components/VoxelMeshComponent.h"
@@ -66,7 +67,7 @@ namespace
 }
 
 FVoxelViewPublisher::FVoxelViewPublisher(UVoxelModule& InModule, FVoxelTaskScheduler& InScheduler, const uint64 InWorldEpoch)
-	: Module(InModule), Scheduler(InScheduler), WorldEpoch(InWorldEpoch)
+	: Module(InModule), Scheduler(InScheduler), WorldEpoch(InWorldEpoch), OriginalWorld(InModule.GetWorld())
 {
 	const auto SelectionConsumer = FVoxelGenerationConsumerKey::Section(WorldEpoch, NativeOwnerId, 1, {}, 1);
 	PrepareSelection.BindResources(Scheduler.GetTerrainResources(), SelectionConsumer);
@@ -2431,6 +2432,7 @@ void FVoxelViewPublisher::ReleaseNativeGroup(FGroup& InGroup)
 
 void FVoxelViewPublisher::Forget(FVoxelViewSourceId InSourceId)
 {
+	if (bStopRequested) return;
 	const FVoxelViewSourceId Key(InSourceId);
 	for (const auto& Publication : Publications)
 	{
@@ -2483,16 +2485,53 @@ bool FVoxelViewPublisher::Retire(FVoxelViewSourceId InSourceId)
 
 void FVoxelViewPublisher::Reset()
 {
+	FString Error;
+	const bool bReset = TryResetForWorldStop(Error);
+	ensureMsgf(bReset, TEXT("Voxel publisher retirement incomplete: %s"), *Error);
+}
+
+void FVoxelViewPublisher::BeginWorldStop()
+{
+	bStopRequested = true;
 	if (CommitCallbackLifetime) *CommitCallbackLifetime = false;
 	CommitCallbackLifetime.Reset();
-	if (TerrainRenderer) TerrainRenderer->Reset();
-	++BatchSerial;
-	DiscardGroups();
-	PendingGroups.Reset();
-	PendingGroupIds.Reset();
-	for (const auto& Retired : RetiredComponents)
+}
+
+bool FVoxelViewPublisher::TryResetForWorldStop(FString& OutError)
+{
+	if (bStopComplete) return true;
+	if (bStopInProgress) { OutError = TEXT("Voxel retirement is already in progress"); return false; }
+	TGuardValue<bool> Stopping(bStopInProgress, true);
+	BeginWorldStop();
+	if (TerrainRenderer && !TerrainRenderer->TryResetForWorldStop(OutError)) return false;
+	if (!bStopPrepared)
 	{
-		if (UVoxelMeshComponent* Component = Retired.Get()) Component->DestroyComponent();
+		// DiscardGroup otherwise destroys components while its publication is being mutated.
+		for (const auto& Publication : Publications)
+			for (auto& Update : Publication->Updates)
+			{
+				for (UVoxelMeshComponent* Component : Update.Components) if (Component) RetiredComponents.AddUnique(Component);
+				Update.Components.Reset();
+			}
+		for (auto& Update : PendingUpdates)
+		{
+			for (UVoxelMeshComponent* Component : Update.Components) if (Component) RetiredComponents.AddUnique(Component);
+			Update.Components.Reset();
+		}
+		for (auto& Pair : Entries)
+		{
+			for (UVoxelMeshComponent* Component : Pair.Value.Components) if (Component) RetiredComponents.AddUnique(Component);
+			Pair.Value.Components.Reset();
+		}
+		++BatchSerial;
+		DiscardGroups();
+		PendingGroups.Reset();
+		PendingGroupIds.Reset();
+		bStopPrepared = true;
+	}
+	while (!RetiredComponents.IsEmpty())
+	{
+		if (UVoxelMeshComponent* Component = RetiredComponents.Pop(EAllowShrinking::No).Get()) Component->DestroyComponent();
 	}
 	RetiredComponents.Reset();
 	Entries.Reset();
@@ -2501,6 +2540,9 @@ void FVoxelViewPublisher::Reset()
 	ActiveBusyKeys.Reset();
 	bActiveBusyKeysDirty = true;
 	bRetry = false;
+	bStopComplete = true;
+	OutError.Reset();
+	return true;
 }
 
 bool FVoxelViewPublisher::IsBusy() const
@@ -3007,6 +3049,7 @@ void FVoxelViewPublisher::RebuildFirstOwners()
 
 void FVoxelViewPublisher::Tick(FVoxelPublishBudget& InBudget, bool bInAllowCommit, const double InDeadlineSeconds)
 {
+	if (bStopRequested || Module.GetWorldState() == EVoxelWorldState::Closing) return;
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_PublisherTick);
 	check(PublisherTickSerial < MAX_uint64);
 	++PublisherTickSerial;

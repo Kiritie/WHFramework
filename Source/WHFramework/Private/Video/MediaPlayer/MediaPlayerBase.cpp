@@ -2,6 +2,7 @@
 
 
 #include "Video/MediaPlayer/MediaPlayerBase.h"
+#include "GameFramework/PlayerController.h"
 
 #include "MediaPlayer.h"
 #include "Main/MainModule.h"
@@ -25,7 +26,7 @@ void AMediaPlayerBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
 
-	UVideoModuleStatics::AddMediaPlayerToList(this);
+	UVideoModuleStatics::AddMediaPlayerToList(this, this);
 	
 	if(MediaPlayer)
 	{
@@ -48,7 +49,7 @@ void AMediaPlayerBase::OnTermination_Implementation()
 	Super::OnTermination_Implementation();
 }
 
-void AMediaPlayerBase::PlayMovie_Implementation(const FName InMovieName, bool bMulticast)
+void AMediaPlayerBase::PlayMovie_Implementation(const FName InMovieName, bool bMulticast, APlayerController* InController)
 {
 	if(bMulticast)
 	{
@@ -56,20 +57,20 @@ void AMediaPlayerBase::PlayMovie_Implementation(const FName InMovieName, bool bM
 		{
 			MultiPlayMovie(InMovieName);
 		}
-		else if(UVideoModuleNetworkComponent* VideoModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UVideoModuleNetworkComponent>())
+		else if(UVideoModuleNetworkComponent* VideoModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UVideoModuleNetworkComponent>(InController && InController->GetWorld() == GetWorld() ? InController : nullptr))
 		{
-			VideoModuleNetworkComponent->ServerPlayMovieMulticast(this, InMovieName);
+			VideoModuleNetworkComponent->ServerPlayMovieMulticast(VideoModuleNetworkComponent->MaintainLocalWorldRoute(), this, InMovieName);
 		}
 		return;
 	}
 	PlayMovieImpl(InMovieName);
 }
 
-void AMediaPlayerBase::PlayMovieWithDelegate_Implementation(const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast)
+void AMediaPlayerBase::PlayMovieWithDelegate_Implementation(const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast, APlayerController* InController)
 {
 	OnMoviePlayFinishedSingleDelegate = InOnPlayFinished;
 
-	PlayMovie(InMovieName, bMulticast);
+	PlayMovie(InMovieName, bMulticast, InController);
 }
 
 void AMediaPlayerBase::PlayMovieImpl_Implementation(const FName InMovieName)
@@ -87,7 +88,7 @@ void AMediaPlayerBase::MultiPlayMovie_Implementation(const FName InMovieName)
 	PlayMovie(InMovieName, false);
 }
 
-void AMediaPlayerBase::PauseMovie_Implementation(bool bMulticast)
+void AMediaPlayerBase::PauseMovie_Implementation(bool bMulticast, APlayerController* InController)
 {
 	if(bMulticast)
 	{
@@ -95,9 +96,9 @@ void AMediaPlayerBase::PauseMovie_Implementation(bool bMulticast)
 		{
 			MultiPauseMovie();
 		}
-		else if(UVideoModuleNetworkComponent* VideoModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UVideoModuleNetworkComponent>())
+		else if(UVideoModuleNetworkComponent* VideoModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UVideoModuleNetworkComponent>(InController && InController->GetWorld() == GetWorld() ? InController : nullptr))
 		{
-			VideoModuleNetworkComponent->ServerPauseMovieMulticast(this);
+			VideoModuleNetworkComponent->ServerPauseMovieMulticast(VideoModuleNetworkComponent->MaintainLocalWorldRoute(), this);
 		}
 		return;
 	}
@@ -117,7 +118,7 @@ void AMediaPlayerBase::PauseMovieImpl_Implementation()
 	}
 }
 
-void AMediaPlayerBase::SeekMovie_Implementation(const FTimespan& InTimespan, bool bMulticast)
+void AMediaPlayerBase::SeekMovie_Implementation(const FTimespan& InTimespan, bool bMulticast, APlayerController* InController)
 {
 	if(bMulticast)
 	{
@@ -125,9 +126,9 @@ void AMediaPlayerBase::SeekMovie_Implementation(const FTimespan& InTimespan, boo
 		{
 			MultiSeekMovie(InTimespan);
 		}
-		else if(UVideoModuleNetworkComponent* VideoModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UVideoModuleNetworkComponent>())
+		else if(UVideoModuleNetworkComponent* VideoModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UVideoModuleNetworkComponent>(InController && InController->GetWorld() == GetWorld() ? InController : nullptr))
 		{
-			VideoModuleNetworkComponent->ServerSeekMovieMulticast(this, InTimespan);
+			VideoModuleNetworkComponent->ServerSeekMovieMulticast(VideoModuleNetworkComponent->MaintainLocalWorldRoute(), this, InTimespan);
 		}
 		return;
 	}
@@ -147,7 +148,7 @@ void AMediaPlayerBase::SeekMovieImpl_Implementation(const FTimespan& InTimespan)
 	}
 }
 
-void AMediaPlayerBase::StopMovie_Implementation(bool bSkip, bool bMulticast)
+void AMediaPlayerBase::StopMovie_Implementation(bool bSkip, bool bMulticast, APlayerController* InController)
 {
 	if(bMulticast)
 	{
@@ -155,9 +156,9 @@ void AMediaPlayerBase::StopMovie_Implementation(bool bSkip, bool bMulticast)
 		{
 			MultiStopMovie(bSkip);
 		}
-		else if(UVideoModuleNetworkComponent* VideoModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UVideoModuleNetworkComponent>())
+		else if(UVideoModuleNetworkComponent* VideoModuleNetworkComponent = AMainModule::GetModuleNetworkComponentByClass<UVideoModuleNetworkComponent>(InController && InController->GetWorld() == GetWorld() ? InController : nullptr))
 		{
-			VideoModuleNetworkComponent->ServerStopMovieMulticast(this, bSkip);
+			VideoModuleNetworkComponent->ServerStopMovieMulticast(VideoModuleNetworkComponent->MaintainLocalWorldRoute(), this, bSkip);
 		}
 		return;
 	}

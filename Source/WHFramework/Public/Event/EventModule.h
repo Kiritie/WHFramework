@@ -1,6 +1,9 @@
 #pragma once
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "EventModuleTypes.h"
+#include "Main/NetworkDispatchTypes.h"
 
 #include "Main/Base/ModuleBase.h"
 
@@ -35,21 +38,20 @@ public:
 	FDelegateHandle SubscribeEvent(UObject* InOwner, TFunction<void(UObject*, const TEvent&)> InCallback)
 	{
 		static_assert(TIsDerivedFrom<TEvent, FEventBase>::Value, "Event must inherit FEventBase");
+		if (!InCallback) return FDelegateHandle();
 
-		FEventListener Listener;
-		Listener.Owner = InOwner;
-		Listener.Handle = FDelegateHandle(FDelegateHandle::GenerateNewHandle);
-		Listener.Delegate.BindLambda([Callback = MoveTemp(InCallback)](UObject* InSender, FConstStructView InData)
+		FEventDelegate Delegate;
+		Delegate.BindLambda([Callback = MoveTemp(InCallback)](UObject* InSender, FConstStructView InData)
 		{
 			Callback(InSender, InData.Get<TEvent>());
 		});
-		EventMappings.FindOrAdd(TEvent::StaticStruct()).Listeners.Add(MoveTemp(Listener));
-		return EventMappings[TEvent::StaticStruct()].Listeners.Last().Handle;
+		return SubscribeEvent(InOwner, TEvent::StaticStruct(), MoveTemp(Delegate));
 	}
 
 	template<typename TEvent, typename TObject>
 	FDelegateHandle SubscribeEvent(TObject* InOwner, void (TObject::*InCallback)(UObject*, const TEvent&))
 	{
+		if (!InOwner || !InCallback) return FDelegateHandle();
 		return SubscribeEvent<TEvent>(InOwner, [InOwner, InCallback](UObject* InSender, const TEvent& InEvent)
 		{
 			(InOwner->*InCallback)(InSender, InEvent);
@@ -59,6 +61,7 @@ public:
 	template<typename TEvent, typename TCallbackObject>
 	FDelegateHandle SubscribeEvent(UObject* InOwner, void (TCallbackObject::*InCallback)())
 	{
+		if (!InOwner || !InCallback) return FDelegateHandle();
 		return SubscribeEvent<TEvent>(InOwner, [InOwner, InCallback](UObject*, const TEvent&)
 		{
 			if(TCallbackObject* CallbackOwner = Cast<TCallbackObject>(InOwner))
@@ -82,19 +85,24 @@ public:
 	void UnsubscribeAllEvent();
 
 	template<typename TEvent>
-	void BroadcastEvent(UObject* InSender, const TEvent& InEvent = TEvent(), EEventNetType InNetType = EEventNetType::Local)
+	FNetworkDispatchResult BroadcastEvent(UObject* InSender, const TEvent& InEvent = TEvent(), EEventNetType InNetType = EEventNetType::Local, APlayerController* InController = nullptr)
 	{
 		static_assert(TIsDerivedFrom<TEvent, FEventBase>::Value, "Event must inherit FEventBase");
-		BroadcastEvent(InSender, FConstStructView::Make(InEvent), InNetType);
+		return BroadcastEvent(InSender, FConstStructView::Make(InEvent), InNetType, InController);
 	}
 
-	void BroadcastEvent(UObject* InSender, FConstStructView InEvent, EEventNetType InNetType = EEventNetType::Local);
+	FNetworkDispatchResult BroadcastEvent(UObject* InSender, FConstStructView InEvent, EEventNetType InNetType = EEventNetType::Local, APlayerController* InController = nullptr);
 	void BroadcastEventInternal(UObject* InSender, FConstStructView InEvent);
+	virtual bool CanAcceptClientEvent(const APlayerController* InController, FConstStructView InEvent) const { return false; }
+
+	FNetworkDispatchResult MulticastWorldEvent(const FEventNetworkMessage& InMessage);
 
 protected:
 	void UnsubscribeEvent(const UScriptStruct* InEventType, UObject* InOwner);
 
 	TMap<const UScriptStruct*, FEventMapping> EventMappings;
+	bool bEventDeliveryClosing = false;
+	bool IsEventDeliveryClosing() const { return bEventDeliveryClosing || !IsBusinessAdmissionOpen(); }
 
 protected:
 	UPROPERTY(EditAnywhere, Instanced)

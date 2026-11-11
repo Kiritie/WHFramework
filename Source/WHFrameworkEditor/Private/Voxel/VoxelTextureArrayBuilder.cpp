@@ -52,7 +52,11 @@ namespace
 bool FVoxelTextureArrayBuilder::Build(const TArray<UVoxelData*>& Assets,UVoxelMaterialSet& Set,const FVoxelArrayBuildOptions& O,FString& Error)
 {
     check(IsInGameThread());Error.Reset();
-    if(Assets.IsEmpty()||!FPackageName::IsValidLongPackageName(O.OutputRoot)||O.TileSize<4||O.TileSize>256||!FMath::IsPowerOfTwo(O.TileSize)||O.MaxSlicesPerBank<1||O.MaxSlicesPerBank>2048)
+    if(Assets.IsEmpty()||!FPackageName::IsValidLongPackageName(O.TextureOutputRoot)||!FPackageName::IsValidLongPackageName(O.MaterialOutputRoot)||
+       O.TextureOutputRoot.Equals(O.MaterialOutputRoot,ESearchCase::IgnoreCase)||
+       O.TextureOutputRoot.StartsWith(O.MaterialOutputRoot+TEXT("/"),ESearchCase::IgnoreCase)||
+       O.MaterialOutputRoot.StartsWith(O.TextureOutputRoot+TEXT("/"),ESearchCase::IgnoreCase)||
+       O.TileSize<4||O.TileSize>256||!FMath::IsPowerOfTwo(O.TileSize)||O.MaxSlicesPerBank<1||O.MaxSlicesPerBank>2048)
     {Error=TEXT("Invalid array builder options");return false;}
     TArray<FSource> Sources;TMap<FString,int32> Lookup;TSet<FName> Names;
     for(UVoxelData* A:Assets)
@@ -78,7 +82,9 @@ bool FVoxelTextureArrayBuilder::Build(const TArray<UVoxelData*>& Assets,UVoxelMa
         Lookup.Add(Sources[I].Key,I);
     }
     // All pixel validation completes before published assets are modified.
-    const FString BuildRoot=O.OutputRoot+TEXT("/Build_")+FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    const FString BuildName=TEXT("/Build_")+FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    const FString TextureBuildRoot=O.TextureOutputRoot+BuildName;
+    const FString MaterialBuildRoot=O.MaterialOutputRoot+BuildName;
     TArray<FVoxelMaterialBank> Banks;TMap<uint8,UMaterial*> Masters;
     int32 Cursor=0;
     while(Cursor<Sources.Num())
@@ -94,17 +100,17 @@ bool FVoxelTextureArrayBuilder::Build(const TArray<UVoxelData*>& Assets,UVoxelMa
                 auto& S=Sources[Cursor++];S.Baked.Bank=Bank;S.Baked.Layer=Count;S.Baked.Frames=S.Face.FrameCount;S.Baked.FPS=S.Face.FramesPerSecond;
                 Count+=S.Face.FrameCount;Pixels.Append(S.Pixels);
             }
-            const FString Stem=BuildRoot+FString::Printf(TEXT("/G%u_B%u"),uint8(G),Bank);
-            auto* Array=Cast<UTexture2DArray>(FVoxelEditorAssetIO::LoadOrCreate(UTexture2DArray::StaticClass(),Stem+TEXT("_Array"),Error));
+            const FString Stem=FString::Printf(TEXT("/G%u_B%u"),uint8(G),Bank);
+            auto* Array=Cast<UTexture2DArray>(FVoxelEditorAssetIO::LoadOrCreate(UTexture2DArray::StaticClass(),TextureBuildRoot+Stem+TEXT("_Array"),Error));
             if(!Array)return false;
             Array->SRGB=true;Array->CompressionSettings=TC_Default;Array->MipGenSettings=TMGS_FromTextureGroup;
             Array->Filter=TF_Nearest;Array->AddressX=TA_Wrap;Array->AddressY=TA_Wrap;Array->AddressZ=TA_Clamp;
             Array->Source.Init(O.TileSize,O.TileSize,Count,1,TSF_BGRA8,Pixels.GetData());
             Array->PostEditChange();if(!FVoxelEditorAssetIO::Save(Array,Error))return false;
             UMaterial*& Master=Masters.FindOrAdd(uint8(G));
-            if(!Master)Master=FVoxelMaterialBuilder::BuildMaster(BuildRoot+FString::Printf(TEXT("/M_G%u"),uint8(G)),G,Array,Error);
+            if(!Master)Master=FVoxelMaterialBuilder::BuildMaster(MaterialBuildRoot+FString::Printf(TEXT("/M_G%u"),uint8(G)),G,Array,Error);
             if(!Master)return false;
-            auto* MI=FVoxelMaterialBuilder::BuildInstance(Stem+TEXT("_MI"),Master,Array,Error);if(!MI)return false;
+            auto* MI=FVoxelMaterialBuilder::BuildInstance(MaterialBuildRoot+Stem+TEXT("_MI"),Master,Array,Error);if(!MI)return false;
             FVoxelMaterialBank B;B.Group=G;B.Bank=Bank++;B.SliceCount=Count;B.Textures=Array;B.Material=MI;Banks.Add(B);
         }
     }

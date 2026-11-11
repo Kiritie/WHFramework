@@ -23,11 +23,11 @@
 namespace
 {
 	const FSoftObjectPath DefaultTreeTrunkPath(
-		TEXT("/WHFramework/Voxel/DataAssets/Voxel/DA_Oak.DA_Oak"));
+		TEXT("/WHFramework/DataAssets/Voxel/Blocks/DA_Oak.DA_Oak"));
 	const FSoftObjectPath DefaultTreeLeavesPath(
-		TEXT("/WHFramework/Voxel/DataAssets/Voxel/DA_Oak_Leaves.DA_Oak_Leaves"));
+		TEXT("/WHFramework/DataAssets/Voxel/Blocks/DA_Oak_Leaves.DA_Oak_Leaves"));
 	const FSoftObjectPath DefaultGrassPlantPath(
-		TEXT("/WHFramework/Voxel/DataAssets/Voxel/DA_Tall_Grass.DA_Tall_Grass"));
+		TEXT("/WHFramework/DataAssets/Voxel/Blocks/DA_Tall_Grass.DA_Tall_Grass"));
 
 	UVoxelData* LoadBuiltinEcologyVoxel(const FSoftObjectPath& InPath)
 	{

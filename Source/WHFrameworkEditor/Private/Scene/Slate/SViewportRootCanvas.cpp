@@ -2,6 +2,8 @@
 
 
 #include "Scene/Slate/SViewportRootCanvas.h"
+#include "Common/CommonTypes.h"
+#include "Widget/WorldWidgetTypes.h"
 
 #include "IAssetViewport.h"
 #include "Scene/SceneEditor.h"
@@ -12,7 +14,7 @@ BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
 
 SViewportRootCanvas::SViewportRootCanvas()
 {
-	Viewport = nullptr;
+	Viewport.Reset();
 }
 
 void SViewportRootCanvas::Construct(const FArguments& InArgs)
@@ -38,7 +40,9 @@ int32 SViewportRootCanvas::OnPaint(const FPaintArgs& Args, const FGeometry& Allo
 			if(UWorldWidgetBase* WorldWidget = Cast<UWorldWidgetBase>(ChildWidget->GetWidgetObject()))
 			{
 				FSceneViewProjectionData ProjectionData;
-				if (FSceneEditorManager::Get().GetSceneViewProjectionData(&Viewport->GetAssetViewportClient(), ProjectionData))
+				const TSharedPtr<IAssetViewport> TargetViewport = Viewport.Pin();
+				FSceneEditorManager* Manager = FSceneEditorManager::GetPtr();
+				if (TargetViewport && Manager && Manager->GetSceneViewProjectionData(&TargetViewport->GetAssetViewportClient(), ProjectionData))
 				{
 					FWorldWidgetMapping Mapping;
 					if(WorldWidget->GetWidgetMapping(WorldWidget, Mapping))

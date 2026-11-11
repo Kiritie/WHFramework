@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Main/Slate/SModuleToolbarWidget.h"
+#include "Common/CommonModuleStatics.h"
 
 #include "SlateOptMacros.h"
 #include "Main/Slate/SModuleEditorWidget.h"

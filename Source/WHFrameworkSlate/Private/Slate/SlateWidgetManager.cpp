@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Slate/SlateWidgetManager.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "Input/InputManager.h"
 #include "Main/MainManager.h"
@@ -76,8 +77,11 @@ void FSlateWidgetManager::OnRefresh(float DeltaSeconds)
 
 void FSlateWidgetManager::OnTermination()
 {
-	FManagerBase::OnTermination();
-
+    ClearAllEditorWidget();
+    ClearAllSlateWidget();
+    TemporarySlateWidget.Reset();
+    if (FInputManager* Input = FInputManager::GetPtr()) Input->ReleaseInputMode(this);
+    FManagerBase::OnTermination();
 }
 
 void FSlateWidgetManager::CloseAllSlateWidget(bool bInstant)
@@ -95,7 +99,10 @@ void FSlateWidgetManager::CloseAllSlateWidget(bool bInstant)
 
 void FSlateWidgetManager::ClearAllSlateWidget(EObjectDespawnMode InMode)
 {
-	for (auto Iter : AllSlateWidgets)
+	const auto Widgets = MoveTemp(AllSlateWidgets);
+	AllSlateWidgets.Reset();
+	TemporarySlateWidget.Reset();
+	for (auto Iter : Widgets)
 	{
 		if(Iter.Value)
 		{
@@ -119,7 +126,9 @@ void FSlateWidgetManager::CloseAllEditorWidget(bool bInstant)
 
 void FSlateWidgetManager::ClearAllEditorWidget()
 {
-	for (auto Iter : AllEditorWidgets)
+	const auto Widgets = MoveTemp(AllEditorWidgets);
+	AllEditorWidgets.Reset();
+	for (auto Iter : Widgets)
 	{
 		if(Iter.Value)
 		{
@@ -134,11 +143,11 @@ void FSlateWidgetManager::RefreshInputModeRequest()
 	const EInputMode InputMode = GetDesiredInputMode();
 	if(InputMode == EInputMode::None)
 	{
-		FInputManager::Get().ReleaseInputMode(this);
+		if (FInputManager* Input = FInputManager::GetPtr()) Input->ReleaseInputMode(this);
 	}
 	else
 	{
-		FInputManager::Get().RequestInputMode(this, InputMode, 10);
+		if (FInputManager* Input = FInputManager::GetPtr()) Input->RequestInputMode(this, InputMode, 10);
 	}
 }
 

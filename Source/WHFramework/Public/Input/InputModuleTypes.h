@@ -111,6 +111,15 @@ struct WHFRAMEWORK_API FInputPlayerRuntime
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FInputLocalProfileData
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<uint8> Settings;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FInputModuleSaveData : public FSaveData
 {
 	GENERATED_BODY()
@@ -118,11 +127,13 @@ struct WHFRAMEWORK_API FInputModuleSaveData : public FSaveData
 public:
 	FORCEINLINE FInputModuleSaveData() = default;
 
+	UPROPERTY()
+	TMap<FString, FInputLocalProfileData> Profiles;
 
 public:
 	virtual bool IsValid() const override
 	{
-		return !Datas.IsEmpty();
+		return !Profiles.IsEmpty();
 	}
 	
 	virtual void MakeSaved() override

@@ -15,47 +15,47 @@ class WHFRAMEWORK_API UReferencePoolModuleStatics : public UBlueprintFunctionLib
 public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Runtime Reference
-	UFUNCTION(BlueprintPure, Category = "ReferencePoolModule")
-	static bool HasReference(TSubclassOf<UObject> InType);
+	UFUNCTION(BlueprintPure, Category = "ReferencePoolModule", meta = (WorldContext = "WorldContextObject"))
+	static bool HasReference(const UObject* WorldContextObject, TSubclassOf<UObject> InType);
 
-	UFUNCTION(BlueprintCallable, Category = "ReferencePoolModule", meta = (DeterminesOutputType = "InType"))
-	static UObject* GetReference(TSubclassOf<UObject> InType);
+	UFUNCTION(BlueprintCallable, Category = "ReferencePoolModule", meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InType"))
+	static UObject* GetReference(const UObject* WorldContextObject, TSubclassOf<UObject> InType);
 
-	UFUNCTION(BlueprintCallable, Category = "ReferencePoolModule")
-	static bool ResetReference(TSubclassOf<UObject> InType);
+	UFUNCTION(BlueprintCallable, Category = "ReferencePoolModule", meta = (WorldContext = "WorldContextObject"))
+	static bool ResetReference(const UObject* WorldContextObject, TSubclassOf<UObject> InType);
 
-	UFUNCTION(BlueprintCallable, Category = "ReferencePoolModule")
-	static bool ClearReference(TSubclassOf<UObject> InType);
+	UFUNCTION(BlueprintCallable, Category = "ReferencePoolModule", meta = (WorldContext = "WorldContextObject"))
+	static bool ClearReference(const UObject* WorldContextObject, TSubclassOf<UObject> InType);
 
-	UFUNCTION(BlueprintCallable, Category = "ReferencePoolModule")
-	static void ClearAllReference();
+	UFUNCTION(BlueprintCallable, Category = "ReferencePoolModule", meta = (WorldContext = "WorldContextObject"))
+	static void ClearAllReference(const UObject* WorldContextObject);
 
 	template<class T>
-	static bool HasReference(TSubclassOf<T> InType = T::StaticClass())
+	static bool HasReference(const UObject* WorldContextObject, TSubclassOf<T> InType = T::StaticClass())
 	{
-		UReferencePoolModule* Module = UReferencePoolModule::GetPtr();
+		UReferencePoolModule* Module = UReferencePoolModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
 		return Module ? Module->HasReference<T>(InType) : false;
 	}
 
 	template<class T>
-	static T& GetReference(TSubclassOf<T> InType = T::StaticClass())
+	static T& GetReference(const UObject* WorldContextObject, TSubclassOf<T> InType = T::StaticClass())
 	{
-		UReferencePoolModule* Module = UReferencePoolModule::GetPtr();
+		UReferencePoolModule* Module = UReferencePoolModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
 		checkf(Module, TEXT("ReferencePoolModule is not available."));
 		return Module->GetReference<T>(InType);
 	}
 
 	template<class T>
-	static bool ResetReference(TSubclassOf<T> InType = T::StaticClass())
+	static bool ResetReference(const UObject* WorldContextObject, TSubclassOf<T> InType = T::StaticClass())
 	{
-		UReferencePoolModule* Module = UReferencePoolModule::GetPtr();
+		UReferencePoolModule* Module = UReferencePoolModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
 		return Module ? Module->ResetReference<T>(InType) : false;
 	}
 
 	template<class T>
-	static bool ClearReference(TSubclassOf<T> InType = T::StaticClass())
+	static bool ClearReference(const UObject* WorldContextObject, TSubclassOf<T> InType = T::StaticClass())
 	{
-		UReferencePoolModule* Module = UReferencePoolModule::GetPtr();
+		UReferencePoolModule* Module = UReferencePoolModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
 		return Module ? Module->ClearReference<T>(InType) : false;
 	}
 

@@ -3,12 +3,27 @@
 #pragma once
 #include "Parameter/ParameterValueTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
+#include "Main/NetworkDispatchTypes.h"
 
 #include "AudioModuleTypes.generated.h"
 
 class USoundBase;
 
 DECLARE_DYNAMIC_DELEGATE(FOnSoundPlayFinishDelegate);
+
+UENUM(BlueprintType)
+enum class EAudioNetworkSoundState : uint8
+{
+	Unknown,
+	Pending,
+	Authorized,
+	// 服务器已发起广播；各客户端的实际播放可能尚未开始。
+	Started,
+	Rejected,
+	Finished,
+	Cancelled,
+	TimedOut
+};
 
 USTRUCT(BlueprintType)
 struct FSingleSoundHandle
@@ -20,39 +35,66 @@ struct FSingleSoundHandle
 	{
 	}
 
-	FSingleSoundHandle(int32 InHandle)
-		: Handle(InHandle)
+	FSingleSoundHandle(int32 InHandle, bool bInNetwork = false)
+		: Handle(InHandle), bNetwork(bInNetwork)
 	{
+	}
+
+	static FSingleSoundHandle Pending(const FGuid& InRequestId)
+	{
+		FSingleSoundHandle Result;
+		Result.RequestId = InRequestId;
+		return Result;
 	}
 
 	bool IsValid() const
 	{
-		return Handle != INDEX_NONE;
+		return Handle != INDEX_NONE || RequestId.IsValid();
 	}
+	bool IsPending() const { return RequestId.IsValid(); }
+	const FGuid& GetRequestId() const { return RequestId; }
 
 	bool operator==(const FSingleSoundHandle& Other) const
 	{
-		return Handle == Other.Handle;
+		return Handle == Other.Handle && bNetwork == Other.bNetwork && RequestId == Other.RequestId;
 	}
 
 	bool operator!=(const FSingleSoundHandle& Other) const
 	{
-		return Handle != Other.Handle;
+		return !(*this == Other);
 	}
 
 	friend uint32 GetTypeHash(const FSingleSoundHandle& SpecHandle)
 	{
-		return ::GetTypeHash(SpecHandle.Handle);
+		return HashCombine(HashCombine(::GetTypeHash(SpecHandle.Handle), ::GetTypeHash(static_cast<uint8>(SpecHandle.bNetwork))), GetTypeHash(SpecHandle.RequestId));
 	}
 
 	FString ToString() const
 	{
-		return IsValid() ? FString::FromInt(Handle) : TEXT("Invalid");
+		return IsPending() ? RequestId.ToString() : Handle != INDEX_NONE ? FString::FromInt(Handle) : TEXT("Invalid");
 	}
 
 private:
 	UPROPERTY()
 	int32 Handle;
+
+	UPROPERTY()
+	bool bNetwork = false;
+
+	UPROPERTY()
+	FGuid RequestId;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FSoundPlaybackResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly)
+	FSingleSoundHandle Handle;
+
+	UPROPERTY(BlueprintReadOnly)
+	FNetworkDispatchResult Dispatch;
 };
 
 USTRUCT(BlueprintType)

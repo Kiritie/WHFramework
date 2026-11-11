@@ -3,7 +3,9 @@
 #pragma once
 
 
-#include "Common/CommonModuleTypes.h"
+#include "Widget/WidgetMountTypes.h"
+#include "Widget/WorldWidgetTypes.h"
+#include "Common/CommonTypes.h"
 #include "Components/WidgetComponent.h"
 #include "CommonUserWidget.h"
 #include "ObjectPool/ObjectPoolInterface.h"
@@ -15,6 +17,9 @@
 #include "WorldWidgetBase.generated.h"
 
 class UCanvasPanelSlot;
+class UWidgetModule;
+class UObjectPoolModule;
+class UWorld;
 /**
  * 
  */

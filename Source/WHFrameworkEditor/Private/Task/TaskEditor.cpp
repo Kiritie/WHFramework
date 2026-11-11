@@ -6,6 +6,7 @@
 #include "EdGraphUtilities.h"
 
 #include "Editor.h"
+#include "Engine/World.h"
 #include "UObject/UObjectHash.h"
 #include "WHFrameworkSlateStatics.h"
 #include "Task/TaskModule.h"
@@ -87,9 +88,10 @@ TSharedRef<FTaskEditor> FTaskEditorModule::CreateTaskEditor(const EToolkitMode::
 
 void FTaskEditorModule::OnClickedTaskEditorButton()
 {
-	if(const UTaskModule* TaskModule = UTaskModule::GetPtr(!UCommonModuleStatics::IsPlaying()))
+	UWorld* EditorWorld = GEditor ? (GEditor->PlayWorld ? GEditor->PlayWorld.Get() : GEditor->GetEditorWorldContext().World()) : nullptr;
+	if(const UTaskModule* TaskModule = UTaskModule::GetPtr(EditorWorld))
 	{
-		for(auto Iter : !UCommonModuleStatics::IsPlaying() ? TaskModule->GetDefaultAssets() : TaskModule->GetAssets())
+		for(auto Iter : !(EditorWorld && EditorWorld->IsGameWorld()) ? TaskModule->GetDefaultAssets() : TaskModule->GetAssets())
 		{
 			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Iter);
 		}

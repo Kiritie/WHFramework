@@ -19,7 +19,6 @@ UAbilityItemDataBase::UAbilityItemDataBase()
 	MaxCount = 1;
 	MaxLevel = 1;
 	AbilityClass = nullptr;
-	PickUpClass = nullptr;
 
 	_Icon = nullptr;
 }
@@ -158,7 +157,6 @@ FInventoryItemDefinition UAbilityItemDataBase::BuildInventoryDefinition() const
     Definition.StackPolicy = StackPolicy;
     Definition.UsePolicy = UsePolicy;
     Definition.AbilityClass = FSoftClassPath(AbilityClass.Get());
-    Definition.PickupActorClass = FSoftClassPath(PickUpClass.Get());
     Definition.ConsumableCount = ConsumableCount;
     Definition.bCanTrade = bCanTrade;
     Definition.bCanDrop = bCanDrop;

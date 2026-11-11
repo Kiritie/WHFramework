@@ -1,4 +1,5 @@
 #include "Setting/Provider/SettingProviderBase.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "Setting/SettingModule.h"
 
@@ -56,8 +57,19 @@ bool USettingProviderBase::Apply(const FSettingDefinition& InDefinition, const F
 	return false;
 }
 
-void USettingProviderBase::Rollback(const FSettingDefinition& InDefinition)
+bool USettingProviderBase::RollbackForHostTermination(const FSettingDefinition& InDefinition, UWHLocalPlayer* InPlayer)
 {
+	return true;
+}
+
+bool USettingProviderBase::CanRollbackForHostTermination(const FSettingDefinition& InDefinition, const UWHLocalPlayer* InPlayer) const
+{
+	return true;
+}
+
+bool USettingProviderBase::Rollback(const FSettingDefinition& InDefinition)
+{
+	return false;
 }
 
 void USettingProviderBase::Commit()

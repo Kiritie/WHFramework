@@ -1,32 +1,46 @@
 #include "Dialogue/DialogueModuleStatics.h"
-
 #include "Dialogue/DialogueModule.h"
+#include "GameFramework/PlayerController.h"
 
-bool UDialogueModuleStatics::StartDialogue(UDialogueAsset* InDialogue, APlayerController* InPlayer, AActor* InNPC)
+namespace
 {
-	return UDialogueModule::IsValid() && UDialogueModule::Get().StartDialogue(InDialogue, InPlayer, InNPC);
+    UDialogueModule* FindDialogueModule(APlayerController* Player)
+    {
+        return ::IsValid(Player) ? UDialogueModule::GetPtr(Player->GetWorld()) : nullptr;
+    }
 }
-bool UDialogueModuleStatics::SelectDialogueNode(int32 InNodeID)
+
+bool UDialogueModuleStatics::StartDialogue(UDialogueAsset* Dialogue, APlayerController* Player, AActor* NPC)
 {
-	return UDialogueModule::IsValid() && UDialogueModule::Get().SelectDialogueNode(InNodeID);
+    UDialogueModule* Module = FindDialogueModule(Player);
+    return Module && Module->StartDialogue(Player, Dialogue, NPC);
 }
-void UDialogueModuleStatics::EndDialogue()
+bool UDialogueModuleStatics::SelectDialogueNode(APlayerController* Player, int32 Node)
 {
-	if (UDialogueModule::IsValid()) UDialogueModule::Get().EndDialogue();
+    UDialogueModule* Module = FindDialogueModule(Player);
+    return Module && Module->SelectDialogueNode(Player, Node);
 }
-bool UDialogueModuleStatics::IsDialogueActive()
+void UDialogueModuleStatics::EndDialogue(APlayerController* Player)
 {
-	return UDialogueModule::IsValid() && UDialogueModule::Get().IsDialogueActive();
+    if (UDialogueModule* Module = FindDialogueModule(Player)) Module->EndDialogue(Player);
 }
-UDialogueAsset* UDialogueModuleStatics::GetCurrentDialogue()
+bool UDialogueModuleStatics::IsDialogueActive(APlayerController* Player)
 {
-	return UDialogueModule::IsValid() ? UDialogueModule::Get().GetCurrentDialogue() : nullptr;
+    const UDialogueModule* Module = FindDialogueModule(Player);
+    return Module && Module->IsDialogueActive(Player);
 }
-FDialogueNode UDialogueModuleStatics::GetCurrentDialogueNode()
+UDialogueAsset* UDialogueModuleStatics::GetCurrentDialogue(APlayerController* Player)
 {
-	return UDialogueModule::IsValid() ? UDialogueModule::Get().GetCurrentNode() : FDialogueNode();
+    const UDialogueModule* Module = FindDialogueModule(Player);
+    return Module ? Module->GetCurrentDialogue(Player) : nullptr;
 }
-TArray<FDialogueNode> UDialogueModuleStatics::GetAvailableDialogueNodes()
+FDialogueNode UDialogueModuleStatics::GetCurrentDialogueNode(APlayerController* Player)
 {
-	return UDialogueModule::IsValid() ? UDialogueModule::Get().GetAvailableNodes() : TArray<FDialogueNode>();
+    const UDialogueModule* Module = FindDialogueModule(Player);
+    return Module ? Module->GetCurrentNode(Player) : FDialogueNode();
+}
+TArray<FDialogueNode> UDialogueModuleStatics::GetAvailableDialogueNodes(APlayerController* Player)
+{
+    const UDialogueModule* Module = FindDialogueModule(Player);
+    return Module ? Module->GetAvailableNodes(Player) : TArray<FDialogueNode>();
 }

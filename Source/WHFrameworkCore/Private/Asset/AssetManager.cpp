@@ -1,8 +1,10 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Asset/AssetManager.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "WHFrameworkCoreStatics.h"
+#include "Engine/Texture2D.h"
 #include "Debug/DebugTypes.h"
 #include "Main/MainManager.h"
 
@@ -13,7 +15,6 @@ IMPLEMENTATION_MANAGER(FAssetManager)
 FAssetManager::FAssetManager() : FManagerBase(Type)
 {
 	AssetMap = TMap<FUniqueAssetID, FUniqueAssetData*>();
-	TextureMap = TMap<FString, UTexture2D*>();
 }
 
 void FAssetManager::OnInitialize()
@@ -21,8 +22,21 @@ void FAssetManager::OnInitialize()
 	FManagerBase::OnInitialize();
 }
 
+void FAssetManager::OnTermination()
+{
+	ClearTextureCache();
+	for (const auto& Entry : AssetMap) delete Entry.Value;
+	AssetMap.Empty();
+	FManagerBase::OnTermination();
+}
+
 bool FAssetManager::RegisterAsset(FUniqueAssetData* InAssetData)
 {
+	if (!InAssetData) return false;
+	if (FUniqueAssetData* const* Existing = AssetMap.Find(InAssetData->GetID()); Existing && *Existing == InAssetData)
+	{
+		return false;
+	}
 	if (!AssetMap.Contains(InAssetData->GetID()))
 	{
 		AssetMap.Add(InAssetData->GetID(), InAssetData);
@@ -153,12 +167,12 @@ UTexture2D* FAssetManager::LoadTextureByPath(const FString& InTexturePath, bool 
 		Texture = FCoreStatics::LoadTextureFromFile(InTexturePath);
 		if (Texture)
 		{
-			TextureMap.Add(InTexturePath, Texture);
+			TextureMap.Add(InTexturePath, TStrongObjectPtr<UTexture2D>(Texture));
 		}
 	}
 	else
 	{
-		Texture = TextureMap[InTexturePath];
+		Texture = TextureMap[InTexturePath].Get();
 	}
 
 	ensureEditorMsgf(!bEnsured || Texture, FString::Printf(TEXT("Failed to load texture for path %s!"), *InTexturePath), EDC_Asset, EDV_Error);
@@ -171,4 +185,9 @@ void FAssetManager::ReleaseRuntimeData()
 	{
 		Iter.Value->ResetRuntimeData();
 	}
+}
+
+void FAssetManager::ClearTextureCache()
+{
+	TextureMap.Empty();
 }

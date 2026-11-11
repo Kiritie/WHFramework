@@ -2,18 +2,22 @@
 
 #pragma once
 
+#include "Widget/WorldWidgetTypes.h"
 #include "Components/SceneComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Parameter/ParameterModuleTypes.h"
 #include "WorldWidgetComponent.generated.h"
 
 class UWorldWidgetBase;
+class ULocalPlayer;
+class APlayerController;
 struct FWorldWidgetConfig;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), hidecategories=(Physics, Collision, HLOD, PathTracing, Natigation, VirtualTexture, Tags, Cooking, MaterialParameters, TextureStreaming, Mobile, RayTracing, AssetUserData))
 class WHFRAMEWORK_API UWorldWidgetComponent : public UWidgetComponent
 {
 	friend class AWorldWidgetActor;
+	friend class UWidgetModule;
 	
 	GENERATED_BODY()
 
@@ -85,6 +89,13 @@ protected:
 	UPROPERTY(Transient, DuplicateTransient)
 	UWorldWidgetBase* WorldWidget;
 
+	UPROPERTY(Transient, DuplicateTransient)
+	TMap<TObjectPtr<ULocalPlayer>, TObjectPtr<UWorldWidgetBase>> PlayerWorldWidgets;
+
+	UPROPERTY(Transient)
+	FParameter ActiveWidgetParam;
+	bool bPlayerWorldWidgetsRequested = false;
+
 public:
 	UFUNCTION(BlueprintCallable)
 	bool IsAutoCreate() const { return bAutoCreate; }
@@ -105,7 +116,10 @@ public:
 	void SetBindToSelf(bool bInBindToSelf) { this->bBindToSelf = bInBindToSelf; }
 	
 	UFUNCTION(BlueprintPure)
-	UUserWidget* GetWorldWidget() const;
+	UUserWidget* GetWorldWidget(APlayerController* InPlayer) const;
+
+	UFUNCTION(BlueprintPure)
+	TArray<UWorldWidgetBase*> GetWorldWidgets() const;
 
 	UFUNCTION(BlueprintPure)
 	USceneComponent* GetWidgetPoint(FName InPointName) const;
@@ -118,4 +132,5 @@ private:
 	const FWorldWidgetConfig* ResolveWorldWidgetConfig() const;
 
 	TSubclassOf<UWorldWidgetBase> ResolveWorldWidgetClass() const;
+	void RefreshPlayerWorldWidgets();
 };

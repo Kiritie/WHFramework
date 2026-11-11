@@ -1,6 +1,10 @@
 #include "Event/Manager/DefaultEventManagerBase.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Common/LifecycleTypes.h"
 
 #include "Event/EventModuleStatics.h"
+#include "Event/EventModule.h"
+#include "Main/MainModuleStatics.h"
 
 UDefaultEventManagerBase::UDefaultEventManagerBase()
 {
@@ -29,9 +33,12 @@ void UDefaultEventManagerBase::OnTermination(EPhase InPhase)
 {
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		UEventModuleStatics::UnsubscribeEvent<FEventGameInited>(this);
-		UEventModuleStatics::UnsubscribeEvent<FEventGameStarted>(this);
-		UEventModuleStatics::UnsubscribeEvent<FEventGameExited>(this);
+		if (UEventModule* Events = UMainModuleStatics::GetModuleForCleanup<UEventModule>(GetWorld()))
+		{
+			Events->UnsubscribeEvent<FEventGameInited>(this);
+			Events->UnsubscribeEvent<FEventGameStarted>(this);
+			Events->UnsubscribeEvent<FEventGameExited>(this);
+		}
 	}
 	Super::OnTermination(InPhase);
 }

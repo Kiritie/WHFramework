@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Ticker.h"
 #include "Slate/Editor/Base/IEditorWidgetBase.h"
 
 /**
@@ -18,6 +19,7 @@ public:
 	SLATE_END_ARGS()
 
 	SEditorWidgetBase();
+	virtual ~SEditorWidgetBase() override;
 
 	void Construct(const FArguments& InArgs);
 
@@ -106,7 +108,10 @@ protected:
 	FCurveSequence WidgetAnimSequence;
 
 private:
+	void DetachWindow();
 	bool bInitialized;
+	FTSTicker::FDelegateHandle WindowBindTicker;
+	TWeakPtr<SWindow> BoundWindow;
 	
 	FDelegateHandle OnWindowActivatedHandle;
 	FDelegateHandle OnWindowDeactivatedHandle;

@@ -1,7 +1,7 @@
 #include "Widget/Theme/WidgetThemeResolver.h"
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/Theme/WidgetThemeSettings.h"
-#include "Widget/Theme/WidgetThemeSubsystem.h"
+#include "Widget/Theme/WidgetThemeModule.h"
 #include "Widget/Theme/WidgetStyleTags.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
@@ -28,11 +28,11 @@ namespace WidgetThemeResolverPrivate
 		DefaultTheme.Reset(S->DefaultTheme.LoadSynchronous());
 	}
 #endif
-	UWidgetThemeSubsystem* Subsystem(const UObject* Context)
+	UWidgetThemeModule* ThemeModule(const UObject* Context)
 	{
 		const UWorld* World = Context ? Context->GetWorld() : nullptr;
 		UGameInstance* GI = World && World->IsGameWorld() ? World->GetGameInstance() : nullptr;
-		return GI ? GI->GetSubsystem<UWidgetThemeSubsystem>() : nullptr;
+		return UWidgetThemeModule::GetPtr(GI);
 	}
 } // namespace WidgetThemeResolverPrivate
 FSimpleMulticastDelegate& FWidgetThemeResolver::OnThemeChanged()
@@ -129,8 +129,8 @@ const UWidgetTheme* FWidgetThemeResolver::ResolveTheme(const UObject* Context)
 
 	if (Context && Context->GetWorld() && Context->GetWorld()->IsGameWorld())
 	{
-		const auto* Sub = WidgetThemeResolverPrivate::Subsystem(Context);
-		return Sub ? Sub->GetActiveTheme() : nullptr;
+		const auto* Module = WidgetThemeResolverPrivate::ThemeModule(Context);
+		return Module ? Module->GetActiveTheme() : nullptr;
 	}
 #if WITH_EDITOR
 	using namespace WidgetThemeResolverPrivate;

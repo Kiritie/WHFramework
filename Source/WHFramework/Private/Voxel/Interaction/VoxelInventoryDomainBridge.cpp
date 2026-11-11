@@ -1,6 +1,10 @@
 #include "Voxel/Interaction/VoxelInventoryDomainBridge.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
+#include "Ability/Inventory/InventoryCommandTypes.h"
+#include "Ability/Inventory/InventoryPlanTypes.h"
 
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Misc/Crc.h"
 #include "Misc/SecureHash.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
@@ -155,7 +159,7 @@ namespace InventoryVoxelRecord
     }
 }
 
-FVoxelInventoryDomainBridge::FVoxelInventoryDomainBridge(UInventoryWorldSubsystem& InSystem)
+FVoxelInventoryDomainBridge::FVoxelInventoryDomainBridge(UInventoryModule& InSystem)
     : System(InSystem)
 {
 }

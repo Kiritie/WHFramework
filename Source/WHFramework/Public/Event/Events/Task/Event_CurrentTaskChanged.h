@@ -13,10 +13,13 @@ struct WHFRAMEWORK_API FEventCurrentTaskChanged : public FEventBase
 public:
 	FEventCurrentTaskChanged() = default;
 
-	FEventCurrentTaskChanged(class UTaskBase* InTask)
-		: Task(MoveTemp(InTask))
+	FEventCurrentTaskChanged(FGuid InPlayerId, class UTaskBase* InTask)
+		: PlayerId(InPlayerId), Task(InTask)
 	{
 	}
+
+	UPROPERTY(BlueprintReadWrite)
+	FGuid PlayerId;
 
 	UPROPERTY(BlueprintReadWrite)
 	class UTaskBase* Task = nullptr;

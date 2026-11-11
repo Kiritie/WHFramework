@@ -4,8 +4,6 @@
 
 #include "AbilityRawDataBase.generated.h"
 
-class AAbilityRawBase;
-
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UAbilityRawDataBase : public UAbilityTransItemDataBase
 {
@@ -13,8 +11,4 @@ class WHFRAMEWORK_API UAbilityRawDataBase : public UAbilityTransItemDataBase
 
 public:
 	UAbilityRawDataBase();
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AAbilityRawBase> RawClass;
 };

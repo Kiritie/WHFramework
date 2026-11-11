@@ -2,6 +2,8 @@
 
 
 #include "Widget/World/WorldWidgetComponent.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
+#include "Widget/WorldWidgetTypes.h"
 
 #include "Camera/CameraModuleStatics.h"
 #include "Common/CommonModuleStatics.h"
@@ -10,6 +12,10 @@
 #include "Widget/WidgetModule.h"
 #include "Widget/WidgetModuleStatics.h"
 #include "Widget/World/WorldWidgetActor.h"
+#include "Engine/GameInstance.h"
+#include "Engine/LocalPlayer.h"
+#include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
 
 namespace
 {
@@ -86,10 +92,7 @@ void UWorldWidgetComponent::BeginPlay()
 
 void UWorldWidgetComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if(UCommonModuleStatics::IsPlaying() && EndPlayReason == EEndPlayReason::Type::Destroyed)
-	{
-		DestroyWorldWidget();
-	}
+	DestroyWorldWidget();
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -97,14 +100,23 @@ void UWorldWidgetComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	if (bPlayerWorldWidgetsRequested) RefreshPlayerWorldWidgets();
 
 	if(bOrientCamera)
 	{
 #if WITH_EDITOR
-		SetWorldRotation(GIsPlaying ? UCameraModuleStatics::GetViewRotation() : FSceneManager::Get().GetActiveViewportViewRotation());
-#else
-		SetWorldRotation(UCameraModuleStatics::GetViewRotation());
+		if (!GetWorld() || !GetWorld()->IsGameWorld()) SetWorldRotation(FSceneManager::Get().GetActiveViewportViewRotation());
+		else
 #endif
+		{
+			UGameInstance* Instance = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+			if (Instance && Instance->GetLocalPlayers().Num() == 1)
+			{
+				ULocalPlayer* LocalPlayer = Instance->GetLocalPlayers()[0];
+				APlayerController* Controller = LocalPlayer ? LocalPlayer->GetPlayerController(GetWorld()) : nullptr;
+				if (Controller && Controller->PlayerCameraManager) SetWorldRotation(Controller->PlayerCameraManager->GetCameraRotation());
+			}
+		}
 		SetRelativeScale3D(FVector(-WidgetScale.X, -WidgetScale.Y, WidgetScale.Z));
 	}
 	else
@@ -112,7 +124,7 @@ void UWorldWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		SetRelativeScale3D(WidgetScale);
 	}
 
-	if(UCommonModuleStatics::IsPlaying())
+	if(GetWorld() && GetWorld()->IsGameWorld())
 	{
 		if(WorldWidget && GetWidgetSpace() == EWidgetSpace::World)
 		{
@@ -260,6 +272,14 @@ void UWorldWidgetComponent::CreateWorldWidget(const FParameter& InParam, bool bI
 	const FParameter Param = MakeWidgetParam(
 		this,
 		InParam.HasValue() ? InParam : WidgetParam);
+	if (!bInEditor && Space == EWidgetSpace::Screen)
+	{
+		ActiveWidgetParam = Param;
+		bPlayerWorldWidgetsRequested = true;
+		if (UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld())) Widgets->RegisterWorldWidgetComponent(this);
+		RefreshPlayerWorldWidgets();
+		return;
+	}
 	
 	if(Config && ResolvedClass)
 	{
@@ -280,22 +300,26 @@ void UWorldWidgetComponent::CreateWorldWidget(const FParameter& InParam, bool bI
 			}
 			case EWidgetSpace::Screen:
 			{
-				UWorldWidgetBase* _WorldWidget;
+				UWorldWidgetBase* _WorldWidget = nullptr;
 				if(bInEditor)
 				{
 					_WorldWidget = CreateWidget<UWorldWidgetBase>(GetWorld(), ResolvedClass);
-					_WorldWidget->bWidgetInEditor = true;
-					_WorldWidget->WidgetTag = Config->ResolveWidgetTag();
-					IObjectPoolInterface::Execute_OnSpawn(_WorldWidget, Param);
-					_WorldWidget->OnCreate(this, Param);
+					if (_WorldWidget)
+					{
+						_WorldWidget->bWidgetInEditor = true;
+						_WorldWidget->WidgetTag = Config->ResolveWidgetTag();
+						IObjectPoolInterface::Execute_OnSpawn(_WorldWidget, Param);
+						_WorldWidget->OnCreate(this, Param);
+					}
 				}
 				else
 				{
-					_WorldWidget = UWidgetModuleStatics::CreateWorldWidgetByTag(
+					UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld());
+					_WorldWidget = Widgets ? Widgets->CreateWorldWidgetByTag(
 						Config->ResolveWidgetTag(),
 						this,
 						Param,
-						ResolvedClass);
+						ResolvedClass) : nullptr;
 				}
 				SetWorldWidget(_WorldWidget);
 				break;
@@ -306,6 +330,14 @@ void UWorldWidgetComponent::CreateWorldWidget(const FParameter& InParam, bool bI
 
 void UWorldWidgetComponent::DestroyWorldWidget(EObjectDespawnMode InMode, bool bInEditor)
 {
+	if (UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld())) Widgets->UnregisterWorldWidgetComponent(this);
+	bPlayerWorldWidgetsRequested = false;
+	ActiveWidgetParam.Reset();
+	TArray<TObjectPtr<UWorldWidgetBase>> PlayerWidgets;
+	PlayerWorldWidgets.GenerateValueArray(PlayerWidgets);
+	PlayerWorldWidgets.Reset();
+	if (UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld()))
+		for (UWorldWidgetBase* PlayerWidget : PlayerWidgets) if (PlayerWidget) Widgets->DestroyWorldWidget(PlayerWidget, InMode);
 	if(UWorldWidgetBase* WidgetToDestroy = WorldWidget)
 	{
 		WorldWidget = nullptr;
@@ -326,11 +358,49 @@ void UWorldWidgetComponent::DestroyWorldWidget(EObjectDespawnMode InMode, bool b
 				}
 				else
 				{
-					UWidgetModuleStatics::DestroyWorldWidget(WidgetToDestroy, InMode);
+					if (UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld())) Widgets->DestroyWorldWidget(WidgetToDestroy, InMode);
 				}
 				break;
 			}
 		}
+	}
+}
+
+void UWorldWidgetComponent::RefreshPlayerWorldWidgets()
+{
+	UWorld* World = GetWorld();
+	UGameInstance* Instance = World ? World->GetGameInstance() : nullptr;
+	UWidgetModule* Widgets = World ? UWidgetModule::GetPtr(World) : nullptr;
+	if (!Instance || !Widgets || !bPlayerWorldWidgetsRequested) return;
+	Widgets->RegisterWorldWidgetComponent(this);
+	const TArray<ULocalPlayer*> Players = Instance->GetLocalPlayers();
+	TArray<UWorldWidgetBase*> Removed;
+	for (auto It = PlayerWorldWidgets.CreateIterator(); It; ++It)
+	{
+		ULocalPlayer* LocalPlayer = It.Key();
+		APlayerController* Controller = LocalPlayer ? LocalPlayer->GetPlayerController(World) : nullptr;
+		if (!Players.Contains(LocalPlayer) || !Controller || !It.Value() || !It.Value()->GetWidgetTag().IsValid() || It.Value()->GetOwningPlayer() != Controller)
+		{
+			if (It.Value()) Removed.Add(It.Value());
+			It.RemoveCurrent();
+		}
+	}
+	for (UWorldWidgetBase* RemovedWidget : Removed) Widgets->DestroyWorldWidget(RemovedWidget);
+	const FWorldWidgetConfig* Config = ResolveWorldWidgetConfig();
+	const TSubclassOf<UWorldWidgetBase> ResolvedClass = ResolveWorldWidgetClass();
+	if (!Config || !ResolvedClass) return;
+	const FGameplayTag Tag = Config->ResolveWidgetTag();
+	for (ULocalPlayer* LocalPlayer : Players)
+	{
+		APlayerController* Controller = LocalPlayer ? LocalPlayer->GetPlayerController(World) : nullptr;
+		if (!Controller || PlayerWorldWidgets.Contains(LocalPlayer) || !Widgets->GetWorldWidgetContainer(Controller)) continue;
+		FParameter Param = ActiveWidgetParam;
+		FWidgetSpawnParameter* Spawn = Param.GetMutablePtr<FWidgetSpawnParameter>();
+		if (!Spawn) continue;
+		Spawn->OwningPlayer = Controller;
+		UWorldWidgetBase* PlayerWidget = Widgets->CreateWorldWidgetByTag(Tag, this, Param, ResolvedClass);
+		if (PlayerWidget)
+			PlayerWorldWidgets.Add(LocalPlayer, PlayerWidget);
 	}
 }
 
@@ -356,9 +426,9 @@ void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UWorldWidgetBase> In
 	if(WorldWidgetClassOverride == InClass) return;
 
 	WorldWidgetClassOverride = InClass;
-	if(UWidgetModule::IsValid())
+	if(UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld()))
 	{
-		WorldWidgetTag = UWidgetModule::Get().ResolveWorldWidgetTagForClass(InClass, false);
+		WorldWidgetTag = Widgets->ResolveWorldWidgetTagForClass(InClass, false);
 	}
 
 	RefreshParams();
@@ -372,7 +442,7 @@ void UWorldWidgetComponent::SetWorldWidgetClass(TSubclassOf<UWorldWidgetBase> In
 			{
 				if(FSlateApplication::IsInitialized())
 				{
-					if(HasBegunPlay() && !GetWorld()->bIsTearingDown)
+					if(HasBegunPlay())
 					{
 						if(WidgetClass)
 						{
@@ -420,9 +490,19 @@ void UWorldWidgetComponent::SetWorldWidgetTag(FGameplayTag InTag, bool bRefresh)
 	}
 }
 
-UUserWidget* UWorldWidgetComponent::GetWorldWidget() const
+UUserWidget* UWorldWidgetComponent::GetWorldWidget(APlayerController* InPlayer) const
 {
-	return Space == EWidgetSpace::World ? GetUserWidgetObject() : WorldWidget;
+	if (Space == EWidgetSpace::World) return GetUserWidgetObject();
+	ULocalPlayer* LocalPlayer = InPlayer ? InPlayer->GetLocalPlayer() : nullptr;
+	return LocalPlayer ? PlayerWorldWidgets.FindRef(LocalPlayer) : nullptr;
+}
+
+TArray<UWorldWidgetBase*> UWorldWidgetComponent::GetWorldWidgets() const
+{
+	TArray<UWorldWidgetBase*> Result;
+	if (WorldWidget) Result.Add(WorldWidget);
+	if (Space == EWidgetSpace::Screen) for (const auto& Entry : PlayerWorldWidgets) if (Entry.Value) Result.Add(Entry.Value);
+	return Result;
 }
 
 USceneComponent* UWorldWidgetComponent::GetWidgetPoint(FName InPointName) const
@@ -441,7 +521,8 @@ bool UWorldWidgetComponent::EDC_AutoCreate() const
 
 const FWorldWidgetConfig* UWorldWidgetComponent::ResolveWorldWidgetConfig() const
 {
-	if(!UWidgetModule::IsValid())
+	UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld());
+	if(!Widgets)
 	{
 		return nullptr;
 	}
@@ -449,10 +530,10 @@ const FWorldWidgetConfig* UWorldWidgetComponent::ResolveWorldWidgetConfig() cons
 	FGameplayTag WidgetTag = WorldWidgetTag;
 	if(!WidgetTag.IsValid() && WorldWidgetClassOverride)
 	{
-		WidgetTag = UWidgetModule::Get().ResolveWorldWidgetTagForClass(WorldWidgetClassOverride, false);
+		WidgetTag = Widgets->ResolveWorldWidgetTagForClass(WorldWidgetClassOverride, false);
 	}
 	return WidgetTag.IsValid()
-		? UWidgetModule::Get().GetWorldWidgetConfig(WidgetTag)
+		? Widgets->GetWorldWidgetConfig(WidgetTag)
 		: nullptr;
 }
 

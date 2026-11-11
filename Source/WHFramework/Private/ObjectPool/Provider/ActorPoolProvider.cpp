@@ -1,8 +1,13 @@
 #include "ObjectPool/Provider/ActorPoolProvider.h"
 
+#include "Common/Base/WHActor.h"
+#include "Pawn/Base/PawnBase.h"
+#include "Character/Base/CharacterBase.h"
+#include "Ability/Spawner/AbilitySpawnerBase.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Pawn.h"
 #include "ObjectPool/ObjectPoolBucket.h"
 #include "ObjectPool/ObjectPoolModule.h"
 #include "ObjectPool/ObjectPoolModuleTypes.h"
@@ -24,10 +29,12 @@ UObject* FActorPoolProvider::Spawn(UClass* InClass, const FParameter& InParam)
 	UWorld* World = GEngine && WorldContext
 		? GEngine->GetWorldFromContextObject(WorldContext, EGetWorldErrorMode::ReturnNull)
 		: Module.GetWorld();
-	if(!World || World->bIsTearingDown)
+	if(!World || World != Module.GetWorld() || World->bIsTearingDown)
 	{
 		return nullptr;
 	}
+	if (Parameter && ((Parameter->Owner && Parameter->Owner->GetWorld() != World) ||
+		(Parameter->Instigator && Parameter->Instigator->GetWorld() != World))) return nullptr;
 
 	const FObjectPoolPolicy Policy = Module.GetPoolPolicy(InClass);
 	AActor* Actor = Policy.bEnablePooling
@@ -37,6 +44,8 @@ UObject* FActorPoolProvider::Spawn(UClass* InClass, const FParameter& InParam)
 	if(!Actor)
 	{
 		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.bDeferConstruction = InClass->IsChildOf(AWHActor::StaticClass()) || InClass->IsChildOf(APawnBase::StaticClass()) ||
+			InClass->IsChildOf(ACharacterBase::StaticClass()) || InClass->IsChildOf(AAbilitySpawnerBase::StaticClass());
 		if(Parameter)
 		{
 			SpawnParameters.Owner = Parameter->Owner;
@@ -48,6 +57,7 @@ UObject* FActorPoolProvider::Spawn(UClass* InClass, const FParameter& InParam)
 			InClass,
 			Parameter ? Parameter->Transform : FTransform::Identity,
 			SpawnParameters);
+		if (Actor && SpawnParameters.bDeferConstruction) DeferredIdentitySpawns.Add(Actor);
 	}
 	else
 	{
@@ -64,6 +74,11 @@ UObject* FActorPoolProvider::Spawn(UClass* InClass, const FParameter& InParam)
 	}
 
 	return Actor;
+}
+
+bool FActorPoolProvider::TakeDeferredSpawn(AActor* Actor)
+{
+	return Actor && DeferredIdentitySpawns.Remove(Actor) > 0;
 }
 
 void FActorPoolProvider::PrepareDespawn(UObject* InObject)
@@ -115,6 +130,7 @@ void FActorPoolProvider::Destroy(UObject* InObject)
 	{
 		Module.RemoveFromGenericBucket(Actor);
 		ActorStates.Remove(Actor);
+		DeferredIdentitySpawns.Remove(Actor);
 		if(IsValid(Actor))
 		{
 			Actor->Destroy();
@@ -125,4 +141,5 @@ void FActorPoolProvider::Destroy(UObject* InObject)
 void FActorPoolProvider::ClearAll()
 {
 	ActorStates.Reset();
+	DeferredIdentitySpawns.Reset();
 }

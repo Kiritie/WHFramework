@@ -23,9 +23,9 @@ void UCommonButtonGroup::OnDespawn_Implementation(EObjectDespawnMode InMode)
 
 	for(auto Iter : Buttons)
 	{
-		UObjectPoolModuleStatics::DespawnObject(
-			Iter.Get(),
-			EObjectDespawnMode::Recovery);
+		UWidget* Button = Iter.Get();
+		if (UObjectPoolModule* Pool = Button ? UObjectPoolModule::GetPtr(Button->GetWorld()) : nullptr)
+			Pool->DespawnObject(Button, EObjectDespawnMode::Recovery);
 	}
 	RemoveAll();
 }

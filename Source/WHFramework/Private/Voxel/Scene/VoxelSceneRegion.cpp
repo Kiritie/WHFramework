@@ -1,6 +1,9 @@
 #include "Voxel/Scene/VoxelSceneRegion.h"
+#include "Ability/AbilityActorSaveTypes.h"
+#include "Scene/SceneActorSaveTypes.h"
 
 #include "Ability/AbilityModuleStatics.h"
+#include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "SaveGame/SaveDataSerializer.h"
@@ -315,7 +318,7 @@ bool UVoxelSceneRegion::RestorePendingActor(const FGuid& InId, const FParameter&
 {
 	FVector Location;
 	const FSceneActorSaveData* SceneActor = InData.GetPtr<FSceneActorSaveData>();
-	if (SceneActor)
+	if (SceneActor && SceneActor->ActorID == InId && InId.IsValid())
 	{
 		Location = SceneActor->SpawnTransform.GetLocation();
 	}
@@ -338,7 +341,7 @@ bool UVoxelSceneRegion::RestorePendingActor(const FGuid& InId, const FParameter&
 		return false;
 	}
 	TGuardValue<FGuid> RestoreIdentity(RestoringActorId, InId);
-	AActor* Actor = UAbilityModuleStatics::SpawnAbilityActor(InData, this);
+	AActor* Actor = UAbilityModuleStatics::SpawnAbilityActor(GetWorld(), InData, this);
 	if (!Actor || !Actor->Implements<USceneActorInterface>())
 	{
 		if (Actor)
@@ -348,11 +351,10 @@ bool UVoxelSceneRegion::RestorePendingActor(const FGuid& InId, const FParameter&
 		bSceneFailed = true;
 		return false;
 	}
-	RemoveSceneActor(Actor);
-	ISceneActorInterface::Execute_SetActorID(Actor, InId.ToString());
 	Actor->SetReplicates(true);
-	if (!AddSceneActor(Actor))
+	if (ISceneActorInterface::Execute_GetActorID(Actor) != InId || SceneActorMap.FindRef(InId) != Actor)
 	{
+		bSceneFailed = true;
 		Actor->Destroy();
 		return false;
 	}

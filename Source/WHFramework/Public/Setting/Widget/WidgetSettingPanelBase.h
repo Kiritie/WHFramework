@@ -2,6 +2,7 @@
 
 #pragma once
 #include "Widget/Screen/UserWidgetBase.h"
+#include "Setting/SettingEditTypes.h"
 
 #include "WidgetSettingPanelBase.generated.h"
 
@@ -63,7 +64,6 @@ protected:
 	bool bOwnsEditSession = false;
 	TWeakObjectPtr<USettingModule> EditSessionSource;
 	FText SessionStatus;
-	uint64 EditSessionRevision = 0;
 	UFUNCTION()
 	void OnCloseButtonClicked();
 	FTimerHandle ConfirmationRefreshTimer;

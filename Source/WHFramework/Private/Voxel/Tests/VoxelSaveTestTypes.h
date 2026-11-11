@@ -1,5 +1,6 @@
-﻿#pragma once
+#pragma once
 
+#include "Common/LifecycleTypes.h"
 #include "Main/Base/ModuleBase.h"
 #include "SaveGame/SaveGameModule.h"
 #include "Voxel/VoxelModuleTypes.h"
@@ -35,7 +36,7 @@ public:
 	virtual void OnBeforeSaveData() override
 	{
 		++BeforeCount;
-		if (bRefreshDuringBefore) Coordinator->OnRefresh(0.01f, false);
+		if (bRefreshDuringBefore) Coordinator->OnControlRefresh(0.01f);
 		if (bTerminateBefore) Coordinator->OnTermination(EPhase::All);
 	}
 

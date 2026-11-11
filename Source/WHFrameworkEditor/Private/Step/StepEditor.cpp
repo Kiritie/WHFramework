@@ -6,6 +6,7 @@
 #include "EdGraphUtilities.h"
 
 #include "Editor.h"
+#include "Engine/World.h"
 #include "UObject/UObjectHash.h"
 #include "Subsystems/AssetEditorSubsystem.h"
 #include "WHFrameworkSlateStatics.h"
@@ -88,9 +89,10 @@ TSharedRef<FStepEditor> FStepEditorModule::CreateStepEditor(const EToolkitMode::
 
 void FStepEditorModule::OnClickedStepEditorButton()
 {
-	if(const UStepModule* Module = UStepModule::GetPtr(!UCommonModuleStatics::IsPlaying()))
+	UWorld* EditorWorld = GEditor ? (GEditor->PlayWorld ? GEditor->PlayWorld.Get() : GEditor->GetEditorWorldContext().World()) : nullptr;
+	if(const UStepModule* Module = UStepModule::GetPtr(EditorWorld))
 	{
-		UStepAsset* Asset = UCommonModuleStatics::IsPlaying() ? Module->GetCurrentAsset() : Module->GetDefaultAsset();
+		UStepAsset* Asset = (EditorWorld && EditorWorld->IsGameWorld()) ? Module->GetCurrentAsset() : Module->GetDefaultAsset();
 		if(Asset)
 		{
 			GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Asset);

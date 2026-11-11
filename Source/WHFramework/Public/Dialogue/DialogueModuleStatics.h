@@ -16,20 +16,20 @@ public:
 	static bool StartDialogue(UDialogueAsset* InDialogue, APlayerController* InPlayer, AActor* InNPC);
 
 	UFUNCTION(BlueprintCallable)
-	static bool SelectDialogueNode(int32 InNodeID);
+	static bool SelectDialogueNode(APlayerController* InPlayer, int32 InNodeID);
 
 	UFUNCTION(BlueprintCallable)
-	static void EndDialogue();
+	static void EndDialogue(APlayerController* InPlayer);
 
 	UFUNCTION(BlueprintPure)
-	static bool IsDialogueActive();
+	static bool IsDialogueActive(APlayerController* InPlayer);
 
 	UFUNCTION(BlueprintPure)
-	static UDialogueAsset* GetCurrentDialogue();
+	static UDialogueAsset* GetCurrentDialogue(APlayerController* InPlayer);
 
 	UFUNCTION(BlueprintPure)
-	static FDialogueNode GetCurrentDialogueNode();
+	static FDialogueNode GetCurrentDialogueNode(APlayerController* InPlayer);
 
 	UFUNCTION(BlueprintPure)
-	static TArray<FDialogueNode> GetAvailableDialogueNodes();
+	static TArray<FDialogueNode> GetAvailableDialogueNodes(APlayerController* InPlayer);
 };

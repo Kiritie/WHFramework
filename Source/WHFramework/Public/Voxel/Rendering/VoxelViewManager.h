@@ -28,6 +28,7 @@ struct FVoxelOverlayPreflightStatus;
 class FVoxelViewPublisher;
 class UVoxelMeshComponent;
 class UVoxelModule;
+class UWorld;
 
 struct FVoxelMacroTileData;
 struct FVoxelCoverageBox;
@@ -258,6 +259,7 @@ public:
 		int32& InOutCursor, FString& OutError, int32 InMaximumEntries = 8);
 
 	void Reset();
+	bool TryResetForWorldStop(FString& OutError);
 	bool HasPrimaryRepresentation() const;
 	FVoxelRepresentationReadiness GetRepresentationReadiness() const;
 	FVoxelTerrainReadinessSnapshot CaptureTerrainReadiness() const;
@@ -707,6 +709,11 @@ private:
 	UVoxelModule& Module;
 	FVoxelTaskScheduler& Scheduler;
 	uint64 WorldEpoch = 0;
+	TWeakObjectPtr<UWorld> OriginalWorld;
+	bool bStopRequested = false;
+	bool bStopInProgress = false;
+	bool bStopPrepared = false;
+	bool bStopComplete = false;
 	FGuid TaskOwnerId = FGuid::NewGuid();
 	uint64 TaskOwnerIncarnation = 1;
 	mutable uint64 NextRepresentationAttempt = 0;

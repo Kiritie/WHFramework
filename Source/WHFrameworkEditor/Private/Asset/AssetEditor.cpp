@@ -1,12 +1,16 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Asset/AssetEditor.h"
+#include "Kismet/GameplayStatics.h"
 
 #include "IAssetTools.h"
 #include "ISettingsSection.h"
 #include "WHFrameworkSlateStatics.h"
 #include "Asset/AssetEditorTypes.h"
+#include "Asset/AssetSourceEditorToolset.h"
 #include "Asset/Slate/SAssetModifierEditorWidget.h"
+#include "Misc/CoreDelegates.h"
+#include "ToolsetRegistry/UToolsetRegistry.h"
 
 #define LOCTEXT_NAMESPACE "FAssetModifierEditor"
 
@@ -24,6 +28,17 @@ FAssetEditorModule::FAssetEditorModule()
 void FAssetEditorModule::StartupModule()
 {
 	FAssetModifierEditorCommands::Register();
+	if (!IsRunningCommandlet())
+	{
+		if (UToolsetRegistry::IsAvailable())
+		{
+			RegisterToolsets();
+		}
+		else
+		{
+			FCoreDelegates::OnAllModuleLoadingPhasesComplete.AddRaw(this, &FAssetEditorModule::RegisterToolsets);
+		}
+	}
 
 	// Register tabs
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(AssetModifierEditorTabName, FOnSpawnTab::CreateRaw(this, &FAssetEditorModule::OnSpawnAssetModifierEditorTab))
@@ -33,7 +48,18 @@ void FAssetEditorModule::StartupModule()
 
 void FAssetEditorModule::ShutdownModule()
 {
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(AssetModifierEditorTabName);
+	FCoreDelegates::OnAllModuleLoadingPhasesComplete.RemoveAll(this);
+	if (!IsRunningCommandlet() && UToolsetRegistry::IsAvailable())
+	{
+		UToolsetRegistry::UnregisterToolsetClass(UAssetSourceEditorToolset::StaticClass());
+	}
 	FAssetModifierEditorCommands::Unregister();
+}
+
+void FAssetEditorModule::RegisterToolsets()
+{
+	UToolsetRegistry::RegisterToolsetClass(UAssetSourceEditorToolset::StaticClass());
 }
 
 void FAssetEditorModule::RegisterSettings(ISettingsModule* SettingsModule)

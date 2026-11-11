@@ -3,6 +3,7 @@
 #pragma once
 
 #include "InputTypes.h"
+#include "Type/NativeTypeIdentity.h"
 #include "Main/MainTypes.h"
 #include "Main/Base/ManagerBase.h"
 
@@ -79,5 +80,5 @@ public:
 
 	virtual void SetDefaultInputMode(EInputMode InInputMode);
 
-	virtual EInputMode GetGlobalInputMode(APlayerController* InController = nullptr) const;
+	virtual EInputMode GetGlobalInputMode(APlayerController* InController) const;
 };

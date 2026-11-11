@@ -2,150 +2,203 @@
 
 
 #include "Audio/AudioModuleStatics.h"
+#include "Common/LanguageTypes.h"
 
 #include "Audio/AudioModule.h"
+#include "Engine/World.h"
 
-TArray<FLanguageType> UAudioModuleStatics::GetAudioLanguageTypes()
+TArray<FLanguageType> UAudioModuleStatics::GetAudioLanguageTypes(const UObject* WorldContextObject)
 {
-	return UAudioModule::Get().GetLanguageTypes();
+	return UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).GetLanguageTypes();
 }
 
-void UAudioModuleStatics::SetAudioLanguageTypes(const TArray<FLanguageType>& InLanguageTypes)
+void UAudioModuleStatics::SetAudioLanguageTypes(const UObject* WorldContextObject, const TArray<FLanguageType>& InLanguageTypes)
 {
-	UAudioModule::Get().SetLanguageTypes(InLanguageTypes);
+	UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).SetLanguageTypes(InLanguageTypes);
 }
 
-int32 UAudioModuleStatics::GetAudioLanguageType()
+int32 UAudioModuleStatics::GetAudioLanguageType(const UObject* WorldContextObject)
 {
-	return UAudioModule::Get().GetLanguageType();
+	return UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).GetLanguageType();
 }
 
-void UAudioModuleStatics::SetAudioLanguageType(int32 InLanguageType)
+void UAudioModuleStatics::SetAudioLanguageType(const UObject* WorldContextObject, int32 InLanguageType)
 {
-	UAudioModule::Get().SetLanguageType(InLanguageType);
+	UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).SetLanguageType(InLanguageType);
 }
 
-void UAudioModuleStatics::PlaySound2D(USoundBase* InSound, float InVolume, bool bMulticast)
+FNetworkDispatchResult UAudioModuleStatics::PlaySound2D(const UObject* WorldContextObject, USoundBase* InSound, float InVolume, bool bMulticast, APlayerController* InController)
 {
-	UAudioModule::Get().PlaySound2D(InSound, InVolume, bMulticast);
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	if (!::IsValid(World) || World->bIsTearingDown) return FNetworkDispatchResult::Failure(ENetworkDispatchStatus::InvalidContext);
+	UAudioModule* Audio = UAudioModule::GetPtr(World);
+	return Audio ? Audio->PlaySound2D(InSound, InVolume, bMulticast, InController) : FNetworkDispatchResult::Failure(World ? ENetworkDispatchStatus::ModuleUnavailable : ENetworkDispatchStatus::InvalidContext);
 }
 
-void UAudioModuleStatics::PlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume, bool bMulticast)
+FNetworkDispatchResult UAudioModuleStatics::PlaySoundAtLocation(const UObject* WorldContextObject, USoundBase* InSound, FVector InLocation, float InVolume, bool bMulticast, APlayerController* InController)
 {
-	UAudioModule::Get().PlaySoundAtLocation(InSound, InLocation, InVolume, bMulticast);
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	if (!::IsValid(World) || World->bIsTearingDown) return FNetworkDispatchResult::Failure(ENetworkDispatchStatus::InvalidContext);
+	UAudioModule* Audio = UAudioModule::GetPtr(World);
+	return Audio ? Audio->PlaySoundAtLocation(InSound, InLocation, InVolume, bMulticast, InController) : FNetworkDispatchResult::Failure(World ? ENetworkDispatchStatus::ModuleUnavailable : ENetworkDispatchStatus::InvalidContext);
 }
 
-FSingleSoundInfo UAudioModuleStatics::GetSingleSoundInfo(const FSingleSoundHandle& InHandle)
+FSingleSoundInfo UAudioModuleStatics::GetSingleSoundInfo(const UObject* WorldContextObject, const FSingleSoundHandle& InHandle, APlayerController* InController)
 {
-	return UAudioModule::Get().GetSingleSoundInfo(InHandle);
+	const UAudioModule* Audio = UAudioModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Audio ? Audio->GetSingleSoundInfo(InHandle, InController) : FSingleSoundInfo();
 }
 
-FSingleSoundHandle UAudioModuleStatics::PlaySingleSound2D(USoundBase* InSound, float InVolume, bool bMulticast)
+EAudioNetworkSoundState UAudioModuleStatics::GetSingleSoundRequestState(const UObject* WorldContextObject, const FSingleSoundHandle& InHandle, APlayerController* InController)
 {
-	return UAudioModule::Get().PlaySingleSound2D(InSound, InVolume, bMulticast);
+	UAudioModule* Audio = UAudioModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Audio ? Audio->GetSingleSoundRequestState(InHandle, InController) : EAudioNetworkSoundState::Unknown;
 }
 
-FSingleSoundHandle UAudioModuleStatics::PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume, bool bMulticast)
+FNetworkDispatchResult UAudioModuleStatics::GetSingleSoundDispatchResult(const UObject* WorldContextObject, const FSingleSoundHandle& InHandle, APlayerController* InController)
 {
-	return UAudioModule::Get().PlaySingleSound2DWithDelegate(InSound, InOnSoundPlayFinish, InVolume, bMulticast);
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	if (!::IsValid(World) || World->bIsTearingDown) return FNetworkDispatchResult::Failure(ENetworkDispatchStatus::InvalidContext);
+	UAudioModule* Audio = UAudioModule::GetPtr(World);
+	return Audio ? Audio->GetSingleSoundDispatchResult(InHandle, InController) : FNetworkDispatchResult::Failure(World ? ENetworkDispatchStatus::ModuleUnavailable : ENetworkDispatchStatus::InvalidContext);
 }
 
-FSingleSoundHandle UAudioModuleStatics::PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume, bool bMulticast)
+FSoundPlaybackResult UAudioModuleStatics::PlaySingleSound2D(const UObject* WorldContextObject, USoundBase* InSound, float InVolume, bool bMulticast, APlayerController* InController)
 {
-	return UAudioModule::Get().PlaySingleSoundAtLocation(InSound, InLocation, InVolume, bMulticast);
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	if (!::IsValid(World) || World->bIsTearingDown) { FSoundPlaybackResult Result; Result.Dispatch.Status = ENetworkDispatchStatus::InvalidContext; return Result; }
+	UAudioModule* Audio = UAudioModule::GetPtr(World);
+	if (Audio) return Audio->PlaySingleSound2D(InSound, InVolume, bMulticast, InController);
+	FSoundPlaybackResult Result;
+	Result.Dispatch.Status = World ? ENetworkDispatchStatus::ModuleUnavailable : ENetworkDispatchStatus::InvalidContext;
+	return Result;
 }
 
-FSingleSoundHandle UAudioModuleStatics::PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume, bool bMulticast)
+FSoundPlaybackResult UAudioModuleStatics::PlaySingleSound2DWithDelegate(const UObject* WorldContextObject, USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume, bool bMulticast, APlayerController* InController)
 {
-	return UAudioModule::Get().PlaySingleSoundAtLocationWithDelegate(InSound, InOnSoundPlayFinish, InLocation, InVolume, bMulticast);
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	if (!::IsValid(World) || World->bIsTearingDown) { FSoundPlaybackResult Result; Result.Dispatch.Status = ENetworkDispatchStatus::InvalidContext; return Result; }
+	UAudioModule* Audio = UAudioModule::GetPtr(World);
+	if (Audio) return Audio->PlaySingleSound2DWithDelegate(InSound, InOnSoundPlayFinish, InVolume, bMulticast, InController);
+	FSoundPlaybackResult Result;
+	Result.Dispatch.Status = World ? ENetworkDispatchStatus::ModuleUnavailable : ENetworkDispatchStatus::InvalidContext;
+	return Result;
 }
 
-void UAudioModuleStatics::StopSingleSound(const FSingleSoundHandle& InHandle, bool bMulticast)
+FSoundPlaybackResult UAudioModuleStatics::PlaySingleSoundAtLocation(const UObject* WorldContextObject, USoundBase* InSound, FVector InLocation, float InVolume, bool bMulticast, APlayerController* InController)
 {
-	UAudioModule::Get().StopSingleSound(InHandle, bMulticast);
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	if (!::IsValid(World) || World->bIsTearingDown) { FSoundPlaybackResult Result; Result.Dispatch.Status = ENetworkDispatchStatus::InvalidContext; return Result; }
+	UAudioModule* Audio = UAudioModule::GetPtr(World);
+	if (Audio) return Audio->PlaySingleSoundAtLocation(InSound, InLocation, InVolume, bMulticast, InController);
+	FSoundPlaybackResult Result;
+	Result.Dispatch.Status = World ? ENetworkDispatchStatus::ModuleUnavailable : ENetworkDispatchStatus::InvalidContext;
+	return Result;
 }
 
-void UAudioModuleStatics::SetSingleSoundPaused(const FSingleSoundHandle& InHandle, bool bPaused, bool bMulticast)
+FSoundPlaybackResult UAudioModuleStatics::PlaySingleSoundAtLocationWithDelegate(const UObject* WorldContextObject, USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume, bool bMulticast, APlayerController* InController)
 {
-	UAudioModule::Get().SetSingleSoundPaused(InHandle, bPaused, bMulticast);
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	if (!::IsValid(World) || World->bIsTearingDown) { FSoundPlaybackResult Result; Result.Dispatch.Status = ENetworkDispatchStatus::InvalidContext; return Result; }
+	UAudioModule* Audio = UAudioModule::GetPtr(World);
+	if (Audio) return Audio->PlaySingleSoundAtLocationWithDelegate(InSound, InOnSoundPlayFinish, InLocation, InVolume, bMulticast, InController);
+	FSoundPlaybackResult Result;
+	Result.Dispatch.Status = World ? ENetworkDispatchStatus::ModuleUnavailable : ENetworkDispatchStatus::InvalidContext;
+	return Result;
 }
 
-float UAudioModuleStatics::GetGlobalSoundVolume()
+FNetworkDispatchResult UAudioModuleStatics::StopSingleSound(const UObject* WorldContextObject, const FSingleSoundHandle& InHandle, bool bMulticast, APlayerController* InController)
 {
-	return UAudioModule::Get().GetGlobalSoundVolume();
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	if (!::IsValid(World) || World->bIsTearingDown) return FNetworkDispatchResult::Failure(ENetworkDispatchStatus::InvalidContext);
+	UAudioModule* Audio = UAudioModule::GetPtr(World);
+	return Audio ? Audio->StopSingleSound(InHandle, bMulticast, InController) : FNetworkDispatchResult::Failure(World ? ENetworkDispatchStatus::ModuleUnavailable : ENetworkDispatchStatus::InvalidContext);
 }
 
-void UAudioModuleStatics::SetGlobalSoundVolume(float InVolume, float InFadeInTime)
+FNetworkDispatchResult UAudioModuleStatics::SetSingleSoundPaused(const UObject* WorldContextObject, const FSingleSoundHandle& InHandle, bool bPaused, bool bMulticast, APlayerController* InController)
 {
-	UAudioModule::Get().SetGlobalSoundVolume(InVolume, InFadeInTime);
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	if (!::IsValid(World) || World->bIsTearingDown) return FNetworkDispatchResult::Failure(ENetworkDispatchStatus::InvalidContext);
+	UAudioModule* Audio = UAudioModule::GetPtr(World);
+	return Audio ? Audio->SetSingleSoundPaused(InHandle, bPaused, bMulticast, InController) : FNetworkDispatchResult::Failure(World ? ENetworkDispatchStatus::ModuleUnavailable : ENetworkDispatchStatus::InvalidContext);
 }
 
-float UAudioModuleStatics::GetGlobalSoundPitch()
+float UAudioModuleStatics::GetGlobalSoundVolume(const UObject* WorldContextObject)
 {
-	return UAudioModule::Get().GetGlobalSoundPitch();
+	return UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).GetGlobalSoundVolume();
 }
 
-void UAudioModuleStatics::SetGlobalSoundPitch(float InPitch, float InFadeInTime)
+void UAudioModuleStatics::SetGlobalSoundVolume(const UObject* WorldContextObject, float InVolume, float InFadeInTime)
 {
-	UAudioModule::Get().SetGlobalSoundPitch(InPitch, InFadeInTime);
+	UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).SetGlobalSoundVolume(InVolume, InFadeInTime);
 }
 
-float UAudioModuleStatics::GetBackgroundSoundVolume()
+float UAudioModuleStatics::GetGlobalSoundPitch(const UObject* WorldContextObject)
 {
-	return UAudioModule::Get().GetBackgroundSoundVolume();
+	return UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).GetGlobalSoundPitch();
 }
 
-void UAudioModuleStatics::SetBackgroundSoundVolume(float InVolume, float InFadeInTime)
+void UAudioModuleStatics::SetGlobalSoundPitch(const UObject* WorldContextObject, float InPitch, float InFadeInTime)
 {
-	UAudioModule::Get().SetBackgroundSoundVolume(InVolume, InFadeInTime);
+	UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).SetGlobalSoundPitch(InPitch, InFadeInTime);
 }
 
-float UAudioModuleStatics::GetBackgroundSoundPitch()
+float UAudioModuleStatics::GetBackgroundSoundVolume(const UObject* WorldContextObject)
 {
-	return UAudioModule::Get().GetBackgroundSoundPitch();
+	return UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).GetBackgroundSoundVolume();
 }
 
-void UAudioModuleStatics::SetBackgroundSoundPitch(float InPitch, float InFadeInTime)
+void UAudioModuleStatics::SetBackgroundSoundVolume(const UObject* WorldContextObject, float InVolume, float InFadeInTime)
 {
-	UAudioModule::Get().SetBackgroundSoundPitch(InPitch, InFadeInTime);
+	UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).SetBackgroundSoundVolume(InVolume, InFadeInTime);
 }
 
-float UAudioModuleStatics::GetEnvironmentSoundVolume()
+float UAudioModuleStatics::GetBackgroundSoundPitch(const UObject* WorldContextObject)
 {
-	return UAudioModule::Get().GetEnvironmentSoundVolume();
+	return UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).GetBackgroundSoundPitch();
 }
 
-void UAudioModuleStatics::SetEnvironmentSoundVolume(float InVolume, float InFadeInTime)
+void UAudioModuleStatics::SetBackgroundSoundPitch(const UObject* WorldContextObject, float InPitch, float InFadeInTime)
 {
-	UAudioModule::Get().SetEnvironmentSoundVolume(InVolume, InFadeInTime);
+	UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).SetBackgroundSoundPitch(InPitch, InFadeInTime);
 }
 
-float UAudioModuleStatics::GetEnvironmentSoundPitch()
+float UAudioModuleStatics::GetEnvironmentSoundVolume(const UObject* WorldContextObject)
 {
-	return UAudioModule::Get().GetEnvironmentSoundPitch();
+	return UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).GetEnvironmentSoundVolume();
 }
 
-void UAudioModuleStatics::SetEnvironmentSoundPitch(float InPitch, float InFadeInTime)
+void UAudioModuleStatics::SetEnvironmentSoundVolume(const UObject* WorldContextObject, float InVolume, float InFadeInTime)
 {
-	UAudioModule::Get().SetEnvironmentSoundPitch(InPitch, InFadeInTime);
+	UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).SetEnvironmentSoundVolume(InVolume, InFadeInTime);
 }
 
-float UAudioModuleStatics::GetEffectSoundVolume()
+float UAudioModuleStatics::GetEnvironmentSoundPitch(const UObject* WorldContextObject)
 {
-	return UAudioModule::Get().GetEffectSoundVolume();
+	return UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).GetEnvironmentSoundPitch();
 }
 
-void UAudioModuleStatics::SetEffectSoundVolume(float InVolume, float InFadeInTime)
+void UAudioModuleStatics::SetEnvironmentSoundPitch(const UObject* WorldContextObject, float InPitch, float InFadeInTime)
 {
-	UAudioModule::Get().SetEffectSoundVolume(InVolume, InFadeInTime);
+	UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).SetEnvironmentSoundPitch(InPitch, InFadeInTime);
 }
 
-float UAudioModuleStatics::GetEffectSoundPitch()
+float UAudioModuleStatics::GetEffectSoundVolume(const UObject* WorldContextObject)
 {
-	return UAudioModule::Get().GetEffectSoundPitch();
+	return UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).GetEffectSoundVolume();
 }
 
-void UAudioModuleStatics::SetEffectSoundPitch(float InPitch, float InFadeInTime)
+void UAudioModuleStatics::SetEffectSoundVolume(const UObject* WorldContextObject, float InVolume, float InFadeInTime)
 {
-	UAudioModule::Get().SetEffectSoundPitch(InPitch, InFadeInTime);
+	UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).SetEffectSoundVolume(InVolume, InFadeInTime);
+}
+
+float UAudioModuleStatics::GetEffectSoundPitch(const UObject* WorldContextObject)
+{
+	return UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).GetEffectSoundPitch();
+}
+
+void UAudioModuleStatics::SetEffectSoundPitch(const UObject* WorldContextObject, float InPitch, float InFadeInTime)
+{
+	UAudioModule::Get(WorldContextObject ? WorldContextObject->GetWorld() : nullptr).SetEffectSoundPitch(InPitch, InFadeInTime);
 }

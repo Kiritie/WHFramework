@@ -1,11 +1,19 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Pawn/AbilityPawnBase.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Ability/AbilityTags.h"
+#include "Pawn/PawnTags.h"
+#include "Ability/AbilityAttributeAccessors.h"
+#include "Ability/AbilityExecutionTypes.h"
+#include "Ability/AbilityInfoTypes.h"
+#include "Ability/AbilityActorSaveTypes.h"
+#include "Common/LifecycleTypes.h"
 #include "Ability/Components/AbilityControlComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Ability/Effects/EffectBase.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Engine/World.h"
 
 #include "Ability/Interaction/AbilityInteractionOptions.h"
@@ -66,6 +74,12 @@ AAbilityPawnBase::AAbilityPawnBase(const FObjectInitializer& ObjectInitializer)
 
 }
 
+void AAbilityPawnBase::OnRep_ActorID()
+{
+	if (AbilitySystem) AbilitySystem->SetAbilityEntityId(ActorID);
+	Super::OnRep_ActorID();
+}
+
 void AAbilityPawnBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	if (HasAuthority() && AttributeSet)
@@ -83,6 +97,7 @@ void AAbilityPawnBase::OnSpawn_Implementation(const FParameter& InParam)
 	}
 
 	Super::OnSpawn_Implementation(InParam);
+	if (HasActorBegunPlay() && !Execute_IsInitialized(this)) return;
 
 	AbilitySystem->SetAbilityEntityId(ActorID);
 	InitializeAbilities();
@@ -235,26 +250,30 @@ void AAbilityPawnBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 	const FPawnSaveData* SaveData = InSaveData.GetPtr<FPawnSaveData>();
 	if (!SaveData || !HasAuthority())
 	{
+		MarkLoadDataFailed();
 		return;
 	}
+	Super::LoadData(InSaveData, InPhase);
+	if (!WasLoadDataApplied()) return;
 	if (PHASEC(InPhase, EPhase::Primary))
 	{
-		SetActorTransform(SaveData->SpawnTransform);
 		BirthTransform = SaveData->IsSaved() ? SaveData->BirthTransform : SaveData->SpawnTransform;
 		AbilitySystem->SetAbilityEntityId(ActorID);
-		const UAbilityPawnDataBase& Data = GetPawnData<UAbilityPawnDataBase>();
+		const UAbilityPawnDataBase* Data = GetPawnData<UAbilityPawnDataBase>();
+		if (!Data) { MarkLoadDataFailed(); UE_LOG(LogTemp, Error, TEXT("Pawn 定义尚未绑定：%s"), *AssetID.ToString()); return; }
 		TArray<FAbilityGrantDefinition> Grants;
-		for (const FVitalityActionAbilityData& Action : Data.ActionAbilities)
+		for (const FVitalityActionAbilityData& Action : Data->ActionAbilities)
 		{
 			FAbilityGrantDefinition Grant;
 			Grant.DefinitionId = Action.ID;
 			Grant.AbilityClass = Action.AbilityClass;
-			Grant.SourceObject = const_cast<UAbilityPawnDataBase*>(&Data);
+			Grant.SourceObject = const_cast<UAbilityPawnDataBase*>(Data);
 			Grant.Level = Action.Level;
 			Grants.Add(Grant);
 		}
 		if (!AbilitySystem->SetGrantSource(GetDefaultGrantSourceId(), Grants, {}, 1))
 		{
+			MarkLoadDataFailed();
 			UE_LOG(LogTemp, Error, TEXT("Invalid action definitions on %s"), *GetName());
 			return;
 		}
@@ -267,10 +286,11 @@ void AAbilityPawnBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 
 		if (HasAuthority() && SaveData->InventorySnapshot.InventoryId.IsValid())
 		{
-			UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+			UInventoryModule* Subsystem = GetWorld() ? UInventoryModule::GetPtr(GetWorld()) : nullptr;
 			UAbilityInventoryBase* Resolved = Subsystem ? Subsystem->Resolve(SaveData->InventorySnapshot.InventoryId) : nullptr;
 			if (!Resolved)
 			{
+				MarkLoadDataFailed();
 				UE_LOG(LogTemp, Error, TEXT("Inventory restore requires the recovered world store: %s"), *SaveData->InventorySnapshot.InventoryId.ToString());
 				return;
 			}
@@ -326,7 +346,7 @@ void AAbilityPawnBase::Death(IAbilityVitalityInterface* InKiller)
 	UAbilitySystemComponentBase* const DyingSystem = AbilitySystem;
 	const auto IsSameDeath = [this, DyingIdentity, DyingSystem]()
 	{
-		return IsValid(this) && ActorID == DyingIdentity && AbilitySystem == DyingSystem &&
+		return ActorID == DyingIdentity && AbilitySystem == DyingSystem &&
 			DyingSystem->GetAvatarActor() == this && IsDead();
 	};
 	SwitchFinalFiniteState({Cast<UObject>(InKiller)});
@@ -514,15 +534,15 @@ void AAbilityPawnBase::HandleDamage(const FGameplayAttribute& DamageAttribute,
 
 	if (DamageValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue),
-		                                    UAbilityModuleStatics::GetAttributeColor(DamageAttribute),
+		USceneModuleStatics::SpawnWorldText(this, FString::FromInt(DamageValue),
+		                                    UAbilityModuleStatics::GetAttributeColor(GetWorld(), DamageAttribute),
 		                                    !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress,
 		                                    GetActorLocation(),
 		                                    FVector(20.f));
 	}
 	if (DefendValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(DefendValue), FColor::Cyan, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+		USceneModuleStatics::SpawnWorldText(this, FString::FromInt(DefendValue), FColor::Cyan, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
 	}
 }
 
@@ -540,7 +560,7 @@ void AAbilityPawnBase::HandleRecovery(
 
 		if (RecoveryValue > 1.f)
 		{
-			USceneModuleStatics::SpawnWorldText(FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+			USceneModuleStatics::SpawnWorldText(this, FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
 		}
 	}
 }
@@ -638,16 +658,17 @@ bool AAbilityPawnBase::SetLevelA(int32 InLevel)
 	{
 		return false;
 	}
-	const auto& Data = GetPawnData<UAbilityPawnDataBase>();
-	InLevel = Data.ClampLevel(InLevel);
+	const UAbilityPawnDataBase* Data = GetPawnData<UAbilityPawnDataBase>();
+	if (!Data) return false;
+	InLevel = Data->ClampLevel(InLevel);
 	if (InLevel == Level)
 	{
 		return false;
 	}
 	TArray<TSubclassOf<UEffectBase>> Effects;
-	if (Data.PEClass)
+	if (Data->PEClass)
 	{
-		Effects.Add(Data.PEClass);
+		Effects.Add(Data->PEClass);
 	}
 	if (!AbilitySystem->SetGrantSource(GetProgressionGrantSourceId(), {}, Effects, InLevel))
 	{
@@ -776,8 +797,8 @@ void AAbilityPawnBase::BindInventory(UAbilityInventoryBase* InInventory)
 	{
 		return;
 	}
-	UInventoryWorldSubsystem* NextSubsystem = InInventory ? Cast<UInventoryWorldSubsystem>(InInventory->GetOuter()) : nullptr;
-	UInventoryWorldSubsystem* WorldSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	UInventoryModule* NextSubsystem = InInventory ? Cast<UInventoryModule>(InInventory->GetOuter()) : nullptr;
+	UInventoryModule* WorldSubsystem = GetWorld() ? UInventoryModule::GetPtr(GetWorld()) : nullptr;
 	if (InInventory && (!NextSubsystem || NextSubsystem != WorldSubsystem || !NextSubsystem->AcquireLease(InInventory->GetInventoryId())))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Inventory binding rejected for %s"), *GetName());
@@ -787,7 +808,7 @@ void AAbilityPawnBase::BindInventory(UAbilityInventoryBase* InInventory)
 	Inventory = InInventory;
 	if (PreviousInventory)
 	{
-		if (UInventoryWorldSubsystem* PreviousSubsystem = Cast<UInventoryWorldSubsystem>(PreviousInventory->GetOuter()))
+		if (UInventoryModule* PreviousSubsystem = Cast<UInventoryModule>(PreviousInventory->GetOuter()))
 		{
 			PreviousSubsystem->ReleaseLease(PreviousInventory->GetInventoryId());
 		}

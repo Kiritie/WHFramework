@@ -182,7 +182,7 @@ UVoxelModule::UVoxelModule()
 	};
 
 	DefaultData.GenerationProfile = TSoftObjectPtr<UVoxelWorldGenerationProfile>(
-		FSoftObjectPath(TEXT("/WHFramework/Voxel/Generation/DA_VoxelWorldGenerationProfile_Default.DA_VoxelWorldGenerationProfile_Default")));
+		FSoftObjectPath(TEXT("/WHFramework/DataAssets/Voxel/Generation/DA_VoxelWorldGenerationProfile_Default.DA_VoxelWorldGenerationProfile_Default")));
 
 	WorldData =
 		MakeUnique<

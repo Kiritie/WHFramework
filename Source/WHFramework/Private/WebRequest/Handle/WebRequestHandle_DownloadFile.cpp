@@ -20,6 +20,9 @@ void UWebRequestHandle_DownloadFile::OnDespawn_Implementation(EObjectDespawnMode
 
 void UWebRequestHandle_DownloadFile::Parse(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
 {
+	bSucceeded = false;
+	FilePath.Reset();
+	if (!InResult.bSucceeded || !InResult.HttpResponse.IsValid()) return;
 	if (InParams.IsValidIndex(0))
 	{
 		FilePath = InParams[0].Get<FString>();
@@ -37,9 +40,8 @@ void UWebRequestHandle_DownloadFile::Parse(const FWebRequestResult& InResult, co
 
 		if (IFileHandle* FileHandle = PlatformFile.OpenWrite(*FilePath))
 		{
-			FileHandle->Write(InResult.HttpResponse->GetContent().GetData(), InResult.HttpResponse->GetContentLength());
+			bSucceeded = FileHandle->Write(InResult.HttpResponse->GetContent().GetData(), InResult.HttpResponse->GetContentLength());
 			delete FileHandle;
-			bSucceeded = true;
 		}
 	}
 }

@@ -2,6 +2,9 @@
 
 
 #include "SaveGame/SaveGameModuleTypes.h"
+#include "SaveGame/SaveOperationTypes.h"
+#include "SaveGame/SaveSlotTypes.h"
+#include "SaveGame/SaveManifestTypes.h"
 
 #include "Misc/Paths.h"
 

@@ -1,41 +1,50 @@
 #include "Event/EventModuleStatics.h"
+#include "GameFramework/PlayerController.h"
 
-void UEventModuleStatics::UnsubscribeAllEvent()
+void UEventModuleStatics::UnsubscribeAllEvent(const UObject* WorldContextObject)
 {
-	UEventModule::Get().UnsubscribeAllEvent();
+	if (UEventModule* Events = UEventModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr)) Events->UnsubscribeAllEvent();
 }
 
-void UEventModuleStatics::K2_BroadcastEvent(UObject*, const int32&, EEventNetType)
+FNetworkDispatchResult UEventModuleStatics::K2_BroadcastEvent(const UObject*, UObject*, const int32&, EEventNetType, APlayerController*)
 {
 	checkNoEntry();
+	return FNetworkDispatchResult::Failure(ENetworkDispatchStatus::InvalidRequest);
 }
 
 DEFINE_FUNCTION(UEventModuleStatics::execK2_BroadcastEvent)
 {
+	P_GET_OBJECT(UObject, WorldContextObject);
 	P_GET_OBJECT(UObject, Sender);
 	Stack.MostRecentProperty = nullptr;
 	Stack.StepCompiledIn<FProperty>(nullptr);
 	const FStructProperty* EventProperty = CastField<FStructProperty>(Stack.MostRecentProperty);
 	const void* EventPtr = Stack.MostRecentPropertyAddress;
 	P_GET_ENUM(EEventNetType, NetType);
+	P_GET_OBJECT(APlayerController, Controller);
 	P_FINISH;
 	P_NATIVE_BEGIN;
+	FNetworkDispatchResult Result = FNetworkDispatchResult::Failure(ENetworkDispatchStatus::InvalidRequest);
 	if(EventProperty && EventPtr && EventProperty->Struct->IsChildOf(FEventBase::StaticStruct()))
 	{
-		UEventModule::Get().BroadcastEvent(Sender, FConstStructView(EventProperty->Struct, static_cast<const uint8*>(EventPtr)), static_cast<EEventNetType>(NetType));
+		if (UEventModule* Events = UEventModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr))
+			Result = Events->BroadcastEvent(Sender, FConstStructView(EventProperty->Struct, static_cast<const uint8*>(EventPtr)), static_cast<EEventNetType>(NetType), Controller);
+		else Result.Status = ENetworkDispatchStatus::ModuleUnavailable;
 	}
+	*static_cast<FNetworkDispatchResult*>(RESULT_PARAM) = MoveTemp(Result);
 	P_NATIVE_END;
 }
 
 void UEventModuleStatics::K2_SubscribeEvent(UObject* Owner, UScriptStruct* EventStruct, FEventDynamicDelegate Callback)
 {
+	if (!::IsValid(Owner) || !EventStruct || !Callback.IsBound()) return;
 	FEventDelegate NativeCallback;
 	NativeCallback.BindLambda([Callback = MoveTemp(Callback)](UObject* Sender, FConstStructView Event) mutable
 	{
 		FInstancedStruct EventData(Event);
 		Callback.ExecuteIfBound(Sender, EventData);
 	});
-	UEventModule::Get().SubscribeEvent(Owner, EventStruct, MoveTemp(NativeCallback));
+	if (UEventModule* Events = UEventModule::GetPtr(Owner ? Owner->GetWorld() : nullptr)) Events->SubscribeEvent(Owner, EventStruct, MoveTemp(NativeCallback));
 }
 
 void UEventModuleStatics::K2_GetEventData(const FInstancedStruct&, int32&)
@@ -63,12 +72,14 @@ DEFINE_FUNCTION(UEventModuleStatics::execK2_GetEventData)
 	P_NATIVE_END;
 }
 
-UEventManagerBase* UEventModuleStatics::GetEventManager(TSubclassOf<UEventManagerBase> InClass)
+UEventManagerBase* UEventModuleStatics::GetEventManager(const UObject* WorldContextObject, TSubclassOf<UEventManagerBase> InClass)
 {
-	return UEventModule::Get().GetEventManager(InClass);
+	UEventModule* Events = UEventModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Events ? Events->GetEventManager(InClass) : nullptr;
 }
 
-UEventManagerBase* UEventModuleStatics::GetEventManagerByName(const FName InName, TSubclassOf<UEventManagerBase> InClass)
+UEventManagerBase* UEventModuleStatics::GetEventManagerByName(const UObject* WorldContextObject, const FName InName, TSubclassOf<UEventManagerBase> InClass)
 {
-	return UEventModule::Get().GetEventManagerByName(InName, InClass);
+	UEventModule* Events = UEventModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Events ? Events->GetEventManagerByName(InName, InClass) : nullptr;
 }

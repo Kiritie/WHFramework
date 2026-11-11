@@ -2,21 +2,19 @@
 
 
 #include "Network/NetworkModule.h"
+#include "Common/LifecycleTypes.h"
 
 #include "SocketSubsystem.h"
 #include "Kismet/GameplayStatics.h"
-#include "Main/MainModule.h"
-#include "Network/NetworkModuleNetworkComponent.h"
-
-IMPLEMENTATION_MODULE(UNetworkModule)
+#include "Engine/GameInstance.h"
+#include "Engine/World.h"
+#include "Gameplay/WHGameInstance.h"
 
 // ParamSets default values
 UNetworkModule::UNetworkModule()
 {
 	ModuleName = FName("NetworkModule");
 	ModuleDisplayName = FText::FromString(TEXT("Network Module"));
-
-	ModuleNetworkComponent = UNetworkModuleNetworkComponent::StaticClass();
 
 	bLocalMode = false;
 	ServerURL = TEXT("");
@@ -25,7 +23,17 @@ UNetworkModule::UNetworkModule()
 
 UNetworkModule::~UNetworkModule()
 {
-	TERMINATION_MODULE(UNetworkModule)
+}
+
+UNetworkModule* UNetworkModule::GetPtr(const UGameInstance* InGameInstance)
+{
+	const UWHGameInstance* Owner = Cast<UWHGameInstance>(InGameInstance);
+	return Owner ? Owner->FindModule<UNetworkModule>() : nullptr;
+}
+
+UNetworkModule* UNetworkModule::GetPtr(const UWorld* InWorld)
+{
+	return InWorld ? GetPtr(InWorld->GetGameInstance()) : nullptr;
 }
 
 #if WITH_EDITOR
@@ -38,7 +46,6 @@ void UNetworkModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UNetworkModule)
 }
 #endif
 
@@ -82,6 +89,7 @@ FString UNetworkModule::GetModuleDebugMessage()
 
 FString UNetworkModule::GetServerURL() const
 {
+	if (!bLocalMode && ServerURL.IsEmpty()) return FString();
 	return FString::Printf(TEXT("%s:%d"), !bLocalMode ? *ServerURL : TEXT("127.0.0.1"), ServerPort);
 }
 
@@ -130,24 +138,29 @@ int32 UNetworkModule::GetServerLocalPort() const
 	return LocalPort;
 }
 
-bool UNetworkModule::ConnectServer(const FString& InServerURL, int32 InServerPort, const FString& InOptions)
+bool UNetworkModule::ConnectServer(const UObject* WorldContextObject, const FString& InServerURL, int32 InServerPort, const FString& InOptions)
 {
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	const UWHGameInstance* Instance = GetGameInstanceOwner();
+	if (!World || World->bIsTearingDown || !Instance || World->GetGameInstance() != Instance || Instance->GetWorld() != World) return false;
 	if(!InServerURL.IsEmpty()) ServerURL = InServerURL;
 	
 	if(InServerPort > 0) ServerPort = InServerPort;
 	
 	if(ServerURL.IsEmpty()) return false;
 	
-	UGameplayStatics::OpenLevel(this, *GetServerURL(), true, InOptions);
+	UGameplayStatics::OpenLevel(World, *GetServerURL(), true, InOptions);
 
 	return true;
 }
 
-bool UNetworkModule::DisconnectServer(const FString& InLevelName)
+bool UNetworkModule::DisconnectServer(const UObject* WorldContextObject, const FString& InLevelName)
 {
-	if(InLevelName.IsEmpty()) return false;
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	const UWHGameInstance* Instance = GetGameInstanceOwner();
+	if (!World || World->bIsTearingDown || !Instance || World->GetGameInstance() != Instance || Instance->GetWorld() != World || InLevelName.IsEmpty()) return false;
 	
-	UGameplayStatics::OpenLevel(this, *InLevelName);
+	UGameplayStatics::OpenLevel(World, *InLevelName);
 
 	return true;
 }

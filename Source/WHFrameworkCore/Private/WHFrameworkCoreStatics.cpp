@@ -1,33 +1,38 @@
 ﻿#include "WHFrameworkCoreStatics.h"
 
 #include "IImageWrapperModule.h"
+#include "SaveGame/SaveDataArchive.h"
+#include "WHFrameworkCoreMacros.h"
 #include "WHFrameworkCoreTypes.h"
 #include "ImageUtils.h"
 #include "Engine/Texture.h"
+#include "UObject/StrongObjectPtr.h"
 #include<string>
 #include<stdio.h>
 #include<assert.h>
 
 using namespace std;
 
-void FCoreStatics::SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
+bool FCoreStatics::SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
 {
-	if(InObject)
-	{
-		FMemoryWriter MemoryWriter(OutObjectData, true);
-		FSaveDataArchive Ar(MemoryWriter);
-		InObject->Serialize(Ar);
-	}
+	OutObjectData.Reset();
+	if (!IsValid(InObject)) return false;
+	const TStrongObjectPtr<UObject> ActiveObject(InObject);
+	FMemoryWriter MemoryWriter(OutObjectData, true);
+	FSaveDataArchive Ar(MemoryWriter);
+	InObject->Serialize(Ar);
+	if (!IsValid(InObject) || Ar.IsError() || MemoryWriter.IsError()) { OutObjectData.Reset(); return false; }
+	return true;
 }
 
-void FCoreStatics::LoadObjectDataFromMemory(UObject* InObject, const TArray<uint8>& InObjectData)
+bool FCoreStatics::LoadObjectDataFromMemory(UObject* InObject, const TArray<uint8>& InObjectData)
 {
-	if(InObject && InObjectData.Num() > 0)
-	{
-		FMemoryReader MemoryReader(InObjectData, true);
-		FSaveDataArchive Ar(MemoryReader);
-		InObject->Serialize(Ar);
-	}
+	if (!IsValid(InObject) || InObjectData.IsEmpty()) return false;
+	const TStrongObjectPtr<UObject> ActiveObject(InObject);
+	FMemoryReader MemoryReader(InObjectData, true);
+	FSaveDataArchive Ar(MemoryReader);
+	InObject->Serialize(Ar);
+	return IsValid(InObject) && !Ar.IsError() && !MemoryReader.IsError() && MemoryReader.AtEnd();
 }
 
 void FCoreStatics::ImportExposedProperties(UObject* InObject, TSharedPtr<FJsonObject> InJsonObject)
@@ -231,7 +236,6 @@ UTexture2D* FCoreStatics::LoadTextureFromFile(const FString& InFilePath)
 					Texture = UTexture2D::CreateTransient(ImageWrapper->GetWidth(), ImageWrapper->GetHeight(), PF_B8G8R8A8);
 					if (Texture)
 					{
-						Texture->AddToRoot();
 						const auto PlatformData = Texture->GetPlatformData();
 						void* TextureData = PlatformData->Mips[0].BulkData.Lock(LOCK_READ_WRITE);
 						FMemory::Memcpy(TextureData, RawData.GetData(), RawData.Num());

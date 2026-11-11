@@ -1,5 +1,9 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "SaveGame/SaveOperationTypes.h"
+#include "SaveGame/SaveManifestTypes.h"
+#include "SaveGame/SaveFileTypes.h"
+#include "Common/LifecycleTypes.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformProcess.h"
 #include "HAL/PlatformFileManager.h"
@@ -1181,10 +1185,8 @@ bool FVoxelSaveCoordinatorTest::RunTest(const FString& InParameters)
 	Producer->Coordinator = Save;
 	OtherProducer->Coordinator = Save;
 	Producer->bRefreshDuringBefore = true;
-	Owner->GetModules().Add(Producer);
-	Owner->GetModuleMap().Add(Producer->GetModuleName(), Producer);
-	Owner->GetModules().Add(OtherProducer);
-	Owner->GetModuleMap().Add(OtherProducer->GetModuleName(), OtherProducer);
+	Owner->RegisterModule(Producer);
+	Owner->RegisterModule(OtherProducer);
 	FSaveGameStorage Storage(0, Root);
 	ON_SCOPE_EXIT
 	{
@@ -1192,11 +1194,9 @@ bool FVoxelSaveCoordinatorTest::RunTest(const FString& InParameters)
 		if (Save->bSaveOperationRunning)
 			AddWarning(TEXT("Coordinator worker is still retiring; its outcome and fixture files remain available for inspection."));
 		World->DestroyWorld(false);
-		Owner->GetModuleMap().Reset();
-		Owner->GetModules().Reset();
 		GEngine->DestroyWorldContext(World);
 	};
-	if (!TestEqual(TEXT("Coordinator uses its world MainModule singleton"), AMainModule::GetPtr(World, true), Owner)) return false;
+	if (!TestEqual(TEXT("Coordinator uses its world MainModule singleton"), AMainModule::GetPtr(World), Owner)) return false;
 	if (!TestTrue(TEXT("Coordinator does not install a voxel owner or an external store participant"),
 		!UVoxelModule::GetPtr(World) && !Save->WorldStoreParticipant.Begin && !Save->PendingCreatedSaveId.IsValid())) return false;
 	auto Create = [&]()
@@ -1295,10 +1295,10 @@ bool FVoxelSaveCoordinatorTest::RunTest(const FString& InParameters)
 		OtherProducer->BeforeCount == 0 && Save->AsyncPrepareCount == 1);
 	BlockedFrame.End(FPlatformTime::Seconds());
 	Producer->bRefreshDuringBefore = false;
-	Save->OnRefresh(0.01f, false);
+	Save->OnControlRefresh(0.01f);
 	TestTrue(TEXT("The next coordinator step advances the persistent preparation cursor"),
 		Producer->BeforeCount == 1 && OtherProducer->BeforeCount == 1 && Producer->CaptureCount == 0);
-	Save->OnRefresh(0.01f, false);
+	Save->OnControlRefresh(0.01f);
 	TestEqual(TEXT("A later coordinator step freezes the module exactly once"), Producer->CaptureCount, 1);
 	Producer->Seed = 99;
 	int32 MaximumCopied = 0;
@@ -1309,7 +1309,7 @@ bool FVoxelSaveCoordinatorTest::RunTest(const FString& InParameters)
 	{
 		const int32 Previous = Save->AsyncModuleCapturePhase == 4 ? Save->AsyncModulePayloadCursor : 0;
 		const int32 PreviousAfter = Producer->AfterCount + OtherProducer->AfterCount;
-		Save->OnRefresh(0.01f, false);
+		Save->OnControlRefresh(0.01f);
 		MaximumAfterCallbacks = FMath::Max(MaximumAfterCallbacks, Producer->AfterCount + OtherProducer->AfterCount - PreviousAfter);
 		if (Save->AsyncCompletionResult.IsSet() && Save->bAsyncCompletionFilesCommitted)
 		{
@@ -1348,7 +1348,7 @@ bool FVoxelSaveCoordinatorTest::RunTest(const FString& InParameters)
 	const double AfterDeadline = FPlatformTime::Seconds() + 10.0;
 	while (Save->bSaveOperationRunning && FPlatformTime::Seconds() < AfterDeadline)
 	{
-		Save->OnRefresh(0.01f, false);
+		Save->OnControlRefresh(0.01f);
 		FPlatformProcess::SleepNoStats(0.001f);
 	}
 	if (!TestTrue(TEXT("OnAfter termination applies after the original commit callback without recursive cleanup"),
@@ -1361,7 +1361,7 @@ bool FVoxelSaveCoordinatorTest::RunTest(const FString& InParameters)
 	const auto BeforeResult = Save->SaveSlotAsync(BeforeSlot);
 	if (!TestTrue(TEXT("Before-callback request has validated absolute generation paths"),
 		ValidateAcceptedPlan(BeforeSlot, BeforeResult))) return false;
-	Save->OnRefresh(0.01f, false);
+	Save->OnControlRefresh(0.01f);
 	if (!TestTrue(TEXT("OnBefore termination cancels the accepted capture once before file work"),
 		BeforeResult.Code == ESaveResultCode::Accepted && Save->GetWorldSaveResult(BeforeResult.OperationId).Code != ESaveResultCode::Accepted &&
 		Producer->AfterCount == 3 && OtherProducer->AfterCount == 2 && !Producer->bAfterSucceeded && !Save->Storage)) return false;
@@ -1372,9 +1372,9 @@ bool FVoxelSaveCoordinatorTest::RunTest(const FString& InParameters)
 	const auto CaptureAccepted = Save->SaveSlotAsync(CaptureSlot);
 	if (!TestTrue(TEXT("Capture-callback request has validated absolute generation paths"),
 		ValidateAcceptedPlan(CaptureSlot, CaptureAccepted))) return false;
-	Save->OnRefresh(0.01f, false);
-	Save->OnRefresh(0.01f, false);
-	Save->OnRefresh(0.01f, false);
+	Save->OnControlRefresh(0.01f);
+	Save->OnControlRefresh(0.01f);
+	Save->OnControlRefresh(0.01f);
 	TestTrue(TEXT("ToData termination preserves the callback frame until original capture cleanup finishes"),
 		Save->GetWorldSaveResult(CaptureAccepted.OperationId).Code != ESaveResultCode::Accepted &&
 		Producer->AfterCount == 4 && !Producer->bAfterSucceeded && !Save->Storage && !Save->bSaveOperationRunning);

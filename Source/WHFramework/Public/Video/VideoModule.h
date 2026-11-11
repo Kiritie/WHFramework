@@ -3,6 +3,8 @@
 #pragma once
 
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "VideoModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
 
@@ -84,19 +86,19 @@ public:
 	/// Movie
 public:
 	UFUNCTION(BlueprintCallable)
-	void PlayMovieForMediaPlayer(const FName InName, const FName InMovieName, bool bMulticast = false);
+	void PlayMovieForMediaPlayer(const FName InName, const FName InMovieName, bool bMulticast = false, APlayerController* InController = nullptr);
 
 	UFUNCTION(BlueprintCallable)
-	void PlayMovieForMediaPlayerWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false);
+	void PlayMovieForMediaPlayerWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false, APlayerController* InController = nullptr);
 	
 	UFUNCTION(BlueprintCallable)
-	void PauseMovieForMediaPlayer(const FName InName, bool bMulticast = false);
+	void PauseMovieForMediaPlayer(const FName InName, bool bMulticast = false, APlayerController* InController = nullptr);
 	
 	UFUNCTION(BlueprintCallable)
-	void SeekMovieForMediaPlayer(const FName InName, const FTimespan& InTimespan, bool bMulticast = false);
+	void SeekMovieForMediaPlayer(const FName InName, const FTimespan& InTimespan, bool bMulticast = false, APlayerController* InController = nullptr);
 
 	UFUNCTION(BlueprintCallable)
-	void StopMovieForMediaPlayer(const FName InName, bool bSkip, bool bMulticast = false);
+	void StopMovieForMediaPlayer(const FName InName, bool bSkip, bool bMulticast = false, APlayerController* InController = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// VideoSetting

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Type/NativeTypeIdentity.h"
 #include "WHFrameworkEditorTypes.h"
 #include "Main/Module/EditorModuleBase.h"
 #include "Scene/SceneManager.h"
@@ -59,6 +60,7 @@ public:
 
 public:
 	virtual void OnInitialize() override;
+	virtual void OnTermination() override;
 
 protected:
 	void OnLevelEditorCreated(TSharedPtr<ILevelEditor> InLevelEditor);
@@ -103,5 +105,17 @@ public:
 	TSharedRef<SViewportRootCanvas> GetOrCreateViewportRootCanvas(const TSharedPtr<IAssetViewport>& InViewport);
 
 protected:
-	TMap<TSharedPtr<IAssetViewport>, TSharedPtr<SViewportRootCanvas>> ViewportRootCanvases;
+	FDelegateHandle LevelEditorCreatedHandle;
+	struct FEditorViewportBinding
+	{
+		TWeakPtr<ILevelEditor> Editor;
+		FDelegateHandle Handle;
+	};
+	TArray<FEditorViewportBinding> EditorViewportBindings;
+	struct FViewportCanvasBinding
+	{
+		TWeakPtr<IAssetViewport> Viewport;
+		TSharedPtr<SViewportRootCanvas> Canvas;
+	};
+	TArray<FViewportCanvasBinding> ViewportRootCanvases;
 };

@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "Widget/WorldWidgetTypes.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
 #include "Widget/World/WorldWidgetBase.h"
 #include "WidgetWorldText.generated.h"
 

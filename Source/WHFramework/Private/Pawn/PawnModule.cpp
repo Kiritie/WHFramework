@@ -2,6 +2,9 @@
 
 
 #include "Pawn/PawnModule.h"
+#include "Common/LifecycleTypes.h"
+#include "Camera/CameraViewTypes.h"
+#include "Camera/CameraFeatureTypes.h"
 
 #include "Camera/CameraModule.h"
 #include "Camera/Manager/CameraManagerBase.h"
@@ -11,6 +14,7 @@
 #include "Gameplay/WHPlayerController.h"
 #include "Common/CommonModuleStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "Misc/ScopeExit.h"
 		
 IMPLEMENTATION_MODULE(UPawnModule)
 
@@ -27,12 +31,10 @@ UPawnModule::UPawnModule()
 	DefaultPawn = nullptr;
 	DefaultInstantSwitch = false;
 	DefaultResetCamera = true;
-	CurrentPawn = nullptr;
 }
 
 UPawnModule::~UPawnModule()
 {
-	TERMINATION_MODULE(UPawnModule)
 }
 
 #if WITH_EDITOR
@@ -45,7 +47,6 @@ void UPawnModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UPawnModule)
 }
 #endif
 
@@ -66,13 +67,6 @@ void UPawnModule::OnPreparatory(EPhase InPhase)
 {
 	Super::OnPreparatory(InPhase);
 
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		if(DefaultPawn)
-		{
-			SwitchPawn(DefaultPawn, DefaultResetCamera, DefaultInstantSwitch);
-		}
-	}
 }
 
 void UPawnModule::OnRefresh(float DeltaSeconds, bool bInEditor)
@@ -97,12 +91,12 @@ void UPawnModule::OnTermination(EPhase InPhase)
 
 FString UPawnModule::GetModuleDebugMessage()
 {
-	return FString::Printf(TEXT("CurrentPawn: %s"), CurrentPawn ? *CurrentPawn->GetNameP().ToString() : TEXT("None"));
+	return FString::Printf(TEXT("Registered Pawns: %d"), Pawns.Num());
 }
 
 void UPawnModule::AddPawnToList(APawnBase* InPawn)
 {
-	if(!Pawns.Contains(InPawn))
+	if(::IsValid(InPawn) && InPawn->GetWorld() == GetWorld() && !Pawns.Contains(InPawn))
 	{
 		Pawns.Add(InPawn);
 		if(!PawnMap.Contains(InPawn->GetNameP()))
@@ -114,68 +108,72 @@ void UPawnModule::AddPawnToList(APawnBase* InPawn)
 
 void UPawnModule::RemovePawnFromList(APawnBase* InPawn)
 {
-	if(Pawns.Contains(InPawn))
+	if(::IsValid(InPawn) && Pawns.Contains(InPawn))
 	{
 		Pawns.Remove(InPawn);
-		if(PawnMap.Contains(InPawn->GetNameP()))
+		if(PawnMap.FindRef(InPawn->GetNameP()) == InPawn)
 		{
 			PawnMap.Remove(InPawn->GetNameP());
 		}
 	}
 }
 
-void UPawnModule::SwitchPawn(APawnBase* InPawn, bool bResetCamera, bool bInstant)
+bool UPawnModule::SwitchPawn(APlayerController* InPlayer, APawnBase* InPawn, bool bResetCamera, bool bInstant)
 {
-	if(CurrentPawn == InPawn) return;
-
-	AWHPlayerController* PlayerController = UCommonModuleStatics::GetPlayerController<AWHPlayerController>();
-	
-	if(InPawn)
+	if (!::IsValid(InPlayer) || InPlayer->GetWorld() != GetWorld() || !InPlayer->HasAuthority() ||
+		(InPawn && (!::IsValid(InPawn) || InPawn->GetWorld() != GetWorld()))) return false;
+	const TWeakObjectPtr<APlayerController> SwitchingPlayer(InPlayer);
+	if (SwitchingPlayers.Contains(SwitchingPlayer)) return false;
+	SwitchingPlayers.Add(SwitchingPlayer);
+	ON_SCOPE_EXIT { SwitchingPlayers.Remove(SwitchingPlayer); };
+	APawn* PreviousPossessed = InPlayer->GetPawn();
+	if (PreviousPossessed == InPawn) return true;
+	if (InPawn)
 	{
-		if(CurrentPawn)
+		if (const APlayerController* Existing = Cast<APlayerController>(InPawn->GetController()); Existing && Existing != InPlayer) return false;
+		InPlayer->Possess(InPawn);
+		if (InPlayer->GetPawn() != InPawn)
 		{
-			CurrentPawn->OnUnSwitch();
-			if(CurrentPawn->GetDefaultController())
-			{
-				CurrentPawn->GetDefaultController()->Possess(CurrentPawn);
-			}
-		}
-		CurrentPawn = InPawn;
-		PlayerController->Possess(CurrentPawn);
-		CurrentPawn->OnSwitch();
-		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
-		{
-			FCameraModeContext Context;
-			Context.Target = CurrentPawn;
-			Context.Transition = bInstant ? FCameraTransitionParams::Instant() : FCameraTransitionParams::Smooth();
-			CameraManager->SetMode(UFollowCameraMode::StaticClass(), Context);
+			if (::IsValid(PreviousPossessed)) InPlayer->Possess(PreviousPossessed);
+			return false;
 		}
 	}
-	else if(CurrentPawn)
+	else
 	{
-		APawnBase* PreviousPawn = CurrentPawn;
-		CurrentPawn->OnUnSwitch();
-		PlayerController->UnPossess();
-		if(CurrentPawn->GetDefaultController())
-		{
-			CurrentPawn->GetDefaultController()->Possess(CurrentPawn);
-		}
-		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
-		{
-			CameraManager->ClearModeTarget();
-		}
-		CurrentPawn = nullptr;
+		InPlayer->UnPossess();
 	}
+	if (APawnBase* Previous = Cast<APawnBase>(PreviousPossessed))
+	{
+		Previous->OnUnSwitch();
+		if (!::IsValid(InPlayer) || InPlayer->GetWorld() != GetWorld() || InPlayer->GetPawn() != InPawn) return false;
+		if (::IsValid(Previous))
+		{
+			if (AController* DefaultController = Previous->GetDefaultController(); ::IsValid(DefaultController) && DefaultController != InPlayer && !DefaultController->GetPawn())
+				DefaultController->Possess(Previous);
+		}
+	}
+	if (::IsValid(InPawn)) InPawn->OnSwitch();
+	if (!::IsValid(InPlayer) || InPlayer->GetWorld() != GetWorld() || InPlayer->GetPawn() != InPawn) return false;
+	if (UPawnModuleNetworkComponent* Network = InPlayer->FindComponentByClass<UPawnModuleNetworkComponent>())
+		Network->NotifyPawnSwitchCommitted(InPawn, bResetCamera, bInstant);
+	return true;
 }
 
-void UPawnModule::SwitchPawnByClass(TSubclassOf<APawnBase> InClass, bool bResetCamera, bool bInstant)
+bool UPawnModule::SwitchToDefaultPawn(APlayerController* InPlayer)
 {
-	SwitchPawn(GetPawnByClass(InClass), bResetCamera, bInstant);
+	return DefaultPawn && SwitchPawn(InPlayer, DefaultPawn, DefaultResetCamera, DefaultInstantSwitch);
 }
 
-void UPawnModule::SwitchPawnByName(FName InName, bool bResetCamera, bool bInstant)
+bool UPawnModule::SwitchPawnByClass(APlayerController* InPlayer, TSubclassOf<APawnBase> InClass, bool bResetCamera, bool bInstant)
 {
-	SwitchPawn(GetPawnByName(InName), bResetCamera, bInstant);
+	APawnBase* Pawn = GetPawnByClass(InClass);
+	return Pawn && SwitchPawn(InPlayer, Pawn, bResetCamera, bInstant);
+}
+
+bool UPawnModule::SwitchPawnByName(APlayerController* InPlayer, FName InName, bool bResetCamera, bool bInstant)
+{
+	APawnBase* Pawn = GetPawnByName(InName);
+	return Pawn && SwitchPawn(InPlayer, Pawn, bResetCamera, bInstant);
 }
 
 bool UPawnModule::HasPawnByClass(TSubclassOf<APawnBase> InClass) const
@@ -191,14 +189,10 @@ bool UPawnModule::HasPawnByName(FName InName) const
 	return PawnMap.Contains(InName);
 }
 
-APawnBase* UPawnModule::GetCurrentPawn() const
+APawnBase* UPawnModule::GetCurrentPawn(APlayerController* InPlayer, TSubclassOf<APawnBase> InClass) const
 {
-	return CurrentPawn;
-}
-
-APawnBase* UPawnModule::GetCurrentPawn(TSubclassOf<APawnBase> InClass) const
-{
-	return CurrentPawn;
+	APawnBase* Pawn = InPlayer && InPlayer->GetWorld() == GetWorld() ? Cast<APawnBase>(InPlayer->GetPawn()) : nullptr;
+	return Pawn && (!InClass || Pawn->IsA(InClass)) ? Pawn : nullptr;
 }
 
 APawnBase* UPawnModule::GetPawnByClass(TSubclassOf<APawnBase> InClass) const
@@ -211,14 +205,8 @@ APawnBase* UPawnModule::GetPawnByClass(TSubclassOf<APawnBase> InClass) const
 
 APawnBase* UPawnModule::GetPawnByName(FName InName) const
 {
-	for (auto Iter : Pawns)
-	{
-		if(Iter->GetNameP() == InName)
-		{
-			return Iter;
-		}
-	}
-	return nullptr;
+	APawnBase* Pawn = PawnMap.FindRef(InName);
+	return ::IsValid(Pawn) && Pawn->GetWorld() == GetWorld() ? Pawn : nullptr;
 }
 
 void UPawnModule::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

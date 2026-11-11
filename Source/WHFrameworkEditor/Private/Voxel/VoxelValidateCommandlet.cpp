@@ -29,7 +29,7 @@ UVoxelValidateCommandlet::UVoxelValidateCommandlet()
 
 int32 UVoxelValidateCommandlet::Main(const FString& Params)
 {
-    FString SetPath = TEXT("/Game/VoxelGenerated/DA_VoxelMaterials.DA_VoxelMaterials");
+    FString SetPath = TEXT("/Game/DataAssets/Voxel/DA_VoxelMaterials.DA_VoxelMaterials");
     FString ReportPath = FPaths::ProjectSavedDir() / TEXT("Voxel/asset_validation.json");
     FParse::Value(*Params, TEXT("Set="), SetPath);
     FParse::Value(*Params, TEXT("Report="), ReportPath);

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Camera/CameraModuleTypes.h"
+#include "Camera/CameraConfigTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
 #include "Setting/Provider/SettingProviderBase.h"
 #include "CameraSettingProvider.generated.h"
 
@@ -21,7 +23,9 @@ public:
 	virtual FSettingValidationResult Validate(const FSettingDefinition& InDefinition, const FParameter& InValue) const override;
 	virtual bool SetPendingValue(const FSettingDefinition& InDefinition, const FParameter& InValue) override;
 	virtual bool Apply(const FSettingDefinition& InDefinition, const FParameter& InValue) override;
-	virtual void Rollback(const FSettingDefinition& InDefinition) override;
+	virtual bool Rollback(const FSettingDefinition& InDefinition) override;
+	virtual bool RollbackForHostTermination(const FSettingDefinition& InDefinition, UWHLocalPlayer* InPlayer) override;
+	virtual bool CanRollbackForHostTermination(const FSettingDefinition& InDefinition, const UWHLocalPlayer* InPlayer) const override;
 	virtual void Commit() override;
 	virtual void EndEdit() override;
 

@@ -3,8 +3,14 @@
 #pragma once
 
 
+#include "Task/TaskExecutionTypes.h"
+#include "Task/TaskReferenceTypes.h"
+#include "Task/TaskObjectiveTypes.h"
+#include "Task/TaskPresentationTypes.h"
+#include "Task/TaskSaveTypes.h"
+#include "Common/LifecycleTypes.h"
 #include "Task/TaskModuleTypes.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "Common/Base/WHObject.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
 
@@ -111,9 +117,11 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnSuspend")
 	void K2_OnSuspend();
 	virtual void OnSuspend();
+	// 仅释放本任务持有的外部订阅和计时器；世界终止期间也可调用，不得发布业务事件。
+	virtual void ReleaseRuntimeResources();
 	void ClearTaskTimers();
 	FTaskRuntimeSaveData CaptureRuntimeData();
-	void ResumeRuntimeData(const FTaskRuntimeSaveData& Data);
+	bool ResumeRuntimeData(const FTaskRuntimeSaveData& Data);
 	void SetTaskTimersPaused(bool bPaused);
 	virtual void BeginDestroy() override;
 
@@ -422,9 +430,6 @@ protected:
 	FTimerHandle AutoExecuteTimerHandle;
 	FTimerHandle AutoLeaveTimerHandle;
 	FTimerHandle AutoCompleteTimerHandle;
-
-public:
-	bool bRuntimeSelected;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Graph

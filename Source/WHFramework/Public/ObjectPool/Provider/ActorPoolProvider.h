@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ObjectPool/ObjectPoolProvider.h"
+#include "ObjectPool/ObjectPoolProviderInterface.h"
 
 struct FActorPoolState
 {
@@ -16,6 +16,8 @@ public:
 
 	virtual UObject* Spawn(UClass* InClass, const FParameter& InParam) override;
 
+	bool TakeDeferredSpawn(AActor* Actor);
+
 	virtual void PrepareDespawn(UObject* InObject) override;
 
 	virtual bool Despawn(UObject* InObject) override;
@@ -28,4 +30,5 @@ private:
 	UObjectPoolModule& Module;
 
 	TMap<TWeakObjectPtr<AActor>, FActorPoolState> ActorStates;
+	TSet<TWeakObjectPtr<AActor>> DeferredIdentitySpawns;
 };

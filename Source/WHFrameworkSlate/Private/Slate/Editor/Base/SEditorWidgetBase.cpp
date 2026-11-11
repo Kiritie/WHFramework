@@ -20,6 +20,11 @@ SEditorWidgetBase::SEditorWidgetBase()
 	bInitialized = false;
 }
 
+SEditorWidgetBase::~SEditorWidgetBase()
+{
+	DetachWindow();
+}
+
 void SEditorWidgetBase::Construct(const FArguments& InArgs)
 {
 	OnCreate();
@@ -50,19 +55,25 @@ void SEditorWidgetBase::OnInitialize()
 
 	OnBindCommands(WidgetCommands);
 
-	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float DeltaSeconds)
-	{
-		if(WidgetType == EEditorWidgetType::Main)
-		{
-			if(GetOwnerWindow().IsValid())
-			{
-				OnWindowActivatedHandle = GetOwnerWindow()->GetOnWindowActivatedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowActivated);
-				OnWindowDeactivatedHandle = GetOwnerWindow()->GetOnWindowDeactivatedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowDeactivated);
-				OnWindowClosedHandle = GetOwnerWindow()->GetOnWindowClosedEvent().AddRaw(this, &SEditorWidgetBase::OnWindowClosed);
-			}
-		}
-		return false;
-	}));
+    const TWeakPtr<SEditorWidgetBase> WeakThis = SharedThis(this);
+    WindowBindTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([WeakThis](float)
+    {
+        if (TSharedPtr<SEditorWidgetBase> Self = WeakThis.Pin())
+        {
+            Self->WindowBindTicker.Reset();
+            if (Self->WidgetType == EEditorWidgetType::Main)
+            {
+                if (TSharedPtr<SWindow> Window = Self->GetOwnerWindow())
+                {
+                    Self->BoundWindow = Window;
+                    Self->OnWindowActivatedHandle = Window->GetOnWindowActivatedEvent().AddRaw(Self.Get(), &SEditorWidgetBase::OnWindowActivated);
+                    Self->OnWindowDeactivatedHandle = Window->GetOnWindowDeactivatedEvent().AddRaw(Self.Get(), &SEditorWidgetBase::OnWindowDeactivated);
+                    Self->OnWindowClosedHandle = Window->GetOnWindowClosedEvent().AddRaw(Self.Get(), &SEditorWidgetBase::OnWindowClosed);
+                }
+            }
+        }
+        return false;
+    }));
 }
 
 void SEditorWidgetBase::OnOpen(const FParameter& InParam, bool bInstant)
@@ -137,31 +148,34 @@ void SEditorWidgetBase::OnTick(float InDeltaTime)
 	}
 }
 
+void SEditorWidgetBase::DetachWindow()
+{
+    if (WindowBindTicker.IsValid()) FTSTicker::GetCoreTicker().RemoveTicker(WindowBindTicker);
+    WindowBindTicker.Reset();
+    if (TSharedPtr<SWindow> Window = BoundWindow.Pin())
+    {
+        if (OnWindowActivatedHandle.IsValid()) Window->GetOnWindowActivatedEvent().Remove(OnWindowActivatedHandle);
+        if (OnWindowDeactivatedHandle.IsValid()) Window->GetOnWindowDeactivatedEvent().Remove(OnWindowDeactivatedHandle);
+        if (OnWindowClosedHandle.IsValid()) Window->GetOnWindowClosedEvent().Remove(OnWindowClosedHandle);
+    }
+    BoundWindow.Reset();
+    OnWindowActivatedHandle.Reset();
+    OnWindowDeactivatedHandle.Reset();
+    OnWindowClosedHandle.Reset();
+}
+
 void SEditorWidgetBase::OnDestroy()
 {
-	FSlateWidgetManager::Get().RemoveEditorWidget<SEditorWidgetBase>(GetWidgetName());
-
-	switch(WidgetType)
-	{
-		case EEditorWidgetType::Main:
-		{
-			// if(GetOwnerWindow().IsValid())
-			// {
-			// 	GetOwnerWindow()->RequestDestroyWindow();
-			// }
-			break;
-		}
-		case EEditorWidgetType::Child:
-		{
-			break;
-		}
-	}
-
-	for(auto Iter : ChildWidgets)
-	{
-		Iter->OnDestroy();
-	}
-	ChildWidgets.Empty();
+    DetachWindow();
+    if (FSlateWidgetManager* Manager = FSlateWidgetManager::GetPtr()) Manager->RemoveEditorWidget<SEditorWidgetBase>(GetWidgetName());
+    const TArray<TSharedPtr<IEditorWidgetBase>> Children = MoveTemp(ChildWidgets);
+    ChildWidgetMap.Reset();
+    for (const auto& Child : Children)
+    {
+        if (Child) Child->OnDestroy();
+    }
+    ParentWidget.Reset();
+    bInitialized = false;
 }
 
 void SEditorWidgetBase::OnBindCommands(const TSharedRef<FUICommandList>& InCommands)
@@ -179,20 +193,8 @@ void SEditorWidgetBase::OnWindowDeactivated()
 
 void SEditorWidgetBase::OnWindowClosed(const TSharedRef<SWindow>& InOwnerWindow)
 {
-	if(OnWindowActivatedHandle.IsValid())
-	{
-		InOwnerWindow->GetOnWindowActivatedEvent().Remove(OnWindowActivatedHandle);
-	}
-	if(OnWindowDeactivatedHandle.IsValid())
-	{
-		InOwnerWindow->GetOnWindowDeactivatedEvent().Remove(OnWindowDeactivatedHandle);
-	}
-	if(OnWindowClosedHandle.IsValid())
-	{
-		InOwnerWindow->GetOnWindowClosedEvent().Remove(OnWindowClosedHandle);
-	}
-
-	Destroy();
+    DetachWindow();
+    if (FSlateWidgetManager* Manager = FSlateWidgetManager::GetPtr()) Manager->DestroyEditorWidget<SEditorWidgetBase>(GetWidgetName());
 }
 
 void SEditorWidgetBase::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)

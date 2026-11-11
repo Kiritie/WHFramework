@@ -8,6 +8,7 @@
 #include "Voxel/Generation/VoxelGenerationConsumer.h"
 
 class AActor;
+class UWorld;
 class UHierarchicalInstancedStaticMeshComponent;
 class UVoxelCollisionComponent;
 class FVoxelTaskScheduler;
@@ -32,6 +33,7 @@ struct FVoxelDetailPresentationBatch
 	FIntPoint HostKey = FIntPoint::ZeroValue;
 	TWeakObjectPtr<UHierarchicalInstancedStaticMeshComponent> Instances;
 	TWeakObjectPtr<UVoxelCollisionComponent> Collision;
+	bool bHostReleased = false;
 };
 
 struct FVoxelDetailHost
@@ -57,6 +59,7 @@ public:
 	void Tick(TConstArrayView<FVector> InObservers);
 	bool OnTask(FVoxelTaskResult&& InResult);
 	void Reset();
+	bool TryResetForWorldStop(FString& OutError);
 
 private:
 	bool BuildAssetBatch(int32 InAssetIndex, bool& bOutComplete, FString& OutError);
@@ -71,6 +74,7 @@ private:
 	UVoxelModule& Module;
 	FVoxelTaskScheduler& Scheduler;
 	uint64 WorldEpoch = 0;
+	TWeakObjectPtr<UWorld> OriginalWorld;
 	FGuid OwnerId = FGuid::NewGuid();
 	uint64 OwnerIncarnation = 1;
 	uint64 NextToken = 1;
@@ -99,4 +103,7 @@ private:
 	bool bRunning = false;
 	bool bDirty = true;
 	bool bStopped = false;
+	bool bStopInProgress = false;
+	bool bStopPrepared = false;
+	bool bStopComplete = false;
 };

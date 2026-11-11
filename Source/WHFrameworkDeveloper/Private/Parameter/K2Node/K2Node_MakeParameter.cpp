@@ -43,7 +43,7 @@ void UK2Node_MakeParameter::AllocateDefaultPins()
 void UK2Node_MakeParameter::ExpandNode(FKismetCompilerContext& CompilerContext, UEdGraph* SourceGraph)
 {
 	Super::ExpandNode(CompilerContext, SourceGraph);
-	if(!CanUseStruct(ParameterStruct, true))
+	if(!CanUseStruct(ParameterStruct, true) || !GetValuePin() || !GetParameterPin() || !FindPin(MakeDescriptionPinName))
 	{
 		CompilerContext.MessageLog.Error(*LOCTEXT("MissingType", "@@ has no valid Parameter type.").ToString(), this);
 		BreakAllNodeLinks();
@@ -63,8 +63,15 @@ void UK2Node_MakeParameter::ExpandNode(FKismetCompilerContext& CompilerContext, 
 		MakeStructNode->bMadeAfterOverridePinRemoval = true;
 		MakeStructNode->AllocateDefaultPins();
 		CompilerContext.MessageLog.NotifyIntermediateObjectCreation(MakeStructNode, this);
-		CompilerContext.MovePinLinksToIntermediate(*GetValuePin(), *MakeStructNode->FindPinChecked(MakeValuePinName));
-		MakeStructNode->FindPinChecked(ParameterStruct->GetFName())->MakeLinkTo(CallValuePin);
+		UEdGraphPin* InlineValuePin = MakeStructNode->FindPin(MakeValuePinName);
+		UEdGraphPin* StructPin = MakeStructNode->FindPin(ParameterStruct->GetFName());
+		if (!InlineValuePin || !StructPin || !CompilerContext.GetSchema()->TryCreateConnection(StructPin, CallValuePin))
+		{
+			CompilerContext.MessageLog.Error(*LOCTEXT("InvalidInlineValue", "@@ cannot construct the inline Parameter Value field.").ToString(), this);
+			BreakAllNodeLinks();
+			return;
+		}
+		CompilerContext.MovePinLinksToIntermediate(*GetValuePin(), *InlineValuePin);
 	}
 	else
 	{

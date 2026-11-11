@@ -1,8 +1,11 @@
 #include "Step/Base/StepBase.h"
+#include "Camera/CameraFeatureTypes.h"
 
 #include "Camera/CameraModule.h"
 #include "Camera/Anchor/CameraShotAnchor.h"
 #include "Camera/Manager/CameraManagerBase.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Events/Step/Event_StepCompleted.h"
 #include "Event/Events/Step/Event_StepEntered.h"
@@ -72,6 +75,7 @@ void UStepBase::OnUnGenerate()
 
 void UStepBase::InitializeRuntime(UStepRuntime* InRuntime)
 {
+	ReleaseCameraAction(false);
 	Runtime = InRuntime;
 	bRuntimeInitialized = false;
 	RootStep = nullptr;
@@ -82,7 +86,6 @@ void UStepBase::InitializeRuntime(UStepRuntime* InRuntime)
 	CurrentSubStepIndex = INDEX_NONE;
 	CurrentStepTaskIndex = INDEX_NONE;
 	StepTaskItems.Reset();
-	CameraOverrideHandle.Reset();
 	ClearRuntimeTimers();
 }
 
@@ -559,22 +562,31 @@ bool UStepBase::IsSkipAble_Implementation() const
 
 void UStepBase::ApplyCameraAction()
 {
-	if(!Runtime || !IsEntered() || !bApplyCameraAction)
+	if (!Runtime || !IsEntered() || !bApplyCameraAction || !GetWorld()) return;
+	TArray<TWeakObjectPtr<APlayerController>> Players;
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		if (APlayerController* Player = It->Get(); Player && Player->IsLocalController()) Players.Add(Player);
+	for (const TWeakObjectPtr<APlayerController>& Player : Players)
+		if (Player.IsValid()) ApplyCameraActionForPlayer(Player.Get());
+}
+
+void UStepBase::ApplyCameraActionForPlayer(APlayerController* InPlayer)
+{
+	UWorld* World = GetWorld();
+	if (!Runtime || !IsEntered() || !bApplyCameraAction || !InPlayer || !InPlayer->IsLocalController()) return;
+	UCameraModule* CameraModule = UCameraModule::GetPtr(World);
+	ACameraManagerBase* CameraManager = CameraModule ? CameraModule->GetCameraManagerForPlayer(InPlayer) : nullptr;
+	if (!CameraManager) return;
+	FStepPlayerCameraState Previous;
+	if (PlayerCameras.RemoveAndCopyValue(InPlayer, Previous))
 	{
-		return;
+		if (ACameraManagerBase* Manager = Previous.Manager.Get(); Manager && Previous.Override.IsValid()) Manager->PopCameraConfigOverride(Previous.Override);
 	}
-	UCameraModule* CameraModule = UCameraModule::GetPtr(GetWorld());
-	ACameraManagerBase* CameraManager = CameraModule ? CameraModule->GetCameraManager() : nullptr;
-	if(!CameraManager)
-	{
-		return;
-	}
-	if(CameraOverrideHandle.IsValid())
-	{
-		CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
-	}
-	CameraOverrideHandle = CameraManager->PushCameraConfigOverride(CameraOverride, 20);
-	if(CameraModeClass)
+	const FCameraConfigOverrideHandle Override = CameraManager->PushCameraConfigOverride(CameraOverride, 20);
+	FStepPlayerCameraState& State = PlayerCameras.FindOrAdd(InPlayer);
+	State.Manager = CameraManager;
+	State.Override = Override;
+	if (CameraModeClass)
 	{
 		FCameraModeContext Context;
 		Context.Target = OperationTarget.LoadSynchronous();
@@ -584,22 +596,51 @@ void UStepBase::ApplyCameraAction()
 	}
 }
 
+void UStepBase::SyncPlayerCameraActions()
+{
+	UWorld* World = GetWorld();
+	if (!Runtime || !IsEntered() || !bApplyCameraAction || !World) return;
+	UCameraModule* Cameras = UCameraModule::GetPtr(World);
+	if (!Cameras) return;
+	TSet<TWeakObjectPtr<APlayerController>> CurrentPlayers;
+	TArray<TWeakObjectPtr<APlayerController>> Players;
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* Player = It->Get();
+		if (!Player || !Player->IsLocalController()) continue;
+		CurrentPlayers.Add(Player);
+		Players.Add(Player);
+	}
+	for (const TWeakObjectPtr<APlayerController>& Entry : Players)
+	{
+		APlayerController* Player = Entry.Get();
+		if (!Player) continue;
+		const FStepPlayerCameraState* State = PlayerCameras.Find(Player);
+		if (!State || State->Manager.Get() != Cameras->GetCameraManagerForPlayer(Player)) ApplyCameraActionForPlayer(Player);
+	}
+	TArray<TWeakObjectPtr<APlayerController>> PreviousPlayers;
+	PlayerCameras.GetKeys(PreviousPlayers);
+	for (const TWeakObjectPtr<APlayerController>& Player : PreviousPlayers)
+	{
+		if (CurrentPlayers.Contains(Player)) continue;
+		FStepPlayerCameraState Previous;
+		if (PlayerCameras.RemoveAndCopyValue(Player, Previous))
+			if (ACameraManagerBase* Manager = Previous.Manager.Get(); Manager && Previous.Override.IsValid()) Manager->PopCameraConfigOverride(Previous.Override);
+	}
+}
+
 void UStepBase::ReleaseCameraAction(bool bRestoreMode)
 {
-	UCameraModule* CameraModule = UCameraModule::GetPtr(GetWorld());
-	ACameraManagerBase* CameraManager = CameraModule ? CameraModule->GetCameraManager() : nullptr;
-	if(CameraManager)
+	const auto PreviousCameras = MoveTemp(PlayerCameras);
+	PlayerCameras.Reset();
+	for (const auto& Entry : PreviousCameras)
 	{
-		if(CameraOverrideHandle.IsValid())
+		if (ACameraManagerBase* Manager = Entry.Value.Manager.Get())
 		{
-			CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
-		}
-		if(bRestoreMode)
-		{
-			CameraManager->SetDefaultMode(CameraTransition);
+			if (Entry.Value.Override.IsValid()) Manager->PopCameraConfigOverride(Entry.Value.Override);
+			if (bRestoreMode) Manager->SetDefaultMode(CameraTransition);
 		}
 	}
-	CameraOverrideHandle.Reset();
 }
 
 AActor* UStepBase::GetOperationTarget(TSubclassOf<AActor> InClass) const

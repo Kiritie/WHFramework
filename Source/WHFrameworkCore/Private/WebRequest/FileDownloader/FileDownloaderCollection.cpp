@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "WebRequest/FileDownloader/FileDownloaderCollection.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "Asset/AssetTypes.h"
 #include "Debug/DebugTypes.h"
@@ -26,7 +27,7 @@ FFileDownloaderCollection::~FFileDownloaderCollection()
 
 void FFileDownloaderCollection::DownloadFiles(const FString& SavePath, float Timeout, const FString& ContentType, bool bForceByPayload)
 {
-	if(DownloadResult == EDownloadToStorageResult::Cancelled) return;
+	if (bDestroyed || DownloadResult != EDownloadToStorageResult::None) return;
 	
 	TArray<FWebFileURL> URLs = GetFileURLs();
 	
@@ -106,64 +107,60 @@ void FFileDownloaderCollection::DownloadFiles(const FString& SavePath, float Tim
 		}
 	}
 
-	TWeakPtr<FFileDownloaderCollection> _WeakThis(SharedThis(this));
-
-	for(int32 i = 0; i < Downloaders.Num(); i++)
+	if (Downloaders.IsEmpty())
 	{
-		Downloaders[i]->OnProgress.AddLambda([_WeakThis, i](FString CurrentFileUrl, int64 CurrentFileIndex, int64 TotalFileNum, int64 BytesSent, int64 BytesReceived, int64 FullSize)
+		OnComplete_Internal(EDownloadToStorageResult::Success);
+		if (bAutoDestroy) DestroyDownload();
+		return;
+	}
+	const TWeakPtr<FFileDownloaderCollection> WeakThis(SharedThis(this));
+	const TSharedRef<TArray<TWeakPtr<FFileDownloader>>> Batch = MakeShared<TArray<TWeakPtr<FFileDownloader>>>();
+	for (const TSharedPtr<FFileDownloader>& Item : Downloaders) Batch->Add(Item);
+	for (int32 Index = 0; Index < Batch->Num(); ++Index)
+	{
+		TSharedPtr<FFileDownloader> Child = (*Batch)[Index].Pin();
+		if (!Child) continue;
+		const TWeakPtr<FFileDownloader> WeakChild = Child;
+		Child->OnProgress.AddLambda([WeakThis, Index, Batch](FString CurrentFileUrl, int64, int64, int64 BytesSent, int64 BytesReceived, int64 FullSize)
 		{
-			TSharedPtr<FFileDownloaderCollection> ThisPtr = _WeakThis.Pin();
-			if(ThisPtr.IsValid())
-			{
-				ThisPtr->OnProgress_Internal(CurrentFileUrl, i, ThisPtr->Downloaders.Num(), BytesSent, BytesReceived, FullSize);
-				ThisPtr->OnProgress.Broadcast(CurrentFileUrl, i, ThisPtr->Downloaders.Num(), BytesSent, BytesReceived, FullSize);
-			}
+			TSharedPtr<FFileDownloaderCollection> Owner = WeakThis.Pin();
+			if (!Owner || Owner->bDestroyed || Owner->DownloadResult != EDownloadToStorageResult::None) return;
+			Owner->OnProgress_Internal(CurrentFileUrl, Index, Batch->Num(), BytesSent, BytesReceived, FullSize);
+			Owner->OnProgress.Broadcast(CurrentFileUrl, Index, Batch->Num(), BytesSent, BytesReceived, FullSize);
 		});
-
-		Downloaders[i]->OnDestroy.AddLambda([_WeakThis, i]()
+		Child->OnDestroy.AddLambda([WeakThis, WeakChild]()
 		{
-			TSharedPtr<FFileDownloaderCollection> ThisPtr = _WeakThis.Pin();
-			if(ThisPtr.IsValid())
-			{
-				ThisPtr->RemoveDownloader(ThisPtr->Downloaders[i]);
-
-				if(ThisPtr->Downloaders.IsEmpty())
-				{
-					ThisPtr->OnDestroy_Internal();
-
-					ThisPtr->OnDestroy.Broadcast();
-				}
-			}
+			TSharedPtr<FFileDownloaderCollection> Owner = WeakThis.Pin();
+			TSharedPtr<FFileDownloader> ChildPtr = WeakChild.Pin();
+			if (!Owner || Owner->bDestroyed) return;
+			if (ChildPtr) Owner->RemoveDownloader(ChildPtr);
+			if (Owner->DownloadResult == EDownloadToStorageResult::None)
+				Owner->CancelDownload();
 		});
-		
-		Downloaders[i]->OnComplete.AddLambda([_WeakThis, i, Timeout, ContentType, bForceByPayload, DownloadFilePaths](EDownloadToStorageResult Result, const FString& SavePath)
+		Child->OnComplete.AddLambda([WeakThis, Index, Batch, Timeout, ContentType, bForceByPayload, DownloadFilePaths](EDownloadToStorageResult Result, const FString&)
 		{
-			TSharedPtr<FFileDownloaderCollection> ThisPtr = _WeakThis.Pin();
-			if(ThisPtr.IsValid())
+			TSharedPtr<FFileDownloaderCollection> Owner = WeakThis.Pin();
+			if (!Owner || Owner->bDestroyed || Owner->DownloadResult != EDownloadToStorageResult::None) return;
+			const bool bSuccess = Result == EDownloadToStorageResult::Success || Result == EDownloadToStorageResult::SucceededByPayload;
+			if (!bSuccess || Index + 1 == Batch->Num())
 			{
-				if(i == ThisPtr->Downloaders.Num() - 1 || Result == EDownloadToStorageResult::Cancelled)
-				{
-					ThisPtr->OnComplete_Internal(Result);
-
-					if(ThisPtr->bAutoDestroy)
-					{
-						ThisPtr->OnDestroy_Internal();
-
-						ThisPtr->OnDestroy.Broadcast();
-					}
-				}
-				else if(Result == EDownloadToStorageResult::Success || Result == EDownloadToStorageResult::SucceededByPayload)
-				{
-					ThisPtr->Downloaders[i + 1]->DownloadFile(DownloadFilePaths[i + 1], Timeout, ContentType, bForceByPayload);
-				}
+				Owner->OnComplete_Internal(Result);
+				if (Owner->bAutoDestroy) Owner->DestroyDownload();
+				return;
 			}
+			TSharedPtr<FFileDownloader> Next = (*Batch)[Index + 1].Pin();
+			if (!Next || !DownloadFilePaths.IsValidIndex(Index + 1))
+			{
+				Owner->OnComplete_Internal(EDownloadToStorageResult::DownloadFailed);
+				if (Owner->bAutoDestroy) Owner->DestroyDownload();
+				return;
+			}
+			Next->DownloadFile(DownloadFilePaths[Index + 1], Timeout, ContentType, bForceByPayload);
 		});
 	}
-
-	if(Downloaders.IsValidIndex(0))
-	{
-		Downloaders[0]->DownloadFile(DownloadFilePaths[0], Timeout, ContentType, bForceByPayload);
-	}
+	if (TSharedPtr<FFileDownloader> First = (*Batch)[0].Pin())
+		First->DownloadFile(DownloadFilePaths[0], Timeout, ContentType, bForceByPayload);
+	else OnComplete_Internal(EDownloadToStorageResult::DownloadFailed);
 }
 
 void FFileDownloaderCollection::RefreshDownload(float DeltaSeconds)
@@ -173,38 +170,32 @@ void FFileDownloaderCollection::RefreshDownload(float DeltaSeconds)
 
 void FFileDownloaderCollection::CancelDownload()
 {
-	OnComplete.Broadcast(DownloadResult = EDownloadToStorageResult::Cancelled, FileSavePath);
-
-	if(!Downloaders.IsEmpty())
-	{
-		for(auto& Iter : TArray(Downloaders))
-		{
-			Iter->CancelDownload();
-		}
-	}
-	else if(bAutoDestroy)
-	{
-		OnDestroy_Internal();
-
-		OnDestroy.Broadcast();
-	}
+	if (bDestroyed || DownloadResult != EDownloadToStorageResult::None) return;
+	const TSharedPtr<FFileDownloaderCollection> KeepAlive = SharedThis(this);
+	const TArray<TSharedPtr<FFileDownloader>> Active = Downloaders;
+	OnComplete_Internal(EDownloadToStorageResult::Cancelled);
+	for (const TSharedPtr<FFileDownloader>& Child : Active) if (Child) Child->CancelDownload();
+	if (bAutoDestroy && !bDestroyed) DestroyDownload();
 }
 
 void FFileDownloaderCollection::DestroyDownload()
 {
-	if(!Downloaders.IsEmpty())
+	if (bDestroyed) return;
+	const TSharedPtr<FFileDownloaderCollection> KeepAlive = SharedThis(this);
+	bDestroyed = true;
+	if (DownloadResult == EDownloadToStorageResult::None) DownloadResult = EDownloadToStorageResult::Cancelled;
+	const TArray<TSharedPtr<FFileDownloader>> Active = MoveTemp(Downloaders);
+	Downloaders.Reset();
+	for (const TSharedPtr<FFileDownloader>& Child : Active)
 	{
-		for(auto& Iter : TArray(Downloaders))
-		{
-			Iter->DestroyDownload();
-		}
+		if (!Child) continue;
+		Child->OnProgress.Clear();
+		Child->OnComplete.Clear();
+		Child->OnDestroy.Clear();
+		Child->DestroyDownload();
 	}
-	else
-	{
-		OnDestroy_Internal();
-
-		OnDestroy.Broadcast();
-	}
+	OnDestroy_Internal();
+	OnDestroy.Broadcast();
 }
 
 void FFileDownloaderCollection::AddDownloader(const TSharedPtr<FFileDownloader>& Downloader)
@@ -234,5 +225,5 @@ void FFileDownloaderCollection::OnDestroy_Internal()
 {
 	WHLog(FString::Printf(TEXT("Download collection destroyed")), EDC_WebRequest, EDV_Log);
 
-	FWebRequestManager::Get().RemoveDownloader(SharedThis(this));
+	if (FWebRequestManager* Manager = FWebRequestManager::GetPtr()) Manager->RemoveDownloader(SharedThis(this));
 }

@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "WHFrameworkEditor.h"
+#include "Common/CommonTypes.h"
 
 #include "AssetToolsModule.h"
 #include "ISettingsModule.h"
@@ -13,6 +14,8 @@
 #include "WHFrameworkEditorStyle.h"
 #include "WHFrameworkEditorTypes.h"
 #include "Achievement/AchievementEditor.h"
+#include "Ability/AbilityLevelValueCustomization.h"
+#include "Ability/InventoryMeshDataCustomization.h"
 #include "Asset/AssetEditor.h"
 #include "Camera/CameraEditor.h"
 #include "Character/Base/CharacterBase.h"
@@ -40,7 +43,7 @@ void FWHFrameworkEditorModule::StartupModule()
 	BeginPIEDelegateHandle = FEditorDelegates::PostPIEStarted.AddRaw(this, &FWHFrameworkEditorModule::OnBeginPIE);
 	EndPIEDelegateHandle = FEditorDelegates::EndPIE.AddRaw(this, &FWHFrameworkEditorModule::OnEndPIE);
 
-	FCoreDelegates::OnPostEngineInit.AddRaw(this, &FWHFrameworkEditorModule::OnPostEngineInit);
+	PostEngineInitDelegateHandle = FCoreDelegates::OnPostEngineInit.AddRaw(this, &FWHFrameworkEditorModule::OnPostEngineInit);
 
 	// Register styles
 	FWHFrameworkEditorStyle::Initialize();
@@ -52,11 +55,25 @@ void FWHFrameworkEditorModule::StartupModule()
 	StartupEditorModules();
 
 	// Register menus
-	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FWHFrameworkEditorModule::RegisterMenus));
+	MenuStartupHandle = UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FWHFrameworkEditorModule::RegisterMenus));
 }
 
 void FWHFrameworkEditorModule::ShutdownModule()
 {
+	FEditorDelegates::PostPIEStarted.Remove(BeginPIEDelegateHandle);
+	FEditorDelegates::EndPIE.Remove(EndPIEDelegateHandle);
+	FCoreDelegates::OnPostEngineInit.Remove(PostEngineInitDelegateHandle);
+	UToolMenus::UnRegisterStartupCallback(MenuStartupHandle);
+	FTSTicker::GetCoreTicker().RemoveTicker(EndPIEResetHandle);
+	if (GUnrealEd)
+	{
+		GUnrealEd->OnBlueprintCompiled().Remove(BlueprintCompiledHandle);
+		GUnrealEd->OnLevelViewportClientListChanged().Remove(ViewportListChangedHandle);
+		if (UUnrealEdOptions* Options = GUnrealEd->GetUnrealEdOptions(); Options && Options->OnGetNewAssetDefaultClasses().IsBoundToObject(this))
+		{
+			Options->OnGetNewAssetDefaultClasses().Unbind();
+		}
+	}
 	UnRegisterMenus();
 
 	FWHFrameworkEditorStyle::Shutdown();
@@ -99,6 +116,10 @@ void FWHFrameworkEditorModule::StartupEditorModules()
 	STARTUP_MODULE(FTaskEditorModule);
 	STARTUP_MODULE(FDialogueEditorModule);
 	STARTUP_MODULE(FWidgetEditorModule);
+	PropertyEditorModule.RegisterCustomPropertyTypeLayout(TEXT("AbilityLevelValue"),
+		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FAbilityLevelValueCustomization::MakeInstance));
+	PropertyEditorModule.RegisterCustomPropertyTypeLayout(TEXT("InventoryMeshData"),
+		FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FInventoryMeshDataCustomization::MakeInstance));
 	PropertyEditorModule.RegisterCustomClassLayout(
 		TEXT("VoxelModule"),
 		FOnGetDetailCustomizationInstance::CreateStatic(&FVoxelModuleCustomization::MakeInstance));
@@ -131,6 +152,8 @@ void FWHFrameworkEditorModule::ShutdownEditorModules()
 	SHUTDOWN_MODULE(FTaskEditorModule);
 	SHUTDOWN_MODULE(FDialogueEditorModule);
 	SHUTDOWN_MODULE(FWidgetEditorModule);
+	PropertyEditorModule.UnregisterCustomPropertyTypeLayout(TEXT("AbilityLevelValue"));
+	PropertyEditorModule.UnregisterCustomPropertyTypeLayout(TEXT("InventoryMeshData"));
 	PropertyEditorModule.UnregisterCustomClassLayout(TEXT("VoxelModule"));
 
 	if(FModuleManager::Get().IsModuleLoaded(TEXT("AssetTools")))
@@ -201,9 +224,9 @@ void FWHFrameworkEditorModule::OnPostEngineInit()
 	{
 		GUnrealEd->GetUnrealEdOptions()->OnGetNewAssetDefaultClasses().BindRaw(this, &FWHFrameworkEditorModule::GetNewAssetDefaultClasses);
 		
-		GUnrealEd->OnBlueprintCompiled().AddRaw(this, &FWHFrameworkEditorModule::OnBlueprintCompiled);
+		BlueprintCompiledHandle = GUnrealEd->OnBlueprintCompiled().AddRaw(this, &FWHFrameworkEditorModule::OnBlueprintCompiled);
 
-		GUnrealEd->OnLevelViewportClientListChanged().AddRaw(this, &FWHFrameworkEditorModule::OnLevelViewportClientListChanged);
+		ViewportListChangedHandle = GUnrealEd->OnLevelViewportClientListChanged().AddRaw(this, &FWHFrameworkEditorModule::OnLevelViewportClientListChanged);
 	}
 }
 
@@ -250,18 +273,15 @@ void FWHFrameworkEditorModule::OnBeginPIE(bool bIsSimulating)
 {
 	GIsPlaying = true;
 	GIsSimulating = bIsSimulating;
-
-	GWorldContext = GetMutableWorldContext(false);
 }
 
 void FWHFrameworkEditorModule::OnEndPIE(bool bIsSimulating)
 {
-	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([](float InDeltaTime)
+	FTSTicker::GetCoreTicker().RemoveTicker(EndPIEResetHandle);
+	EndPIEResetHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([](float InDeltaTime)
 	{
 		GIsPlaying = false;
 		GIsSimulating = false;
-
-		GWorldContext = GetMutableWorldContext(true);
 
 		for(auto Iter : FMainManager::GetAllManager())
 		{

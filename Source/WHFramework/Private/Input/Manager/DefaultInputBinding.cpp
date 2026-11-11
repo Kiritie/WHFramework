@@ -2,8 +2,12 @@
 
 
 #include "Input/Manager/DefaultInputBinding.h"
+#include "Input/InputTags.h"
+#include "Camera/CameraInputTypes.h"
 
 #include "Camera/CameraModule.h"
+#include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
 #include "Camera/Manager/CameraManagerBase.h"
 #include "Common/CommonModuleStatics.h"
 #include "Gameplay/WHPlayerInterface.h"
@@ -14,11 +18,6 @@
 UDefaultInputBinding::UDefaultInputBinding()
 {
 	InputBindingName = FName("Default");
-}
-
-void UDefaultInputBinding::OnInitialize(int32 InPlayerIndex)
-{
-	Super::OnInitialize(InPlayerIndex);
 }
 
 void UDefaultInputBinding::OnReset()
@@ -79,10 +78,10 @@ void UDefaultInputBinding::OnTurnCamera_Implementation(const FInputActionValue& 
 	const float Value = InValue.Get<float>();
 	if(FMath::IsNearlyZero(Value)) return;
 
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	if(ACameraManagerBase* CameraManager = Cast<ACameraManagerBase>(GetOwningPlayerController() ? GetOwningPlayerController()->PlayerCameraManager : nullptr))
 	{
 		FCameraInputIntent Intent;
-		Intent.Look.X = Value / UCommonModuleStatics::GetTimeScale();
+		Intent.Look.X = Value / FMath::Max(UGameplayStatics::GetGlobalTimeDilation(GetOwningPlayerController()), UE_SMALL_NUMBER);
 		CameraManager->AddInputIntent(Intent);
 	}
 }
@@ -92,10 +91,10 @@ void UDefaultInputBinding::OnLookUpCamera_Implementation(const FInputActionValue
 	const float Value = InValue.Get<float>();
 	if(FMath::IsNearlyZero(Value)) return;
 
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	if(ACameraManagerBase* CameraManager = Cast<ACameraManagerBase>(GetOwningPlayerController() ? GetOwningPlayerController()->PlayerCameraManager : nullptr))
 	{
 		FCameraInputIntent Intent;
-		Intent.Look.Y = Value / UCommonModuleStatics::GetTimeScale();
+		Intent.Look.Y = Value / FMath::Max(UGameplayStatics::GetGlobalTimeDilation(GetOwningPlayerController()), UE_SMALL_NUMBER);
 		CameraManager->AddInputIntent(Intent);
 	}
 }
@@ -105,10 +104,10 @@ void UDefaultInputBinding::OnPanHCamera_Implementation(const FInputActionValue& 
 	const float Value = InValue.Get<float>();
 	if(FMath::IsNearlyZero(Value)) return;
 
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	if(ACameraManagerBase* CameraManager = Cast<ACameraManagerBase>(GetOwningPlayerController() ? GetOwningPlayerController()->PlayerCameraManager : nullptr))
 	{
 		FCameraInputIntent Intent;
-		Intent.Pan.X = Value / UCommonModuleStatics::GetTimeScale();
+		Intent.Pan.X = Value / FMath::Max(UGameplayStatics::GetGlobalTimeDilation(GetOwningPlayerController()), UE_SMALL_NUMBER);
 		CameraManager->AddInputIntent(Intent);
 	}
 }
@@ -118,10 +117,10 @@ void UDefaultInputBinding::OnPanVCamera_Implementation(const FInputActionValue& 
 	const float Value = InValue.Get<float>();
 	if(FMath::IsNearlyZero(Value)) return;
 
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	if(ACameraManagerBase* CameraManager = Cast<ACameraManagerBase>(GetOwningPlayerController() ? GetOwningPlayerController()->PlayerCameraManager : nullptr))
 	{
 		FCameraInputIntent Intent;
-		Intent.Pan.Y = Value / UCommonModuleStatics::GetTimeScale();
+		Intent.Pan.Y = Value / FMath::Max(UGameplayStatics::GetGlobalTimeDilation(GetOwningPlayerController()), UE_SMALL_NUMBER);
 		CameraManager->AddInputIntent(Intent);
 	}
 }
@@ -131,10 +130,10 @@ void UDefaultInputBinding::OnZoomCamera_Implementation(const FInputActionValue& 
 	const float Value = InValue.Get<float>();
 	if(FMath::IsNearlyZero(Value)) return;
 
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	if(ACameraManagerBase* CameraManager = Cast<ACameraManagerBase>(GetOwningPlayerController() ? GetOwningPlayerController()->PlayerCameraManager : nullptr))
 	{
 		FCameraInputIntent Intent;
-		Intent.Zoom = -Value / UCommonModuleStatics::GetTimeScale();
+		Intent.Zoom = -Value / FMath::Max(UGameplayStatics::GetGlobalTimeDilation(GetOwningPlayerController()), UE_SMALL_NUMBER);
 		CameraManager->AddInputIntent(Intent);
 	}
 }
@@ -144,10 +143,10 @@ void UDefaultInputBinding::OnMoveForwardCamera_Implementation(const FInputAction
 	const float Value = InValue.Get<float>();
 	if(FMath::IsNearlyZero(Value)) return;
 
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	if(ACameraManagerBase* CameraManager = Cast<ACameraManagerBase>(GetOwningPlayerController() ? GetOwningPlayerController()->PlayerCameraManager : nullptr))
 	{
 		FCameraInputIntent Intent;
-		Intent.Move.X = Value / UCommonModuleStatics::GetTimeScale();
+		Intent.Move.X = Value / FMath::Max(UGameplayStatics::GetGlobalTimeDilation(GetOwningPlayerController()), UE_SMALL_NUMBER);
 		CameraManager->AddInputIntent(Intent);
 	}
 }
@@ -157,10 +156,10 @@ void UDefaultInputBinding::OnMoveRightCamera_Implementation(const FInputActionVa
 	const float Value = InValue.Get<float>();
 	if(FMath::IsNearlyZero(Value)) return;
 
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	if(ACameraManagerBase* CameraManager = Cast<ACameraManagerBase>(GetOwningPlayerController() ? GetOwningPlayerController()->PlayerCameraManager : nullptr))
 	{
 		FCameraInputIntent Intent;
-		Intent.Move.Y = Value / UCommonModuleStatics::GetTimeScale();
+		Intent.Move.Y = Value / FMath::Max(UGameplayStatics::GetGlobalTimeDilation(GetOwningPlayerController()), UE_SMALL_NUMBER);
 		CameraManager->AddInputIntent(Intent);
 	}
 }
@@ -170,10 +169,10 @@ void UDefaultInputBinding::OnMoveUpCamera_Implementation(const FInputActionValue
 	const float Value = InValue.Get<float>();
 	if(FMath::IsNearlyZero(Value)) return;
 
-	if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager(LocalPlayerIndex))
+	if(ACameraManagerBase* CameraManager = Cast<ACameraManagerBase>(GetOwningPlayerController() ? GetOwningPlayerController()->PlayerCameraManager : nullptr))
 	{
 		FCameraInputIntent Intent;
-		Intent.Move.Z = Value / UCommonModuleStatics::GetTimeScale();
+		Intent.Move.Z = Value / FMath::Max(UGameplayStatics::GetGlobalTimeDilation(GetOwningPlayerController()), UE_SMALL_NUMBER);
 		CameraManager->AddInputIntent(Intent);
 	}
 }
@@ -182,9 +181,9 @@ void UDefaultInputBinding::OnTurnPlayer_Implementation(const FInputActionValue& 
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	if(UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn() && UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn()->Implements<UWHPlayerInterface>())
+	if (APawn* Pawn = GetOwningPlayerController() ? GetOwningPlayerController()->GetPawn() : nullptr; Pawn && Pawn->Implements<UWHPlayerInterface>())
 	{
-		IWHPlayerInterface::Execute_Turn(UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn(), InValue.Get<float>());
+		IWHPlayerInterface::Execute_Turn(Pawn, InValue.Get<float>());
 	}
 }
 
@@ -192,9 +191,9 @@ void UDefaultInputBinding::OnMoveForwardPlayer_Implementation(const FInputAction
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	if(UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn() && UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn()->Implements<UWHPlayerInterface>())
+	if (APawn* Pawn = GetOwningPlayerController() ? GetOwningPlayerController()->GetPawn() : nullptr; Pawn && Pawn->Implements<UWHPlayerInterface>())
 	{
-		IWHPlayerInterface::Execute_MoveForward(UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn(), InValue.Get<float>());
+		IWHPlayerInterface::Execute_MoveForward(Pawn, InValue.Get<float>());
 	}
 	else
 	{
@@ -210,9 +209,9 @@ void UDefaultInputBinding::OnMoveRightPlayer_Implementation(const FInputActionVa
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	if(UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn() && UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn()->Implements<UWHPlayerInterface>())
+	if (APawn* Pawn = GetOwningPlayerController() ? GetOwningPlayerController()->GetPawn() : nullptr; Pawn && Pawn->Implements<UWHPlayerInterface>())
 	{
-		IWHPlayerInterface::Execute_MoveRight(UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn(), InValue.Get<float>());
+		IWHPlayerInterface::Execute_MoveRight(Pawn, InValue.Get<float>());
 	}
 	else
 	{
@@ -228,9 +227,9 @@ void UDefaultInputBinding::OnMoveUpPlayer_Implementation(const FInputActionValue
 {
 	if(InValue.Get<float>() == 0.f) return;
 
-	if(UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn() && UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn()->Implements<UWHPlayerInterface>())
+	if (APawn* Pawn = GetOwningPlayerController() ? GetOwningPlayerController()->GetPawn() : nullptr; Pawn && Pawn->Implements<UWHPlayerInterface>())
 	{
-		IWHPlayerInterface::Execute_MoveUp(UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn(), InValue.Get<float>());
+		IWHPlayerInterface::Execute_MoveUp(Pawn, InValue.Get<float>());
 	}
 	else
 	{
@@ -244,9 +243,9 @@ void UDefaultInputBinding::OnActionUpPlayer_Implementation(const FInputActionVal
 
 void UDefaultInputBinding::OnJumpPlayer_Implementation()
 {
-	if(UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn() && UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn()->Implements<UWHPlayerInterface>())
+	if (APawn* Pawn = GetOwningPlayerController() ? GetOwningPlayerController()->GetPawn() : nullptr; Pawn && Pawn->Implements<UWHPlayerInterface>())
 	{
-		IWHPlayerInterface::Execute_JumpN(UCommonModuleStatics::GetPlayerController(LocalPlayerIndex)->GetPawn());
+		IWHPlayerInterface::Execute_JumpN(Pawn);
 	}
 }
 void UDefaultInputBinding::OnPrimaryPressed_Implementation()

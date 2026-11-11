@@ -20,7 +20,9 @@ void UWebRequestHandle_GetJson::OnDespawn_Implementation(EObjectDespawnMode InMo
 
 void UWebRequestHandle_GetJson::Parse(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
 {
-	if(InResult.bSucceeded)
+	bSucceeded = false;
+	Json = nullptr;
+	if(InResult.bSucceeded && InResult.HttpResponse.IsValid())
 	{
 		if(UCommonModuleStatics::StringToJsonObject(InResult.HttpResponse->GetContentAsString(), Json))
 		{

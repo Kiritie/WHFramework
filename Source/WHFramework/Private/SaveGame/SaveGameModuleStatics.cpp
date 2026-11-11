@@ -1,113 +1,161 @@
-﻿#include "SaveGame/SaveGameModuleStatics.h"
+#include "SaveGame/SaveGameModuleStatics.h"
+#include "SaveGame/SaveOperationTypes.h"
+#include "SaveGame/SaveSlotTypes.h"
+#include "Common/LifecycleTypes.h"
 
 #include "SaveGame/SaveGameModule.h"
 
-int32 USaveGameModuleStatics::GetUserIndex()
+int32 USaveGameModuleStatics::GetUserIndex(const UObject* WorldContextObject)
 {
-	return USaveGameModule::Get().GetUserIndex();
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->GetUserIndex() : INDEX_NONE;
 }
 
-void USaveGameModuleStatics::SetUserIndex(int32 InUserIndex)
+void USaveGameModuleStatics::SetUserIndex(const UObject* WorldContextObject, int32 InUserIndex)
 {
-	USaveGameModule::Get().SetUserIndex(InUserIndex);
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	if (Saves) Saves->SetUserIndex(InUserIndex);
+	else UE_LOG(LogTemp, Warning, TEXT("保存操作未执行：原世界的 SaveGameModule 不可用。"));
 }
 
-FSaveOperationResult USaveGameModuleStatics::CreateSaveSlot(const FCreateSaveSlotParams& Params, FSaveSlotSummary& OutSummary)
+FSaveOperationResult USaveGameModuleStatics::CreateSaveSlot(const UObject* WorldContextObject, const FCreateSaveSlotParams& Params, FSaveSlotSummary& OutSummary)
 {
-	return USaveGameModule::Get().CreateSaveSlot(Params, OutSummary);
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	if (!Saves) OutSummary = FSaveSlotSummary();
+	return Saves ? Saves->CreateSaveSlot(Params, OutSummary) : FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.Save", "MissingWorldModule", "原世界的保存模块不可用。"));
 }
 
-FSaveOperationResult USaveGameModuleStatics::SaveActiveSlot()
+FSaveOperationResult USaveGameModuleStatics::SaveActiveSlot(const UObject* WorldContextObject)
 {
-	return USaveGameModule::Get().SaveActiveSlot();
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->SaveActiveSlot() : FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.Save", "MissingWorldModule", "原世界的保存模块不可用。"));
 }
 
-void USaveGameModuleStatics::BeginPendingSaveSlot(const FCreateSaveSlotParams& Params)
+FGuid USaveGameModuleStatics::BeginPendingSaveSlot(const UObject* WorldContextObject, const FCreateSaveSlotParams& Params)
 {
-	USaveGameModule::Get().BeginPendingSaveSlot(Params);
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->BeginPendingSaveSlot(Params) : FGuid();
 }
 
-void USaveGameModuleStatics::CancelPendingSaveSlot()
+bool USaveGameModuleStatics::CancelPendingSaveSlot(const UObject* WorldContextObject, const FGuid& InToken)
 {
-	USaveGameModule::Get().CancelPendingSaveSlot();
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves && Saves->CancelPendingSaveSlot(InToken);
 }
 
-bool USaveGameModuleStatics::HasPendingSaveSlot()
+bool USaveGameModuleStatics::IsPendingSaveSlot(const UObject* WorldContextObject, const FGuid& InToken)
 {
-	return USaveGameModule::Get().HasPendingSaveSlot();
+	const USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves && Saves->IsPendingSaveSlot(InToken);
 }
 
-FSaveOperationResult USaveGameModuleStatics::SaveCurrentSlot()
+FSaveOperationResult USaveGameModuleStatics::SavePendingSlot(const UObject* WorldContextObject, const FGuid& InToken)
 {
-	return USaveGameModule::Get().SaveCurrentSlot();
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->SavePendingSlot(InToken) : FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.Save", "MissingWorldModule", "原世界的保存模块不可用。"));
 }
 
-FSaveOperationResult USaveGameModuleStatics::GetWorldSaveResult(const FGuid& InOperationId)
+bool USaveGameModuleStatics::ConsumePendingSlotResult(const UObject* WorldContextObject, const FGuid& InToken, FSaveOperationResult& OutResult)
 {
-	return USaveGameModule::Get().GetWorldSaveResult(InOperationId);
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves && Saves->ConsumePendingSlotResult(InToken, OutResult);
 }
 
-void USaveGameModuleStatics::DetachActiveSave()
+bool USaveGameModuleStatics::HasPendingSaveSlot(const UObject* WorldContextObject)
 {
-	USaveGameModule::Get().DetachActiveSave();
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->HasPendingSaveSlot() : false;
 }
 
-void USaveGameModuleStatics::ClearActiveSave()
+FSaveOperationResult USaveGameModuleStatics::SaveCurrentSlot(const UObject* WorldContextObject)
 {
-	USaveGameModule::Get().ClearActiveSave();
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->SaveCurrentSlot() : FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.Save", "MissingWorldModule", "原世界的保存模块不可用。"));
 }
 
-FSaveOperationResult USaveGameModuleStatics::SaveSlot(FGuid SaveId)
+FSaveOperationResult USaveGameModuleStatics::GetWorldSaveResult(const UObject* WorldContextObject, const FGuid& InOperationId)
 {
-	return USaveGameModule::Get().SaveSlot(SaveId);
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->GetWorldSaveResult(InOperationId) : FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.Save", "MissingWorldModule", "原世界的保存模块不可用。"));
 }
 
-FSaveOperationResult USaveGameModuleStatics::LoadSaveSlot(FGuid SaveId, EPhase InPhase)
+void USaveGameModuleStatics::DetachActiveSave(const UObject* WorldContextObject)
 {
-	return USaveGameModule::Get().LoadSlot(SaveId, InPhase);
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	if (Saves) Saves->DetachActiveSave();
+	else UE_LOG(LogTemp, Warning, TEXT("保存操作未执行：原世界的 SaveGameModule 不可用。"));
 }
 
-FSaveOperationResult USaveGameModuleStatics::DeleteSaveSlot(FGuid SaveId)
+void USaveGameModuleStatics::ClearActiveSave(const UObject* WorldContextObject)
 {
-	return USaveGameModule::Get().DeleteSaveSlot(SaveId);
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	if (Saves) Saves->ClearActiveSave();
+	else UE_LOG(LogTemp, Warning, TEXT("保存操作未执行：原世界的 SaveGameModule 不可用。"));
 }
 
-FSaveOperationResult USaveGameModuleStatics::RenameSaveSlot(FGuid SaveId, const FString& NewName)
+FSaveOperationResult USaveGameModuleStatics::SaveSlot(const UObject* WorldContextObject, FGuid SaveId)
 {
-	return USaveGameModule::Get().RenameSaveSlot(SaveId, NewName);
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->SaveSlot(SaveId) : FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.Save", "MissingWorldModule", "原世界的保存模块不可用。"));
 }
 
-FSaveOperationResult USaveGameModuleStatics::DuplicateSaveSlot(FGuid SourceSaveId, const FString& NewName, FSaveSlotSummary& OutSummary)
+FSaveOperationResult USaveGameModuleStatics::LoadSaveSlot(const UObject* WorldContextObject, FGuid SaveId, EPhase InPhase)
 {
-	return USaveGameModule::Get().DuplicateSaveSlot(SourceSaveId, NewName, OutSummary);
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->LoadSlot(SaveId, InPhase) : FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.Save", "MissingWorldModule", "原世界的保存模块不可用。"));
 }
 
-FSaveSlotSummary USaveGameModuleStatics::GetSaveSlotSummary(FGuid SaveId)
+FSaveOperationResult USaveGameModuleStatics::DeleteSaveSlot(const UObject* WorldContextObject, FGuid SaveId)
 {
-	return USaveGameModule::Get().GetSaveSlotSummary(SaveId);
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->DeleteSaveSlot(SaveId) : FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.Save", "MissingWorldModule", "原世界的保存模块不可用。"));
 }
 
-TArray<FSaveSlotSummary> USaveGameModuleStatics::GetSaveSlotSummaries()
+FSaveOperationResult USaveGameModuleStatics::RenameSaveSlot(const UObject* WorldContextObject, FGuid SaveId, const FString& NewName)
 {
-	return USaveGameModule::Get().GetSaveSlotSummaries();
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->RenameSaveSlot(SaveId, NewName) : FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.Save", "MissingWorldModule", "原世界的保存模块不可用。"));
 }
 
-bool USaveGameModuleStatics::HasActiveSave()
+FSaveOperationResult USaveGameModuleStatics::DuplicateSaveSlot(const UObject* WorldContextObject, FGuid SourceSaveId, const FString& NewName, FSaveSlotSummary& OutSummary)
 {
-	return USaveGameModule::Get().HasActiveSave();
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	if (!Saves) OutSummary = FSaveSlotSummary();
+	return Saves ? Saves->DuplicateSaveSlot(SourceSaveId, NewName, OutSummary) : FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.Save", "MissingWorldModule", "原世界的保存模块不可用。"));
 }
 
-FGuid USaveGameModuleStatics::GetActiveSaveId()
+FSaveSlotSummary USaveGameModuleStatics::GetSaveSlotSummary(const UObject* WorldContextObject, FGuid SaveId)
 {
-	return USaveGameModule::Get().GetActiveSaveId();
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->GetSaveSlotSummary(SaveId) : FSaveSlotSummary();
 }
 
-FSaveOperationResult USaveGameModuleStatics::SaveProfile(FName ProfileName)
+TArray<FSaveSlotSummary> USaveGameModuleStatics::GetSaveSlotSummaries(const UObject* WorldContextObject)
 {
-	return USaveGameModule::Get().SaveProfile(ProfileName);
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->GetSaveSlotSummaries() : TArray<FSaveSlotSummary>();
 }
 
-FSaveOperationResult USaveGameModuleStatics::LoadProfile(FName ProfileName)
+bool USaveGameModuleStatics::HasActiveSave(const UObject* WorldContextObject)
 {
-	return USaveGameModule::Get().LoadProfile(ProfileName);
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->HasActiveSave() : false;
+}
+
+FGuid USaveGameModuleStatics::GetActiveSaveId(const UObject* WorldContextObject)
+{
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->GetActiveSaveId() : FGuid();
+}
+
+FSaveOperationResult USaveGameModuleStatics::SaveProfile(const UObject* WorldContextObject, FName ProfileName)
+{
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->SaveProfile(ProfileName) : FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.Save", "MissingWorldModule", "原世界的保存模块不可用。"));
+}
+
+FSaveOperationResult USaveGameModuleStatics::LoadProfile(const UObject* WorldContextObject, FName ProfileName)
+{
+	USaveGameModule* Saves = USaveGameModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Saves ? Saves->LoadProfile(ProfileName) : FSaveOperationResult::Failed(ESaveResultCode::ModuleMissing, NSLOCTEXT("WH.Save", "MissingWorldModule", "原世界的保存模块不可用。"));
 }

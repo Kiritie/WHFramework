@@ -4,6 +4,8 @@
 #include "SlateOptMacros.h"
 #include "Main/MainModuleStatics.h"
 #include "Main/Base/ModuleBase.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
+#include "Engine/World.h"
 #include "Widgets/Layout/SWrapBox.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -24,13 +26,16 @@ void SDebugPanelWidget::Construct(const FArguments& InArgs)
 void SDebugPanelWidget::OnCreate(const FParameter& InParams)
 {
 	SSlateWidgetBase::OnCreate(InParams);
+	const FWidgetSpawnParameter* Spawn = InParams.GetPtr<FWidgetSpawnParameter>();
+	PanelWorld = Spawn ? Cast<UWorld>(Spawn->OwnerObject.Get()) : nullptr;
 
 	const TSharedPtr<SWrapBox> MessageBox = SNew(SWrapBox)
 		.Orientation(Orient_Vertical)
 		.UseAllottedSize(true);
 
-	for(auto Iter : UMainModuleStatics::GetAllModule())
+	for(UModuleBase* Iter : UMainModuleStatics::GetAllModule(PanelWorld.Get()))
 	{
+		const TWeakObjectPtr<UModuleBase> WeakModule(Iter);
 		MessageBox->AddSlot()
 		.Padding(5.0f)
 		.HAlign(HAlign_Left)
@@ -46,8 +51,8 @@ void SDebugPanelWidget::OnCreate(const FParameter& InParams)
 			.Padding(FMargin(0.f, 0.f, 0.f, 5.f))
 			[
 				SNew(STextBlock)
-				.Text_Lambda([Iter]() { return FText::FromString(FString::Printf(TEXT("[%s]"), *Iter->GetModuleDisplayName().ToString())); })
-				.ColorAndOpacity_Lambda([Iter](){ return !Iter->IsModuleRequired() ? FSlateColor(FLinearColor(1.f, 1.f, 1.f)) : FSlateColor(FLinearColor(1.f, 0.5f, 0.1f)); })
+				.Text_Lambda([WeakModule]() { return WeakModule.IsValid() ? FText::FromString(FString::Printf(TEXT("[%s]"), *WeakModule->GetModuleDisplayName().ToString())) : FText::GetEmpty(); })
+				.ColorAndOpacity_Lambda([WeakModule](){ return WeakModule.IsValid() && WeakModule->IsModuleRequired() ? FSlateColor(FLinearColor(1.f, 0.5f, 0.1f)) : FSlateColor(FLinearColor(1.f, 1.f, 1.f)); })
 				.ShadowOffset(FVector2D(0.5f, 0.5f))
 				.ShadowColorAndOpacity(FLinearColor(0.1f, 0.1f, 0.1f))
 			]
@@ -57,7 +62,7 @@ void SDebugPanelWidget::OnCreate(const FParameter& InParams)
 			.AutoHeight()
 			[
 				SNew(STextBlock)
-				.Text_Lambda([Iter]() { return FText::FromString(Iter->GetModuleDebugMessage()); })
+				.Text_Lambda([WeakModule]() { return WeakModule.IsValid() ? FText::FromString(WeakModule->GetModuleDebugMessage()) : FText::GetEmpty(); })
 				.ColorAndOpacity(FLinearColor(0.85f, 0.85f, 0.85f))
 				.ShadowOffset(FVector2D(0.5f, 0.5f))
 				.ShadowColorAndOpacity(FLinearColor(0.1f, 0.1f, 0.1f))
@@ -90,6 +95,11 @@ void SDebugPanelWidget::OnCreate(const FParameter& InParams)
 			]
 		]
 	];
+}
+
+UGameViewportClient* SDebugPanelWidget::ResolveViewport() const
+{
+	return PanelWorld.IsValid() ? PanelWorld->GetGameViewport() : nullptr;
 }
 
 void SDebugPanelWidget::OnOpen(const FParameter& InParams, bool bInstant)

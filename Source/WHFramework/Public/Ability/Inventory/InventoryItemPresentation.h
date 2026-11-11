@@ -4,33 +4,23 @@
 #include "GameplayEffect.h"
 #include "InventoryItemPresentation.generated.h"
 
-class UStaticMesh;
-class USkeletalMesh;
+class UAnimInstance;
+class UStreamableRenderAsset;
 class UMaterialInterface;
-
-UENUM(BlueprintType)
-enum class EInventoryPickupVisual : uint8
-{
-    None,
-    Icon,
-    StaticMesh,
-    SkeletalMesh
-};
+class UMeshComponent;
+class AActor;
 
 /** 只描述世界表现；物品数量、属性和所有权仍来自库存快照。 */
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FInventoryPickupPresentation
+struct WHFRAMEWORK_API FInventoryMeshData
 {
     GENERATED_BODY()
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    EInventoryPickupVisual Visual = EInventoryPickupVisual::Icon;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(AllowedClasses="/Script/Engine.StaticMesh,/Script/Engine.SkeletalMesh"))
+    TObjectPtr<UStreamableRenderAsset> Mesh;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    TObjectPtr<UStaticMesh> StaticMesh;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    TObjectPtr<USkeletalMesh> SkeletalMesh;
+    TSubclassOf<UAnimInstance> AnimationClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TObjectPtr<UMaterialInterface> MaterialOverride;
@@ -38,8 +28,7 @@ struct WHFRAMEWORK_API FInventoryPickupPresentation
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FTransform LocalTransform = FTransform::Identity;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="8", ClampMax="512"))
-    float IconSize = 48.f;
+    UMeshComponent* CreateComponent(AActor* InOwner) const;
 };
 
 UENUM(BlueprintType)

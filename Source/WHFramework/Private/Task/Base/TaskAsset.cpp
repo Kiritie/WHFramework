@@ -1,12 +1,15 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Task/Base/TaskAsset.h"
+#include "Task/TaskReferenceTypes.h"
+#include "Task/TaskObjectiveTypes.h"
 #include "AssetRegistry/AssetData.h"
 #include "Task/Base/TaskBase.h"
 #include "Task/Base/TaskAssetReferenceTask.h"
 #include "Task/TaskModuleTypes.h"
 #include "Task/TaskGraphCompiler.h"
 #include "Misc/SecureHash.h"
+#include "Task/TaskModule.h"
 #if WITH_EDITOR
 #include "Misc/DataValidation.h"
 #include "UObject/ObjectSaveContext.h"
@@ -50,10 +53,7 @@ bool UTaskAsset::InitializeRuntimeTasks()
 		return false;
 	}
 	Super::Initialize();
-	for(UTaskBase* Task : RootTasks)
-	{
-		if(Task) Task->OnInitialize();
-	}
+	for (UTaskBase* Task : RootTasks) if (Task) Task->OnInitialize();
 	return true;
 }
 

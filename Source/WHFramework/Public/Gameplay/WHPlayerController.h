@@ -7,6 +7,7 @@
 
 #include "WHPlayerController.generated.h"
 
+class ACharacterBase;
 class IInteractionAgentInterface;
 class IWHPlayerInterface;
 class UModuleNetworkComponentBase;
@@ -50,6 +51,21 @@ private:
 
 public:
 	AWHPlayerController();
+	virtual bool InputKey(const FInputKeyEventArgs& Params) override;
+	virtual bool InputTouch(FTouchId TouchId, ETouchType::Type Type, const FVector2D& TouchLocation, float Force, uint64 Timestamp) override;
+	virtual bool InputMotion(FInputDeviceId DeviceId, const FVector& Tilt, const FVector& RotationRate, const FVector& Gravity, const FVector& Acceleration, uint64 Timestamp) override;
+	virtual bool InputGesture(FInputDeviceId DeviceId, EGestureEvent GestureType, EGesturePhase GesturePhase, const FVector2D& GestureDelta, bool bIsDirectionInvertedFromDevice, uint64 Timestamp) override;
+
+	UFUNCTION(Server, Reliable)
+	void ServerRequestCharacterSwitch(ACharacterBase* InCharacter, bool bResetCamera, bool bInstant);
+
+	UFUNCTION(Client, Reliable)
+	void ClientApplyCharacterView(ACharacterBase* InCharacter, bool bInstant);
+
+	virtual bool CanRequestCharacterSwitch(const ACharacterBase* InCharacter) const;
+
+private:
+	bool ShouldSuppressGameplayInput() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// WHActor

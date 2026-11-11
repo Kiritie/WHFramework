@@ -2,33 +2,33 @@
 
 #include "ReferencePool/ReferencePoolModuleStatics.h"
 
-bool UReferencePoolModuleStatics::HasReference(TSubclassOf<UObject> InType)
+bool UReferencePoolModuleStatics::HasReference(const UObject* WorldContextObject, TSubclassOf<UObject> InType)
 {
-	UReferencePoolModule* Module = UReferencePoolModule::GetPtr();
+	UReferencePoolModule* Module = UReferencePoolModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
 	return Module ? Module->HasReference(InType.Get()) : false;
 }
 
-UObject* UReferencePoolModuleStatics::GetReference(TSubclassOf<UObject> InType)
+UObject* UReferencePoolModuleStatics::GetReference(const UObject* WorldContextObject, TSubclassOf<UObject> InType)
 {
-	UReferencePoolModule* Module = UReferencePoolModule::GetPtr();
+	UReferencePoolModule* Module = UReferencePoolModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
 	return Module ? Module->GetReference(InType.Get()) : nullptr;
 }
 
-bool UReferencePoolModuleStatics::ResetReference(TSubclassOf<UObject> InType)
+bool UReferencePoolModuleStatics::ResetReference(const UObject* WorldContextObject, TSubclassOf<UObject> InType)
 {
-	UReferencePoolModule* Module = UReferencePoolModule::GetPtr();
+	UReferencePoolModule* Module = UReferencePoolModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
 	return Module ? Module->ResetReference(InType.Get()) : false;
 }
 
-bool UReferencePoolModuleStatics::ClearReference(TSubclassOf<UObject> InType)
+bool UReferencePoolModuleStatics::ClearReference(const UObject* WorldContextObject, TSubclassOf<UObject> InType)
 {
-	UReferencePoolModule* Module = UReferencePoolModule::GetPtr();
+	UReferencePoolModule* Module = UReferencePoolModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
 	return Module ? Module->ClearReference(InType.Get()) : false;
 }
 
-void UReferencePoolModuleStatics::ClearAllReference()
+void UReferencePoolModuleStatics::ClearAllReference(const UObject* WorldContextObject)
 {
-	if(UReferencePoolModule* Module = UReferencePoolModule::GetPtr())
+	if(UReferencePoolModule* Module = UReferencePoolModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr))
 	{
 		Module->ClearAllReference();
 	}

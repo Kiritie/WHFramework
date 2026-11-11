@@ -1,6 +1,7 @@
 #include "FSM/Components/FSMComponent.h"
 #include "FSM/Base/FSMAgentInterface.h"
 #include "FSM/FSMModule.h"
+#include "Main/MainModuleStatics.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/GameStateBase.h"
@@ -134,7 +135,7 @@ void UFSMComponent::OnTermination()
 		PresentedState->OnPresentationLeave(nullptr);
 		PresentedState = nullptr;
 	}
-	if (UFSMModule* Module = UFSMModule::GetPtr(GetWorld()))
+	if (UFSMModule* Module = UMainModuleStatics::GetModuleForCleanup<UFSMModule>(GetWorld()))
 	{
 		Module->UnregisterFSM(this);
 	}

@@ -19,78 +19,78 @@ class WHFRAMEWORK_API UWebRequestModuleStatics : public UBlueprintFunctionLibrar
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics")
-	static bool IsWebLocalMode();
+	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static bool IsWebLocalMode(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static void SetWebLocalMode(bool bInLocalMode);
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetWebLocalMode(const UObject* WorldContextObject, bool bInLocalMode);
 
-	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics")
-	static FString GetWebServerURL();
+	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FString GetWebServerURL(const UObject* WorldContextObject);
 	
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static void SetWebServerURL(const FString& InServerURL);
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetWebServerURL(const UObject* WorldContextObject, const FString& InServerURL);
 
-	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics")
-	static int32 GetWebServerPort();
+	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static int32 GetWebServerPort(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static void SetWebServerPort(int32 InServerPort);
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetWebServerPort(const UObject* WorldContextObject, int32 InServerPort);
 
 public:
-	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics")
-	static bool HasWebInterface(const FName InName);
+	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static bool HasWebInterface(const UObject* WorldContextObject, const FName InName);
 
-	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics")
-	static UWebInterfaceBase* GetWebInterface(const FName InName, TSubclassOf<UWebInterfaceBase> InClass = nullptr);
+	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static UWebInterfaceBase* GetWebInterface(const UObject* WorldContextObject, const FName InName, TSubclassOf<UWebInterfaceBase> InClass = nullptr);
 
 	template<class T>
-	static T* CreateWebInterface(const FName InName)
+	static T* CreateWebInterface(const UObject* WorldContextObject, const FName InName)
 	{
-		return Cast<T>(CreateWebInterface(InName, T::StaticClass()));
+		return Cast<T>(CreateWebInterface(WorldContextObject, InName, T::StaticClass()));
 	}
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static UWebInterfaceBase* CreateWebInterface(const FName InName, TSubclassOf<UWebInterfaceBase> InClass);
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static UWebInterfaceBase* CreateWebInterface(const UObject* WorldContextObject, const FName InName, TSubclassOf<UWebInterfaceBase> InClass);
 
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static bool RegisterWebInterface(const FName InName, const FOnWebRequestComplete& InOnRequestComplete);
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static bool RegisterWebInterface(const UObject* WorldContextObject, const FName InName, const FOnWebRequestComplete& InOnRequestComplete);
 
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static bool UnRegisterWebInterface(const FName InName, const FOnWebRequestComplete& InOnRequestComplete);
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static bool UnRegisterWebInterface(const UObject* WorldContextObject, const FName InName, const FOnWebRequestComplete& InOnRequestComplete);
 
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static bool UnRegisterAllWebInterface(const FName InName);
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static bool UnRegisterAllWebInterface(const UObject* WorldContextObject, const FName InName);
 
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static bool ClearWebInterface(const FName InName);
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static bool ClearWebInterface(const UObject* WorldContextObject, const FName InName);
 
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static void ClearAllWebInterface();
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void ClearAllWebInterface(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics")
-	static FWebRequestConfig GetWebRequestConfig(const FName InName);
+	UFUNCTION(BlueprintPure, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FWebRequestConfig GetWebRequestConfig(const UObject* WorldContextObject, const FName InName);
 
-	static FWebRequestConfig CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams = nullptr, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent(), EWebRequestTriggerType InTriggerType = EWebRequestTriggerType::None, float InTriggerTime = 0.f);
+	static FWebRequestConfig CreateWebRequestConfig(const UObject* WorldContextObject, const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams = nullptr, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent(), EWebRequestTriggerType InTriggerType = EWebRequestTriggerType::None, float InTriggerTime = 0.f);
 
-	static FWebRequestConfig CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent(), EWebRequestTriggerType InTriggerType = EWebRequestTriggerType::None, float InTriggerTime = 0.f);
+	static FWebRequestConfig CreateWebRequestConfig(const UObject* WorldContextObject, const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent(), EWebRequestTriggerType InTriggerType = EWebRequestTriggerType::None, float InTriggerTime = 0.f);
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Create Web Request Config"), Category = "WebRequestModuleStatics")
-	FWebRequestConfig K2_CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime);
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject", DisplayName = "Create Web Request Config"), Category = "WebRequestModuleStatics")
+	static FWebRequestConfig K2_CreateWebRequestConfig(const UObject* WorldContextObject, const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime);
 
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static bool ClearWebRequestConfig(const FName InName);
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static bool ClearWebRequestConfig(const UObject* WorldContextObject, const FName InName);
 
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static void ClearAllWebRequestConfig();
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void ClearAllWebRequestConfig(const UObject* WorldContextObject);
 
 public:
-	static bool SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams = nullptr, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
+	static bool SendWebRequest(const UObject* WorldContextObject, const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams = nullptr, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
 
-	static bool SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
+	static bool SendWebRequest(const UObject* WorldContextObject, const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap = FParameterMap(), FWebContent InContent = FWebContent());
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Send Web Request", AutoCreateRefTerm = "InParams"), Category = "WebRequestModuleStatics")
-	static bool K2_SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent);
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject", DisplayName = "Send Web Request", AutoCreateRefTerm = "InParams"), Category = "WebRequestModuleStatics")
+	static bool K2_SendWebRequest(const UObject* WorldContextObject, const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent);
 
-	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics")
-	static bool SendWebRequestByConfig(const FName InName);
+	UFUNCTION(BlueprintCallable, Category = "WebRequestModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static bool SendWebRequestByConfig(const UObject* WorldContextObject, const FName InName);
 };

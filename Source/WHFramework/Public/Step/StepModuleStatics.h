@@ -21,38 +21,38 @@ class WHFRAMEWORK_API UStepModuleStatics : public UBlueprintFunctionLibrary
 
 public:
 	UFUNCTION(BlueprintPure, Category = "StepModule", meta = (WorldContext = "WorldContextObject"))
-	static TArray<UStepAsset*> GetStepAssets(const UObject* WorldContextObject = nullptr);
+	static TArray<UStepAsset*> GetStepAssets(const UObject* WorldContextObject);
 
 	UFUNCTION(BlueprintPure, Category = "StepModule", meta = (WorldContext = "WorldContextObject"))
-	static UStepAsset* GetCurrentStepAsset(const UObject* WorldContextObject = nullptr);
+	static UStepAsset* GetCurrentStepAsset(const UObject* WorldContextObject);
 
 	UFUNCTION(BlueprintPure, Category = "StepModule", meta = (WorldContext = "WorldContextObject"))
-	static UStepBase* GetCurrentStep(const UObject* WorldContextObject = nullptr);
+	static UStepBase* GetCurrentStep(const UObject* WorldContextObject);
 
 	UFUNCTION(BlueprintPure, Category = "StepModule", meta = (WorldContext = "WorldContextObject"))
-	static UStepBase* GetCurrentRootStep(const UObject* WorldContextObject = nullptr);
+	static UStepBase* GetCurrentRootStep(const UObject* WorldContextObject);
 
 	UFUNCTION(BlueprintPure, Category = "StepModule", meta = (WorldContext = "WorldContextObject"))
-	static UStepBase* GetStepByGUID(const FString& InStepGUID, const UObject* WorldContextObject = nullptr);
+	static UStepBase* GetStepByGUID(const FString& InStepGUID, const UObject* WorldContextObject);
 
 public:
 	UFUNCTION(BlueprintPure, Category = "StepModule", meta = (WorldContext = "WorldContextObject"))
-	static UStepAsset* GetStepAsset(UStepAsset* InAsset, const UObject* WorldContextObject = nullptr);
+	static UStepAsset* GetStepAsset(UStepAsset* InAsset, const UObject* WorldContextObject);
 	
 	UFUNCTION(BlueprintCallable, Category = "StepModule", meta = (WorldContext = "WorldContextObject"))
-	static void AddStepAsset(UStepAsset* InAsset, const UObject* WorldContextObject = nullptr);
+	static void AddStepAsset(UStepAsset* InAsset, const UObject* WorldContextObject);
 	
 	UFUNCTION(BlueprintCallable, Category = "StepModule", meta = (WorldContext = "WorldContextObject"))
-	static void RemoveStepAsset(UStepAsset* InAsset, const UObject* WorldContextObject = nullptr);
+	static void RemoveStepAsset(UStepAsset* InAsset, const UObject* WorldContextObject);
 	
 	UFUNCTION(BlueprintCallable, Category = "StepModule", meta = (WorldContext = "WorldContextObject"))
-	static void SwitchStepAsset(UStepAsset* InAsset, const UObject* WorldContextObject = nullptr);
+	static void SwitchStepAsset(UStepAsset* InAsset, const UObject* WorldContextObject);
 
 	UFUNCTION(BlueprintCallable, Category = "StepModule", meta = (WorldContext = "WorldContextObject"))
-	static void StartStep(int32 InRootStepIndex = -1, bool bSkipSteps = false, const UObject* WorldContextObject = nullptr);
+	static void StartStep(int32 InRootStepIndex, bool bSkipSteps, const UObject* WorldContextObject);
 
 	UFUNCTION(BlueprintCallable, Category = "StepModule", meta = (WorldContext = "WorldContextObject"))
-	static void EndStep(bool bRestoreSteps = false, const UObject* WorldContextObject = nullptr);
+	static void EndStep(bool bRestoreSteps, const UObject* WorldContextObject);
 
 	UFUNCTION(BlueprintCallable, Category = "StepModule")
 	static void RestoreStep(UStepBase* InStep);

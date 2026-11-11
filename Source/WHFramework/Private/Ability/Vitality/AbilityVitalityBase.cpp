@@ -1,6 +1,12 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Vitality/AbilityVitalityBase.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Ability/AbilityTags.h"
+#include "Ability/AbilityAttributeAccessors.h"
+#include "Ability/AbilityInfoTypes.h"
+#include "Ability/AbilityActorSaveTypes.h"
+#include "Common/LifecycleTypes.h"
 #include "Ability/Components/AbilityControlComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Ability/Effects/EffectBase.h"
@@ -13,7 +19,6 @@
 #include "Ability/Vitality/AbilityVitalityDataBase.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
 #include "Ability/Vitality/States/AbilityVitalityState_Spawn.h"
-#include "Asset/AssetModuleStatics.h"
 #include "FSM/Components/FSMComponent.h"
 #include "Scene/SceneModuleStatics.h"
 #include "Voxel/VoxelModule.h"
@@ -120,27 +125,31 @@ void AAbilityVitalityBase::OnTermination_Implementation()
 
 void AAbilityVitalityBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	if (!HasAuthority())
+	if (!HasAuthority() || !InSaveData.GetPtr<FVitalitySaveData>())
 	{
+		MarkLoadDataFailed();
 		return;
 	}
 	Super::LoadData(InSaveData, InPhase);
+	if (!WasLoadDataApplied()) return;
 	const FVitalitySaveData* SaveData = InSaveData.GetPtr<FVitalitySaveData>();
 	if (!SaveData)
 	{
+		MarkLoadDataFailed();
 		return;
 	}
 	if (PHASEC(InPhase, EPhase::Primary))
 	{
 		AbilitySystem->SetAbilityEntityId(ActorID);
-		const UAbilityVitalityDataBase& Data = GetVitalityData();
+		const UAbilityVitalityDataBase* Data = GetVitalityData();
+		if (!Data) { UE_LOG(LogTemp, Error, TEXT("生命体定义尚未绑定：%s"), *AssetID.ToString()); return; }
 		TArray<FAbilityGrantDefinition> Grants;
-		for (const FVitalityActionAbilityData& Action : Data.ActionAbilities)
+		for (const FVitalityActionAbilityData& Action : Data->ActionAbilities)
 		{
 			FAbilityGrantDefinition Grant;
 			Grant.DefinitionId = Action.ID;
 			Grant.AbilityClass = Action.AbilityClass;
-			Grant.SourceObject = const_cast<UAbilityVitalityDataBase*>(&Data);
+			Grant.SourceObject = const_cast<UAbilityVitalityDataBase*>(Data);
 			Grant.Level = Action.Level;
 			Grants.Add(Grant);
 		}
@@ -201,7 +210,7 @@ void AAbilityVitalityBase::Death(IAbilityVitalityInterface* InKiller)
 	UAbilitySystemComponentBase* const DyingSystem = AbilitySystem;
 	const auto IsSameDeath = [this, DyingIdentity, DyingSystem]()
 	{
-		return IsValid(this) && ActorID == DyingIdentity && AbilitySystem == DyingSystem &&
+		return ActorID == DyingIdentity && AbilitySystem == DyingSystem &&
 			DyingSystem->GetAvatarActor() == this && IsDead();
 	};
 	SwitchFinalFiniteState({Cast<UObject>(InKiller)});
@@ -385,15 +394,15 @@ void AAbilityVitalityBase::HandleDamage(const FGameplayAttribute& DamageAttribut
 
 	if (DamageValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(DamageValue),
-		                                    UAbilityModuleStatics::GetAttributeColor(DamageAttribute),
+		USceneModuleStatics::SpawnWorldText(this, FString::FromInt(DamageValue),
+		                                    UAbilityModuleStatics::GetAttributeColor(GetWorld(), DamageAttribute),
 		                                    !bHasCrited ? EWorldTextStyle::Normal : EWorldTextStyle::Stress,
 		                                    GetActorLocation(),
 		                                    FVector(20.f));
 	}
 	if (DefendValue >= 1.f)
 	{
-		USceneModuleStatics::SpawnWorldText(FString::FromInt(DefendValue), FColor::Cyan, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+		USceneModuleStatics::SpawnWorldText(this, FString::FromInt(DefendValue), FColor::Cyan, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
 	}
 }
 
@@ -411,7 +420,7 @@ void AAbilityVitalityBase::HandleRecovery(
 
 		if (RecoveryValue >= 1.f)
 		{
-			USceneModuleStatics::SpawnWorldText(FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
+			USceneModuleStatics::SpawnWorldText(this, FString::FromInt(RecoveryValue), FColor::Green, EWorldTextStyle::Normal, GetActorLocation(), FVector(20.f));
 		}
 	}
 }
@@ -471,9 +480,9 @@ FVitalityActionAbilityData AAbilityVitalityBase::GetActionAbility(const FGamepla
 	return Data ? *Data : FVitalityActionAbilityData();
 }
 
-UAbilityVitalityDataBase& AAbilityVitalityBase::GetVitalityData() const
+const UAbilityVitalityDataBase* AAbilityVitalityBase::GetVitalityData() const
 {
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityVitalityDataBase>(AssetID);
+	return Cast<UAbilityVitalityDataBase>(GetActorData());
 }
 
 
@@ -523,16 +532,17 @@ bool AAbilityVitalityBase::SetLevelA(int32 InLevel)
 	{
 		return false;
 	}
-	const auto& Data = GetVitalityData();
-	InLevel = Data.ClampLevel(InLevel);
+	const UAbilityVitalityDataBase* Data = GetVitalityData();
+	if (!Data) return false;
+	InLevel = Data->ClampLevel(InLevel);
 	if (InLevel == Level)
 	{
 		return false;
 	}
 	TArray<TSubclassOf<UEffectBase>> Effects;
-	if (Data.PEClass)
+	if (Data->PEClass)
 	{
-		Effects.Add(Data.PEClass);
+		Effects.Add(Data->PEClass);
 	}
 	if (!AbilitySystem->SetGrantSource(GetProgressionGrantSourceId(), {}, Effects, InLevel))
 	{

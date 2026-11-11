@@ -44,7 +44,7 @@ void UWidgetLoadingLevelPanel::OnRefresh()
 
 	if(!LevelPath.IsNone())
 	{
-		const float Progress = bUnloading ? USceneModuleStatics::GetAsyncUnloadLevelProgress(LevelPath) : (USceneModuleStatics::GetAsyncLoadLevelProgress(LevelPath) * 0.5f);
+		const float Progress = bUnloading ? USceneModuleStatics::GetAsyncUnloadLevelProgress(this, LevelPath) : (USceneModuleStatics::GetAsyncLoadLevelProgress(this, LevelPath) * 0.5f);
 		if(Progress > LoadProgress)
 		{
 			LoadProgress = Progress;

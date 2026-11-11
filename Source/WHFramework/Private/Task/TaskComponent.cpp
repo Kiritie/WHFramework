@@ -1,4 +1,7 @@
 #include "Task/TaskComponent.h"
+#include "Task/TaskExecutionTypes.h"
+#include "Task/TaskReferenceTypes.h"
+#include "Scene/SceneMarkerTypes.h"
 
 #include "Scene/Actor/SceneActorInterface.h"
 #include "Scene/SceneModule.h"
@@ -71,23 +74,25 @@ TArray<UTaskAsset*> UTaskComponent::GetRuntimeAssets() const
 	return TaskModule != nullptr && AgentID.IsValid() ? TaskModule->GetAssetsByAgent(AgentID) : TArray<UTaskAsset*>();
 }
 
-bool UTaskComponent::HasRuntimeAsset(UTaskAsset* InSource) const
+bool UTaskComponent::HasRuntimeAsset(UTaskAsset* InSource, FGuid InPlayerId) const
 {
-	if(!InSource) return false;
+	if(!InSource || !InPlayerId.IsValid()) return false;
 	const FSoftObjectPath SourcePath(InSource);
 	for(UTaskAsset* Asset : GetRuntimeAssets())
 	{
-		if(Asset && Asset->SourceObject && FSoftObjectPath(Asset->SourceObject) == SourcePath) return true;
+		if(Asset && Asset->OwnerActorID == InPlayerId && Asset->SourceObject && FSoftObjectPath(Asset->SourceObject) == SourcePath) return true;
 	}
 	return false;
 }
 
-TArray<UTaskAsset*> UTaskComponent::GetOfferedAssets() const
+TArray<UTaskAsset*> UTaskComponent::GetOfferedAssets(AActor* InInteractor) const
 {
 	TArray<UTaskAsset*> Result;
+	const FGuid PlayerId = InInteractor && InInteractor->GetWorld() == GetWorld() && InInteractor->Implements<USceneActorInterface>() ? ISceneActorInterface::Execute_GetActorID(InInteractor) : FGuid();
+	if (!PlayerId.IsValid()) return Result;
 	for(UTaskAsset* Asset : ResolvedTaskAssets)
 	{
-		if(Asset && !HasRuntimeAsset(Asset)) Result.Add(Asset);
+		if(Asset && !HasRuntimeAsset(Asset, PlayerId)) Result.Add(Asset);
 	}
 	return Result;
 }
@@ -104,11 +109,13 @@ void UTaskComponent::ResolveTaskAssets()
 	}
 }
 
-UTaskBase* UTaskComponent::GetTask(ETaskStage InStage) const
+UTaskBase* UTaskComponent::GetTask(AActor* InInteractor, ETaskStage InStage) const
 {
+	const FGuid PlayerId = InInteractor && InInteractor->GetWorld() == GetWorld() && InInteractor->Implements<USceneActorInterface>() ? ISceneActorInterface::Execute_GetActorID(InInteractor) : FGuid();
+	if (!PlayerId.IsValid()) return nullptr;
 	for(UTaskAsset* Asset : GetRuntimeAssets())
 	{
-		if(!Asset) continue;
+		if(!Asset || Asset->OwnerActorID != PlayerId) continue;
 		for(UTaskBase* Task : Asset->RootTasks)
 		{
 			if(Task && Task->GetTaskStage() == InStage) return Task;
@@ -117,19 +124,27 @@ UTaskBase* UTaskComponent::GetTask(ETaskStage InStage) const
 	return nullptr;
 }
 
-UTaskBase* UTaskComponent::ResolveTask(const FTaskReference& InReference) const
+UTaskBase* UTaskComponent::ResolveTask(AActor* InInteractor, const FTaskReference& InReference) const
 {
 	UTaskModule* TaskModule = UTaskModule::GetPtr(GetWorld());
-	if(TaskModule == nullptr) return nullptr;
-	if(InReference.InstanceID.IsValid()) return TaskModule->ResolveTask(InReference);
+	const FGuid PlayerId = InInteractor && InInteractor->GetWorld() == GetWorld() && InInteractor->Implements<USceneActorInterface>() ? ISceneActorInterface::Execute_GetActorID(InInteractor) : FGuid();
+	if(TaskModule == nullptr || !PlayerId.IsValid()) return nullptr;
+	if(InReference.InstanceID.IsValid())
+	{
+		UTaskBase* Task = TaskModule->ResolveTask(InReference);
+		const UTaskAsset* Asset = Task ? Task->GetTaskAsset() : nullptr;
+		return Asset && Asset->OwnerActorID == PlayerId && Asset->AgentID == AgentID ? Task : nullptr;
+	}
+	UTaskBase* Found = nullptr;
 	for(UTaskAsset* Asset : GetRuntimeAssets())
 	{
-		if(!Asset || !Asset->SourceObject) continue;
+		if(!Asset || Asset->OwnerActorID != PlayerId || !Asset->SourceObject) continue;
 		if(!InReference.Asset.IsNull() && FSoftObjectPath(Asset->SourceObject) != InReference.Asset.ToSoftObjectPath()) continue;
-		if(InReference.TaskGUID.IsEmpty()) return Asset->RootTasks.IsEmpty() ? nullptr : Asset->RootTasks[0];
-		if(UTaskBase* Task = Asset->TaskMap.FindRef(InReference.TaskGUID)) return Task;
+		UTaskBase* Task = InReference.TaskGUID.IsEmpty() ? (Asset->RootTasks.IsEmpty() ? nullptr : Asset->RootTasks[0]) : Asset->TaskMap.FindRef(InReference.TaskGUID);
+		if (Task && Found && Found != Task) return nullptr;
+		if (Task) Found = Task;
 	}
-	return nullptr;
+	return Found;
 }
 
 UTaskBase* UTaskComponent::AcceptTask(UTaskAsset* InAsset, FString InTaskGUID, AActor* InInteractor)
@@ -144,12 +159,13 @@ UTaskBase* UTaskComponent::AcceptTask(UTaskAsset* InAsset, FString InTaskGUID, A
 		OwnerActorID = ISceneActorInterface::Execute_GetActorID(InInteractor);
 		if(!OwnerActorID.IsValid()) return nullptr;
 	}
+	if (!OwnerActorID.IsValid()) return nullptr;
 	if(!InAsset)
 	{
-		const TArray<UTaskAsset*> Offers = GetOfferedAssets();
+		const TArray<UTaskAsset*> Offers = GetOfferedAssets(InInteractor);
 		InAsset = Offers.IsEmpty() ? nullptr : Offers[0];
 	}
-	if(!InAsset || HasRuntimeAsset(InAsset)) return nullptr;
+	if(!InAsset || HasRuntimeAsset(InAsset, OwnerActorID)) return nullptr;
 	UTaskAsset* RuntimeAsset = TaskModule->CreateAsset(InAsset, AgentID, OwnerActorID);
 	if(!RuntimeAsset) return nullptr;
 	RuntimeAsset->AgentLocation = GetOwner()->GetActorLocation();
@@ -170,11 +186,13 @@ UTaskBase* UTaskComponent::AcceptTask(UTaskAsset* InAsset, FString InTaskGUID, A
 	return Task;
 }
 
-bool UTaskComponent::TurnInTask(UTaskBase* InTask)
+bool UTaskComponent::TurnInTask(AActor* InInteractor, UTaskBase* InTask)
 {
 	UTaskModule* TaskModule = UTaskModule::GetPtr(GetWorld());
 	if(!bAgentActive || TaskModule == nullptr) return false;
-	if(!InTask) InTask = GetTask(ETaskStage::Deliverable);
+	if(!InTask) InTask = GetTask(InInteractor, ETaskStage::Deliverable);
+	const FGuid PlayerId = InInteractor && InInteractor->GetWorld() == GetWorld() && InInteractor->Implements<USceneActorInterface>() ? ISceneActorInterface::Execute_GetActorID(InInteractor) : FGuid();
+	if (!PlayerId.IsValid() || !InTask || !InTask->GetTaskAsset() || InTask->GetTaskAsset()->OwnerActorID != PlayerId) return false;
 	const bool bSucceeded = TaskModule->TurnInTask(InTask, GetOwner());
 	RefreshTaskMarker();
 	return bSucceeded;
@@ -193,9 +211,9 @@ void UTaskComponent::SetAgentActive(bool bInActive)
 	RefreshTaskMarker();
 }
 
-bool UTaskComponent::HasAvailableTask() const
+bool UTaskComponent::HasAvailableTask(AActor* InInteractor) const
 {
-	return bAgentActive && !GetOfferedAssets().IsEmpty();
+	return bAgentActive && !GetOfferedAssets(InInteractor).IsEmpty();
 }
 
 void UTaskComponent::OnTaskAssetsChanged()
@@ -206,60 +224,12 @@ void UTaskComponent::OnTaskAssetsChanged()
 
 void UTaskComponent::RefreshTaskMarker()
 {
-	USceneModule* SceneModule = USceneModule::GetPtr(GetWorld());
-	const bool bAvailable = HasAvailableTask();
-	if(bHasAvailableTask != bAvailable)
-	{
-		bHasAvailableTask = bAvailable;
-		OnTaskAvailabilityChanged.Broadcast(bAvailable);
-		if(UInteractionComponent* Interaction = GetOwner()->FindComponentByClass<UInteractionComponent>()) Interaction->NotifyOptionsChanged();
-	}
-	if(!bAgentActive || SceneModule == nullptr || (!AgentID.IsValid() && !ResolveAgentID()))
-	{
-		if(SceneModule != nullptr && MarkerID.IsValid()) SceneModule->RemoveMarker(MarkerID);
-		LastMarkerTag = FGameplayTag();
-		return;
-	}
-	for(UTaskAsset* Asset : GetRuntimeAssets())
-	{
-		if(Asset && GetOwner()) Asset->AgentLocation = GetOwner()->GetActorLocation();
-	}
-	FGameplayTag MarkerTag;
-	TSoftObjectPtr<UTexture2D> Icon;
-	FLinearColor Color;
-	FText DisplayName;
-	if(UTaskBase* Task = GetTask(ETaskStage::Deliverable))
-	{
-		MarkerTag = TaskTags::Marker_Deliverable;
-		Icon = DeliverableMarkerIcon;
-		Color = FLinearColor(1.f, 0.82f, 0.15f);
-		DisplayName = Task->TaskDisplayName;
-	}
-	else
-	{
-		if(MarkerID.IsValid()) SceneModule->RemoveMarker(MarkerID);
-		if(LastMarkerTag.IsValid())
-		{
-			if(UInteractionComponent* Interaction = GetOwner()->FindComponentByClass<UInteractionComponent>()) Interaction->NotifyOptionsChanged();
-		}
-		LastMarkerTag = FGameplayTag();
-		return;
-	}
-	if(LastMarkerTag != MarkerTag)
-	{
-		if(UInteractionComponent* Interaction = GetOwner()->FindComponentByClass<UInteractionComponent>()) Interaction->NotifyOptionsChanged();
-	}
-	FSceneMarker Marker;
-	Marker.MarkerID = MarkerID;
-	Marker.MarkerTag = MarkerTag;
-	Marker.DisplayName = DisplayName;
-	Marker.Icon = Icon;
-	Marker.Color = Color;
-	Marker.Location = GetOwner()->GetActorLocation();
-	Marker.Offset = MarkerOffset;
-	Marker.ActorID = AgentID;
-	Marker.Channels = static_cast<int32>(ESceneMarkerChannel::World);
-	Marker.Priority = 200;
-	if(!SceneModule->UpdateMarker(Marker)) SceneModule->AddMarker(Marker);
-	LastMarkerTag = MarkerTag;
+    // TaskPresentation publishes the owner-scoped deliverable marker; this
+    // component only reports that the agent's options may have changed.
+    if (USceneModule* Scene = USceneModule::GetPtr(GetWorld()); Scene && MarkerID.IsValid()) Scene->RemoveMarker(MarkerID);
+    LastMarkerTag = FGameplayTag();
+    for (UTaskAsset* Asset : GetRuntimeAssets())
+        if (Asset && GetOwner()) Asset->AgentLocation = GetOwner()->GetActorLocation();
+    bHasAvailableTask = bAgentActive && !ResolvedTaskAssets.IsEmpty();
+    OnTaskAvailabilityChanged.Broadcast(bHasAvailableTask);
 }

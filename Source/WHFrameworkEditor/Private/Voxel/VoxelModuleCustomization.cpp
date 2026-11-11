@@ -68,8 +68,8 @@ void FVoxelModuleCustomization::CustomizeDetails(IDetailLayoutBuilder& DetailBui
 					Filter.ClassPaths.Add(UVoxelData::StaticClass()->GetClassPathName());
 					Filter.bRecursiveClasses = true;
 					Filter.PackagePaths.Add(TEXT("/WHFramework/Voxel/DataAssets"));
+					Filter.PackagePaths.Add(TEXT("/WHFramework/DataAssets/Voxel"));
 					Filter.PackagePaths.Add(TEXT("/Game/DataAssets/Voxel"));
-					Filter.PackagePaths.Add(TEXT("/Game/VoxelStyle/Blocks"));
 					Filter.bRecursivePaths = true;
 
 					TArray<FAssetData> Found;

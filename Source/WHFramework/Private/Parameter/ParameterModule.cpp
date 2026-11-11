@@ -3,6 +3,7 @@
 
 
 #include "Parameter/ParameterModule.h"
+#include "Common/LifecycleTypes.h"
 
 #include "Event/EventModuleStatics.h"
 #include "Event/Events/Parameter/Event_GlobalParameterChanged.h"
@@ -22,7 +23,6 @@ UParameterModule::UParameterModule()
 
 UParameterModule::~UParameterModule()
 {
-	TERMINATION_MODULE(UParameterModule)
 }
 
 #if WITH_EDITOR
@@ -35,7 +35,6 @@ void UParameterModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UParameterModule)
 }
 #endif
 

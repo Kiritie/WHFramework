@@ -48,7 +48,6 @@ private:
 
 	UModuleBase* DuplicateModule(UModuleBase* InModule);
 
-	void GenerateRequireModules();
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Class Picker

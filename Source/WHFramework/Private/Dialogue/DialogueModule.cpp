@@ -1,13 +1,8 @@
 #include "Dialogue/DialogueModule.h"
-
-#include "Dialogue/Base/DialogueConditionBase.h"
-#include "Dialogue/Base/DialogueEventBase.h"
-#include "GameFramework/PlayerController.h"
-#include "Engine/GameInstance.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Dialogue/DialogueSession.h"
 #include "Engine/World.h"
-#include "Common/Interaction/InteractionComponent.h"
-#include "Common/Interaction/InteractionAgentInterface.h"
-#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 
 IMPLEMENTATION_MODULE(UDialogueModule)
 
@@ -15,439 +10,253 @@ UDialogueModule::UDialogueModule()
 {
     ModuleName = FName("DialogueModule");
     ModuleDisplayName = NSLOCTEXT("WHFramework", "DialogueModule", "Dialogue Module");
+    SaveDataVersion = 2;
     SaveScope = ESaveScope::World;
     ModuleDependencies.Add(FName("TaskModule"));
     bModuleRequired = false;
 }
 
-UDialogueModule::~UDialogueModule()
+UDialogueModule::~UDialogueModule() {}
+
+void UDialogueModule::OnInitialize()
 {
-    TERMINATION_MODULE(UDialogueModule)
+    SaveDataVersion = 2;
+    Super::OnInitialize();
+}
+bool UDialogueModule::StartDialogue(APlayerController* Player, UDialogueAsset* Asset, AActor* NPC)
+{
+    UDialogueSession* Session = GetOrCreateSession(Player);
+    return Session && Session->StartDialogue(Asset, Player, NPC);
+}
+bool UDialogueModule::SelectDialogueNode(APlayerController* Player, int32 Node)
+{
+    UDialogueSession* Session = FindSession(Player);
+    return Session && Session->SelectDialogueNode(Node);
+}
+bool UDialogueModule::ContinueDialogue(APlayerController* Player)
+{
+    UDialogueSession* Session = FindSession(Player);
+    return Session && Session->ContinueDialogue();
+}
+void UDialogueModule::EndDialogue(APlayerController* Player)
+{
+    if (UDialogueSession* Session = FindSession(Player)) Session->EndDialogue();
+}
+bool UDialogueModule::IsDialogueActive(APlayerController* Player) const
+{
+    const UDialogueSession* Session = FindSession(Player);
+    return Session && Session->IsDialogueActive();
+}
+UDialogueAsset* UDialogueModule::GetCurrentDialogue(APlayerController* Player) const
+{
+    const UDialogueSession* Session = FindSession(Player);
+    return Session ? Session->GetCurrentDialogue() : nullptr;
+}
+FDialogueNode UDialogueModule::GetCurrentNode(APlayerController* Player) const
+{
+    const UDialogueSession* Session = FindSession(Player);
+    return Session ? Session->GetCurrentNode() : FDialogueNode();
+}
+TArray<FDialogueNode> UDialogueModule::GetAvailableNodes(APlayerController* Player) const
+{
+    const UDialogueSession* Session = FindSession(Player);
+    return Session ? Session->GetAvailableNodes() : TArray<FDialogueNode>();
+}
+TArray<FDialogueNode> UDialogueModule::GetAvailableChoices(APlayerController* Player) const
+{
+    const UDialogueSession* Session = FindSession(Player);
+    return Session ? Session->GetAvailableChoices() : TArray<FDialogueNode>();
+}
+AActor* UDialogueModule::GetNPCActor(APlayerController* Player) const
+{
+    const UDialogueSession* Session = FindSession(Player);
+    return Session ? Session->GetNPCActor() : nullptr;
+}
+bool UDialogueModule::SetPersistentPlayerId(APlayerController* Player, FGuid Id)
+{
+    UDialogueSession* Session = GetOrCreateSession(Player);
+    return Session && BindPlayerIdentity(*Session, Id);
+}
+bool UDialogueModule::BindNetworkBridge(APlayerController* Player, UObject* Owner, FDialogueNetworkBegin Begin,
+    FDialogueNetworkSelect Select, FDialogueNetworkContinue Continue, FDialogueNetworkEnd End)
+{
+    UDialogueSession* Session = GetOrCreateSession(Player);
+    return Session && Session->BindNetworkBridge(Owner, MoveTemp(Begin), MoveTemp(Select), MoveTemp(Continue), MoveTemp(End));
+}
+bool UDialogueModule::IsNetworkBridgeOwner(APlayerController* Player, const UObject* Owner) const
+{
+    const UDialogueSession* Session = FindSession(Player);
+    return Session && Session->IsNetworkBridgeOwner(Owner);
+}
+void UDialogueModule::UnbindNetworkBridge(APlayerController* Player, UObject* Owner)
+{
+    if (UDialogueSession* Session = FindSession(Player)) Session->UnbindNetworkBridge(Owner);
+}
+void UDialogueModule::ClearNetworkPresentation(APlayerController* Player, UObject* Owner)
+{
+    if (UDialogueSession* Session = FindSession(Player); Session && Session->IsNetworkBridgeOwner(Owner)) Session->ClearNetworkPresentation();
+}
+bool UDialogueModule::ApplyNetworkPresentation(APlayerController* Player, UObject* Owner, AActor* NPC,
+    const FDialogueNetworkNode& Current, const TArray<FDialogueNetworkNode>& Available)
+{
+    UDialogueSession* Session = FindSession(Player);
+    return Session && Session->ApplyNetworkPresentation(Owner, Player, NPC, Current, Available);
+}
+void UDialogueModule::GetNetworkNodeDecoration(APlayerController* Player, int32 Node, bool& Conditions, bool& Events, bool& Links) const
+{
+    Conditions = Events = Links = false;
+    if (const UDialogueSession* Session = FindSession(Player)) Session->GetNetworkNodeDecoration(Node, Conditions, Events, Links);
+}
+void UDialogueModule::NotifyChanged(UDialogueSession& Session, bool bEnded)
+{
+    if (APlayerController* Player = Session.GetOwnerPlayer())
+    {
+        if (bEnded) OnDialogueEnded.Broadcast(Player);
+        else OnDialogueChanged.Broadcast(Player);
+    }
 }
 
-bool UDialogueModule::HasNetworkBridge() const
+UDialogueSession* UDialogueModule::FindSession(APlayerController* InPlayer) const
 {
-    return NetworkBridgeOwner.IsValid() && NetworkBegin.IsBound() && NetworkSelect.IsBound() &&
-        NetworkContinue.IsBound() && NetworkEnd.IsBound();
+    if (bShuttingDown || !::IsValid(InPlayer) || !InPlayer->IsLocalController()) return nullptr;
+    for (UDialogueSession* Session : Sessions)
+        if (::IsValid(Session) && Session->GetOwnerPlayer() == InPlayer) return Session;
+    return nullptr;
 }
 
-bool UDialogueModule::IsNetworkBridgeOwner(const UObject* InOwner) const
+UDialogueSession* UDialogueModule::GetOrCreateSession(APlayerController* InPlayer)
 {
-    return InOwner && NetworkBridgeOwner.Get() == InOwner && HasNetworkBridge();
+    if (bShuttingDown || !::IsValid(InPlayer) || !InPlayer->IsLocalController()) return nullptr;
+    if (UDialogueSession* Existing = FindSession(InPlayer)) return Existing;
+    UDialogueSession* Session = NewObject<UDialogueSession>(this);
+    Session->Initialize(*this, *InPlayer);
+    Sessions.Add(Session);
+    return Session;
 }
 
-bool UDialogueModule::BindNetworkBridge(UObject* InOwner, FDialogueNetworkBegin InBegin, FDialogueNetworkSelect InSelect,
-    FDialogueNetworkContinue InContinue, FDialogueNetworkEnd InEnd)
+bool UDialogueModule::BindPlayerIdentity(UDialogueSession& InSession, FGuid InPlayerId)
 {
-    if (!::IsValid(InOwner) || !InBegin.IsBound() || !InSelect.IsBound() || !InContinue.IsBound() || !InEnd.IsBound() ||
-        (NetworkBridgeOwner.IsValid() && NetworkBridgeOwner.Get() != InOwner))
+    if (!InPlayerId.IsValid() || !Sessions.Contains(&InSession) || !InSession.GetOwnerPlayer()) return false;
+    for (UDialogueSession* Other : Sessions)
+        if (Other && Other != &InSession && Other->GetPersistentPlayerId() == InPlayerId) return false;
+    if (InSession.PersistentPlayerId != InPlayerId)
     {
-        return false;
-    }
-    if (!HasNetworkBridge())
-    {
-        EndDialogue();
-    }
-    NetworkBridgeOwner = InOwner;
-    NetworkBegin = MoveTemp(InBegin);
-    NetworkSelect = MoveTemp(InSelect);
-    NetworkContinue = MoveTemp(InContinue);
-    NetworkEnd = MoveTemp(InEnd);
-    SavedDialogue = FDialogueModuleSaveData();
-    return true;
-}
 
-void UDialogueModule::UnbindNetworkBridge(UObject* InOwner)
-{
-    if (NetworkBridgeOwner.Get() != InOwner)
-    {
-        return;
-    }
-    ClearNetworkPresentation();
-    NetworkBridgeOwner.Reset();
-    NetworkBegin.Unbind();
-    NetworkSelect.Unbind();
-    NetworkContinue.Unbind();
-    NetworkEnd.Unbind();
-}
-
-void UDialogueModule::ClearNetworkPresentation()
-{
-    if (!bNetworkPresentation)
-    {
-        return;
-    }
-    const bool bWasActive = CurrentDialogue != nullptr;
-    CurrentDialogue = nullptr;
-    SourceDialogue = nullptr;
-    CurrentNodeID = INDEX_NONE;
-    ConsideringPlayer = nullptr;
-    NPCActor = nullptr;
-    NetworkNodes.Reset();
-    bNetworkPresentation = false;
-    if (bWasActive)
-    {
-        OnDialogueEnded.Broadcast();
-        OnDialogueChanged.Broadcast();
-    }
-}
-
-bool UDialogueModule::ApplyNetworkPresentation(UObject* InOwner, APlayerController* InPlayer, AActor* InNPC,
-    const FDialogueNetworkNode& InCurrent, const TArray<FDialogueNetworkNode>& InAvailable)
-{
-    if (!IsNetworkBridgeOwner(InOwner) || !InPlayer || !InPlayer->IsLocalController() || !::IsValid(InNPC) ||
-        InPlayer->GetWorld() != GetWorld() || InNPC->GetWorld() != GetWorld() || InCurrent.Id < 0 || InAvailable.Num() > 32)
-    {
-        return false;
-    }
-    if (!bNetworkPresentation || !CurrentDialogue)
-    {
-        CurrentDialogue = NewObject<UDialogueAsset>(this);
-    }
-    bNetworkPresentation = true;
-    SourceDialogue = nullptr;
-    ConsideringPlayer = InPlayer;
-    NPCActor = InNPC;
-    CurrentNodeID = InCurrent.Id;
-    CurrentDialogue->Data.Reset();
-    NetworkNodes.Reset();
-    NetworkNodes.Add(InCurrent.Id, InCurrent);
-    FDialogueNode Current;
-    Current.id = InCurrent.Id;
-    Current.Text = InCurrent.Text;
-    Current.isPlayer = InCurrent.bPlayer;
-    for (const FDialogueNetworkNode& Node : InAvailable)
-    {
-        Current.Links.AddUnique(Node.Id);
-        NetworkNodes.Add(Node.Id, Node);
-    }
-    CurrentDialogue->Data.Add(Current);
-    for (const FDialogueNetworkNode& Node : InAvailable)
-    {
-        if (Node.Id == Current.id)
+        if (InSession.PersistentPlayerId.IsValid())
         {
-            continue;
+            const FDialogueResumeData Previous = InSession.CaptureResume();
+            if (!Previous.DialogueAsset.IsNull() && Previous.NodeID >= 0)
+                SavedDialogue.PlayerSessions.Add(InSession.PersistentPlayerId, Previous);
+            if (InSession.HasNetworkBridge()) InSession.ClearNetworkPresentation();
+            else InSession.EndDialogue();
+            if (!Sessions.Contains(&InSession) || bShuttingDown) return false;
         }
-        FDialogueNode Display;
-        Display.id = Node.Id;
-        Display.Text = Node.Text;
-        Display.isPlayer = Node.bPlayer;
-        CurrentDialogue->Data.Add(MoveTemp(Display));
-    }
-    OnDialogueChanged.Broadcast();
-    return true;
-}
-
-void UDialogueModule::GetNetworkNodeDecoration(int32 InNodeId, bool& bOutConditions, bool& bOutEvents, bool& bOutLinks) const
-{
-    if (bNetworkPresentation)
-    {
-        if (const FDialogueNetworkNode* Node = NetworkNodes.Find(InNodeId))
+        InSession.PersistentPlayerId = InPlayerId;
+        if (!InSession.HasNetworkBridge()) if (FDialogueResumeData* Resume = SavedDialogue.PlayerSessions.Find(InPlayerId))
         {
-            bOutConditions = Node->bHasConditions;
-            bOutEvents = Node->bHasEvents;
-            bOutLinks = Node->bHasLinks;
-        }
-    }
-}
-
-bool UDialogueModule::IsNodeAvailable(const FDialogueNode& Node) const
-{
-    if (Node.id < 0)
-    {
-        return false;
-    }
-    if (bNetworkPresentation)
-    {
-        return NetworkNodes.Contains(Node.id);
-    }
-    for (UDialogueConditionBase* Condition : Node.Conditions)
-    {
-        if (!Condition || !Condition->IsConditionMet(ConsideringPlayer, NPCActor))
-        {
-            return false;
+            InSession.RestoreResume(*Resume);
+            SavedDialogue.PlayerSessions.Remove(InPlayerId);
         }
     }
     return true;
 }
 
-bool UDialogueModule::StartDialogue(UDialogueAsset* InDialogue, APlayerController* InPlayer, AActor* InNPC)
+void UDialogueModule::ReleaseSession(APlayerController* InPlayer)
 {
-    if (HasNetworkBridge())
+    UDialogueSession* Session = FindSession(InPlayer);
+    if (!Session) return;
+    const FGuid Id = Session->GetPersistentPlayerId();
+    const FDialogueResumeData Resume = Session->CaptureResume();
+    if (Id.IsValid() && !Resume.DialogueAsset.IsNull() && Resume.NodeID >= 0) SavedDialogue.PlayerSessions.Add(Id, Resume);
+
+    Sessions.Remove(Session);
+    Session->Shutdown();
+}
+
+void UDialogueModule::OnControlRefresh(float RealDeltaSeconds)
+{
+    if (bShuttingDown) return;
+    TArray<TWeakObjectPtr<UDialogueSession>> Retiring;
+    for (int32 Index = Sessions.Num() - 1; Index >= 0; --Index)
     {
-        return InPlayer && InPlayer->IsLocalController() && NetworkBegin.Execute(InPlayer, InNPC);
-    }
-    if (!GetWorld() || GetWorld()->GetNetMode() != NM_Standalone)
-    {
-        return false;
-    }
-    if (!InDialogue || !InPlayer || bSelectingNode)
-    {
-        return false;
-    }
-    TArray<FText> Errors;
-    if (!InDialogue->ValidateDialogue(Errors))
-    {
-        return false;
-    }
-    const FDialogueModuleSaveData ResumeData = CurrentDialogue ? FDialogueModuleSaveData() : SavedDialogue;
-    EndDialogue();
-    if (IInteractionAgentInterface* Agent = Cast<IInteractionAgentInterface>(InNPC))
-    {
-        Interaction = Agent->GetInteractionComponent();
-        if (!Interaction->BeginInteraction(InPlayer->GetPawn(), this))
+        UDialogueSession* Session = Sessions[Index];
+        APlayerController* Player = Session ? Session->GetOwnerPlayer() : nullptr;
+        if (!::IsValid(Player) || !Player->IsLocalController())
         {
-            Interaction.Reset();
-            return false;
-        }
-        Interaction->OnInteractionCancelled.AddUniqueDynamic(this, &UDialogueModule::EndDialogue);
-    }
-    SavedDialogue = ResumeData;
-    SourceDialogue = InDialogue;
-    CurrentDialogue = DuplicateObject<UDialogueAsset>(InDialogue, this);
-    CurrentDialogue->SourceObject = InDialogue;
-    CurrentDialogue->AssignPersistentOuter(InPlayer->GetGameInstance());
-    ConsideringPlayer = InPlayer;
-    NPCActor = InNPC;
-    if (NPCActor)
-    {
-        NPCActor->OnDestroyed.AddUniqueDynamic(this, &UDialogueModule::OnParticipantDestroyed);
-    }
-    if (InPlayer->GetPawn())
-    {
-        InPlayer->GetPawn()->OnDestroyed.AddUniqueDynamic(this, &UDialogueModule::OnParticipantDestroyed);
-    }
-    if (SavedDialogue.DialogueAsset.ToSoftObjectPath() == FSoftObjectPath(InDialogue) && SavedDialogue.NodeID > 0)
-    {
-        const int32 ResumeNodeID = SavedDialogue.NodeID;
-        SavedDialogue = FDialogueModuleSaveData();
-        if (EnterNode(ResumeNodeID, false))
-        {
-            return true;
-        }
-    }
-    const FDialogueNode Start = CurrentDialogue->GetNodeById(0);
-    if (IsNodeAvailable(Start))
-    {
-        for (int32 Link : Start.Links)
-        {
-            if (EnterNode(Link, true))
+            if (Session)
             {
-                return true;
+                const FGuid Id = Session->GetPersistentPlayerId();
+                const FDialogueResumeData Resume = Session->CaptureResume();
+                if (Id.IsValid() && !Resume.DialogueAsset.IsNull() && Resume.NodeID >= 0) SavedDialogue.PlayerSessions.Add(Id, Resume);
             }
+            if (Session) Retiring.Emplace(Session);
+            Sessions.RemoveAt(Index);
         }
     }
-    EndDialogue();
-    return false;
-}
-
-bool UDialogueModule::EnterNode(int32 InNodeID, bool bRunEvents)
-{
-    if (!CurrentDialogue || bSelectingNode || bNetworkPresentation)
-    {
-        return false;
-    }
-    const FDialogueNode Node = CurrentDialogue->GetNodeById(InNodeID);
-    if (Node.id < 0 || (bRunEvents && !IsNodeAvailable(Node)))
-    {
-        return false;
-    }
-    TGuardValue<bool> Guard(bSelectingNode, true);
-    CurrentNodeID = InNodeID;
-    UDialogueAsset* Dialogue = CurrentDialogue;
-    if (bRunEvents)
-    {
-        for (UDialogueEventBase* Event : Node.Events)
-        {
-            if (Event)
-            {
-                Event->ReceiveEventTriggered(ConsideringPlayer, NPCActor);
-            }
-            if (CurrentDialogue != Dialogue)
-            {
-                return true;
-            }
-        }
-    }
-    if (Node.isPlayer && GetAvailableNodes().IsEmpty())
-    {
-        EndDialogue();
-        return true;
-    }
-    OnDialogueChanged.Broadcast();
-    return true;
-}
-
-bool UDialogueModule::SelectDialogueNode(int32 InNodeID)
-{
-    if (HasNetworkBridge())
-    {
-        return bNetworkPresentation && GetCurrentNode().Links.Contains(InNodeID) && NetworkSelect.Execute(InNodeID);
-    }
-    if (!CurrentDialogue || bSelectingNode || !GetCurrentNode().Links.Contains(InNodeID))
-    {
-        return false;
-    }
-    if (!EnterNode(InNodeID, true))
-    {
-        return false;
-    }
-    if (CurrentDialogue && GetCurrentNode().isPlayer)
-    {
-        for (const FDialogueNode& Next : GetAvailableNodes())
-        {
-            if (!Next.isPlayer)
-            {
-                EnterNode(Next.id, true);
-                break;
-            }
-        }
-    }
-    return true;
-}
-
-FDialogueNode UDialogueModule::GetCurrentNode() const
-{
-    return CurrentDialogue ? CurrentDialogue->GetNodeById(CurrentNodeID) : FDialogueNode();
-}
-
-TArray<FDialogueNode> UDialogueModule::GetAvailableNodes() const
-{
-    TArray<FDialogueNode> Nodes;
-    if (CurrentDialogue)
-    {
-        for (int32 Link : GetCurrentNode().Links)
-        {
-            const FDialogueNode Node = CurrentDialogue->GetNodeById(Link);
-            if (IsNodeAvailable(Node))
-            {
-                Nodes.Add(Node);
-            }
-        }
-    }
-    return Nodes;
-}
-
-TArray<FDialogueNode> UDialogueModule::GetAvailableChoices() const
-{
-    return GetAvailableNodes().FilterByPredicate([](const FDialogueNode& Node)
-    {
-        return Node.isPlayer;
-    });
-}
-
-bool UDialogueModule::ContinueDialogue()
-{
-    if (HasNetworkBridge())
-    {
-        return bNetworkPresentation && NetworkContinue.Execute();
-    }
-    if (!CurrentDialogue || bSelectingNode || !GetAvailableChoices().IsEmpty())
-    {
-        return false;
-    }
-    for (const FDialogueNode& Node : GetAvailableNodes())
-    {
-        if (!Node.isPlayer)
-        {
-            return SelectDialogueNode(Node.id);
-        }
-    }
-    EndDialogue();
-    return true;
-}
-
-void UDialogueModule::EndDialogue()
-{
-    if (HasNetworkBridge())
-    {
-        NetworkEnd.Execute();
-        ClearNetworkPresentation();
-        return;
-    }
-    if (bNetworkPresentation)
-    {
-        ClearNetworkPresentation();
-        return;
-    }
-    const bool bWasActive = CurrentDialogue != nullptr;
-    if (NPCActor)
-    {
-        NPCActor->OnDestroyed.RemoveDynamic(this, &UDialogueModule::OnParticipantDestroyed);
-    }
-    if (ConsideringPlayer && ConsideringPlayer->GetPawn())
-    {
-        ConsideringPlayer->GetPawn()->OnDestroyed.RemoveDynamic(this, &UDialogueModule::OnParticipantDestroyed);
-    }
-    SavedDialogue = FDialogueModuleSaveData();
-    if (CurrentDialogue)
-    {
-        CurrentDialogue->CleanOuter();
-    }
-    CurrentDialogue = nullptr;
-    SourceDialogue = nullptr;
-    CurrentNodeID = INDEX_NONE;
-    ConsideringPlayer = nullptr;
-    NPCActor = nullptr;
-    if (Interaction.IsValid())
-    {
-        Interaction->OnInteractionCancelled.RemoveDynamic(this, &UDialogueModule::EndDialogue);
-        Interaction->EndInteraction(this);
-    }
-    Interaction.Reset();
-    if (bWasActive)
-    {
-        OnDialogueEnded.Broadcast();
-        OnDialogueChanged.Broadcast();
-    }
-}
-
-void UDialogueModule::OnParticipantDestroyed(AActor* InActor)
-{
-    EndDialogue();
+    for (const TWeakObjectPtr<UDialogueSession>& Session : Retiring) if (Session.IsValid()) Session->Shutdown();
 }
 
 void UDialogueModule::OnTermination(EPhase InPhase)
 {
-    Super::OnTermination(InPhase);
     if (PHASEC(InPhase, EPhase::Final))
     {
-        EndDialogue();
+		bShuttingDown = true;
+        TArray<TWeakObjectPtr<UDialogueSession>> Previous;
+        for (UDialogueSession* Session : Sessions) if (Session) Previous.Emplace(Session);
+        Sessions.Reset();
+        for (const TWeakObjectPtr<UDialogueSession>& Session : Previous) if (Session.IsValid()) Session->Shutdown();
+        SavedDialogue = {};
     }
+    Super::OnTermination(InPhase);
 }
 
 void UDialogueModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-    if (HasNetworkBridge() || !GetWorld() || GetWorld()->GetNetMode() != NM_Standalone)
+    if (!GetWorld() || GetWorld()->GetNetMode() != NM_Standalone || !PHASEC(InPhase, EPhase::Primary)) return;
+    const FDialogueModuleSaveData& Data = InSaveData.GetRef<FDialogueModuleSaveData>();
+    if (!Data.IsSaved()) return;
+    SavedDialogue = Data;
+
+    TArray<TWeakObjectPtr<UDialogueSession>> Previous;
+    for (UDialogueSession* Session : Sessions) if (Session) Previous.Emplace(Session);
+    for (const TWeakObjectPtr<UDialogueSession>& Entry : Previous)
     {
-        return;
-    }
-    if (InSaveData.GetRef<FDialogueModuleSaveData>().IsSaved() && PHASEC(InPhase, EPhase::Primary))
-    {
-        EndDialogue();
-        SavedDialogue = InSaveData.GetRef<FDialogueModuleSaveData>();
+        UDialogueSession* Session = Entry.Get();
+        if (!Session || !Sessions.Contains(Session)) continue;
+        Session->EndDialogue();
+        if (!Sessions.Contains(Session) || bShuttingDown) continue;
+        if (FDialogueResumeData* Resume = SavedDialogue.PlayerSessions.Find(Session->GetPersistentPlayerId()))
+        {
+            Session->RestoreResume(*Resume);
+            SavedDialogue.PlayerSessions.Remove(Session->GetPersistentPlayerId());
+        }
     }
 }
 
 void UDialogueModule::UnloadData(EPhase InPhase)
 {
-    if (PHASEC(InPhase, EPhase::Primary))
-    {
-        EndDialogue();
-        SavedDialogue = FDialogueModuleSaveData();
-    }
+    if (!PHASEC(InPhase, EPhase::Primary)) return;
+    SavedDialogue = {};
+
+    TArray<TWeakObjectPtr<UDialogueSession>> Previous;
+    for (UDialogueSession* Session : Sessions) if (Session) Previous.Emplace(Session);
+    for (const TWeakObjectPtr<UDialogueSession>& Session : Previous)
+        if (Session.IsValid() && Sessions.Contains(Session.Get())) Session->EndDialogue();
 }
 
 FParameter UDialogueModule::ToData()
 {
-    if (HasNetworkBridge() || bNetworkPresentation || !GetWorld() || GetWorld()->GetNetMode() != NM_Standalone)
+    FDialogueModuleSaveData Result = SavedDialogue;
+    if (!GetWorld() || GetWorld()->GetNetMode() != NM_Standalone) return FParameter(FDialogueModuleSaveData());
+    for (const UDialogueSession* Session : Sessions)
     {
-        return FParameter(FDialogueModuleSaveData());
+        if (!Session) continue;
+        const FDialogueResumeData Resume = Session->CaptureResume();
+        if (!Resume.DialogueAsset.IsNull() && Resume.NodeID >= 0)
+        {
+            if (Session->GetPersistentPlayerId().IsValid()) Result.PlayerSessions.Add(Session->GetPersistentPlayerId(), Resume);
+            else UE_LOG(LogTemp, Error, TEXT("Active dialogue lacks a stable player identity and cannot be persisted."));
+        }
     }
-    if (CurrentDialogue)
-    {
-        SavedDialogue.DialogueAsset = SourceDialogue;
-        SavedDialogue.NodeID = CurrentNodeID;
-    }
-    return FParameter(SavedDialogue);
+    return FParameter(MoveTemp(Result));
 }

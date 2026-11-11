@@ -2,6 +2,8 @@
 
 #pragma once
 #include "Camera/Mode/CameraModeBase.h"
+#include "Camera/CameraViewTypes.h"
+#include "Camera/CameraConfigTypes.h"
 
 #include "Step/StepModuleTypes.h"
 #include "Debug/DebugModuleTypes.h"
@@ -15,6 +17,8 @@ class ACameraShotAnchor;
 class UCameraModeBase;
 class UStepRuntime;
 class UStepModule;
+class APlayerController;
+class ACameraManagerBase;
 
 /**
  * 步骤基类
@@ -230,11 +234,18 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
 	bool bRestoreDefaultCameraOnLeave;
 
-	FCameraConfigOverrideHandle CameraOverrideHandle;
+	struct FStepPlayerCameraState
+	{
+		TWeakObjectPtr<ACameraManagerBase> Manager;
+		FCameraConfigOverrideHandle Override;
+	};
+	TMap<TWeakObjectPtr<APlayerController>, FStepPlayerCameraState> PlayerCameras;
+	void ApplyCameraActionForPlayer(APlayerController* InPlayer);
 
 public:
 	UFUNCTION(BlueprintCallable)
 	void ApplyCameraAction();
+	void SyncPlayerCameraActions();
 	/**
 	 * 获取操作目标
 	 */

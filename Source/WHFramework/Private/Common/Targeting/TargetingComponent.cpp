@@ -1,6 +1,8 @@
 // Copyright 2018-2021 Mickael Daniel. All Rights Reserved.
 
 #include "Common/Targeting/TargetingComponent.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
+#include "Widget/WorldWidgetTypes.h"
 
 #include "Common/Targeting/TargetingAgentInterface.h"
 #include "EngineUtils.h"
@@ -9,7 +11,9 @@
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "TimerManager.h"
 #include "Widget/WidgetModuleStatics.h"
+#include "Widget/World/WorldWidgetBase.h"
 
 // Sets default values for this component's properties
 UTargetingComponent::UTargetingComponent(const FObjectInitializer& ObjectInitializer)
@@ -17,7 +21,7 @@ UTargetingComponent::UTargetingComponent(const FObjectInitializer& ObjectInitial
 {
 	PrimaryComponentTick.bCanEverTick = true;
 
-	LockedOnWidgetClass = StaticLoadClass(UObject::StaticClass(), nullptr, TEXT("/Script/UMGEditor.WidgetBlueprint'/WHFramework/Common/Blueprints/Widget/WBP_LockOn_Base.WBP_LockOn_Base_C'"));
+	LockedOnWidgetClass = StaticLoadClass(UWorldWidgetBase::StaticClass(), nullptr, TEXT("/WHFramework/Blueprints/Widget/Common/WBP_LockOn_Base.WBP_LockOn_Base_C"));
 	TargetableActors = APawn::StaticClass();
 	TargetableCollisionChannel = ECC_Pawn;
 }
@@ -41,14 +45,29 @@ void UTargetingComponent::BeginPlay()
 	SetupLocalPlayerController();
 }
 
+void UTargetingComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (APlayerController* Controller = LookInputLockOwner.Get()) Controller->SetIgnoreLookInput(false);
+	LookInputLockOwner.Reset();
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(LineOfSightBreakTimerHandle);
+		World->GetTimerManager().ClearTimer(SwitchingTargetTimerHandle);
+	}
+	if (UWorldWidgetBase* Widget = TargetLockedOnWidget)
+	{
+		TargetLockedOnWidget = nullptr;
+		Widget->Destroy(EObjectDespawnMode::Recovery);
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
 void UTargetingComponent::TickComponent(const float DeltaTime, const ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (!bTargetLocked || !LockedOnTargetActor)
-	{
-		return;
-	}
+	if (!bTargetLocked) return;
+	if (!IsValid(LockedOnTargetActor)) { TargetLockOff(); return; }
 
 	if (!TargetIsTargetAble(LockedOnTargetActor))
 	{
@@ -334,7 +353,12 @@ void UTargetingComponent::TargetLockOn(AActor* TargetToLockOn)
 	{
 		if (IsValid(OwnerPlayerController))
 		{
-			OwnerPlayerController->SetIgnoreLookInput(true);
+			if (LookInputLockOwner.Get() != OwnerPlayerController)
+			{
+				if (APlayerController* Previous = LookInputLockOwner.Get()) Previous->SetIgnoreLookInput(false);
+				OwnerPlayerController->SetIgnoreLookInput(true);
+				LookInputLockOwner = OwnerPlayerController;
+			}
 		}
 	}
 
@@ -350,6 +374,8 @@ void UTargetingComponent::TargetLockOff()
 	SetupLocalPlayerController();
 
 	bTargetLocked = false;
+	if (APlayerController* Controller = LookInputLockOwner.Get()) Controller->SetIgnoreLookInput(false);
+	LookInputLockOwner.Reset();
 	if (TargetLockedOnWidget)
 	{
 		TargetLockedOnWidget->Destroy(EObjectDespawnMode::Recovery);
@@ -361,11 +387,6 @@ void UTargetingComponent::TargetLockOff()
 		if (bShouldControlRotation)
 		{
 			ControlRotation(false);
-		}
-
-		if (IsValid(OwnerPlayerController))
-		{
-			OwnerPlayerController->ResetIgnoreLookInput();
 		}
 
 		if (OnTargetLockOff.IsBound())
@@ -393,13 +414,18 @@ void UTargetingComponent::CreateAndAttachTargetLockedOnWidgetComponent(AActor* T
 	UMeshComponent* MeshComponent = TargetActor->FindComponentByClass<UMeshComponent>();
 	USceneComponent* ParentComponent = MeshComponent && LockedOnWidgetParentSocket != NAME_None ? MeshComponent : TargetActor->GetRootComponent();
 
-	TargetLockedOnWidget = UWidgetModuleStatics::CreateWorldWidget(
+	if (!OwnerPlayerController || !OwnerPlayerController->IsLocalController()) return;
+	UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld());
+	if (!Widgets) return;
+	FWidgetSpawnParameter Spawn(TargetActor);
+	Spawn.OwningPlayer = OwnerPlayerController;
+	TargetLockedOnWidget = Widgets->CreateWorldWidget(
 		LockedOnWidgetClass,
 		FWorldWidgetMapping(
 			ParentComponent,
 			LockedOnWidgetParentSocket,
 			LockedOnWidgetRelativeLocation),
-		FWidgetSpawnParameter(TargetActor));
+		Spawn);
 }
 
 TArray<AActor*> UTargetingComponent::GetAllActorsOfClass(const TSubclassOf<AActor> ActorClass) const

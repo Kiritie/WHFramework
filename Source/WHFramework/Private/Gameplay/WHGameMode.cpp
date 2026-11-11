@@ -10,6 +10,8 @@
 #include "Gameplay/WHPlayerState.h"
 #include "Main/MainModule.h"
 #include "Widget/WidgetModuleStatics.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
+#include "Slate/SlateWidgetManager.h"
 
 AWHGameMode::AWHGameMode()
 {
@@ -53,7 +55,18 @@ bool AWHGameMode::ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObjec
 {
 	if(FPlatformString::Stricmp(Cmd, TEXT("WH.Debug")) == 0)
 	{
-		UWidgetModuleStatics::ToggleSlateWidget<SDebugPanelWidget>(true);
+		FSlateWidgetManager* Widgets = FSlateWidgetManager::GetPtr();
+		if (!Widgets || !GetWorld()) return true;
+		TSharedPtr<SDebugPanelWidget> Panel = Widgets->GetSlateWidget<SDebugPanelWidget>();
+		if (Panel && Panel->GetPanelWorld() != GetWorld())
+		{
+			Widgets->DestroySlateWidget<SDebugPanelWidget>();
+			Panel.Reset();
+		}
+		const FParameter Param{FWidgetSpawnParameter(GetWorld())};
+		if (!Panel) Panel = Widgets->CreateSlateWidget<SDebugPanelWidget>(Param);
+		if (Panel && Panel->IsWidgetOpened()) Widgets->CloseSlateWidget<SDebugPanelWidget>(true);
+		else if (Panel) Widgets->OpenSlateWidget<SDebugPanelWidget>(Param, true);
 		return true;
 	}
 	return Super::ProcessConsoleExec(Cmd, Ar, Executor);
@@ -117,6 +130,11 @@ void AWHGameMode::BeginPlay()
 
 void AWHGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (FSlateWidgetManager* Widgets = FSlateWidgetManager::GetPtr())
+	{
+		const TSharedPtr<SDebugPanelWidget> Panel = Widgets->GetSlateWidget<SDebugPanelWidget>();
+		if (Panel && Panel->GetPanelWorld() == GetWorld()) Widgets->DestroySlateWidget<SDebugPanelWidget>();
+	}
 	Super::EndPlay(EndPlayReason);
 
 	if(Execute_IsUseDefaultLifecycle(this))

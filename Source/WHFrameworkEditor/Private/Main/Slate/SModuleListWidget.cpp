@@ -13,6 +13,7 @@
 #include "Main/Slate/SModuleDetailsWidget.h"
 #include "Main/Slate/SModuleEditorWidget.h"
 #include "Main/Slate/SModuleListItemWidget.h"
+#include "ScopedTransaction.h"
 #include "Widgets/Input/SSearchBox.h"
 
 BEGIN_SLATE_FUNCTION_BUILD_OPTIMIZATION
@@ -333,8 +334,6 @@ void SModuleListWidget::OnInitialize()
 {
 	SEditorWidgetBase::OnInitialize();
 
-	GenerateRequireModules();
-
 	SetIsDefaults(bDefaults);
 	SetIsEditing(bEditing);
 
@@ -374,11 +373,12 @@ FReply SModuleListWidget::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent
 
 UModuleBase* SModuleListWidget::GenerateModule(TSubclassOf<UModuleBase> InClass)
 {
-	UModuleBase* NewModule = NewObject<UModuleBase>(GetParentWidgetN<SModuleEditorWidget>()->MainModule, InClass, NAME_None);
+	UModuleBase* NewModule = NewObject<UModuleBase>(GetParentWidgetN<SModuleEditorWidget>()->MainModule, InClass, NAME_None, RF_Transactional);
 
 	// NewModule->ModuleName = *CurrentModuleClass->GetName().Replace(TEXT("Module_"), TEXT(""));
 	// NewModule->ModuleDisplayName = FText::FromName(NewModule->ModuleName);
 
+	NewModule->Modify();
 	NewModule->OnGenerate();
 
 	return NewModule;
@@ -394,31 +394,6 @@ UModuleBase* SModuleListWidget::DuplicateModule(UModuleBase* InModule)
 	NewModule->OnGenerate();
 
 	return NewModule;
-}
-
-void SModuleListWidget::GenerateRequireModules()
-{
-	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule) return;
-
-	bool bModify = false;
-	
-	for (auto Iter : GetUnAddedModuleClasses())
-	{
-		if(Iter->GetDefaultObject<UModuleBase>()->IsModuleRequired())
-		{
-			UModuleBase* NewModule = GenerateModule(Iter);
-
-			GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Add(NewModule);
-			GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Add(NewModule->GetModuleName(), NewModule);
-
-			bModify = true;
-		}
-	}
-
-	if(bModify)
-	{
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
-	}
 }
 
 TSharedRef<SWidget> SModuleListWidget::GenerateClassPicker()
@@ -450,18 +425,28 @@ void SModuleListWidget::OnClassPicked(UClass* InClass)
 	{
 		if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to change selected module class?"))) == EAppReturnType::Yes)
 		{
+			FScopedTransaction Transaction(NSLOCTEXT("MainModule", "ReplaceModule", "Replace Module"));
 			UModuleBase* OldModule = SelectedModuleListItems[0]->Module;
 			UModuleBase* NewModule = GenerateModule(InClass);
 
 			if(NewModule && OldModule)
 			{
 				FCoreStatics::ExportPropertiesToObject(OldModule, NewModule);
-				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules()[OldModule->GetModuleIndex()] = NewModule;
-				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Emplace(OldModule->GetModuleName(), NewModule);
-				OldModule->OnDestroy();
+				if (GetParentWidgetN<SModuleEditorWidget>()->MainModule->ReplaceModule(OldModule->GetModuleName(), NewModule))
+				{
+					OldModule->Modify();
+					OldModule->OnDestroy();
+				}
+				else
+				{
+					NewModule->OnDestroy();
+					Transaction.Cancel();
+				}
 			}
-
-			GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
+			else
+			{
+				Transaction.Cancel();
+			}
 			
 			UpdateListView();
 
@@ -677,7 +662,9 @@ FReply SModuleListWidget::OnNewModuleClassButtonClicked()
 
 FReply SModuleListWidget::OnAddModuleItemButtonClicked()
 {
-	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule) return FReply::Handled();
+	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule || !SelectedModuleClass) return FReply::Handled();
+	FScopedTransaction Transaction(NSLOCTEXT("MainModule", "AddModule", "Add Module"));
+	bool bAdded = false;
 
 	TArray<FName> ModuleNames;
 	const FName ModuleName = SelectedModuleClass->GetDefaultObject<UModuleBase>()->GetModuleName();
@@ -693,8 +680,8 @@ FReply SModuleListWidget::OnAddModuleItemButtonClicked()
 				const auto Item = MakeShared<FModuleListItem>();
 				Item->Module = NewModule;
 
-				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Add(NewModule);
-				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Add(NewModule->GetModuleName(), NewModule);
+				if (!GetParentWidgetN<SModuleEditorWidget>()->MainModule->RegisterModule(NewModule)) { NewModule->OnDestroy(); continue; }
+				bAdded = true;
 				ModuleListItems.Add(Item);
 
 				if(ModuleNames[0] == ModuleName)
@@ -707,9 +694,8 @@ FReply SModuleListWidget::OnAddModuleItemButtonClicked()
 		}
 		ModuleNames.RemoveAt(0);
 	}
+	if (!bAdded) Transaction.Cancel();
 
-	GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
-	
 	SelectedModuleClass = nullptr;
 
 	UpdateListView();
@@ -720,24 +706,27 @@ FReply SModuleListWidget::OnAddModuleItemButtonClicked()
 FReply SModuleListWidget::OnAddAllModuleItemButtonClicked()
 {
 	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule) return FReply::Handled();
+	const TArray<UClass*> Classes = GetUnAddedModuleClasses();
+	if (Classes.IsEmpty()) return FReply::Handled();
+	FScopedTransaction Transaction(NSLOCTEXT("MainModule", "AddAllModules", "Add Modules"));
+	bool bAdded = false;
 
-	for (auto Iter : GetUnAddedModuleClasses())
+	for (auto Iter : Classes)
 	{
 		UModuleBase* NewModule = GenerateModule(Iter);
 
 		const auto Item = MakeShared<FModuleListItem>();
 		Item->Module = NewModule;
 
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Add(NewModule);
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Add(NewModule->GetModuleName(), NewModule);
+		if (!GetParentWidgetN<SModuleEditorWidget>()->MainModule->RegisterModule(NewModule)) { NewModule->OnDestroy(); continue; }
+		bAdded = true;
 		ModuleListItems.Add(Item);
 	}
+	if (!bAdded) Transaction.Cancel();
 
 	SelectedModuleClass = nullptr;
 
 	UpdateListView();
-
-	GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
 
 	return FReply::Handled();
 }
@@ -746,8 +735,10 @@ FReply SModuleListWidget::OnInsertModuleItemButtonClicked()
 {
 	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule) return FReply::Handled();
 
-	if(SelectedModuleListItems.Num() > 0)
+	if(SelectedModuleClass && SelectedModuleListItems.Num() > 0)
 	{
+		FScopedTransaction Transaction(NSLOCTEXT("MainModule", "InsertModule", "Insert Module"));
+		bool bAdded = false;
 		TArray<FName> ModuleNames;
 		const FName ModuleName = SelectedModuleClass->GetDefaultObject<UModuleBase>()->GetModuleName();
 		ModuleNames.Add(ModuleName);
@@ -763,8 +754,8 @@ FReply SModuleListWidget::OnInsertModuleItemButtonClicked()
 					const auto Item = MakeShared<FModuleListItem>();
 					Item->Module = NewModule;
 
-					GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Insert(NewModule, ModuleIndex);
-					GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Add(NewModule->GetModuleName(), NewModule);
+					if (!GetParentWidgetN<SModuleEditorWidget>()->MainModule->RegisterModule(NewModule, ModuleIndex)) { NewModule->OnDestroy(); continue; }
+					bAdded = true;
 					ModuleListItems.Insert(Item, ModuleIndex);
 
 					ModuleIndex++;
@@ -779,8 +770,7 @@ FReply SModuleListWidget::OnInsertModuleItemButtonClicked()
 			}
 			ModuleNames.RemoveAt(0);
 		}
-
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
+		if (!bAdded) Transaction.Cancel();
 
 		SelectedModuleClass = nullptr;
 
@@ -794,8 +784,10 @@ FReply SModuleListWidget::OnAppendModuleItemButtonClicked()
 {
 	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule) return FReply::Handled();
 
-	if(SelectedModuleListItems.Num() > 0)
+	if(SelectedModuleClass && SelectedModuleListItems.Num() > 0)
 	{
+		FScopedTransaction Transaction(NSLOCTEXT("MainModule", "AppendModule", "Append Module"));
+		bool bAdded = false;
 		TArray<FName> ModuleNames;
 		const FName ModuleName = SelectedModuleClass->GetDefaultObject<UModuleBase>()->GetModuleName();
 		ModuleNames.Add(ModuleName);
@@ -811,8 +803,8 @@ FReply SModuleListWidget::OnAppendModuleItemButtonClicked()
 					const auto Item = MakeShared<FModuleListItem>();
 					Item->Module = NewModule;
 
-					GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Insert(NewModule, ModuleIndex);
-					GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Add(NewModule->GetModuleName(), NewModule);
+					if (!GetParentWidgetN<SModuleEditorWidget>()->MainModule->RegisterModule(NewModule, ModuleIndex)) { NewModule->OnDestroy(); continue; }
+					bAdded = true;
 					ModuleListItems.Insert(Item, ModuleIndex);
 
 					ModuleIndex++;
@@ -827,8 +819,7 @@ FReply SModuleListWidget::OnAppendModuleItemButtonClicked()
 			}
 			ModuleNames.RemoveAt(0);
 		}
-
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
+		if (!bAdded) Transaction.Cancel();
 
 		SelectedModuleClass = nullptr;
 
@@ -840,7 +831,8 @@ FReply SModuleListWidget::OnAppendModuleItemButtonClicked()
 
 FReply SModuleListWidget::OnRefreshModuleItemButtonClicked()
 {
-	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule) return FReply::Handled();
+	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule || GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().IsEmpty()) return FReply::Handled();
+	const FScopedTransaction Transaction(NSLOCTEXT("MainModule", "GenerateModules", "Generate Modules"));
 
 	GetParentWidgetN<SModuleEditorWidget>()->MainModule->GenerateModules();
 
@@ -855,6 +847,7 @@ FReply SModuleListWidget::OnRemoveModuleItemButtonClicked()
 
 	if(SelectedModuleListItems.Num() > 0)
 	{
+		TUniquePtr<FScopedTransaction> Transaction;
 		for(auto Iter : SelectedModuleListItems)
 		{
 			bool bCanRemove = true;
@@ -874,13 +867,13 @@ FReply SModuleListWidget::OnRemoveModuleItemButtonClicked()
 			}
 			if(bCanRemove)
 			{
-				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules()[Iter->GetModuleIndex()]->OnDestroy();
-				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().RemoveAt(Iter->GetModuleIndex());
-				GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModuleMap().Remove(Iter->Module->GetModuleName());
-				ModuleListItems.RemoveAt(Iter->GetModuleIndex());
+				if (!Transaction) Transaction = MakeUnique<FScopedTransaction>(NSLOCTEXT("MainModule", "RemoveModules", "Remove Modules"));
+				const int32 RemovedIndex = Iter->GetModuleIndex();
+				if (!GetParentWidgetN<SModuleEditorWidget>()->MainModule->UnregisterModule(Iter->Module->GetModuleName())) continue;
+				Iter->Module->Modify();
+				Iter->Module->OnDestroy();
+				ModuleListItems.RemoveAt(RemovedIndex);
 				//ListView->SetSelection(ModuleListItems[FMath::Min(SelectedModuleListItem->GetModuleIndex(),ModuleListItems.Num() - 1)]);
-
-				GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
 			}
 		}
 		UpdateListView();
@@ -894,6 +887,8 @@ FReply SModuleListWidget::OnClearAllModuleItemButtonClicked()
 	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule) return FReply::Handled();
 
 	if(FMessageDialog::Open(EAppMsgType::YesNo, FText::FromString(TEXT("Are you sure to clear all modules?"))) != EAppReturnType::Yes) return FReply::Handled();
+	if (GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().IsEmpty()) return FReply::Handled();
+	const FScopedTransaction Transaction(NSLOCTEXT("MainModule", "ClearModules", "Clear Modules"));
 
 	GetParentWidgetN<SModuleEditorWidget>()->MainModule->DestroyModules();
 
@@ -906,14 +901,13 @@ FReply SModuleListWidget::OnMoveUpModuleItemButtonClicked()
 {
 	if(!GetParentWidgetN<SModuleEditorWidget>()->MainModule || SelectedModuleListItems.Num() == 0 || SelectedModuleListItems[0]->GetModuleIndex() == 0) return FReply::Handled();
 
-	const auto TmpModule = GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules()[SelectedModuleListItems[0]->GetModuleIndex()];
-	GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().RemoveAt(SelectedModuleListItems[0]->GetModuleIndex());
-	GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Insert(TmpModule, SelectedModuleListItems[0]->GetModuleIndex() - 1);
+	const int32 OldIndex = SelectedModuleListItems[0]->GetModuleIndex();
+	const TSharedPtr<FModuleListItem> Item = ModuleListItems[OldIndex];
+	FScopedTransaction Transaction(NSLOCTEXT("MainModule", "MoveModuleUp", "Move Module Up"));
+	if (!GetParentWidgetN<SModuleEditorWidget>()->MainModule->MoveModule(SelectedModuleListItems[0]->Module->GetModuleName(), OldIndex - 1)) { Transaction.Cancel(); return FReply::Handled(); }
 
-	ModuleListItems.RemoveAt(SelectedModuleListItems[0]->GetModuleIndex());
-	ModuleListItems.Insert(SelectedModuleListItems, SelectedModuleListItems[0]->GetModuleIndex() - 1);
-
-	GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
+	ModuleListItems.RemoveAt(OldIndex);
+	ModuleListItems.Insert(Item, OldIndex - 1);
 
 	UpdateListView();
 
@@ -926,14 +920,13 @@ FReply SModuleListWidget::OnMoveDownModuleItemButtonClicked()
 
 	if(SelectedModuleListItems[0]->GetModuleIndex() < GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Num() - 1)
 	{
-		const auto TmpModule = GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules()[SelectedModuleListItems[0]->GetModuleIndex()];
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().RemoveAt(SelectedModuleListItems[0]->GetModuleIndex());
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->GetModules().Insert(TmpModule, SelectedModuleListItems[0]->GetModuleIndex() + 1);
+		const int32 OldIndex = SelectedModuleListItems[0]->GetModuleIndex();
+		const TSharedPtr<FModuleListItem> Item = ModuleListItems[OldIndex];
+		FScopedTransaction Transaction(NSLOCTEXT("MainModule", "MoveModuleDown", "Move Module Down"));
+		if (!GetParentWidgetN<SModuleEditorWidget>()->MainModule->MoveModule(SelectedModuleListItems[0]->Module->GetModuleName(), OldIndex + 1)) { Transaction.Cancel(); return FReply::Handled(); }
 
-		ModuleListItems.RemoveAt(SelectedModuleListItems[0]->GetModuleIndex());
-		ModuleListItems.Insert(SelectedModuleListItems, SelectedModuleListItems[0]->GetModuleIndex() + 1);
-
-		GetParentWidgetN<SModuleEditorWidget>()->MainModule->Modify();
+		ModuleListItems.RemoveAt(OldIndex);
+		ModuleListItems.Insert(Item, OldIndex + 1);
 
 		UpdateListView();
 	}

@@ -24,6 +24,7 @@ class WHFRAMEWORK_API UTargetingComponent : public UActorComponent
 public:
 	// Sets default values for this component's properties
 	UTargetingComponent(const FObjectInitializer& ObjectInitializer);
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	// The minimum distance to enable target locked on.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
@@ -189,6 +190,7 @@ private:
 
 	UPROPERTY()
 	APlayerController* OwnerPlayerController;
+	TWeakObjectPtr<APlayerController> LookInputLockOwner;
 
 	UPROPERTY()
 	UWorldWidgetBase* TargetLockedOnWidget;

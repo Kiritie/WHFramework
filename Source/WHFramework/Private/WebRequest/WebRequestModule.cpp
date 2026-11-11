@@ -2,11 +2,15 @@
 
 
 #include "WebRequest/WebRequestModule.h"
+#include "Common/CommonTypes.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Common/LifecycleTypes.h"
 
 #include "Debug/DebugModuleTypes.h"
 #include "Common/CommonModuleStatics.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "WebRequest/Interface/Base/WebInterfaceBase.h"
+#include "Engine/World.h"
 		
 IMPLEMENTATION_MODULE(UWebRequestModule)
 
@@ -28,7 +32,6 @@ UWebRequestModule::UWebRequestModule()
 
 UWebRequestModule::~UWebRequestModule()
 {
-	TERMINATION_MODULE(UWebRequestModule)
 }
 
 #if WITH_EDITOR
@@ -41,7 +44,6 @@ void UWebRequestModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UWebRequestModule)
 }
 #endif
 
@@ -49,9 +51,8 @@ void UWebRequestModule::OnInitialize()
 {
 	Super::OnInitialize();
 
-	FWebRequestManager::Get().SetLocalMode(bLocalMode);
-	FWebRequestManager::Get().SetServerIP(ServerIP);
-	FWebRequestManager::Get().SetServerPort(ServerPort);
+	bStopping = false;
+	LifecycleEpoch = FGuid::NewGuid();
 
 	for(auto& Iter : WebInterfaces)
 	{
@@ -89,6 +90,9 @@ void UWebRequestModule::OnTermination(EPhase InPhase)
 
 	if(PHASEC(InPhase, EPhase::Primary))
 	{
+		bStopping = true;
+		LifecycleEpoch.Invalidate();
+		ClearAllWebRequestConfig();
 		ClearAllWebInterface();
 	}
 }
@@ -101,31 +105,33 @@ FString UWebRequestModule::GetModuleDebugMessage()
 void UWebRequestModule::SetLocalMode(bool bInLocalMode)
 {
 	bLocalMode = bInLocalMode;
-	FWebRequestManager::Get().SetLocalMode(bLocalMode);
 }
 
 void UWebRequestModule::SetServerIP(const FString& InServerIP)
 {
 	ServerIP = InServerIP;
-	FWebRequestManager::Get().SetServerIP(ServerIP);
 }
 
 void UWebRequestModule::SetServerPort(int32 InServerPort)
 {
 	ServerPort = InServerPort;
-	FWebRequestManager::Get().SetServerPort(ServerPort);
 }
 
 FString UWebRequestModule::GetServerURL() const
 {
-	return FWebRequestManager::Get().GetServerURL();
+	return ServerIP.IsEmpty() || ServerPort <= 0 ? FString() : FString::Printf(TEXT("%s:%d"), *ServerIP, ServerPort);
 }
 
 void UWebRequestModule::SetServerURL(const FString& InServerURL)
 {
-	FWebRequestManager::Get().SetServerURL(InServerURL);
-	ServerIP = FWebRequestManager::Get().GetServerIP();
-	ServerPort = FWebRequestManager::Get().GetServerPort();
+	int32 Separator = INDEX_NONE;
+	if (!InServerURL.FindLastChar(TEXT(':'), Separator) || Separator <= 0 || Separator == InServerURL.Len() - 1) return;
+	const FString PortText = InServerURL.Mid(Separator + 1);
+	if (!PortText.IsNumeric()) return;
+	const int32 Port = FCString::Atoi(*PortText);
+	if (Port <= 0 || Port > 65535) return;
+	ServerIP = InServerURL.Left(Separator);
+	ServerPort = Port;
 }
 
 bool UWebRequestModule::HasWebInterface(const FName InName)
@@ -144,15 +150,22 @@ UWebInterfaceBase* UWebRequestModule::GetWebInterface(const FName InName, TSubcl
 
 UWebInterfaceBase* UWebRequestModule::CreateWebInterface(const FName InName, TSubclassOf<UWebInterfaceBase> InClass)
 {
+	if (bStopping || bClearingInterfaces || !LifecycleEpoch.IsValid() || !InClass) return nullptr;
 	if(!HasWebInterface(InName))
 	{
-		return CreateWebInterface(UObjectPoolModuleStatics::SpawnObject<UWebInterfaceBase>(InClass));
+		UWebInterfaceBase* Interface = UObjectPoolModuleStatics::SpawnObject<UWebInterfaceBase>(this, InClass);
+		if (Interface && Interface->GetNameN() == InName)
+		{
+			if (UWebInterfaceBase* Created = CreateWebInterface(Interface)) return Created;
+		}
+		if (Interface) UObjectPoolModuleStatics::DespawnObject(this, Interface);
 	}
 	return nullptr;
 }
 
 UWebInterfaceBase* UWebRequestModule::CreateWebInterface(UWebInterfaceBase* InWebInterface)
 {
+	if (bStopping || bClearingInterfaces || !LifecycleEpoch.IsValid() || !::IsValid(InWebInterface) || InWebInterface->GetWorld() != GetWorld()) return nullptr;
 	if(!HasWebInterface(InWebInterface->GetNameN()))
 	{
 		WebInterfaceMap.Add(InWebInterface->GetNameN(), InWebInterface);
@@ -213,10 +226,17 @@ bool UWebRequestModule::ClearWebInterface(const FName InName)
 {
 	if(UWebInterfaceBase* WebInterface = GetWebInterface(InName))
 	{
+		TArray<FGuid> ToCancel;
+		for (const auto& Entry : OwnedRequests) if (Entry.Value == InName) ToCancel.Add(Entry.Key);
+		for (const FGuid& RequestId : ToCancel)
+		{
+			OwnedRequests.Remove(RequestId);
+			if (FWebRequestManager* Manager = FWebRequestManager::GetPtr()) Manager->CancelWebRequest(RequestId);
+		}
 		WebInterfaceMap.Remove(InName);
-		UObjectPoolModuleStatics::DespawnObject(WebInterface);
+		UObjectPoolModuleStatics::DespawnObject(this, WebInterface);
 
-		WHLog(FString::Printf(TEXT("Succeeded to clear the interface: %s"), *WebInterface->GetNameN().ToString()), EDC_WebRequest);
+		WHLog(FString::Printf(TEXT("Succeeded to clear the interface: %s"), *InName.ToString()), EDC_WebRequest);
 		
 		return true;
 	}
@@ -225,10 +245,16 @@ bool UWebRequestModule::ClearWebInterface(const FName InName)
 
 void UWebRequestModule::ClearAllWebInterface()
 {
-	for(auto Iter : WebInterfaceMap)
-	{
-		UObjectPoolModuleStatics::DespawnObject(Iter.Value);
-	}
+	if (bClearingInterfaces) return;
+	const TGuardValue<bool> Guard(bClearingInterfaces, true);
+	TArray<FName> Names;
+	WebInterfaceMap.GetKeys(Names);
+	for (const FName Name : Names) ClearWebInterface(Name);
+	TArray<FGuid> RemainingRequests;
+	OwnedRequests.GetKeys(RemainingRequests);
+	OwnedRequests.Reset();
+	if (FWebRequestManager* Manager = FWebRequestManager::GetPtr())
+		for (const FGuid& RequestId : RemainingRequests) Manager->CancelWebRequest(RequestId);
 	WebInterfaceMap.Empty();
 }
 
@@ -253,39 +279,38 @@ FWebRequestConfig UWebRequestModule::CreateWebRequestConfig(const FName InName, 
 
 FWebRequestConfig UWebRequestModule::CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
 {
+	UWorld* World = GetWorld();
+	if (bStopping || !LifecycleEpoch.IsValid() || !World || World->bIsTearingDown || InName.IsNone() || HasWebRequestConfig(InName) ||
+		(InTriggerType == EWebRequestTriggerType::Timer && (!FMath::IsFinite(InTriggerTime) || InTriggerTime <= 0.f))) return FWebRequestConfig();
+
 	FWebRequestConfig Config;
-	if(!HasWebRequestConfig(InName))
+	Config.Name = InName;
+	Config.Method = InMethod;
+	Config.Params = InParams;
+	Config.HeadMap = InHeadMap;
+	Config.Content = InContent;
+	Config.TriggerType = InTriggerType;
+	Config.TriggerTime = InTriggerTime;
+	const FGuid Generation = FGuid::NewGuid();
+	ConfigGenerations.Add(InName, Generation);
+	WebRequestConfigMap.Add(InName, Config);
+	const TWeakObjectPtr<UWebRequestModule> WeakOwner(this);
+	const FGuid OriginalLifecycle = LifecycleEpoch;
+	const FTimerDelegate Trigger = FTimerDelegate::CreateLambda([WeakOwner, OriginalLifecycle, Generation, InName]()
 	{
-		Config.Name = InName;
-		Config.Method = InMethod;
-		Config.Params = InParams;
-		Config.HeadMap = InHeadMap;
-		Config.Content = InContent;
-		Config.TriggerType = InTriggerType;
-		Config.TriggerTime = InTriggerTime;
-
-		switch(Config.TriggerType)
-		{
-			case EWebRequestTriggerType::Timer:
-			{
-				GetWorld()->GetTimerManager().SetTimer(Config.TriggerTimerHandle, FTimerDelegate::CreateLambda([this, Config]()
-				{
-					SendWebRequest(Config.Name, Config.Method, Config.Params, Config.HeadMap, Config.Content);
-				}), Config.TriggerTime, true);
-			}
-			case EWebRequestTriggerType::Default:
-			{
-				GetWorld()->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateLambda([this, Config]()
-				{
-					SendWebRequest(Config.Name, Config.Method, Config.Params, Config.HeadMap, Config.Content);
-				}));
-				break;
-			}
-			default: break;
-		}
-
-		WebRequestConfigMap.Add(Config.Name, Config);
-	}
+		UWebRequestModule* Owner = WeakOwner.Get();
+		if (!Owner || Owner->bStopping || Owner->LifecycleEpoch != OriginalLifecycle ||
+			Owner->ConfigGenerations.FindRef(InName) != Generation) return;
+		const FWebRequestConfig* Found = Owner->WebRequestConfigMap.Find(InName);
+		if (!Found) return;
+		const FWebRequestConfig Snapshot = *Found;
+		Owner->SendWebRequest(Snapshot.Name, Snapshot.Method, Snapshot.Params, Snapshot.HeadMap, Snapshot.Content);
+	});
+	if (InTriggerType == EWebRequestTriggerType::Timer)
+		World->GetTimerManager().SetTimer(Config.TriggerTimerHandle, Trigger, InTriggerTime, true);
+	else if (InTriggerType == EWebRequestTriggerType::Default)
+		Config.TriggerTimerHandle = World->GetTimerManager().SetTimerForNextTick(Trigger);
+	if (FWebRequestConfig* Stored = WebRequestConfigMap.Find(InName)) Stored->TriggerTimerHandle = Config.TriggerTimerHandle;
 	return Config;
 }
 
@@ -296,25 +321,19 @@ FWebRequestConfig UWebRequestModule::K2_CreateWebRequestConfig(const FName InNam
 
 bool UWebRequestModule::ClearWebRequestConfig(const FName InName)
 {
-	if(HasWebRequestConfig(InName))
-	{
-		FWebRequestConfig& Config = WebRequestConfigMap[InName];
-		if(Config.TriggerType == EWebRequestTriggerType::Timer)
-		{
-			GetWorld()->GetTimerManager().ClearTimer(Config.TriggerTimerHandle);
-		}
-		WebRequestConfigMap.Remove(InName);
-		return true;
-	}
-	return false;
+	FWebRequestConfig Config;
+	if (!WebRequestConfigMap.RemoveAndCopyValue(InName, Config)) return false;
+	ConfigGenerations.Remove(InName);
+	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(Config.TriggerTimerHandle);
+	return true;
 }
 
 void UWebRequestModule::ClearAllWebRequestConfig()
 {
-	for(auto& Iter : WebRequestConfigMap)
-	{
-		ClearWebRequestConfig(Iter.Key);
-	}
+	TArray<FName> Names;
+	WebRequestConfigMap.GetKeys(Names);
+	for (const FName Name : Names) ClearWebRequestConfig(Name);
+	ConfigGenerations.Empty();
 }
 
 bool UWebRequestModule::SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent)
@@ -324,15 +343,31 @@ bool UWebRequestModule::SendWebRequest(const FName InName, EWebRequestMethod InM
 
 bool UWebRequestModule::SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
+	if (bStopping || bClearingInterfaces || !LifecycleEpoch.IsValid() || !GetWorld() || GetWorld()->bIsTearingDown) return false;
 	if(UWebInterfaceBase* WebInterface = GetWebInterface(InName))
 	{
-		return FWebRequestManager::Get().SendWebRequest(WebInterface->GetFullUrl(), InMethod, InHeadMap, InContent, [this, WebInterface, InContent, InParams](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
-		{
-			if(UCommonModuleStatics::IsPlaying())
-			{
-				OnWebRequestComplete(Request, Response, bSuccess, WebInterface, InContent.ToString(), InParams);
-			}
-		});
+        const TWeakObjectPtr<UWebRequestModule> WeakOwner(this);
+        const TWeakObjectPtr<UWebInterfaceBase> WeakInterface(WebInterface);
+        const FGuid OriginalLifecycle = LifecycleEpoch;
+        const FString FullUrl = WebInterface->GetFullUrl();
+        if (!FullUrl.StartsWith(TEXT("http://"), ESearchCase::IgnoreCase) && !FullUrl.StartsWith(TEXT("https://"), ESearchCase::IgnoreCase)) return false;
+        const FGuid RequestId = FGuid::NewGuid();
+        OwnedRequests.Add(RequestId, InName);
+        const FGuid SubmittedId = FWebRequestManager::Get().SendWebRequest(FullUrl, InMethod, InHeadMap, InContent,
+            [WeakOwner, WeakInterface, OriginalLifecycle, RequestId, InName, InContent, InParams](FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess)
+            {
+                UWebRequestModule* Owner = WeakOwner.Get();
+                UWebInterfaceBase* Interface = WeakInterface.Get();
+                if (!Owner || !Owner->OwnedRequests.Remove(RequestId) || !Interface || Owner->bStopping || Owner->LifecycleEpoch != OriginalLifecycle ||
+                    Owner->GetModuleState() == EModuleState::Terminated || Owner->GetWebInterface(InName) != Interface) return;
+                Owner->OnWebRequestComplete(Request, Response, bSuccess, Interface, InContent.ToString(), InParams);
+            }, RequestId);
+        if (SubmittedId != RequestId)
+        {
+            OwnedRequests.Remove(RequestId);
+            return false;
+        }
+        return true;
 	}
 	else
 	{
@@ -361,5 +396,5 @@ bool UWebRequestModule::SendWebRequestByConfig(const FName InName)
 
 void UWebRequestModule::OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface, const FString InContent, const TArray<FParameter> InParams)
 {
-	InWebInterface->RequestComplete(FWebRequestResult(InContent, bSucceeded, HttpRequest, HttpResponse), InParams);
+	InWebInterface->RequestComplete(FWebRequestResult(InContent, bSucceeded && HttpResponse.IsValid(), HttpRequest, HttpResponse), InParams);
 }

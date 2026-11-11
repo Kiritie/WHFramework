@@ -102,8 +102,8 @@ private:
     bool RemoveLockedDirectory(FString& OutError);
     void SwapState(FInventoryJournal& InOther);
     static bool FoldRecords(FInventoryCheckpoint& InOutCheckpoint, TArray<FInventoryJournalRecord>& InRecords, FString& OutError);
-
     friend struct FInventoryArchiveSnapshot;
+
     friend class FInventoryPreparedStore;
     friend class UInventoryModule;
 };

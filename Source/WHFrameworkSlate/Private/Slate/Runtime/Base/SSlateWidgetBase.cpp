@@ -4,6 +4,7 @@
 #include "Slate/Runtime/Base/SSlateWidgetBase.h"
 #include "SlateOptMacros.h"
 #include "Engine/World.h"
+#include "Engine/GameViewportClient.h"
 #include "Slate/SlateWidgetManager.h"
 #include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 
@@ -124,9 +125,16 @@ void SSlateWidgetBase::OnInitialize(const FParameter& InParam)
 	WidgetParams = InParam;
 }
 
+UGameViewportClient* SSlateWidgetBase::ResolveViewport() const
+{
+	return nullptr;
+}
+
 void SSlateWidgetBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
 	if(WidgetState == EScreenWidgetState::Opening || WidgetState == EScreenWidgetState::Opened) return;
+	UGameViewportClient* Viewport = GetParentWidget() ? nullptr : ResolveViewport();
+	if (!GetParentWidget() && !Viewport) return;
 	
 	WidgetParams = InParam;
 	WidgetState = EScreenWidgetState::Opening;
@@ -134,7 +142,12 @@ void SSlateWidgetBase::OnOpen(const FParameter& InParam, bool bInstant)
 
 	if(!GetParentWidget())
 	{
-		GWorld->GetGameViewport()->AddViewportWidgetContent(SharedThis(this), WidgetZOrder);
+		if (MountedViewport.Get() != Viewport)
+		{
+			if (UGameViewportClient* Previous = MountedViewport.Get()) Previous->RemoveViewportWidgetContent(SharedThis(this));
+			MountedViewport = Viewport;
+			Viewport->AddViewportWidgetContent(SharedThis(this), WidgetZOrder);
+		}
 	}
 
 	SetVisibility(EVisibility::Visible);
@@ -184,10 +197,11 @@ void SSlateWidgetBase::OnRefresh()
 
 void SSlateWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 {
-	if(GWorld->GetGameViewport())
+	if(UGameViewportClient* Viewport = MountedViewport.Get())
 	{
-		GWorld->GetGameViewport()->RemoveViewportWidgetContent(SharedThis(this));
+		Viewport->RemoveViewportWidgetContent(SharedThis(this));
 	}
+	MountedViewport.Reset();
 
 	if(ParentWidget)
 	{
@@ -282,7 +296,8 @@ void SSlateWidgetBase::FinishClose(bool bInstant)
 			{
 				GetLastTemporary()->Open(FParameter());
 			}
-			GWorld->GetGameViewport()->RemoveViewportWidgetContent(SharedThis(this));
+			if (UGameViewportClient* Viewport = MountedViewport.Get()) Viewport->RemoveViewportWidgetContent(SharedThis(this));
+			MountedViewport.Reset();
 		}
 		default: break;
 	}

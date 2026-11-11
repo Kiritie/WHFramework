@@ -29,39 +29,39 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_Health, Category = "VitalityAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_Health, Category = "Attributes|Resources|Health")
 	FGameplayAttributeData Health;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Health)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MaxHealth, Category = "VitalityAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MaxHealth, Category = "Attributes|Resources|Health")
 	FGameplayAttributeData MaxHealth;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MaxHealth)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Transient, Category = "VitalityAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Transient, Category = "Attributes|Execution")
 	FGameplayAttributeData HealthRecovery;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, HealthRecovery)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_HealthRegenSpeed, Category = "VitalityAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_HealthRegenSpeed, Category = "Attributes|Resources|Health")
 	FGameplayAttributeData HealthRegenSpeed;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, HealthRegenSpeed)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Transient, Category = "VitalityAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Transient, Category = "Attributes|Execution")
 	FGameplayAttributeData PhysicsDamage;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, PhysicsDamage)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Transient, Category = "VitalityAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Transient, Category = "Attributes|Execution")
 	FGameplayAttributeData MagicDamage;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, MagicDamage)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Transient, Category = "VitalityAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Transient, Category = "Attributes|Execution")
 	FGameplayAttributeData FallDamage;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, FallDamage)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Transient, Category = "VitalityAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Transient, Category = "Attributes|Execution")
 	FGameplayAttributeData RealDamage;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, RealDamage)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Transient, Category = "VitalityAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Transient, Category = "Attributes|Execution")
 	FGameplayAttributeData Interrupt;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UVitalityAttributeSetBase, Interrupt)
 

@@ -1,66 +1,78 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Pawn/PawnModuleStatics.h"
 
+#include "GameFramework/PlayerController.h"
+#include "Pawn/Base/PawnBase.h"
 #include "Pawn/PawnModule.h"
+#include "Pawn/PawnModuleNetworkComponent.h"
 
-APawnBase* UPawnModuleStatics::GetCurrentPawn()
+APawnBase* UPawnModuleStatics::GetCurrentPawn(APlayerController* Player, TSubclassOf<APawnBase> Class)
 {
-	return UPawnModule::Get().GetCurrentPawn();
+	const UPawnModule* Module = Player ? UPawnModule::GetPtr(Player->GetWorld()) : nullptr;
+	return Module ? Module->GetCurrentPawn(Player, Class) : nullptr;
 }
 
-APawnBase* UPawnModuleStatics::GetCurrentPawn(TSubclassOf<APawnBase> InClass)
+TArray<APawnBase*> UPawnModuleStatics::GetAllPawn(UWorld* World)
 {
-	return UPawnModule::Get().GetCurrentPawn(InClass);
+	const UPawnModule* Module = UPawnModule::GetPtr(World);
+	return Module ? Module->GetAllPawn() : TArray<APawnBase*>();
 }
 
-TArray<APawnBase*> UPawnModuleStatics::GetAllPawn()
+bool UPawnModuleStatics::SwitchPawn(APlayerController* Player, APawnBase* Pawn, bool bResetCamera, bool bInstant)
 {
-	return UPawnModule::Get().GetAllPawn();
+	if (!Player || (Pawn && Pawn->GetWorld() != Player->GetWorld())) return false;
+	if (Player->HasAuthority())
+	{
+		UPawnModule* Module = UPawnModule::GetPtr(Player->GetWorld());
+		return Module && Module->SwitchPawn(Player, Pawn, bResetCamera, bInstant);
+	}
+	UPawnModuleNetworkComponent* Network = Player->IsLocalController() ? Player->FindComponentByClass<UPawnModuleNetworkComponent>() : nullptr;
+	return Network && Network->RequestPawnSwitch(Pawn, bResetCamera, bInstant);
 }
 
-void UPawnModuleStatics::SwitchPawn(APawnBase* InPawn, bool bResetCamera, bool bInstant)
+bool UPawnModuleStatics::SwitchPawnByClass(APlayerController* Player, TSubclassOf<APawnBase> Class, bool bResetCamera, bool bInstant)
 {
-	UPawnModule::Get().SwitchPawn(InPawn, bResetCamera, bInstant);
+	const UPawnModule* Module = Player ? UPawnModule::GetPtr(Player->GetWorld()) : nullptr;
+	APawnBase* Pawn = Module ? Module->GetPawnByClass(Class) : nullptr;
+	return Pawn && SwitchPawn(Player, Pawn, bResetCamera, bInstant);
 }
 
-void UPawnModuleStatics::SwitchPawnByClass(TSubclassOf<APawnBase> InClass, bool bResetCamera, bool bInstant)
+bool UPawnModuleStatics::SwitchPawnByName(APlayerController* Player, FName Name, bool bResetCamera, bool bInstant)
 {
-	UPawnModule::Get().SwitchPawnByClass(InClass, bResetCamera, bInstant);
+	const UPawnModule* Module = Player ? UPawnModule::GetPtr(Player->GetWorld()) : nullptr;
+	APawnBase* Pawn = Module ? Module->GetPawnByName(Name) : nullptr;
+	return Pawn && SwitchPawn(Player, Pawn, bResetCamera, bInstant);
 }
 
-void UPawnModuleStatics::SwitchPawnByName(FName InName, bool bResetCamera, bool bInstant)
+bool UPawnModuleStatics::HasPawnByClass(UWorld* World, TSubclassOf<APawnBase> Class)
 {
-	UPawnModule::Get().SwitchPawnByName(InName, bResetCamera, bInstant);
+	const UPawnModule* Module = UPawnModule::GetPtr(World);
+	return Module && Module->HasPawnByClass(Class);
 }
 
-bool UPawnModuleStatics::HasPawnByClass(TSubclassOf<APawnBase> InClass)
+bool UPawnModuleStatics::HasPawnByName(UWorld* World, FName Name)
 {
-	return UPawnModule::Get().HasPawnByClass(InClass);
+	const UPawnModule* Module = UPawnModule::GetPtr(World);
+	return Module && Module->HasPawnByName(Name);
 }
 
-bool UPawnModuleStatics::HasPawnByName(FName InName)
+APawnBase* UPawnModuleStatics::GetPawnByClass(UWorld* World, TSubclassOf<APawnBase> Class)
 {
-	return UPawnModule::Get().HasPawnByName(InName);
+	const UPawnModule* Module = UPawnModule::GetPtr(World);
+	return Module ? Module->GetPawnByClass(Class) : nullptr;
 }
 
-APawnBase* UPawnModuleStatics::GetPawnByClass(TSubclassOf<APawnBase> InClass)
+APawnBase* UPawnModuleStatics::GetPawnByName(UWorld* World, FName Name)
 {
-	return UPawnModule::Get().GetPawnByClass(InClass);
+	const UPawnModule* Module = UPawnModule::GetPtr(World);
+	return Module ? Module->GetPawnByName(Name) : nullptr;
 }
 
-APawnBase* UPawnModuleStatics::GetPawnByName(FName InName)
+void UPawnModuleStatics::AddPawnToList(APawnBase* Pawn)
 {
-	return UPawnModule::Get().GetPawnByName(InName);
+	if (UPawnModule* Module = Pawn ? UPawnModule::GetPtr(Pawn->GetWorld()) : nullptr) Module->AddPawnToList(Pawn);
 }
 
-void UPawnModuleStatics::AddPawnToList(APawnBase* InPawn)
+void UPawnModuleStatics::RemovePawnFromList(APawnBase* Pawn)
 {
-	UPawnModule::Get().AddPawnToList(InPawn);
-}
-
-void UPawnModuleStatics::RemovePawnFromList(APawnBase* InPawn)
-{
-	UPawnModule::Get().RemovePawnFromList(InPawn);
+	if (UPawnModule* Module = Pawn ? UPawnModule::GetPtr(Pawn->GetWorld()) : nullptr) Module->RemovePawnFromList(Pawn);
 }

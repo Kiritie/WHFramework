@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "Main/Base/ModuleBase.h"
 #include "Input/InputModuleTypes.h"
 
@@ -15,7 +17,8 @@ class UEnhancedInputComponent;
 enum class ECommonInputType : uint8;
 struct FUIInputConfig;
 
-DECLARE_MULTICAST_DELEGATE_TwoParams(FOnInputTypeChanged, int32, ECommonInputType);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnInputTypeChanged, APlayerController*, ECommonInputType);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnInputRuntimeChanged, ULocalPlayer*);
 
 UCLASS()
 class WHFRAMEWORK_API UInputModule : public UModuleBase
@@ -45,6 +48,7 @@ public:
 	virtual void OnReset() override;
 
 	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
+	virtual void OnControlRefresh(float RealDeltaSeconds) override;
 
 	virtual void OnPause() override;
 
@@ -65,10 +69,34 @@ protected:
 
 protected:
 	FInputModuleSaveData LocalSaveData;
+	bool bInputProfilesLoaded = false;
+	FName InputContainerProfile;
 
 	void BuildInputCaches();
 
 	void BuildPlayerRuntimes();
+	void SynchronizePlayerRuntimes();
+	void RemovePlayerRuntime(int32 InIndex);
+	void RefreshPlayerControllerBindings();
+
+public:
+	// Binding a new profile explicitly adopts the current guest settings when no profile exists.
+	// Once bound, a LocalPlayer must be recreated to change identities.
+	UFUNCTION(BlueprintCallable, Category = "Input|Profile")
+	bool BindLocalInputProfile(APlayerController* InPlayer, const FString& InProfileId);
+
+	UFUNCTION(BlueprintPure, Category = "Input|Profile")
+	bool HasPersistentInputProfile(APlayerController* InPlayer) const;
+
+	void ApplyLocalInputProfile(ULocalPlayer* InPlayer, bool bAdoptGuest = false);
+	bool CaptureLocalInputProfile(ULocalPlayer* InPlayer);
+	void InitializeEmptyLocalProfiles();
+	bool PrepareLocalProfileLoad(FName InProfileName);
+	bool CanSaveLocalProfile(FName InProfileName) const { return bInputProfilesLoaded && InputContainerProfile == InProfileName; }
+	bool AreLocalProfilesApplied(FName InProfileName) const;
+	bool TryBindPrimaryInputProfile(APlayerController* InPlayer);
+
+protected:
 
 	void HandleInputMethodChanged(ECommonInputType InInputType, int32 InPlayerIndex);
 
@@ -99,17 +127,28 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetDefaultInputMode(EInputMode InInputMode);
 
+	UFUNCTION(BlueprintCallable)
+	bool SetPlayerDefaultInputMode(APlayerController* InController, EInputMode InInputMode);
+
+	UFUNCTION(BlueprintCallable)
+	bool ResetPlayerDefaultInputMode(APlayerController* InController);
+
+	/** Reset only the input bindings owned by this local controller. */
+	UFUNCTION(BlueprintCallable, Category = "InputModule")
+	bool ResetPlayerBindings(APlayerController* InController);
+
+	/** Resolve an explicit local controller to this World's runtime slot. */
+	int32 FindPlayerRuntimeIndex(APlayerController* InController) const;
+
 	template<class T>
-	T* GetInputBinding(int32 InPlayerIndex = 0) const
+	T* GetInputBinding(int32 InPlayerIndex) const
 	{
 		return Cast<T>(GetInputBinding(T::StaticClass(), InPlayerIndex));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UInputBindingBase* GetInputBinding(TSubclassOf<UInputBindingBase> InClass, int32 InPlayerIndex = 0) const;
+	UInputBindingBase* GetInputBinding(TSubclassOf<UInputBindingBase> InClass, int32 InPlayerIndex) const;
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	UInputBindingBase* GetInputBindingByName(const FName InName, int32 InPlayerIndex = 0, TSubclassOf<UInputBindingBase> InClass = nullptr) const;
+	UInputBindingBase* GetInputBindingByName(const FName InName, int32 InPlayerIndex, TSubclassOf<UInputBindingBase> InClass = nullptr) const;
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Context")
@@ -125,55 +164,48 @@ protected:
 
 	UPROPERTY(Transient)
 	TArray<FInputPlayerRuntime> PlayerRuntimes;
+	bool bPlayerRuntimesReady = false;
+	bool bInputRuntimeClosing = false;
+	bool bSynchronizingPlayerRuntimes = false;
+
+	TMap<TWeakObjectPtr<ULocalPlayer>, EInputMode> PlayerDefaultInputModes;
+	TMap<FName, TSet<FString>> FailedInputProfileCaptures;
 
 public:
 	const TArray<FInputContextConfig>& GetContextConfigs() const { return ContextConfigs; }
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InContextTag"))
-	bool ActivateInputContext(FGameplayTag InContextTag, int32 InPlayerIndex = 0);
+	bool ActivateInputContext(FGameplayTag InContextTag, int32 InPlayerIndex);
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InContextTag"))
-	bool DeactivateInputContext(FGameplayTag InContextTag, int32 InPlayerIndex = 0);
+	bool DeactivateInputContext(FGameplayTag InContextTag, int32 InPlayerIndex);
 
-	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InContextTag"))
-	bool IsInputContextActive(FGameplayTag InContextTag, int32 InPlayerIndex = 0) const;
+	bool IsInputContextActive(FGameplayTag InContextTag, int32 InPlayerIndex) const;
 
-	UFUNCTION(BlueprintPure)
-	TArray<FEnhancedActionKeyMapping> GetAllActionKeyMappings(int32 InPlayerIndex = 0);
+	TArray<FEnhancedActionKeyMapping> GetAllActionKeyMappings(int32 InPlayerIndex);
 
-	UFUNCTION(BlueprintPure)
-	TArray<FName> GetAllActionKeyMappingNames(int32 InPlayerIndex = 0);
+	TArray<FName> GetAllActionKeyMappingNames(int32 InPlayerIndex);
 
-	UFUNCTION(BlueprintPure)
-	TArray<FPlayerKeyMapping> GetAllPlayerKeyMappings(int32 InPlayerIndex = 0);
+	TArray<FPlayerKeyMapping> GetAllPlayerKeyMappings(int32 InPlayerIndex);
 
-	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
-	bool IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey& InKey, int32 InPlayerIndex = 0) const;
+	bool IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey& InKey, int32 InPlayerIndex) const;
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
 	const UInputActionBase* GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured = true) const;
 
-	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InTag"))
-	bool IsInputActionActive(const FGameplayTag& InTag, int32 InPlayerIndex = 0) const;
+	bool IsInputActionActive(const FGameplayTag& InTag, int32 InPlayerIndex) const;
 
-	bool MapPlayerKeyByTag(FGameplayTag InActionTag, FKey InNewKey, EPlayerMappableKeySlot InSlot, int32 InPlayerIndex = 0, FGameplayTagContainer* OutFailureReason = nullptr);
+	bool MapPlayerKeyByTag(FGameplayTag InActionTag, FKey InNewKey, EPlayerMappableKeySlot InSlot, int32 InPlayerIndex, FGameplayTagContainer* OutFailureReason = nullptr);
 
-	bool MapPlayerKeyByMappingName(FName InMappingName, FKey InNewKey, EPlayerMappableKeySlot InSlot, int32 InPlayerIndex = 0, FGameplayTagContainer* OutFailureReason = nullptr);
+	bool MapPlayerKeyByMappingName(FName InMappingName, FKey InNewKey, EPlayerMappableKeySlot InSlot, int32 InPlayerIndex, FGameplayTagContainer* OutFailureReason = nullptr, const UObject* SettingOwner = nullptr);
 
-	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InActionTag"))
-	bool ResetPlayerKeyByTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0);
+	bool ResetPlayerKeyByTag(FGameplayTag InActionTag, int32 InPlayerIndex);
 
-	UFUNCTION(BlueprintCallable)
-	bool ResetPlayerKeyByMappingName(FName InMappingName, int32 InPlayerIndex = 0);
+	bool ResetPlayerKeyByMappingName(FName InMappingName, int32 InPlayerIndex);
 
-	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"))
-	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0) const;
+	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByTag(FGameplayTag InActionTag, int32 InPlayerIndex) const;
 
-	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"))
-	TArray<FKey> GetKeysByActionTag(FGameplayTag InActionTag, int32 InPlayerIndex = 0) const;
+	TArray<FKey> GetKeysByActionTag(FGameplayTag InActionTag, int32 InPlayerIndex) const;
 
-	UFUNCTION(BlueprintPure)
-	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByMappingName(FName InMappingName, int32 InPlayerIndex = 0) const;
+	TArray<FPlayerKeyMapping> GetPlayerKeyMappingsByMappingName(FName InMappingName, int32 InPlayerIndex) const;
 
 	UFUNCTION(BlueprintPure)
 	TArray<FGameplayTag> GetAllMappableActions() const;
@@ -184,17 +216,14 @@ public:
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InActionTag"))
 	TArray<FInputMappableEntry> GetMappableEntriesByActionTag(FGameplayTag InActionTag) const;
 
-	UFUNCTION(BlueprintPure)
-	ECommonInputType GetCurrentInputType(int32 InPlayerIndex = 0) const;
+	ECommonInputType GetCurrentInputType(int32 InPlayerIndex) const;
 
-	UFUNCTION(BlueprintPure)
-	bool IsUsingGamepad(int32 InPlayerIndex = 0) const;
+	bool IsUsingGamepad(int32 InPlayerIndex) const;
 
-	UFUNCTION(BlueprintPure)
-	bool IsUsingMouseAndKeyboard(int32 InPlayerIndex = 0) const;
+	bool IsUsingMouseAndKeyboard(int32 InPlayerIndex) const;
 
-	UFUNCTION(BlueprintPure)
-	bool IsUsingTouch(int32 InPlayerIndex = 0) const;
+	bool IsUsingTouch(int32 InPlayerIndex) const;
 
 	FOnInputTypeChanged OnInputTypeChanged;
+	FOnInputRuntimeChanged OnPlayerRuntimeChanged;
 };

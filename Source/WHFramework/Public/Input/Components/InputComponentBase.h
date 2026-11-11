@@ -32,7 +32,8 @@ public:
 		FuncType InFunction,
 		bool bEnsured = true)
 	{
-		if(const UInputActionBase* InputAction = UInputModule::Get().GetInputActionByTag(InTag, bEnsured))
+		const UInputModule* Input = UInputModule::GetPtr(GetWorld());
+		if(const UInputActionBase* InputAction = Input ? Input->GetInputActionByTag(InTag, bEnsured) : nullptr)
 		{
 			FEnhancedInputActionEventBinding& Binding = BindAction(InputAction, InTriggerEvent, InObject, InFunction);
 			const uint32 Handle = Binding.GetHandle();
@@ -52,7 +53,8 @@ public:
 		const FEnhancedInputActionHandlerDynamicSignature& InDelegate,
 		bool bEnsured = true)
 	{
-		if(const UInputActionBase* InputAction = UInputModule::Get().GetInputActionByTag(InTag, bEnsured))
+		const UInputModule* Input = UInputModule::GetPtr(GetWorld());
+		if(const UInputActionBase* InputAction = Input ? Input->GetInputActionByTag(InTag, bEnsured) : nullptr)
 		{
 			TUniquePtr<FEnhancedInputActionEventDelegateBinding<FEnhancedInputActionHandlerDynamicSignature>> AB =
 				MakeUnique<FEnhancedInputActionEventDelegateBinding<FEnhancedInputActionHandlerDynamicSignature>>(

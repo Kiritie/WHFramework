@@ -2,7 +2,10 @@
 
 #pragma once
 
-#include "AbilityModuleTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "AttributeSet.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "Main/Base/ModuleBase.h"
 #include "Scene/Container/SceneContainerInterface.h"
 

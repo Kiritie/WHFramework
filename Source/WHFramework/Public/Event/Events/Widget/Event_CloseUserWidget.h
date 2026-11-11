@@ -5,6 +5,8 @@
 
 #include "Event_CloseUserWidget.generated.h"
 
+class APlayerController;
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FEventCloseUserWidget : public FEventBase
 {
@@ -13,10 +15,13 @@ struct WHFRAMEWORK_API FEventCloseUserWidget : public FEventBase
 public:
 	FEventCloseUserWidget() = default;
 
-	FEventCloseUserWidget(FGameplayTag InWidgetTag, bool bInInstant)
-		: WidgetTag(InWidgetTag), bInstant(bInInstant)
+	FEventCloseUserWidget(APlayerController* InPlayer, FGameplayTag InWidgetTag, bool bInInstant)
+		: Player(InPlayer), WidgetTag(InWidgetTag), bInstant(bInInstant)
 	{
 	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<APlayerController> Player = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Categories = "Widget.Screen"))
 	FGameplayTag WidgetTag;

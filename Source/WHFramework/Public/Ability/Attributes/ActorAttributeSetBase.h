@@ -30,11 +30,11 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_Exp, Category = "ActorAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_Exp, Category = "Attributes|Progression")
 	FGameplayAttributeData Exp;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UActorAttributeSetBase, Exp)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MaxExp, Category = "ActorAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MaxExp, Category = "Attributes|Progression")
 	FGameplayAttributeData MaxExp;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UActorAttributeSetBase, MaxExp)
 

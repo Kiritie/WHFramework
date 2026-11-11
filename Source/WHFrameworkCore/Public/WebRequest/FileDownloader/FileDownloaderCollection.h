@@ -2,6 +2,7 @@
 
 #pragma once
 #include "FileDownloaderInterface.h"
+#include "Type/NativeTypeIdentity.h"
 
 class FFileDownloader;
 
@@ -47,6 +48,7 @@ public:
 	TArray<FString> IgnoreFiles;
 
 	TArray<TSharedPtr<FFileDownloader>> Downloaders;
+	bool bDestroyed = false;
 
 public:
 	TArray<TSharedPtr<FFileDownloader>> GetAllDownloader() { return Downloaders; }

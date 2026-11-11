@@ -57,11 +57,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSubclassOf<UAbilityBase> AbilityClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AInventoryPickupActor> PickUpClass;
-
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    FInventoryPickupPresentation PickupPresentation;
+    FInventoryMeshData MeshData;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
     TArray<FInventoryPersistentBuffPolicy> ConsumableBuffPolicies;

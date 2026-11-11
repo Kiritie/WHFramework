@@ -86,7 +86,7 @@ USceneModule::USceneModule()
 	WorldMapMinRange = 512.f;
 	WorldMapMaxRange = 3000000.f;
 
-	static ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> MiniMapTexFinder(TEXT("/Script/Engine.TextureRenderTarget2D'/WHFramework/Scene/Textures/Render/RT_MiniMap_Default.RT_MiniMap_Default'"));
+	static ConstructorHelpers::FObjectFinder<UTextureRenderTarget2D> MiniMapTexFinder(TEXT("/Script/Engine.TextureRenderTarget2D'/WHFramework/Textures/Scene/Render/RT_MiniMap_Default.RT_MiniMap_Default'"));
 	if(MiniMapTexFinder.Succeeded())
 	{
 		MiniMapTexture = MiniMapTexFinder.Object;
@@ -120,7 +120,7 @@ USceneModule::USceneModule()
 	WaterPhysicsVolume.PhysicsVolumeClass = APhysicsVolumeBase::StaticClass();
 	DefaultPhysicsVolumes.Add(WaterPhysicsVolume);
 
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> OutlineMatFinder(TEXT("Material'/WHFramework/Scene/Materials/M_PostHigtLight.M_PostHigtLight'"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> OutlineMatFinder(TEXT("Material'/WHFramework/Materials/Scene/M_PostHighlight.M_PostHighlight'"));
 	if(OutlineMatFinder.Succeeded())
 	{
 		OutlineMat = OutlineMatFinder.Object;

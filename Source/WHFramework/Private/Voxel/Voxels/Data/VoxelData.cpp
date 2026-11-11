@@ -10,7 +10,7 @@ bool FVoxelBakedFaceRef::ToRuntime(FVoxelRuntimeFaceRef&O)const
 }
 UVoxelData::UVoxelData()
 {
-    Type=TEXT("Voxel");MaxCount=64;MaxLevel=0;PickUpClass=AInventoryPickupActor::StaticClass();
+    Type=TEXT("Voxel");MaxCount=64;MaxLevel=0;
 }
 void UVoxelData::OnInitialize_Implementation(){Super::OnInitialize_Implementation();}
 void UVoxelData::OnReset_Implementation(){Super::OnReset_Implementation();}

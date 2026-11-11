@@ -4,6 +4,7 @@
 #include "TimerManager.h"
 
 #include "Ability/Inventory/Widget/WidgetAbilityInventoryBase.h"
+#include "Ability/Inventory/Widget/WidgetInventoryPickupIcon.h"
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Components/Overlay.h"
@@ -77,13 +78,42 @@ TSharedRef<SWidget> UWidgetAbilityInventorySlotBase::RebuildWidget()
         StatusSlot->SetHorizontalAlignment(HAlign_Left);
         StatusSlot->SetVerticalAlignment(VAlign_Top);
     }
+    if (IconSize && (!IconFallbackName || !IconFallbackName->GetParent()))
+    {
+        if (UOverlay* Layers = Cast<UOverlay>(IconSize->GetParent()))
+        {
+            if (!IconFallbackName)
+            {
+                IconFallbackName = WidgetTree->ConstructWidget<UCommonTextBlockN>(UCommonTextBlockN::StaticClass(), TEXT("IconFallbackName"));
+            }
+            IconFallbackName->SetAutoWrapText(true);
+            IconFallbackName->SetJustification(ETextJustify::Center);
+            IconFallbackName->SetClipping(EWidgetClipping::ClipToBounds);
+            UOverlaySlot* FallbackSlot = CastChecked<UOverlaySlot>(Layers->InsertChildAt(Layers->GetChildIndex(IconSize) + 1, IconFallbackName));
+            FallbackSlot->SetHorizontalAlignment(HAlign_Fill);
+            FallbackSlot->SetVerticalAlignment(VAlign_Fill);
+            FallbackSlot->SetPadding(FMargin(2.f));
+        }
+    }
     TSharedRef<SWidget> Result = Super::RebuildWidget();
     check(Frame && Icon && IconSize && Count && Status && Cooldown && SelectionMarker && PendingMarker);
+    if (CountStyleTag.IsValid() && Count->GetStyleTag() != CountStyleTag)
+    {
+        Count->SetStyleTag(CountStyleTag);
+    }
+    if (IconFallbackName && CountStyleTag.IsValid() && IconFallbackName->GetStyleTag() != CountStyleTag)
+    {
+        IconFallbackName->SetStyleTag(CountStyleTag);
+    }
     RefreshIconSize();
     Icon->SetStyleTag(FGameplayTag());
     if (!bHasDisplay)
     {
         Icon->SetVisibility(ESlateVisibility::Collapsed);
+        if (IconFallbackName)
+        {
+            IconFallbackName->SetVisibility(ESlateVisibility::Collapsed);
+        }
     }
     RefreshFrame();
     if(bHasDisplay)
@@ -130,7 +160,7 @@ void UWidgetAbilityInventorySlotBase::RefreshIconSize()
 void UWidgetAbilityInventorySlotBase::RefreshSlot(const FInventorySlotState& InState, const FText& InName, UObject* InIcon, const FText& InTooltip)
 {
     DisplayState = InState;
-    DisplayName = InName;
+    DisplayName = !InState.Item.IsEmpty() && InName.IsEmpty() ? FText::FromName(InState.Item.ItemId.PrimaryAssetName) : InName;
     DisplayTooltip = InTooltip;
     DisplayIcon = InIcon;
     bHasDisplay = true;
@@ -138,18 +168,27 @@ void UWidgetAbilityInventorySlotBase::RefreshSlot(const FInventorySlotState& InS
     {
         return;
     }
-    Icon->SetVisibility(InState.Item.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+    bool bHasIcon = false;
     if (UTexture2D* Texture = Cast<UTexture2D>(InIcon))
     {
         Icon->SetBrushFromTexture(Texture);
+        bHasIcon = true;
     }
     else if (UMaterialInterface* Material = Cast<UMaterialInterface>(InIcon))
     {
         Icon->SetBrushFromMaterial(Material);
+        bHasIcon = true;
     }
     else
     {
         Icon->SetBrush(FSlateBrush());
+    }
+    Icon->SetVisibility(!InState.Item.IsEmpty() && bHasIcon ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+    if (IconFallbackName)
+    {
+        const bool bShowFallbackName = !InState.Item.IsEmpty() && !bHasIcon;
+        IconFallbackName->SetText(bShowFallbackName ? DisplayName : FText::GetEmpty());
+        IconFallbackName->SetVisibility(bShowFallbackName ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
     }
     Count->SetText(InState.Item.Count > 1 ? FText::AsNumber(InState.Item.Count) : FText::GetEmpty());
     Status->SetText(InState.bLocked ? NSLOCTEXT("WH.Inventory", "Locked", "锁定")
@@ -309,6 +348,17 @@ void UWidgetAbilityInventorySlotBase::NativeOnDragDetected(const FGeometry& InGe
     Drag->Quantity = View->Item.Count;
     Drag->bChooseQuantity = bChooseQuantity && View->Item.Count > 1 && !View->Item.InstanceId.IsValid();
     Drag->Pivot = EDragPivot::MouseDown;
+    if (UWidgetInventoryPickupIcon* Preview = CreateWidget<UWidgetInventoryPickupIcon>(GetOwningPlayer(), UWidgetInventoryPickupIcon::StaticClass()))
+    {
+        Preview->SetItemPresentation(DisplayIcon.Get(), DisplayName, View->Item.Count, CountStyleTag);
+        USizeBox* PreviewSize = NewObject<USizeBox>(Drag);
+        const FVector2D SourceSize = InGeometry.GetLocalSize();
+        PreviewSize->SetWidthOverride(SourceSize.X > 0.f ? SourceSize.X : IconExtent.X);
+        PreviewSize->SetHeightOverride(SourceSize.Y > 0.f ? SourceSize.Y : IconExtent.Y);
+        PreviewSize->SetContent(Preview);
+        PreviewSize->SetVisibility(ESlateVisibility::HitTestInvisible);
+        Drag->DefaultDragVisual = PreviewSize;
+    }
     OutOperation = Drag;
 }
 

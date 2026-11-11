@@ -159,7 +159,9 @@ void UWidgetAbilityInventoryBase::RefreshControls()
 {
     if (Btn_Sort)
     {
-        Btn_Sort->SetIsEnabled(FindSlot(SelectedInventoryId, SelectedSlot) != nullptr);
+        FGuid InventoryId;
+        FGameplayTag Group;
+        Btn_Sort->SetIsEnabled(ResolveSortTarget(InventoryId, Group));
     }
     if (Btn_QuickStack)
     {
@@ -222,6 +224,19 @@ void UWidgetAbilityInventoryBase::BindInventories(UInventoryNetworkComponent* In
     }
     if (Network.Get() != InNetwork) return;
     RebuildViews();
+	if (Network.Get() != InNetwork) return;
+	if (const auto Ledger = InNetwork->GetRequestReceiptLedger())
+	{
+		for (const FInventoryClientRequestReceipt& Receipt : Ledger->GetReceipts())
+		{
+			if (Receipt.StoreId == InNetwork->GetStoreId() && Receipt.Result.Code == EInventoryResultCode::ConfirmationPending &&
+				InventoryIds.Contains(Receipt.SourceInventoryId))
+			{
+				SetResultText(NSLOCTEXT("WH.Inventory", "RetiredAwaitConfirmation", "此前连接的请求结果尚未确认，请核对库存。"));
+				break;
+			}
+		}
+	}
 }
 
 void UWidgetAbilityInventoryBase::UnbindInventories()
@@ -351,6 +366,10 @@ void UWidgetAbilityInventoryBase::RebuildViews()
             {
                 continue;
             }
+            if (!ShouldDisplaySlot(InventoryId, SlotState))
+            {
+                continue;
+            }
             UPanelWidget* FixedHost = nullptr;
             if (const TMap<int32, TWeakObjectPtr<UPanelWidget>>* Hosts = GroupSlotHosts.Find(SlotState.Key.Group))
             {
@@ -459,6 +478,16 @@ void UWidgetAbilityInventoryBase::ConfigureSlot(UWidgetAbilityInventorySlotBase*
 {
 }
 
+bool UWidgetAbilityInventoryBase::ShouldDisplaySlot(const FGuid& InInventoryId, const FInventorySlotState& InSlot) const
+{
+    return true;
+}
+
+bool UWidgetAbilityInventoryBase::ShouldRebuildOnDelta(const FInventoryDelta& InDelta) const
+{
+    return false;
+}
+
 int32 UWidgetAbilityInventoryBase::GetInventoryColumns(const FGuid& InInventoryId, const FGameplayTag& InGroup) const
 {
     return FMath::Max(1, GroupColumns.Contains(InGroup) ? GroupColumns.FindChecked(InGroup) : Columns);
@@ -467,6 +496,22 @@ int32 UWidgetAbilityInventoryBase::GetInventoryColumns(const FGuid& InInventoryI
 UPanelWidget* UWidgetAbilityInventoryBase::GetInventoryHost(const FGuid& InInventoryId) const
 {
     return nullptr;
+}
+
+bool UWidgetAbilityInventoryBase::CanSelectSlot(const FInventorySlotKey& InSlot) const
+{
+    return true;
+}
+
+bool UWidgetAbilityInventoryBase::ResolveSortTarget(FGuid& OutInventoryId, FGameplayTag& OutGroup) const
+{
+    if (!FindSlot(SelectedInventoryId, SelectedSlot))
+    {
+        return false;
+    }
+    OutInventoryId = SelectedInventoryId;
+    OutGroup = SelectedSlot.Group;
+    return true;
 }
 
 uint64 UWidgetAbilityInventoryBase::ClearViews()
@@ -537,6 +582,11 @@ void UWidgetAbilityInventoryBase::HandleDelta(const FInventoryDelta& InDelta)
 {
     if (InventoryIds.Contains(InDelta.InventoryId))
     {
+        if (ShouldRebuildOnDelta(InDelta))
+        {
+            RebuildViews();
+            return;
+        }
         for (const FInventorySlotState& State : InDelta.Slots)
         {
             RefreshSlot(InDelta.InventoryId, State);
@@ -615,7 +665,7 @@ FInventorySlotKey UWidgetAbilityInventoryBase::GetSelectedSlotKey() const
 
 void UWidgetAbilityInventoryBase::SelectSlot(FGuid InInventoryId, FInventorySlotKey InSlot)
 {
-    if (!FindSlot(InInventoryId, InSlot))
+    if (!FindSlot(InInventoryId, InSlot) || !CanSelectSlot(InSlot))
     {
         return;
     }
@@ -717,7 +767,12 @@ bool UWidgetAbilityInventoryBase::Submit(FInventoryClientRequest InRequest)
     }
     const TWeakObjectPtr<UInventoryNetworkComponent> SubmittedNetwork = Network;
     const uint64 RequestId = SubmittedNetwork->SubmitRequest(MoveTemp(InRequest));
-    return RequestId != 0 && Network == SubmittedNetwork;
+	if (RequestId && Network == SubmittedNetwork)
+	{
+		FInventoryClientRequest PendingRequest;
+		if (SubmittedNetwork->GetPendingRequest(RequestId, PendingRequest)) HandleRequestQueued(PendingRequest);
+	}
+    return RequestId != 0;
 }
 
 void UWidgetAbilityInventoryBase::RefreshPending()
@@ -1039,7 +1094,9 @@ bool UWidgetAbilityInventoryBase::RequestQuickStack(FGuid InInventoryId)
 
 void UWidgetAbilityInventoryBase::SortSelected()
 {
-    if(SelectedInventoryId.IsValid() && SelectedSlot.IsValid()) RequestSort(SelectedInventoryId, SelectedSlot.Group);
+    FGuid InventoryId;
+    FGameplayTag Group;
+    if (ResolveSortTarget(InventoryId, Group)) RequestSort(InventoryId, Group);
 }
 
 void UWidgetAbilityInventoryBase::QuickStackSelected()
@@ -1054,6 +1111,7 @@ void UWidgetAbilityInventoryBase::SetTransferInventoryId(FGuid InInventoryId)
 
 void UWidgetAbilityInventoryBase::SyncSelection(FGuid InInventoryId, FInventorySlotKey InSlot)
 {
+    if (InInventoryId.IsValid() && InSlot.IsValid() && !CanSelectSlot(InSlot)) return;
     ApplySelection(InInventoryId, InSlot);
 }
 

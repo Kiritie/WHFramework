@@ -19,6 +19,7 @@ namespace
 {
 	const FName SpawnClassPinName = TEXT("InClass");
 	const FName SpawnParameterPinName = TEXT("InParam");
+	const FName SpawnWorldContextPinName = TEXT("InWorldContext");
 }
 
 void UK2Node_SpawnObject::AllocateDefaultPins()
@@ -28,6 +29,7 @@ void UK2Node_SpawnObject::AllocateDefaultPins()
 
 	CreatePin(EGPD_Input, UEdGraphSchema_K2::PC_Exec, UEdGraphSchema_K2::PN_Execute);
 	CreatePin(EGPD_Output, UEdGraphSchema_K2::PC_Exec, UEdGraphSchema_K2::PN_Then);
+	CreatePin(EGPD_Input, UEdGraphSchema_K2::PC_Object, UObject::StaticClass(), SpawnWorldContextPinName);
 	UEdGraphPin* ClassPin = CreatePin(EGPD_Input, UEdGraphSchema_K2::PC_Class, UObject::StaticClass(), SpawnClassPinName);
 	ClassPin->DefaultObject = ResolvedClass;
 
@@ -39,6 +41,10 @@ void UK2Node_SpawnObject::AllocateDefaultPins()
 			FProperty* Property = *PropertyIt;
 			if(!Property->HasAllPropertyFlags(CPF_BlueprintVisible) ||
 				Property->HasAnyPropertyFlags(CPF_BlueprintReadOnly | CPF_EditConst) || Property->ArrayDim > 1)
+			{
+				continue;
+			}
+			if (FindPin(Property->GetFName()) || Property->GetFName() == UEdGraphSchema_K2::PN_ReturnValue)
 			{
 				continue;
 			}
@@ -75,11 +81,33 @@ void UK2Node_SpawnObject::ExpandNode(FKismetCompilerContext& CompilerContext, UE
 	Super::ExpandNode(CompilerContext, SourceGraph);
 
 	UScriptStruct* SpawnStruct = ResolveSpawnParameterStruct();
-	if(!CanUseStruct(SpawnStruct))
+	if(!CanUseStruct(SpawnStruct) || !GetClassPin() || !GetResultPin() ||
+		!FindPin(UEdGraphSchema_K2::PN_Execute) || !FindPin(UEdGraphSchema_K2::PN_Then))
 	{
 		CompilerContext.MessageLog.Error(*LOCTEXT("MissingType", "@@ has no valid SpawnParameter type.").ToString(), this);
 		BreakAllNodeLinks();
 		return;
+	}
+	UEdGraphPin* WorldPin = FindPin(SpawnWorldContextPinName);
+	if (!WorldPin || (WorldPin->LinkedTo.IsEmpty() && !WorldPin->DefaultObject))
+	{
+		CompilerContext.MessageLog.Error(*LOCTEXT("MissingWorld", "@@ requires an explicit World context.").ToString(), this);
+		BreakAllNodeLinks();
+		return;
+	}
+	for (TFieldIterator<FProperty> PropertyIt(SpawnStruct, EFieldIteratorFlags::IncludeSuper); PropertyIt; ++PropertyIt)
+	{
+		const FProperty* Property = *PropertyIt;
+		if (!Property->HasAllPropertyFlags(CPF_BlueprintVisible) ||
+			Property->HasAnyPropertyFlags(CPF_BlueprintReadOnly | CPF_EditConst) || Property->ArrayDim > 1) continue;
+		const FName Name = Property->GetFName();
+		if (Name == SpawnWorldContextPinName || Name == SpawnClassPinName ||
+			Name == UEdGraphSchema_K2::PN_Execute || Name == UEdGraphSchema_K2::PN_Then || Name == UEdGraphSchema_K2::PN_ReturnValue)
+		{
+			CompilerContext.MessageLog.Error(*FText::Format(LOCTEXT("ReservedSpawnField", "@@ has a SpawnParameter field named '{0}' which conflicts with a node pin."), FText::FromName(Name)).ToString(), this);
+			BreakAllNodeLinks();
+			return;
+		}
 	}
 
 	UK2Node_MakeStruct* MakeStructNode = CompilerContext.SpawnIntermediateNode<UK2Node_MakeStruct>(this, SourceGraph);
@@ -90,11 +118,20 @@ void UK2Node_SpawnObject::ExpandNode(FKismetCompilerContext& CompilerContext, UE
 
 	for(TFieldIterator<FProperty> PropertyIt(SpawnStruct, EFieldIteratorFlags::IncludeSuper); PropertyIt; ++PropertyIt)
 	{
+		const FProperty* Property = *PropertyIt;
+		if (!Property->HasAllPropertyFlags(CPF_BlueprintVisible) ||
+			Property->HasAnyPropertyFlags(CPF_BlueprintReadOnly | CPF_EditConst) || Property->ArrayDim > 1) continue;
 		if(UEdGraphPin* SourcePin = FindPin(PropertyIt->GetFName()))
 		{
 			if(UEdGraphPin* TargetPin = MakeStructNode->FindPin(PropertyIt->GetFName()))
 			{
 				CompilerContext.MovePinLinksToIntermediate(*SourcePin, *TargetPin);
+			}
+			else
+			{
+				CompilerContext.MessageLog.Error(*FText::Format(LOCTEXT("MissingSpawnField", "@@ cannot construct SpawnParameter field '{0}'."), FText::FromName(PropertyIt->GetFName())).ToString(), this);
+				BreakAllNodeLinks();
+				return;
 			}
 		}
 	}
@@ -106,7 +143,13 @@ void UK2Node_SpawnObject::ExpandNode(FKismetCompilerContext& CompilerContext, UE
 	UEdGraphPin* ValuePin = MakeParameterNode->FindPinChecked(TEXT("Value"));
 	ValuePin->PinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
 	ValuePin->PinType.PinSubCategoryObject = SpawnStruct;
-	MakeStructNode->FindPinChecked(SpawnStruct->GetFName())->MakeLinkTo(ValuePin);
+	UEdGraphPin* SpawnStructPin = MakeStructNode->FindPin(SpawnStruct->GetFName());
+	if (!SpawnStructPin || !CompilerContext.GetSchema()->TryCreateConnection(SpawnStructPin, ValuePin))
+	{
+		CompilerContext.MessageLog.Error(*LOCTEXT("InvalidSpawnParameter", "@@ cannot connect its SpawnParameter value.").ToString(), this);
+		BreakAllNodeLinks();
+		return;
+	}
 
 	UK2Node_CallFunction* SpawnNode = CompilerContext.SpawnIntermediateNode<UK2Node_CallFunction>(this, SourceGraph);
 	SpawnNode->SetFromFunction(UObjectPoolModuleStatics::StaticClass()->FindFunctionByName(TEXT("SpawnObject")));
@@ -115,8 +158,14 @@ void UK2Node_SpawnObject::ExpandNode(FKismetCompilerContext& CompilerContext, UE
 
 	CompilerContext.MovePinLinksToIntermediate(*FindPinChecked(UEdGraphSchema_K2::PN_Execute), *SpawnNode->GetExecPin());
 	CompilerContext.MovePinLinksToIntermediate(*FindPinChecked(UEdGraphSchema_K2::PN_Then), *SpawnNode->GetThenPin());
+	CompilerContext.MovePinLinksToIntermediate(*WorldPin, *SpawnNode->FindPinChecked(SpawnWorldContextPinName));
 	CompilerContext.MovePinLinksToIntermediate(*GetClassPin(), *SpawnNode->FindPinChecked(SpawnClassPinName));
-	MakeParameterNode->GetReturnValuePin()->MakeLinkTo(SpawnNode->FindPinChecked(SpawnParameterPinName));
+	if (!CompilerContext.GetSchema()->TryCreateConnection(MakeParameterNode->GetReturnValuePin(), SpawnNode->FindPinChecked(SpawnParameterPinName)))
+	{
+		CompilerContext.MessageLog.Error(*LOCTEXT("InvalidParameterConnection", "@@ cannot connect the generated Parameter to ObjectPool.").ToString(), this);
+		BreakAllNodeLinks();
+		return;
+	}
 	CompilerContext.MovePinLinksToIntermediate(*GetResultPin(), *SpawnNode->GetReturnValuePin());
 	BreakAllNodeLinks();
 }

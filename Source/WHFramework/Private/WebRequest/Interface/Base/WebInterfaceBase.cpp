@@ -5,23 +5,30 @@
 
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "WebRequest/Handle/Base/WebRequestHandleBase.h"
+#include "WebRequest/WebRequestModule.h"
+#include "Engine/World.h"
 
 UWebInterfaceBase::UWebInterfaceBase()
 {
 	Name = NAME_None;
 	Url = TEXT("");
 	HandleClass = UWebRequestHandleBase::StaticClass();
-	HandleMap = TMap<FString, UWebRequestHandleBase*>();
+}
+
+void UWebInterfaceBase::OnSpawn_Implementation(const FParameter& InParam)
+{
+	Super::OnSpawn_Implementation(InParam);
 }
 
 void UWebInterfaceBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
 	OnWebRequestComplete.Clear();
-	for(auto& Iter : HandleMap)
+	auto PreviousHandles = MoveTemp(Handles);
+	Handles.Empty();
+	for(UWebRequestHandleBase* Handle : PreviousHandles)
 	{
-		 UObjectPoolModuleStatics::DespawnObject(Iter.Value);
+		UObjectPoolModuleStatics::DespawnObject(this, Handle);
 	}
-	HandleMap.Empty();
 }
 
 void UWebInterfaceBase::OnRequestComplete_Implementation(UWebRequestHandleBase* InWebRequestHandle)
@@ -31,29 +38,19 @@ void UWebInterfaceBase::OnRequestComplete_Implementation(UWebRequestHandleBase* 
 
 void UWebInterfaceBase::RequestComplete(FWebRequestResult InResult, const TArray<FParameter>& InParams)
 {
-	UWebRequestHandleBase* WebRequestHandle;
-	if(!HandleMap.Contains(InResult.Content))
-	{
-		WebRequestHandle = UObjectPoolModuleStatics::SpawnObject<UWebRequestHandleBase>(HandleClass);
-		HandleMap.Add(InResult.Content, WebRequestHandle);
-	}
-	else
-	{
-		WebRequestHandle = HandleMap[InResult.Content];
-	}
-	if(WebRequestHandle)
-	{
-		if(InResult.bSucceeded)
-		{
-			WebRequestHandle->Parse(InResult, InParams);
-		}
-		OnRequestComplete(WebRequestHandle);
-		OnWebRequestComplete.Broadcast(WebRequestHandle);
-		HandleMap.Emplace(InResult.Content, WebRequestHandle);
-	}
+    UWebRequestHandleBase* Handle = UObjectPoolModuleStatics::SpawnObject<UWebRequestHandleBase>(this, HandleClass);
+    if (!Handle) return;
+    Handles.Add(Handle);
+    Handle->Parse(InResult, InParams);
+    OnRequestComplete(Handle);
+    OnWebRequestComplete.Broadcast(Handle);
 }
 
 FString UWebInterfaceBase::GetFullUrl() const
 {
-	return FullUrl.IsEmpty() ? UWebRequestModuleStatics::GetWebServerURL() + Url : FullUrl;
+	if (!FullUrl.IsEmpty()) return FullUrl;
+	if (Url.StartsWith(TEXT("http://"), ESearchCase::IgnoreCase) || Url.StartsWith(TEXT("https://"), ESearchCase::IgnoreCase)) return Url;
+	const UWebRequestModule* Owner = UWebRequestModule::GetPtr(GetWorld());
+	const FString Server = Owner ? Owner->GetServerURL() : FString();
+	return Server.IsEmpty() ? FString() : Server + Url;
 }

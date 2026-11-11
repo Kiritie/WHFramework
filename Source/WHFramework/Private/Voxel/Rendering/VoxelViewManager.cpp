@@ -6,6 +6,7 @@
 #include "Algo/BinarySearch.h"
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
+#include "UObject/StrongObjectPtr.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/ScopeExit.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
@@ -421,6 +422,7 @@ FVoxelViewManager::FVoxelViewManager(
 	: Module(InModule),
 	  Scheduler(InScheduler),
 	  WorldEpoch(InWorldEpoch),
+	  OriginalWorld(InModule.GetWorld()),
 	  TerrainFrameBudget(InModule.GetTerrainFrameContext().GetPublishBudget())
 {
 	UE_LOG(LogTemp, Display, TEXT("Voxel terrain seam generation: enabled=%d"), int32(VoxelSeamPolicy::IsEnabled()));
@@ -483,6 +485,7 @@ void FVoxelViewManager::Tick(
 	const uint64 InInterestRevision,
 	const TConstArrayView<FVector> InObservers)
 {
+	if (bStopRequested || Module.GetWorldState() == EVoxelWorldState::Closing) return;
 	TRACE_CPUPROFILER_EVENT_SCOPE(Voxel_ViewManager);
 	const double TickStart = FPlatformTime::Seconds();
 	bTerrainFrameBudgetActive = true;
@@ -3247,6 +3250,7 @@ void FVoxelViewManager::RemoveRetirement(const FVoxelPublishGroupKey& InKey)
 
 bool FVoxelViewManager::OnTask(FVoxelTaskResult&& InResult)
 {
+	if (bStopRequested || Module.GetWorldState() == EVoxelWorldState::Closing) return true;
 	if (InResult.OverlayReadResult && !Module.IsOverlayReadCurrent(*InResult.OverlayReadResult))
 	{
 		++TerrainWorkMetrics.Stale;
@@ -3635,212 +3639,228 @@ void FVoxelViewManager::InvalidateNeighbors(const FIntVector& InKey)
 
 void FVoxelViewManager::Reset()
 {
-	CancelInterestWorkspace();
-	ReleaseInterestWorkspace(CommittedWorkspaceEvents);
-	ResetRetirementContinuation();
-	while (!FineShardSlots.IsEmpty()) RetireFineShard(FineShardSlots.CreateConstIterator().Key());
-	FineShardSlots.Empty();
-	FineShardSlotOrder.Empty();
-	FineShardAdmissionSelection.Reset();
-	for (int32 Stage = 0; Stage < 2; ++Stage)
+	FString Error;
+	const bool bReset = TryResetForWorldStop(Error);
+	ensureMsgf(bReset, TEXT("Voxel view retirement incomplete: %s"), *Error);
+}
+
+bool FVoxelViewManager::TryResetForWorldStop(FString& OutError)
+{
+	if (bStopComplete) return true;
+	if (bStopInProgress) { OutError = TEXT("Voxel retirement is already in progress"); return false; }
+	TGuardValue<bool> Stopping(bStopInProgress, true);
+	bStopRequested = true;
+	Publisher->BeginWorldStop();
+	if (!bStopPrepared)
 	{
-		TransitionAdmissionSelection[Stage].Reset();
-		TransitionAdmissionCursor[Stage] = 0;
-		TransitionAdmissionCostMicroseconds[Stage] = 50.0;
-	}
-	FineShardPresentationSelection.Reset();
-	for (auto& Queue : FinePresentationQueues) Queue.Empty();
-	FineShardBackingLease.Reset();
-	FineShardBackingCapacity = FineShardBackingRejectedCount = 0;
-	FineShardBackingReleaseVersion = 0;
-	FineShardBackingAdmission = EVoxelTerrainResourceAdmission::Granted;
-	FineShardAdmissionCursor = 0;
-	FineShardAdmissionContinuation.Reset();
-	FineShardAdmissionScans = 0;
-	FineShardAdmissionAttempts = 0;
-	FineShardAdmissionContinuationAttempts = 0;
-	FineShardPresentationCursor = 0;
-	check(TaskOwnerIncarnation != MAX_uint64);
-	++TaskOwnerIncarnation;
-	CoverageIndexRetries.Empty();
-	CoverageIndexRetryLease.Reset();
-	CoverageIndexRetryCapacity = CoverageIndexRetryCursor = 0;
-	BindCoverageIndexResources();
-	RepresentationAttempts.Reset();
-	InitialLayoutContinuation.Reset();
-	bInitialLayoutDirty = true;
-	CoverageContinuation.Reset();
-	InvalidateCoverageCommitGate();
-	CommitGateQueriedFrames = 0;
-	CommitGateClosedFrames = 0;
-	CommitGateQueryCount = 0;
-	CommitGateClosedQueryCount = 0;
-	CommitGateQueryFrame = MAX_uint64;
-	CommitGateClosedFrame = MAX_uint64;
-	CommitGateConsecutiveClosedFrames = 0;
-	CoveragePassFirstFrame = 0;
-	for (uint64& Count : CoveragePassFrameBuckets) Count = 0;
-	FailedPublishCoverageRects.Reset();
-	CoverageInterestSnapshot.Reset();
-	bCoverageDrainPending = false;
-	bCoverageReadScope = false;
-	CoverageCommitGateRevision &= ~uint64(1);
-	bCoverageRetryRequested = false;
-	ReleaseInputRoot(CoverageInputRoot);
-	ReleaseInputRoot(AppliedInputRoot);
-	DeferredCoverageResults.Reset();
-	DeferredCoverageResultCursor = 0;
-	DeferredCoverageCallbacks.Empty();
-	GeometryMetrics.Reset();
-	PresentedGeometryMetrics.Reset();
-	TerrainWorkMetrics = {};
-	bTerrainBuildStageDirty = true;
-	Scheduler.SetObservedTerrainStage(0);
-	++VolumePlanSerial;
-	++HeightfieldPlanSerial;
-	HeightfieldCoveragePlans.Reset();
-	PendingHeightfieldPlanOwners.Reset();
-	VolumeCoveragePlans.Reset();
-	VolumeCandidatesRetained = 0;
-	VolumeCandidatesPromoted = 0;
-	VolumeCandidatesRejected = 0;
-	VolumeCandidateGuardWaits = 0;
-	VolumePlanIndex.Reset();
-	PendingVolumeHandoffBoxes.Reset();
-	for (const TPair<FVoxelViewKey, FVoxelViewSourceId>& Pair : VoxelProxySources)
-	{
-		if (Pair.Value)
+		CancelInterestWorkspace();
+		ReleaseInterestWorkspace(CommittedWorkspaceEvents);
+		ResetRetirementContinuation();
+		while (!FineShardSlots.IsEmpty()) RetireFineShard(FineShardSlots.CreateConstIterator().Key());
+		FineShardSlots.Empty();
+		FineShardSlotOrder.Empty();
+		FineShardAdmissionSelection.Reset();
+		for (int32 Stage = 0; Stage < 2; ++Stage)
 		{
-			Publisher->Forget(Pair.Value);
+			TransitionAdmissionSelection[Stage].Reset();
+			TransitionAdmissionCursor[Stage] = 0;
+			TransitionAdmissionCostMicroseconds[Stage] = 50.0;
 		}
-	}
-	for (const TPair<FVoxelSurfaceTileKey, FVoxelViewSourceId>& Pair : SurfaceSources)
-	{
-		if (Pair.Value)
-			Publisher->Forget(Pair.Value);
-	}
-	for (const TPair<FVoxelSurfaceTileKey, FVoxelViewSourceId>& Pair : WaterSources)
-	{
-		if (Pair.Value)
-			Publisher->Forget(Pair.Value);
-	}
-	for (const TPair<FVoxelMacroTileKey, FVoxelViewSourceId>& Pair : MacroSources)
-	{
-		if (Pair.Value)
-			Publisher->Forget(Pair.Value);
-	}
-	for (const TPair<FVoxelHeightfieldNodeKey, FVoxelViewSourceId>& Pair : HeightfieldTransitionSources)
-	{
-		if (Pair.Value)
-			Publisher->Forget(Pair.Value);
-	}
-	PreparedData.Reset();
-	for (const auto& Entry : PreparedEnvironmentRetentions)
-		Module.ReleaseGenerationFacts(MakeCoarseGenerationConsumer(Entry.Key.Stamp.GeometryIdentity, Entry.Key.Stamp));
-	PreparedEnvironmentRetentions.Reset();
-	PreparedDataBytes = 0;
-	PendingDataBytes = 0;
-	SkippedProxyMeshes = 0;
-	SkippedVolumeMeshes = 0;
-	for (auto& Scans : DataScanIndices)
-		Scans.Reset();
-	for (auto& Scans : DataFrontierScanIndices)
-		Scans.Reset();
-	FineSectionMeshes.Reset();
-	for (int32 Stage = 0; Stage < 2; ++Stage)
-	{
-		verify(AdmissionSelection[Stage].Reset());
-		AdmissionAges[Stage].Empty();
-		AdmissionAgeLeases[Stage].Reset();
-		AdmissionAgeCapacities[Stage] = 0;
-		AdmissionAgeCleanupCursors[Stage] = 0;
-		bAdmissionAgeCapacityWaiting[Stage] = false;
-		AdmissionAgeCapacityVersions[Stage] = 0;
-		bServiceSelectionCapacityWaiting[Stage] = false;
-		ServiceSelectionCapacityVersions[Stage] = 0;
-		ServiceAdmissionKinds[Stage] = 0;
-		for (int32 Kind = 0; Kind < 4; ++Kind)
+		FineShardPresentationSelection.Reset();
+		for (auto& Queue : FinePresentationQueues) Queue.Empty();
+		FineShardBackingLease.Reset();
+		FineShardBackingCapacity = FineShardBackingRejectedCount = 0;
+		FineShardBackingReleaseVersion = 0;
+		FineShardBackingAdmission = EVoxelTerrainResourceAdmission::Granted;
+		FineShardAdmissionCursor = 0;
+		FineShardAdmissionContinuation.Reset();
+		FineShardAdmissionScans = 0;
+		FineShardAdmissionAttempts = 0;
+		FineShardAdmissionContinuationAttempts = 0;
+		FineShardPresentationCursor = 0;
+		check(TaskOwnerIncarnation != MAX_uint64);
+		++TaskOwnerIncarnation;
+		CoverageIndexRetries.Empty();
+		CoverageIndexRetryLease.Reset();
+		CoverageIndexRetryCapacity = CoverageIndexRetryCursor = 0;
+		BindCoverageIndexResources();
+		RepresentationAttempts.Reset();
+		InitialLayoutContinuation.Reset();
+		bInitialLayoutDirty = true;
+		CoverageContinuation.Reset();
+		InvalidateCoverageCommitGate();
+		CommitGateQueriedFrames = 0;
+		CommitGateClosedFrames = 0;
+		CommitGateQueryCount = 0;
+		CommitGateClosedQueryCount = 0;
+		CommitGateQueryFrame = MAX_uint64;
+		CommitGateClosedFrame = MAX_uint64;
+		CommitGateConsecutiveClosedFrames = 0;
+		CoveragePassFirstFrame = 0;
+		for (uint64& Count : CoveragePassFrameBuckets) Count = 0;
+		FailedPublishCoverageRects.Reset();
+		CoverageInterestSnapshot.Reset();
+		bCoverageDrainPending = false;
+		bCoverageReadScope = false;
+		CoverageCommitGateRevision &= ~uint64(1);
+		bCoverageRetryRequested = false;
+		ReleaseInputRoot(CoverageInputRoot);
+		ReleaseInputRoot(AppliedInputRoot);
+		DeferredCoverageResults.Reset();
+		DeferredCoverageResultCursor = 0;
+		DeferredCoverageCallbacks.Empty();
+		GeometryMetrics.Reset();
+		PresentedGeometryMetrics.Reset();
+		TerrainWorkMetrics = {};
+		bTerrainBuildStageDirty = true;
+		Scheduler.SetObservedTerrainStage(0);
+		++VolumePlanSerial;
+		++HeightfieldPlanSerial;
+		HeightfieldCoveragePlans.Reset();
+		PendingHeightfieldPlanOwners.Reset();
+		VolumeCoveragePlans.Reset();
+		VolumeCandidatesRetained = 0;
+		VolumeCandidatesPromoted = 0;
+		VolumeCandidatesRejected = 0;
+		VolumeCandidateGuardWaits = 0;
+		VolumePlanIndex.Reset();
+		PendingVolumeHandoffBoxes.Reset();
+		for (const TPair<FVoxelViewKey, FVoxelViewSourceId>& Pair : VoxelProxySources)
 		{
-			ServiceAdmissionScans[Stage][Kind] = 0;
-			AdmissionCostEstimates[Stage][Kind] = 0.0;
+			if (Pair.Value)
+			{
+				Publisher->Forget(Pair.Value);
+			}
 		}
-	}
-	GetInputRoot().FinePagePlan = {};
-	PresentedFineSectionOwners.Reset();
-	DirtyFinePages.Reset();
-	PendingFinePages.Reset();
-	bFinePresentationDirty = true;
-	bHeightfieldTopologyDirty = true;
-	FineRevisions.Reset();
-	VoxelProxySources.Reset();
-	VoxelProxyRevisions.Reset();
-	SurfaceSources.Reset();
-	WaterSources.Reset();
-	MacroSources.Reset();
-	HeightfieldTransitionSources.Reset();
-	HeightfieldTransitionSignatures.Reset();
-	ResetTransitionInputDirectories();
-	PendingTransitionSignatures.Reset();
-	PreparedTransitionSignatures.Reset();
-	PreparedTransitionMeshes.Reset();
-	UnsubmittedTransitionOwners.Reset();
-	PendingHeightfieldHandoffRects.Reset();
-	HeightfieldUnbalancedEdgeCount = 0;
-	VolumeTransitionSignatures.Reset();
-	PendingVolumeSignatures.Reset();
-	PreparedVolumeSignatures.Reset();
-	PreparedVolumeMeshes.Reset();
-	PreparedVolumeBoundaryMeshes.Reset();
-	for (const auto& Pair : VolumeBoundarySources)
-		if (Pair.Value)
+		for (const TPair<FVoxelSurfaceTileKey, FVoxelViewSourceId>& Pair : SurfaceSources)
 		{
-			Publisher->Forget(Pair.Value);
+			if (Pair.Value)
+				Publisher->Forget(Pair.Value);
 		}
-	VolumeBoundarySources.Reset();
-	UnsubmittedVolumeOwners.Reset();
-	VolumeUnbalancedFaceCount = 0;
-	SurfaceRevisions.Reset();
-	MacroRevisions.Reset();
-	VisibleTerrainNodes.Reset();
-	VisibleTerrainNodesByGroup.Reset();
-	CoverageIndex.Reset();
-	HeightfieldCoverageIndex.Reset();
-	GetInputRoot().FineWanted.Reset();
-	GetInputRoot().ProxyWanted.Reset();
-	GetInputRoot().MaximumProxyLevel = 0;
-	GetInputRoot().bInitialLayout = false;
-	GetInputRoot().SurfaceWanted.Reset();
-	GetInputRoot().MacroWanted.Reset();
-	FineReady.Reset();
-	VoxelProxyReady.Reset();
-	ReadyTerrainBranches.Reset();
-	bReadyTerrainBranchesDirty = true;
-	SurfaceReady.Reset();
-	MacroReady.Reset();
-	VoxelProxyData.Reset();
-	AirVoxelProxyNodes.Reset();
-	ProxySurfaceCoverage.Reset();
-	SurfaceData.Reset();
-	WaterData.Reset();
-	MacroData.Reset();
-	FineLastWanted.Reset();
-	VoxelProxyLastWanted.Reset();
-	SurfaceLastWanted.Reset();
-	MacroLastWanted.Reset();
-	Admissions = {};
-	PendingPublicationInputs.Reset();
-	PendingInterestSnapshot.Reset();
-	QueuedInterestSnapshot.Reset();
-	AppliedInterestSnapshot.Reset();
-	PendingInterestRevision = 0;
-	bTaskPrioritiesDirty = false;
-	InterestInputPhase = InterestInputCursor = 0;
-	PendingFinePagePlan = {};
-	PendingLayoutInvalidations.Reset();
-	PriorityObservers.Reset();
-	for (auto& Scans : AdmissionScanIndices)
-		Scans.Reset();
-	Publisher->Reset();
+		for (const TPair<FVoxelSurfaceTileKey, FVoxelViewSourceId>& Pair : WaterSources)
+		{
+			if (Pair.Value)
+				Publisher->Forget(Pair.Value);
+		}
+		for (const TPair<FVoxelMacroTileKey, FVoxelViewSourceId>& Pair : MacroSources)
+		{
+			if (Pair.Value)
+				Publisher->Forget(Pair.Value);
+		}
+		for (const TPair<FVoxelHeightfieldNodeKey, FVoxelViewSourceId>& Pair : HeightfieldTransitionSources)
+		{
+			if (Pair.Value)
+				Publisher->Forget(Pair.Value);
+		}
+		PreparedData.Reset();
+		for (const auto& Entry : PreparedEnvironmentRetentions)
+			Module.ReleaseGenerationFacts(MakeCoarseGenerationConsumer(Entry.Key.Stamp.GeometryIdentity, Entry.Key.Stamp));
+		PreparedEnvironmentRetentions.Reset();
+		PreparedDataBytes = 0;
+		PendingDataBytes = 0;
+		SkippedProxyMeshes = 0;
+		SkippedVolumeMeshes = 0;
+		for (auto& Scans : DataScanIndices)
+			Scans.Reset();
+		for (auto& Scans : DataFrontierScanIndices)
+			Scans.Reset();
+		FineSectionMeshes.Reset();
+		for (int32 Stage = 0; Stage < 2; ++Stage)
+		{
+			verify(AdmissionSelection[Stage].Reset());
+			AdmissionAges[Stage].Empty();
+			AdmissionAgeLeases[Stage].Reset();
+			AdmissionAgeCapacities[Stage] = 0;
+			AdmissionAgeCleanupCursors[Stage] = 0;
+			bAdmissionAgeCapacityWaiting[Stage] = false;
+			AdmissionAgeCapacityVersions[Stage] = 0;
+			bServiceSelectionCapacityWaiting[Stage] = false;
+			ServiceSelectionCapacityVersions[Stage] = 0;
+			ServiceAdmissionKinds[Stage] = 0;
+			for (int32 Kind = 0; Kind < 4; ++Kind)
+			{
+				ServiceAdmissionScans[Stage][Kind] = 0;
+				AdmissionCostEstimates[Stage][Kind] = 0.0;
+			}
+		}
+		GetInputRoot().FinePagePlan = {};
+		PresentedFineSectionOwners.Reset();
+		DirtyFinePages.Reset();
+		PendingFinePages.Reset();
+		bFinePresentationDirty = true;
+		bHeightfieldTopologyDirty = true;
+		FineRevisions.Reset();
+		VoxelProxySources.Reset();
+		VoxelProxyRevisions.Reset();
+		SurfaceSources.Reset();
+		WaterSources.Reset();
+		MacroSources.Reset();
+		HeightfieldTransitionSources.Reset();
+		HeightfieldTransitionSignatures.Reset();
+		ResetTransitionInputDirectories();
+		PendingTransitionSignatures.Reset();
+		PreparedTransitionSignatures.Reset();
+		PreparedTransitionMeshes.Reset();
+		UnsubmittedTransitionOwners.Reset();
+		PendingHeightfieldHandoffRects.Reset();
+		HeightfieldUnbalancedEdgeCount = 0;
+		VolumeTransitionSignatures.Reset();
+		PendingVolumeSignatures.Reset();
+		PreparedVolumeSignatures.Reset();
+		PreparedVolumeMeshes.Reset();
+		PreparedVolumeBoundaryMeshes.Reset();
+		for (const auto& Pair : VolumeBoundarySources)
+			if (Pair.Value)
+			{
+				Publisher->Forget(Pair.Value);
+			}
+		VolumeBoundarySources.Reset();
+		UnsubmittedVolumeOwners.Reset();
+		VolumeUnbalancedFaceCount = 0;
+		SurfaceRevisions.Reset();
+		MacroRevisions.Reset();
+		VisibleTerrainNodes.Reset();
+		VisibleTerrainNodesByGroup.Reset();
+		CoverageIndex.Reset();
+		HeightfieldCoverageIndex.Reset();
+		GetInputRoot().FineWanted.Reset();
+		GetInputRoot().ProxyWanted.Reset();
+		GetInputRoot().MaximumProxyLevel = 0;
+		GetInputRoot().bInitialLayout = false;
+		GetInputRoot().SurfaceWanted.Reset();
+		GetInputRoot().MacroWanted.Reset();
+		FineReady.Reset();
+		VoxelProxyReady.Reset();
+		ReadyTerrainBranches.Reset();
+		bReadyTerrainBranchesDirty = true;
+		SurfaceReady.Reset();
+		MacroReady.Reset();
+		VoxelProxyData.Reset();
+		AirVoxelProxyNodes.Reset();
+		ProxySurfaceCoverage.Reset();
+		SurfaceData.Reset();
+		WaterData.Reset();
+		MacroData.Reset();
+		FineLastWanted.Reset();
+		VoxelProxyLastWanted.Reset();
+		SurfaceLastWanted.Reset();
+		MacroLastWanted.Reset();
+		Admissions = {};
+		PendingPublicationInputs.Reset();
+		PendingInterestSnapshot.Reset();
+		QueuedInterestSnapshot.Reset();
+		AppliedInterestSnapshot.Reset();
+		PendingInterestRevision = 0;
+		bTaskPrioritiesDirty = false;
+		InterestInputPhase = InterestInputCursor = 0;
+		PendingFinePagePlan = {};
+		PendingLayoutInvalidations.Reset();
+		PriorityObservers.Reset();
+		for (auto& Scans : AdmissionScanIndices)
+			Scans.Reset();
+		bStopPrepared = true;
+	}
+	if (!Publisher->TryResetForWorldStop(OutError)) return false;
 	OpenPublishGroups.Reset();
 	ActiveCoveragePublishGroups.Reset();
 	AppliedInterestRevision = 0;
@@ -3859,6 +3879,9 @@ void FVoxelViewManager::Reset()
 	LastRetireMilliseconds = 0.0;
 	NextRepresentationDebugLog = 0.0;
 	HeightfieldPublicationLogCursor = 0;
+	bStopComplete = true;
+	OutError.Reset();
+	return true;
 }
 
 bool FVoxelViewManager::RequiresSectionData(const FIntVector& InKey) const

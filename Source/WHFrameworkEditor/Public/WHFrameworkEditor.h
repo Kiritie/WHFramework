@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/Ticker.h"
 #include "IAssetTypeActions.h"
 
 #include "Modules/ModuleManager.h"
@@ -51,4 +52,9 @@ private:
 	FDelegateHandle BeginPIEDelegateHandle;
 
 	FDelegateHandle EndPIEDelegateHandle;
+	FDelegateHandle PostEngineInitDelegateHandle;
+	FDelegateHandle MenuStartupHandle;
+	FDelegateHandle BlueprintCompiledHandle;
+	FDelegateHandle ViewportListChangedHandle;
+	FTSTicker::FDelegateHandle EndPIEResetHandle;
 };

@@ -17,8 +17,9 @@ void UWidgetInputAction::SynchronizeProperties()
 void UWidgetInputAction::SetActionTag(FGameplayTag InActionTag)
 {
 	ActionTag = InActionTag;
-	const UInputActionBase* InputAction = ActionTag.IsValid()
-		? UInputModule::Get().GetInputActionByTag(ActionTag)
+	const UInputModule* Input = UInputModule::GetPtr(GetWorld());
+	const UInputActionBase* InputAction = Input && ActionTag.IsValid()
+		? Input->GetInputActionByTag(ActionTag, false)
 		: nullptr;
 	SetEnhancedInputAction(const_cast<UInputActionBase*>(InputAction));
 }

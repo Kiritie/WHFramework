@@ -2,18 +2,27 @@
 
 #include "Gameplay/WHPlayerController.h"
 
-#include "Camera/CameraModuleStatics.h"
 #include "Camera/Manager/CameraManagerBase.h"
+#include "Camera/Mode/FollowCameraMode.h"
+#include "Character/CharacterModule.h"
+#include "Character/Base/CharacterBase.h"
+#include "Camera/CameraModuleStatics.h"
 #include "Components/WidgetInteractionComponent.h"
+#include "Engine/LocalPlayer.h"
+#include "Engine/GameViewportClient.h"
+#include "SceneView.h"
 #include "Gameplay/WHPlayerInterface.h"
 #include "Common/CommonModuleStatics.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "Debug/DebugModuleTypes.h"
 #include "Gameplay/WHPlayerState.h"
 #include "Input/InputModuleStatics.h"
+#include "Input/InputManager.h"
 #include "Input/Components/InputComponentBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainModule.h"
+#include "Main/Base/ModuleNetworkComponentBase.h"
+#include "Pawn/PawnModule.h"
 #include "Voxel/Network/VoxelModuleNetworkComponent.h"
 
 AWHPlayerController::AWHPlayerController()
@@ -28,6 +37,33 @@ AWHPlayerController::AWHPlayerController()
 	InteractionDistance = 100000.f;
 
 	bInitialized = false;
+}
+
+bool AWHPlayerController::ShouldSuppressGameplayInput() const
+{
+	const FInputManager* Manager = FInputManager::GetPtr();
+	const EInputMode Mode = Manager ? Manager->GetGlobalInputMode(const_cast<AWHPlayerController*>(this)) : EInputMode::GameOnly;
+	return IsLocalController() && (Mode == EInputMode::None || Mode == EInputMode::UIOnly);
+}
+
+bool AWHPlayerController::InputKey(const FInputKeyEventArgs& Params)
+{
+	return ShouldSuppressGameplayInput() || Super::InputKey(Params);
+}
+
+bool AWHPlayerController::InputTouch(FTouchId TouchId, ETouchType::Type Type, const FVector2D& TouchLocation, float Force, uint64 Timestamp)
+{
+	return ShouldSuppressGameplayInput() || Super::InputTouch(TouchId, Type, TouchLocation, Force, Timestamp);
+}
+
+bool AWHPlayerController::InputMotion(FInputDeviceId DeviceId, const FVector& Tilt, const FVector& RotationRate, const FVector& Gravity, const FVector& Acceleration, uint64 Timestamp)
+{
+	return ShouldSuppressGameplayInput() || Super::InputMotion(DeviceId, Tilt, RotationRate, Gravity, Acceleration, Timestamp);
+}
+
+bool AWHPlayerController::InputGesture(FInputDeviceId DeviceId, EGestureEvent GestureType, EGesturePhase GesturePhase, const FVector2D& GestureDelta, bool bIsDirectionInvertedFromDevice, uint64 Timestamp)
+{
+	return ShouldSuppressGameplayInput() || Super::InputGesture(DeviceId, GestureType, GesturePhase, GestureDelta, bIsDirectionInvertedFromDevice, Timestamp);
 }
 
 void AWHPlayerController::OnInitialize_Implementation()
@@ -56,6 +92,10 @@ void AWHPlayerController::OnPreparatory_Implementation()
 		UModuleNetworkComponentBase* Component = NewObject<UModuleNetworkComponentBase>(
 		    this, Module->ModuleNetworkComponent, *FString::Printf(TEXT("%sNetworkComp"), *Module->ModuleName.ToString()));
 		Component->RegisterComponent();
+	}
+	if (HasAuthority() && !GetPawn())
+	{
+		if (UPawnModule* Pawns = UPawnModule::GetPtr(GetWorld())) Pawns->SwitchToDefaultPawn(this);
 	}
 }
 
@@ -100,7 +140,7 @@ void AWHPlayerController::OnPossess(APawn* InPawn)
 
 	if (IsLocalController())
 	{
-		SetControlRotation(UCameraModuleStatics::GetViewRotation());
+		if (UCameraModuleStatics::GetCameraManager(this)) SetControlRotation(UCameraModuleStatics::GetViewRotation(this));
 	}
 }
 
@@ -141,8 +181,7 @@ void AWHPlayerController::Tick(float DeltaSeconds)
 
 void AWHPlayerController::RefreshInteraction_Implementation()
 {
-	if (UCommonModuleStatics::GetLocalPlayerNum() > 1)
-		return;
+	if (!IsLocalController()) return;
 
 	FHitResult HitResult;
 
@@ -162,7 +201,7 @@ void AWHPlayerController::RefreshInteraction_Implementation()
 			break;
 	}
 
-	if (HitResult.bBlockingHit)
+	if (HitResult.bBlockingHit && HitResult.GetActor())
 	{
 		AActor* HitActor = HitResult.GetActor();
 		if (HoveringInteraction.GetObject())
@@ -171,38 +210,38 @@ void AWHPlayerController::RefreshInteraction_Implementation()
 			{
 				if (HitActor == HoveringInteraction.GetObject())
 				{
-					IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject());
+					IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject(), this);
 				}
 				else
 				{
-					IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject());
+					IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject(), this);
 					HoveringInteraction = HitActor;
-					IInteractionAgentInterface::Execute_OnBeginHover(HoveringInteraction.GetObject());
-					IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject());
+					IInteractionAgentInterface::Execute_OnBeginHover(HoveringInteraction.GetObject(), this);
+					IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject(), this);
 				}
 			}
 			else
 			{
-				IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject());
+				IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject(), this);
 				HoveringInteraction = nullptr;
 			}
 		}
 		else if (HitActor->Implements<UInteractionAgentInterface>())
 		{
 			HoveringInteraction = HitActor;
-			IInteractionAgentInterface::Execute_OnBeginHover(HoveringInteraction.GetObject());
-			IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject());
+			IInteractionAgentInterface::Execute_OnBeginHover(HoveringInteraction.GetObject(), this);
+			IInteractionAgentInterface::Execute_OnHovering(HoveringInteraction.GetObject(), this);
 		}
 
-		if (UCommonModuleStatics::HasMouseCapture() && HoveringInteraction.GetObject())
+		if (InteractionRaycastMode == EInteractionRaycastMode::FromMousePosition && UCommonModuleStatics::HasMouseCapture(this) && HoveringInteraction.GetObject())
 		{
-			IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject());
+			IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject(), this);
 			HoveringInteraction = nullptr;
 		}
 	}
 	else if (HoveringInteraction.GetObject())
 	{
-		IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject());
+		IInteractionAgentInterface::Execute_OnEndHover(HoveringInteraction.GetObject(), this);
 		HoveringInteraction = nullptr;
 	}
 }
@@ -214,18 +253,18 @@ void AWHPlayerController::SetSelectedInteraction(TScriptInterface<IInteractionAg
 		if (!SelectedInteraction.GetObject())
 		{
 			SelectedInteraction = InInteractionAgent;
-			IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
+			IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject(), this);
 		}
 		else if (SelectedInteraction != InInteractionAgent)
 		{
-			IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
+			IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject(), this);
 			SelectedInteraction = InInteractionAgent;
-			IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject());
+			IInteractionAgentInterface::Execute_OnSelected(SelectedInteraction.GetObject(), this);
 		}
 	}
 	else if (SelectedInteraction.GetObject())
 	{
-		IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject());
+		IInteractionAgentInterface::Execute_OnDeselected(SelectedInteraction.GetObject(), this);
 		SelectedInteraction = nullptr;
 	}
 }
@@ -233,14 +272,15 @@ void AWHPlayerController::SetSelectedInteraction(TScriptInterface<IInteractionAg
 bool AWHPlayerController::RaycastSingleFromScreenPosition(
     FVector2D InScreenPosition, float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
-	if (UInputModuleStatics::GetGlobalInputMode() == EInputMode::None || UInputModuleStatics::GetGlobalInputMode() == EInputMode::UIOnly)
-		return false;
+	const FInputManager* Input = FInputManager::GetPtr();
+	const EInputMode InputMode = Input ? Input->GetGlobalInputMode(this) : EInputMode::None;
+	if (!IsLocalController() || !PlayerCameraManager || InputMode == EInputMode::None || InputMode == EInputMode::UIOnly) return false;
 
 	FVector SightPos, RayDirection;
 	if (DeprojectScreenPositionToWorld(InScreenPosition.X, InScreenPosition.Y, SightPos, RayDirection))
 	{
 		const FVector RayStart = PlayerCameraManager->GetCameraLocation();
-		const ACameraManagerBase* CameraManager = UCameraModuleStatics::GetCameraManager();
+		const ACameraManagerBase* CameraManager = Cast<ACameraManagerBase>(PlayerCameraManager);
 		const FVector RayEnd = RayStart + RayDirection * (InRayDistance + (CameraManager ? CameraManager->GetCurrentRigDistance() : 0.f));
 		TArray<AActor*> IgnoreActors = InIgnoreActors;
 		IgnoreActors.AddUnique(GetPawn());
@@ -254,10 +294,13 @@ bool AWHPlayerController::RaycastSingleFromScreenPosition(
 bool AWHPlayerController::RaycastSingleFromViewportPosition(
     FVector2D InViewportPosition, float InRayDistance, ECollisionChannel InGameTraceChannel, const TArray<AActor*>& InIgnoreActors, FHitResult& OutHitResult)
 {
-	int32 ViewportSizeX, ViewportSizeY;
-	GetViewportSize(ViewportSizeX, ViewportSizeY);
-	return RaycastSingleFromScreenPosition(
-	    FVector2D(ViewportSizeX * InViewportPosition.X, ViewportSizeY * InViewportPosition.Y), InRayDistance, InGameTraceChannel, InIgnoreActors, OutHitResult);
+	const ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	FSceneViewProjectionData Projection;
+	if (!LocalPlayer || !LocalPlayer->ViewportClient || !LocalPlayer->ViewportClient->Viewport ||
+	    !LocalPlayer->GetProjectionData(LocalPlayer->ViewportClient->Viewport, Projection)) return false;
+	const FIntRect Rect = Projection.GetConstrainedViewRect();
+	const FVector2D Position(Rect.Min.X + Rect.Width() * InViewportPosition.X, Rect.Min.Y + Rect.Height() * InViewportPosition.Y);
+	return RaycastSingleFromScreenPosition(Position, InRayDistance, InGameTraceChannel, InIgnoreActors, OutHitResult);
 }
 
 bool AWHPlayerController::RaycastSingleFromMousePosition(float InRayDistance,
@@ -269,7 +312,12 @@ bool AWHPlayerController::RaycastSingleFromMousePosition(float InRayDistance,
 		return false;
 
 	float MousePosX, MousePosY;
-	GetMousePosition(MousePosX, MousePosY);
+	const ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	FSceneViewProjectionData Projection;
+	if (!GetMousePosition(MousePosX, MousePosY) || !LocalPlayer || !LocalPlayer->ViewportClient ||
+	    !LocalPlayer->ViewportClient->Viewport || !LocalPlayer->GetProjectionData(LocalPlayer->ViewportClient->Viewport, Projection)) return false;
+	const FIntRect Rect = Projection.GetConstrainedViewRect();
+	if (MousePosX < Rect.Min.X || MousePosX >= Rect.Max.X || MousePosY < Rect.Min.Y || MousePosY >= Rect.Max.Y) return false;
 	return RaycastSingleFromScreenPosition(FVector2D(MousePosX, MousePosY), InRayDistance, InGameTraceChannel, InIgnoreActors, OutHitResult);
 }
 
@@ -304,4 +352,35 @@ void AWHPlayerController::SetPlayerPawn(APawn* InPlayerPawn)
 void AWHPlayerController::OnPlayerDestroyed(AActor* InPlayerActor)
 {
 	SetPlayerPawn(nullptr);
+}
+
+
+bool AWHPlayerController::CanRequestCharacterSwitch(const ACharacterBase* InCharacter) const
+{
+    if (!InCharacter) return true;
+    return InCharacter->GetWorld() == GetWorld() &&
+        (GetPawn() == InCharacter || (GetPlayerPawn() == InCharacter && InCharacter->IsOwnedBy(this)));
+}
+
+void AWHPlayerController::ServerRequestCharacterSwitch_Implementation(ACharacterBase* InCharacter, bool bResetCamera, bool bInstant)
+{
+    if (!HasAuthority() || !CanRequestCharacterSwitch(InCharacter)) return;
+    if (UCharacterModule* Characters = UCharacterModule::GetPtr(GetWorld()))
+        Characters->SwitchCharacter(this, InCharacter, bResetCamera, bInstant);
+}
+
+void AWHPlayerController::ClientApplyCharacterView_Implementation(ACharacterBase* InCharacter, bool bInstant)
+{
+    if (!IsLocalController() || (InCharacter && InCharacter->GetWorld() != GetWorld())) return;
+    if (ACameraManagerBase* Camera = Cast<ACameraManagerBase>(PlayerCameraManager))
+    {
+        if (InCharacter)
+        {
+            FCameraModeContext Context;
+            Context.Target = InCharacter;
+            Context.Transition = bInstant ? FCameraTransitionParams::Instant() : FCameraTransitionParams::Smooth();
+            Camera->SetMode(UFollowCameraMode::StaticClass(), Context);
+        }
+        else Camera->ClearModeTarget();
+    }
 }

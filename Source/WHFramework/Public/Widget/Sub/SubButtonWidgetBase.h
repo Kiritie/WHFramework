@@ -7,6 +7,7 @@
 
 #include "SubButtonWidgetBase.generated.h"
 
+
 /**
  * 
  */
@@ -14,6 +15,7 @@ UCLASS(BlueprintType, meta = (DisableNativeTick))
 class WHFRAMEWORK_API USubButtonWidgetBase : public UCommonButton, public ISubWidgetInterface
 {
 	GENERATED_BODY()
+
 	
 public:
 	USubButtonWidgetBase(const FObjectInitializer& ObjectInitializer);

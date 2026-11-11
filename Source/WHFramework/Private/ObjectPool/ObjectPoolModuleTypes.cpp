@@ -41,6 +41,13 @@ void FObjectPoolSpawnParameterRegistry::Register(UClass* InClass, UScriptStruct*
 	{
 		return;
 	}
+	const UScriptStruct* ProviderType = InClass->IsChildOf<UUserWidget>() ? FWidgetSpawnParameter::StaticStruct() :
+		InClass->IsChildOf<AActor>() ? FActorSpawnParameter::StaticStruct() : FObjectSpawnParameter::StaticStruct();
+	if (!InStruct->IsChildOf(ProviderType))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("对象池参数注册失败：%s 必须继承 %s。"), *GetNameSafe(InStruct), *GetNameSafe(ProviderType));
+		return;
+	}
 
 	GObjectPoolSpawnParameterTypes.Add(InClass, InStruct);
 }

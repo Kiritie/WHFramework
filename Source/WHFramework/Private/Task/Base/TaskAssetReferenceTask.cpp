@@ -1,4 +1,5 @@
 #include "Task/Base/TaskAssetReferenceTask.h"
+#include "Task/TaskExecutionTypes.h"
 
 #include "Task/TaskModule.h"
 
@@ -29,12 +30,13 @@ bool UTaskAssetReferenceTask::AreSubTasksReadyToComplete() const
 
 void UTaskAssetReferenceTask::EnterReferencedRoots()
 {
-	if(!bRuntimeExpanded || !bAutoEnterReferencedRoots || !IsEntered() || !UTaskModule::IsValid()) return;
+	UTaskModule* Tasks = UTaskModule::GetPtr(GetWorld());
+	if(!bRuntimeExpanded || !bAutoEnterReferencedRoots || !IsEntered() || !Tasks) return;
 	for(UTaskBase* Task : SubTasks)
 	{
 		if(Task && Task->TaskState == ETaskState::None && Task->TaskEnterType != ETaskEnterType::None)
 		{
-			UTaskModule::Get().EnterTask(Task, false);
+			Tasks->EnterTask(Task, false);
 		}
 	}
 }

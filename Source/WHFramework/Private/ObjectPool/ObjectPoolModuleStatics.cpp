@@ -1,21 +1,22 @@
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 
-UObject* UObjectPoolModuleStatics::SpawnObject(UClass* InClass, const FParameter& InParam)
+UObject* UObjectPoolModuleStatics::SpawnObject(const UObject* InWorldContext, UClass* InClass, const FParameter& InParam)
 {
-	return UObjectPoolModule::Get().SpawnObject(InClass, InParam);
+	UObjectPoolModule* Pool = InWorldContext ? UObjectPoolModule::GetPtr(InWorldContext->GetWorld()) : nullptr;
+	return Pool ? Pool->SpawnObject(InClass, InParam) : nullptr;
 }
 
-void UObjectPoolModuleStatics::DespawnObject(UObject* InObject, EObjectDespawnMode InMode)
+void UObjectPoolModuleStatics::DespawnObject(const UObject* InWorldContext, UObject* InObject, EObjectDespawnMode InMode)
 {
-	UObjectPoolModule::Get().DespawnObject(InObject, InMode);
+	if (UObjectPoolModule* Pool = InWorldContext ? UObjectPoolModule::GetPtr(InWorldContext->GetWorld()) : nullptr) Pool->DespawnObject(InObject, InMode);
 }
 
-void UObjectPoolModuleStatics::ClearObject(TSubclassOf<UObject> InClass)
+void UObjectPoolModuleStatics::ClearObject(const UObject* InWorldContext, TSubclassOf<UObject> InClass)
 {
-	UObjectPoolModule::Get().ClearObject(InClass);
+	if (UObjectPoolModule* Pool = InWorldContext ? UObjectPoolModule::GetPtr(InWorldContext->GetWorld()) : nullptr) Pool->ClearObject(InClass);
 }
 
-void UObjectPoolModuleStatics::ClearAllObject()
+void UObjectPoolModuleStatics::ClearAllObject(const UObject* InWorldContext)
 {
-	UObjectPoolModule::Get().ClearAllObject();
+	if (UObjectPoolModule* Pool = InWorldContext ? UObjectPoolModule::GetPtr(InWorldContext->GetWorld()) : nullptr) Pool->ClearAllObject();
 }

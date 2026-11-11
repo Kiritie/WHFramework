@@ -13,21 +13,16 @@ public: \
 ManagerClass* ManagerClass::Instance = nullptr; \
 ManagerClass& ManagerClass::Get() \
 { \
-	return *ManagerClass::GetPtr(); \
+	ManagerClass* Manager = ManagerClass::GetPtr(); \
+	UE_CLOG(!Manager, LogTemp, Fatal, TEXT("Required core manager registry is unavailable")); \
+	return *Manager; \
 } \
 ManagerClass* ManagerClass::GetPtr() \
 { \
-	if(!Instance) \
-	{ \
-		Instance = new ManagerClass(); \
-		Instance->OnInitialize(); \
-	} \
 	return Instance; \
 }
 
 #define GENERATED_MANAGER(ManagerClass) \
-protected: \
-	static ManagerClass* Instance; \
 public: \
 	static ManagerClass& Get(); \
 	static ManagerClass* GetPtr(); \
@@ -35,18 +30,15 @@ public: \
 	static void UnRegister();
 
 #define IMPLEMENTATION_MANAGER(ManagerClass) \
-ManagerClass* ManagerClass::Instance = nullptr; \
 ManagerClass& ManagerClass::Get() \
 { \
-	return *ManagerClass::GetPtr(); \
+	ManagerClass* Manager = ManagerClass::GetPtr(); \
+	UE_CLOG(!Manager, LogTemp, Fatal, TEXT("Required core manager %s is unavailable"), TEXT(#ManagerClass)); \
+	return *Manager; \
 } \
 ManagerClass* ManagerClass::GetPtr() \
 { \
-	if(!Instance) \
-	{ \
-		Instance = FMainManager::GetManager<ManagerClass>(); \
-	} \
-	return Instance; \
+	return FMainManager::GetManager<ManagerClass>(); \
 } \
 void ManagerClass::Register(bool bForce) \
 { \

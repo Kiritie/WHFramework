@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Ability/AbilityAttributeModifier.h"
 #include "GameplayAbilitySpec.h"
 #include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
@@ -8,6 +9,7 @@
 
 class UAbilityBase;
 class UEffectBase;
+class UConfiguredAttributeEffect;
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FAbilityGrantDefinition
@@ -49,6 +51,12 @@ struct WHFRAMEWORK_API FAbilityGrantSourceDefinition
 	TArray<TSubclassOf<UEffectBase>> Effects;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSubclassOf<UConfiguredAttributeEffect> AttributeEffectClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<FAbilityAttributeModifier> AttributeModifiers;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Level = 1;
 };
 
@@ -86,6 +94,12 @@ struct WHFRAMEWORK_API FAbilityGrantSourceState
 
 	UPROPERTY()
 	TArray<TSubclassOf<UEffectBase>> Effects;
+
+	UPROPERTY()
+	TSubclassOf<UConfiguredAttributeEffect> AttributeEffectClass;
+
+	UPROPERTY()
+	TArray<FAbilityAttributeModifier> AttributeModifiers;
 
 	UPROPERTY()
 	TArray<FGameplayAbilitySpecHandle> AbilityHandles;

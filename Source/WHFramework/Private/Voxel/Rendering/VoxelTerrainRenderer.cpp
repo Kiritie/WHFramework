@@ -4581,52 +4581,88 @@ bool FVoxelTerrainRenderer::IsBusy() const
 
 void FVoxelTerrainRenderer::Reset()
 {
+	FString Error;
+	const bool bReset = TryResetForWorldStop(Error);
+	ensureMsgf(bReset, TEXT("Voxel terrain renderer retirement incomplete: %s"), *Error);
+}
+
+bool FVoxelTerrainRenderer::TryResetForWorldStop(FString& OutError)
+{
+	if (!State) { bStopped = true; return true; }
+	if (bStopInProgress) { OutError = TEXT("Voxel retirement is already in progress"); return false; }
+	TGuardValue<bool> Stopping(bStopInProgress, true);
 	bStopped = true;
-	if (!State || !State->bActive.Exchange(false)) return;
-	State->Scheduler.CancelMatching([OwnerId = State->OwnerId, Epoch = State->Epoch](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
+	State->bActive.Store(false);
+	if (!bStopPrepared)
 	{
-		return Kind == EVoxelTaskKind::BuildViewCoverage && Stamp.OwnerId == OwnerId && Stamp.OwnerIncarnation == 1 && Stamp.WorldEpoch == Epoch;
-	});
-	if (State->RootMerge)
-	{
-		State->RootMerge.Reset();
+		State->Scheduler.CancelMatching([OwnerId = State->OwnerId, Epoch = State->Epoch](EVoxelTaskKind Kind, const FVoxelTaskStamp& Stamp)
+		{
+			return Kind == EVoxelTaskKind::BuildViewCoverage && Stamp.OwnerId == OwnerId && Stamp.OwnerIncarnation == 1 && Stamp.WorldEpoch == Epoch;
+		});
+
+		if (State->RootMerge)
+		{
+			State->RootMerge.Reset();
+		}
+		State->Extension.Reset();
+		for (FReadyTransaction& Pending : State->Ready)
+		{
+			State->ReleasePreparation(Pending);
+			TOptional<FVoxelFineHandoffTransaction> Canceled;
+			State->Handoff.RequestCancel(Pending.Id, Canceled);
+		}
+		if (!State->ActivePreparations.IsEmpty()) { OutError = TEXT("Voxel terrain preparations are still active"); return false; }
+		State->Ready.Reset();
+		State->SubmittedCallbacks.Reset();
+		State->PendingCoarseSources.Reset();
+		State->LastSealedSnapshot.Reset();
+		State->BoundSnapshot.Reset();
+		State->RetiringBoundSnapshots.Reset();
+		State->PendingIssued.Reset();
+		State->ResidentPromotion.Reset();
+		State->PresentedFrame.Reset();
+		State->PresentedSnapshot.Reset();
+		State->RetirementSnapshot.Reset();
+		State->RetirementWalk.Reset();
+		State->CoarseRetirementSnapshot.Reset();
+		State->CoarseRetirementWalk.Reset();
+		bStopPrepared = true;
 	}
-	State->Extension.Reset();
-	for (FReadyTransaction& Pending : State->Ready)
-	{
-		State->ReleasePreparation(Pending);
-		TOptional<FVoxelFineHandoffTransaction> Canceled;
-		State->Handoff.RequestCancel(Pending.Id, Canceled);
-	}
-	State->Ready.Reset();
-	check(State->ActivePreparations.IsEmpty());
-	State->SubmittedCallbacks.Reset();
-	State->PendingCoarseSources.Reset();
-	State->LastSealedSnapshot.Reset();
-	State->BoundSnapshot.Reset();
-	State->RetiringBoundSnapshots.Reset();
-	State->PendingIssued.Reset();
-	State->ResidentPromotion.Reset();
-	State->PresentedFrame.Reset();
-	State->PresentedSnapshot.Reset();
-	State->RetirementSnapshot.Reset();
-	State->RetirementWalk.Reset();
-	State->CoarseRetirementSnapshot.Reset();
-	State->CoarseRetirementWalk.Reset();
 	if (auto* Component = State->Component.Get())
 	{
-		Component->UnregisterComponent();
-		Component->TerrainState.Reset();
-		State->ComponentPin.Reset(Component->DetachMaterialKeeper());
+		if (!bComponentUnregistered)
+		{
+			Component->UnregisterComponent();
+			bComponentUnregistered = true;
+		}
+		if (!bComponentDetached)
+		{
+			Component->TerrainState.Reset();
+			State->ComponentPin.Reset(Component->DetachMaterialKeeper());
+			bComponentDetached = true;
+		}
 		Component->DestroyComponent();
+		State->Component.Reset();
+	}
+	else if (bComponentUnregistered && !bComponentDetached)
+	{
+		OutError = TEXT("Voxel terrain material keeper is no longer available for retirement");
+		return false;
 	}
 	State->Component.Reset();
-	if (AActor* Host = State->Host.Get()) Host->Destroy();
+	AActor* Host = State->Host.Get();
+	if (Host && !Host->IsActorBeingDestroyed() && !Host->Destroy())
+	{
+		OutError = TEXT("Voxel terrain host refused destruction");
+		return false;
+	}
 	State->Host.Reset();
 	// 关闭之后继续由独立退休服务消费已发行帧；不依赖已销毁的 Module。
 	FTSTicker::GetCoreTicker().AddTicker(TEXT("VoxelTerrainRetirement"), 0.0f,
 		TUniqueFunction<bool(float)>(FVoxelRendererRetirement{State}));
 	State.Reset();
+	OutError.Reset();
+	return true;
 }
 
 #include "../Tests/VoxelTerrainRendererSceneIsolationTests.inl"

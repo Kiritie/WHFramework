@@ -16,7 +16,7 @@
 UVoxelWorldBakeCommandlet::UVoxelWorldBakeCommandlet(){IsClient=false;IsServer=false;IsEditor=true;LogToConsole=true;}
 int32 UVoxelWorldBakeCommandlet::Main(const FString& Params)
 {
-    FString Path,Root=TEXT("/Game/VoxelGenerated/Details"),ReportPath=FPaths::ProjectSavedDir()/TEXT("VoxelAssetReport.txt");
+    FString Path,Root=TEXT("/Game/Meshes/Voxel/Generated/Details"),ReportPath=FPaths::ProjectSavedDir()/TEXT("VoxelAssetReport.txt");
     if(!FParse::Value(*Params,TEXT("Profile="),Path)){UE_LOG(LogTemp,Error,TEXT("Required: -Profile=/Game/...Asset.Asset"));return 1;}
     FParse::Value(*Params,TEXT("GeneratedRoot="),Root);FParse::Value(*Params,TEXT("Report="),ReportPath);
     const bool ValidateOnly=FParse::Param(*Params,TEXT("ValidateOnly"));
@@ -48,8 +48,8 @@ int32 UVoxelWorldBakeCommandlet::Main(const FString& Params)
     {auto* A=D.LoadSynchronous();if(!A||!FVoxelDetailBaker::Bake(*A,Root,E)){UE_LOG(LogTemp,Error,TEXT("Detail bake: %s"),*E);return 3;}}
     auto& AR=FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();AR.SearchAllAssets(true);
     FARFilter Filter;Filter.ClassPaths.Add(UVoxelData::StaticClass()->GetClassPathName());Filter.bRecursiveClasses=true;
-    Filter.PackagePaths.Add(TEXT("/WHFramework/Voxel/DataAssets"));Filter.PackagePaths.Add(TEXT("/Game/DataAssets/Voxel"));
-    Filter.PackagePaths.Add(TEXT("/Game/VoxelStyle/Blocks"));Filter.bRecursivePaths=true;
+    Filter.PackagePaths.Add(TEXT("/WHFramework/Voxel/DataAssets"));Filter.PackagePaths.Add(TEXT("/WHFramework/DataAssets/Voxel"));Filter.PackagePaths.Add(TEXT("/Game/DataAssets/Voxel"));
+    Filter.bRecursivePaths=true;
     TArray<FAssetData> Found;AR.GetAssets(Filter,Found);TArray<UVoxelData*> Blocks;
     for(const FAssetData& A:Found)if(auto* D=Cast<UVoxelData>(A.GetAsset()))Blocks.Add(D);
     FVoxelRegistry Registry;

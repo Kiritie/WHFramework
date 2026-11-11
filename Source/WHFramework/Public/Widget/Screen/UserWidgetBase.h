@@ -2,8 +2,10 @@
 
 #pragma once
 
+#include "Widget/WidgetMountTypes.h"
+#include "Widget/ScreenWidgetTypes.h"
 #include "CommonActivatableWidget.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Slate/Runtime/Interfaces/ScreenWidgetInterface.h"
 #include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
@@ -14,6 +16,9 @@
 class USubWidgetBase;
 class UWidgetAnimatorBase;
 class UWidgetMountSlot;
+class UWidgetModule;
+class UObjectPoolModule;
+class UWorld;
 struct FUIActionBindingHandle;
 /**
  * 

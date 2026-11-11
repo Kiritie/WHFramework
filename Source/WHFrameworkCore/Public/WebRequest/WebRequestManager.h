@@ -3,6 +3,7 @@
 #pragma once
 
 #include "WebRequestTypes.h"
+#include "Type/NativeTypeIdentity.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Main/MainTypes.h"
 #include "Main/Base/ManagerBase.h"
@@ -30,19 +31,21 @@ public:
 
 	virtual void OnRefresh(float DeltaSeconds) override;
 
+	virtual void OnTermination() override;
+
 public:
 	virtual void ConnectServer(); 
 
 public:
-	virtual bool SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete);
+	virtual FGuid SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete, FGuid InRequestId = FGuid());
 
-	virtual bool SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithText OnComplete);
+	virtual FGuid SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithText OnComplete);
 
-	virtual bool SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithJson OnComplete);
+	virtual FGuid SendWebRequest(const FString& InUrl, EWebRequestMethod InMethod, FParameterMap InHeadMap, FWebContent InContent, FOnWebRequestComplete_WithJson OnComplete);
 
-	virtual bool CancelWebRequest(const FString& InUrl);
+	virtual bool CancelWebRequest(const FGuid& RequestId);
 
-	virtual TSharedPtr<IHttpRequest> GetWebRequest(const FString& InUrl) const;
+	virtual TSharedPtr<IHttpRequest> GetWebRequest(const FGuid& RequestId) const;
 
 public:
 	virtual void AddDownloader(const TSharedPtr<IFileDownloaderInterface>& Downloader);
@@ -50,7 +53,7 @@ public:
 	virtual void RemoveDownloader(const TSharedPtr<IFileDownloaderInterface>& Downloader);
 
 protected:
-	virtual void OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete);
+	virtual void OnWebRequestComplete(FGuid RequestId, FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, TFunction<void(FHttpRequestPtr, FHttpResponsePtr, bool)> OnComplete);
 
 protected:
 	bool bLocalMode;
@@ -61,7 +64,10 @@ protected:
 
 	bool bConnected;
 
-	TMap<FString, TSharedPtr<IHttpRequest>> WebRequestMap;
+	TMap<FGuid, TSharedPtr<IHttpRequest>> WebRequestMap;
+	TSharedPtr<uint8> Lifetime;
+	FGuid ConnectRequestId;
+	bool bStopping = false;
 
 	TArray<TSharedPtr<IFileDownloaderInterface>> Downloaders;
 

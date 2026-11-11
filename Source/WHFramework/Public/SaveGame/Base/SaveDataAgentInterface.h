@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Common/CommonModuleTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Common/CommonTypes.h"
 #include "Parameter/ParameterTypes.h"
 #include "SaveGame/SaveGameModuleTypes.h"
 
@@ -17,11 +18,12 @@ class WHFRAMEWORK_API ISaveDataAgentInterface
 	GENERATED_BODY()
 
 public:
-	void LoadSaveData(const FParameter& InSaveData, EPhase InPhase = EPhase::All);
+	bool LoadSaveData(const FParameter& InSaveData, EPhase InPhase = EPhase::All);
 
 	FParameter GetSaveData(bool bRefresh = false);
 
-	void UnloadSaveData(EPhase InPhase = EPhase::All);
+	bool UnloadSaveData(EPhase InPhase = EPhase::All);
+	virtual bool WasLoadDataApplied() const { return bLoadDataApplied; }
 
 protected:
 	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) = 0;
@@ -36,7 +38,12 @@ protected:
 
 	virtual bool HasArchive() const { return false; }
 
+	void MarkLoadDataFailed() { bLoadDataApplied = false; }
+	void MarkUnloadDataFailed() { bUnloadDataApplied = false; }
+
 private:
+	bool bLoadDataApplied = true;
+	bool bUnloadDataApplied = true;
 	static const FSaveData* ResolveSaveData(const FParameter& InParameter);
 
 	static FSaveData* ResolveSaveData(FParameter& InParameter);

@@ -10,6 +10,7 @@
 #include "Voxel/Rendering/VoxelTerrainRenderer.h"
 
 class UVoxelModule;
+class UWorld;
 class UVoxelMeshComponent;
 class FVoxelTerrainRenderer;
 struct FVoxelTerrainCoarseMesh;
@@ -91,6 +92,8 @@ public:
 	void Forget(FVoxelViewSourceId InSourceId);
 	bool Retire(FVoxelViewSourceId InSourceId);
 	void Reset();
+	void BeginWorldStop();
+	bool TryResetForWorldStop(FString& OutError);
 	bool IsBusy() const;
 	bool HasActiveGroups() const { return !Publications.IsEmpty(); }
 	bool HasReadyCommits() const
@@ -463,6 +466,11 @@ private:
 	UVoxelModule& Module;
 	FVoxelTaskScheduler& Scheduler;
 	uint64 WorldEpoch = 0;
+	TWeakObjectPtr<UWorld> OriginalWorld;
+	bool bStopRequested = false;
+	bool bStopInProgress = false;
+	bool bStopPrepared = false;
+	bool bStopComplete = false;
 	mutable TOptional<FVoxelTerrainRenderer> TerrainRenderer;
 	uint64 BatchSerial = 0;
 	FGuid NativeOwnerId = FGuid::NewGuid();

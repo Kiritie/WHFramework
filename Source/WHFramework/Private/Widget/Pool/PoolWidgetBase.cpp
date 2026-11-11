@@ -2,7 +2,7 @@
 
 #include "Widget/Pool/PoolWidgetBase.h"
 
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "ObjectPool/ObjectPoolModuleTypes.h"
 #include "Widget/WidgetModule.h"
@@ -16,7 +16,7 @@ UPoolWidgetBase::UPoolWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 
 void UPoolWidgetBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
+	if(UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld())) Widgets->RegisterTickableWidget(this);
 
 	const FWidgetSpawnParameter* Parameter = InParam.GetPtr<FWidgetSpawnParameter>();
 	OwnerWidget = Parameter ? Cast<UUserWidget>(Parameter->OwnerObject) : nullptr;
@@ -27,7 +27,7 @@ void UPoolWidgetBase::OnSpawn_Implementation(const FParameter& InParam)
 
 void UPoolWidgetBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
-	if(UWidgetModule::IsValid()) UWidgetModule::Get().UnregisterTickableWidget(this);
+	if(UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld())) Widgets->UnregisterTickableWidget(this);
 
 	OwnerWidget = nullptr;
 	WidgetParam.Reset();
@@ -50,7 +50,7 @@ void UPoolWidgetBase::Refresh()
 
 void UPoolWidgetBase::Destroy(EObjectDespawnMode InMode)
 {
-	UObjectPoolModuleStatics::DespawnObject(this, InMode);
+	if (UObjectPoolModule* Pool = UObjectPoolModule::GetPtr(GetWorld())) Pool->DespawnObject(this, InMode);
 }
 
 UUserWidget* UPoolWidgetBase::GetOwnerWidget(TSubclassOf<UUserWidget> InClass) const

@@ -3,8 +3,12 @@
 #pragma once
 
 #include "AssetTypes.h"
+#include "Type/NativeTypeIdentity.h"
 #include "Main/MainTypes.h"
 #include "Main/Base/ManagerBase.h"
+#include "UObject/StrongObjectPtr.h"
+
+class UTexture2D;
 
 class WHFRAMEWORKCORE_API FAssetManager : public FManagerBase
 {
@@ -17,6 +21,7 @@ public:
 
 public:
 	virtual void OnInitialize() override;
+	virtual void OnTermination() override;
 
 public:
 	virtual bool RegisterAsset(FUniqueAssetData* InAssetData);
@@ -163,9 +168,10 @@ public:
 	virtual UTexture2D* LoadTextureByPath(const FString& InTexturePath, bool bEnsured = true);
 
 	virtual void ReleaseRuntimeData();
+	void ClearTextureCache();
 
 protected:
 	TMap<FUniqueAssetID, FUniqueAssetData*> AssetMap;
 
-	TMap<FString, UTexture2D*> TextureMap;
+	TMap<FString, TStrongObjectPtr<UTexture2D>> TextureMap;
 };

@@ -2,9 +2,12 @@
 
 #pragma once
 
+#include "Containers/Ticker.h"
 
+
+#include "Common/LifecycleTypes.h"
 #include "GameFramework/Actor.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "Scene/Actor/SceneActorInterface.h"
@@ -116,8 +119,15 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// SceneActor
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_ActorID, Category = "SceneActor")
 	FGuid ActorID;
+
+	FTSTicker::FDelegateHandle SceneIdentityRetry;
+	bool bSceneIdentityCommitted = false;
+	bool bSceneRegistrationFailed = false;
+
+	UFUNCTION()
+	virtual void OnRep_ActorID();
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	bool bVisible;
@@ -128,7 +138,7 @@ protected:
 public:
 	virtual FGuid GetActorID_Implementation() const override { return ActorID; }
 
-	virtual void SetActorID_Implementation(const FString& InID) override { ActorID = FGuid(InID); }
+	virtual bool SetActorID_Implementation(FGuid InID) override;
 
 	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override { return Container; }
 
@@ -139,10 +149,19 @@ public:
 	virtual void SetActorVisible_Implementation(bool bInVisible) override;
 
 protected:
+	virtual void PostActorCreated() override;
+
+#if WITH_EDITOR
+	virtual void PostDuplicate(EDuplicateMode::Type DuplicateMode) override;
+	virtual void PostEditImport() override;
+#endif
+
 	virtual void BeginPlay() override;
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 public:
 	virtual void Tick(float DeltaSeconds) override;
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };

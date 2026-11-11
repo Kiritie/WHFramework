@@ -1,9 +1,10 @@
 #include "Voxel/Agent/VoxelAgentComponent.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
 #include "Ability/Inventory/InventoryNetworkComponent.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Ability/Inventory/InventoryItemRegistry.h"
 
 #include "Camera/CameraComponent.h"
@@ -65,6 +66,11 @@ void UVoxelAgentComponent::BeginPlay()
 	}
 
 	ResetBirthClaim();
+}
+
+APlayerController* UVoxelAgentComponent::GetBoundController() const
+{
+	return BoundController.Get();
 }
 
 void UVoxelAgentComponent::BindController(
@@ -212,7 +218,7 @@ FGuid UVoxelAgentComponent::GetInventoryStoreId() const
 {
     if(GetOwner() && GetOwner()->HasAuthority())
     {
-        const UInventoryWorldSubsystem* System = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+        const UInventoryModule* System = GetWorld() ? UInventoryModule::GetPtr(GetWorld()) : nullptr;
         return System && System->IsReady() ? System->GetStoreId() : FGuid();
     }
     const UInventoryNetworkComponent* InventoryNetwork = BoundController.IsValid() ?
@@ -315,7 +321,7 @@ bool UVoxelAgentComponent::MakeIntent(
             if(const FInventorySlotState* Slot = View->FindSlot(OutIntent.InventorySlot))
             {
                 OutIntent.ExpectedItemID = Slot->Item.ItemId;
-                const UInventoryWorldSubsystem* System = GetWorld()->GetSubsystem<UInventoryWorldSubsystem>();
+                const UInventoryModule* System = UInventoryModule::GetPtr(GetWorld());
                 const FInventoryItemDefinition* Item = System ? System->GetRegistry().Find(Slot->Item.ItemId) : nullptr;
                 const FVoxelRuntimeDefinition* Placed = Item ? VoxelModule->GetRegistry()->Find(Item->PlaceableVoxelId) : nullptr;
                 if (HitDefinition && Placed && HitDefinition->Shape == EVoxelShapeKind::Slab && Placed->Shape == EVoxelShapeKind::Slab &&
@@ -478,7 +484,7 @@ bool UVoxelAgentComponent::CanRotateSelected() const
 		Snapshot = *View;
 	}
 	const FInventorySlotState* Slot = Snapshot.FindSlot(InventoryAgent->GetSelectedInventorySlot());
-	const UInventoryWorldSubsystem* System = GetWorld()->GetSubsystem<UInventoryWorldSubsystem>();
+	const UInventoryModule* System = UInventoryModule::GetPtr(GetWorld());
 	const FInventoryItemDefinition* Item = Slot && !Slot->bLocked && !Slot->Item.IsEmpty() && System ? System->GetRegistry().Find(Slot->Item.ItemId) : nullptr;
 	const FVoxelRuntimeDefinition* Definition = Item && VoxelModule->GetRegistry() ? VoxelModule->GetRegistry()->Find(Item->PlaceableVoxelId) : nullptr;
 	return Definition && (Definition->Shape == EVoxelShapeKind::FullCube || Definition->Shape == EVoxelShapeKind::Stair ||

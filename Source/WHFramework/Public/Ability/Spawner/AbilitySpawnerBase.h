@@ -2,7 +2,9 @@
 
 #pragma once
 
-#include "Ability/AbilityModuleTypes.h"
+#include "Containers/Ticker.h"
+
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "Common/Base/WHActor.h"
 #include "Engine/NavigationObjectBase.h"
 
@@ -56,8 +58,15 @@ protected:
 	//////////////////////////////////////////////////////////////////////////
 	/// SceneActor
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_ActorID, Category = "SceneActor")
 	FGuid ActorID;
+
+	FTSTicker::FDelegateHandle SceneIdentityRetry;
+	bool bSceneIdentityCommitted = false;
+	bool bSceneRegistrationFailed = false;
+
+	UFUNCTION()
+	void OnRep_ActorID();
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	bool bVisible;
@@ -68,7 +77,7 @@ protected:
 public:
 	virtual FGuid GetActorID_Implementation() const override { return ActorID; }
 
-	virtual void SetActorID_Implementation(const FString& InID) override { ActorID = FGuid(InID); }
+	virtual bool SetActorID_Implementation(FGuid InID) override;
 
 	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override { return Container; }
 
@@ -79,6 +88,13 @@ public:
 	virtual void SetActorVisible_Implementation(bool bInVisible) override;
 
 protected:
+	virtual void PostActorCreated() override;
+
+#if WITH_EDITOR
+	virtual void PostDuplicate(EDuplicateMode::Type DuplicateMode) override;
+	virtual void PostEditImport() override;
+#endif
+
 	virtual void BeginPlay() override;
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

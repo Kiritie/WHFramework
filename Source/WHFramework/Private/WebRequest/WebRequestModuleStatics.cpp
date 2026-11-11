@@ -5,122 +5,146 @@
 
 #include "WebRequest/WebRequestModule.h"
 
-bool UWebRequestModuleStatics::IsWebLocalMode()
+bool UWebRequestModuleStatics::IsWebLocalMode(const UObject* WorldContextObject)
 {
-	return UWebRequestModule::Get().IsLocalMode();
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->IsLocalMode() : false;
 }
 
-void UWebRequestModuleStatics::SetWebLocalMode(bool bInLocalMode)
+void UWebRequestModuleStatics::SetWebLocalMode(const UObject* WorldContextObject, bool bInLocalMode)
 {
-	UWebRequestModule::Get().SetLocalMode(bInLocalMode);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	if (Module) Module->SetLocalMode(bInLocalMode);
 }
 
-FString UWebRequestModuleStatics::GetWebServerURL()
+FString UWebRequestModuleStatics::GetWebServerURL(const UObject* WorldContextObject)
 {
-	return UWebRequestModule::Get().GetServerURL();
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->GetServerURL() : FString();
 }
 
-void UWebRequestModuleStatics::SetWebServerURL(const FString& InServerURL)
+void UWebRequestModuleStatics::SetWebServerURL(const UObject* WorldContextObject, const FString& InServerURL)
 {
-	UWebRequestModule::Get().SetServerURL(InServerURL);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	if (Module) Module->SetServerURL(InServerURL);
 }
 
-int32 UWebRequestModuleStatics::GetWebServerPort()
+int32 UWebRequestModuleStatics::GetWebServerPort(const UObject* WorldContextObject)
 {
-	return UWebRequestModule::Get().GetServerPort();
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->GetServerPort() : 0;
 }
 
-void UWebRequestModuleStatics::SetWebServerPort(int32 InServerPort)
+void UWebRequestModuleStatics::SetWebServerPort(const UObject* WorldContextObject, int32 InServerPort)
 {
-	UWebRequestModule::Get().SetServerPort(InServerPort);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	if (Module) Module->SetServerPort(InServerPort);
 }
 
-bool UWebRequestModuleStatics::HasWebInterface(const FName InName)
+bool UWebRequestModuleStatics::HasWebInterface(const UObject* WorldContextObject, const FName InName)
 {
-	return UWebRequestModule::Get().HasWebInterface(InName);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->HasWebInterface(InName) : false;
 }
 
-UWebInterfaceBase* UWebRequestModuleStatics::GetWebInterface(const FName InName, TSubclassOf<UWebInterfaceBase> InClass)
+UWebInterfaceBase* UWebRequestModuleStatics::GetWebInterface(const UObject* WorldContextObject, const FName InName, TSubclassOf<UWebInterfaceBase> InClass)
 {
-	return UWebRequestModule::Get().GetWebInterface(InName, InClass);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->GetWebInterface(InName, InClass) : nullptr;
 }
 
-UWebInterfaceBase* UWebRequestModuleStatics::CreateWebInterface(const FName InName, TSubclassOf<UWebInterfaceBase> InClass)
+UWebInterfaceBase* UWebRequestModuleStatics::CreateWebInterface(const UObject* WorldContextObject, const FName InName, TSubclassOf<UWebInterfaceBase> InClass)
 {
-	return UWebRequestModule::Get().CreateWebInterface(InName, InClass);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->CreateWebInterface(InName, InClass) : nullptr;
 }
 
-bool UWebRequestModuleStatics::RegisterWebInterface(const FName InName, const FOnWebRequestComplete& InOnRequestComplete)
+bool UWebRequestModuleStatics::RegisterWebInterface(const UObject* WorldContextObject, const FName InName, const FOnWebRequestComplete& InOnRequestComplete)
 {
-	return UWebRequestModule::Get().RegisterWebInterface(InName, InOnRequestComplete);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->RegisterWebInterface(InName, InOnRequestComplete) : false;
 }
 
-bool UWebRequestModuleStatics::UnRegisterWebInterface(const FName InName, const FOnWebRequestComplete& InOnRequestComplete)
+bool UWebRequestModuleStatics::UnRegisterWebInterface(const UObject* WorldContextObject, const FName InName, const FOnWebRequestComplete& InOnRequestComplete)
 {
-	return UWebRequestModule::Get().UnRegisterWebInterface(InName, InOnRequestComplete);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->UnRegisterWebInterface(InName, InOnRequestComplete) : false;
 }
 
-bool UWebRequestModuleStatics::UnRegisterAllWebInterface(const FName InName)
+bool UWebRequestModuleStatics::UnRegisterAllWebInterface(const UObject* WorldContextObject, const FName InName)
 {
-	return UWebRequestModule::Get().UnRegisterAllWebInterface(InName);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->UnRegisterAllWebInterface(InName) : false;
 }
 
-bool UWebRequestModuleStatics::ClearWebInterface(const FName InName)
+bool UWebRequestModuleStatics::ClearWebInterface(const UObject* WorldContextObject, const FName InName)
 {
-	return UWebRequestModule::Get().ClearWebInterface(InName);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->ClearWebInterface(InName) : false;
 }
 
-void UWebRequestModuleStatics::ClearAllWebInterface()
+void UWebRequestModuleStatics::ClearAllWebInterface(const UObject* WorldContextObject)
 {
-	UWebRequestModule::Get().ClearAllWebInterface();
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	if (Module) Module->ClearAllWebInterface();
 }
 
-FWebRequestConfig UWebRequestModuleStatics::GetWebRequestConfig(const FName InName)
+FWebRequestConfig UWebRequestModuleStatics::GetWebRequestConfig(const UObject* WorldContextObject, const FName InName)
 {
-	return UWebRequestModule::Get().GetWebRequestConfig(InName);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->GetWebRequestConfig(InName) : FWebRequestConfig();
 }
 
-FWebRequestConfig UWebRequestModuleStatics::CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
+FWebRequestConfig UWebRequestModuleStatics::CreateWebRequestConfig(const UObject* WorldContextObject, const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
 {
-	return UWebRequestModule::Get().CreateWebRequestConfig(InName, InMethod, InParams, InHeadMap, InContent, InTriggerType, InTriggerTime);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->CreateWebRequestConfig(InName, InMethod, InParams, InHeadMap, InContent, InTriggerType, InTriggerTime) : FWebRequestConfig();
 }
 
-FWebRequestConfig UWebRequestModuleStatics::CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
+FWebRequestConfig UWebRequestModuleStatics::CreateWebRequestConfig(const UObject* WorldContextObject, const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
 {
-	return UWebRequestModule::Get().CreateWebRequestConfig(InName, InMethod, InParams, InHeadMap, InContent, InTriggerType, InTriggerTime);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->CreateWebRequestConfig(InName, InMethod, InParams, InHeadMap, InContent, InTriggerType, InTriggerTime) : FWebRequestConfig();
 }
 
-FWebRequestConfig UWebRequestModuleStatics::K2_CreateWebRequestConfig(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
+FWebRequestConfig UWebRequestModuleStatics::K2_CreateWebRequestConfig(const UObject* WorldContextObject, const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent, EWebRequestTriggerType InTriggerType, float InTriggerTime)
 {
-	return UWebRequestModule::Get().CreateWebRequestConfig(InName, InMethod, InParams, InHeadMap, InContent, InTriggerType, InTriggerTime);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->CreateWebRequestConfig(InName, InMethod, InParams, InHeadMap, InContent, InTriggerType, InTriggerTime) : FWebRequestConfig();
 }
 
-bool UWebRequestModuleStatics::ClearWebRequestConfig(const FName InName)
+bool UWebRequestModuleStatics::ClearWebRequestConfig(const UObject* WorldContextObject, const FName InName)
 {
-	return UWebRequestModule::Get().ClearWebRequestConfig(InName);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->ClearWebRequestConfig(InName) : false;
 }
 
-void UWebRequestModuleStatics::ClearAllWebRequestConfig()
+void UWebRequestModuleStatics::ClearAllWebRequestConfig(const UObject* WorldContextObject)
 {
-	UWebRequestModule::Get().ClearAllWebRequestConfig();
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	if (Module) Module->ClearAllWebRequestConfig();
 }
 
-bool UWebRequestModuleStatics::SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent)
+bool UWebRequestModuleStatics::SendWebRequest(const UObject* WorldContextObject, const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>* InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
-	return UWebRequestModule::Get().SendWebRequest(InName, InMethod, InParams, InHeadMap, InContent);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->SendWebRequest(InName, InMethod, InParams, InHeadMap, InContent) : false;
 }
 
-bool UWebRequestModuleStatics::SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
+bool UWebRequestModuleStatics::SendWebRequest(const UObject* WorldContextObject, const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
-	return UWebRequestModule::Get().SendWebRequest(InName, InMethod, InParams, InHeadMap, InContent);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->SendWebRequest(InName, InMethod, InParams, InHeadMap, InContent) : false;
 }
 
-bool UWebRequestModuleStatics::K2_SendWebRequest(const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
+bool UWebRequestModuleStatics::K2_SendWebRequest(const UObject* WorldContextObject, const FName InName, EWebRequestMethod InMethod, const TArray<FParameter>& InParams, FParameterMap InHeadMap, FWebContent InContent)
 {
-	return UWebRequestModule::Get().K2_SendWebRequest(InName, InMethod, InParams, InHeadMap, InContent);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->K2_SendWebRequest(InName, InMethod, InParams, InHeadMap, InContent) : false;
 }
 
-bool UWebRequestModuleStatics::SendWebRequestByConfig(const FName InName)
+bool UWebRequestModuleStatics::SendWebRequestByConfig(const UObject* WorldContextObject, const FName InName)
 {
-	return UWebRequestModule::Get().SendWebRequestByConfig(InName);
+	UWebRequestModule* Module = UWebRequestModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr);
+	return Module ? Module->SendWebRequestByConfig(InName) : false;
 }

@@ -57,39 +57,42 @@ namespace
 #undef WH_PARAMETER_STRUCT_TYPES
 }
 
-bool UParameterModuleStatics::HasGlobalParameter(FName InName, bool bEnsured)
+bool UParameterModuleStatics::HasGlobalParameter(UWorld* InWorld, FName InName, bool bEnsured)
 {
-	return UParameterModule::Get().HasParameter(InName, bEnsured);
+	const UParameterModule* Module = UParameterModule::GetPtr(InWorld);
+	return Module && Module->HasParameter(InName, bEnsured);
 }
 
-void UParameterModuleStatics::SetGlobalParameter(FName InName, FParameter InParam)
+void UParameterModuleStatics::SetGlobalParameter(UWorld* InWorld, FName InName, FParameter InParam)
 {
-	UParameterModule::Get().SetParameter(InName, InParam);
+	if (UParameterModule* Module = UParameterModule::GetPtr(InWorld)) Module->SetParameter(InName, InParam);
 }
 
-FParameter UParameterModuleStatics::GetGlobalParameter(FName InName, bool bEnsured)
+FParameter UParameterModuleStatics::GetGlobalParameter(UWorld* InWorld, FName InName, bool bEnsured)
 {
-	return UParameterModule::Get().GetParameter(InName, bEnsured);
+	const UParameterModule* Module = UParameterModule::GetPtr(InWorld);
+	return Module ? Module->GetParameter(InName, bEnsured) : FParameter();
 }
 
-TArray<FParameter> UParameterModuleStatics::GetGlobalParameters(FName InName, bool bEnsured)
+TArray<FParameter> UParameterModuleStatics::GetGlobalParameters(UWorld* InWorld, FName InName, bool bEnsured)
 {
-	return UParameterModule::Get().GetParameters(InName, bEnsured);
+	const UParameterModule* Module = UParameterModule::GetPtr(InWorld);
+	return Module ? Module->GetParameters(InName, bEnsured) : TArray<FParameter>();
 }
 
-void UParameterModuleStatics::RemoveGlobalParameter(FName InName)
+void UParameterModuleStatics::RemoveGlobalParameter(UWorld* InWorld, FName InName)
 {
-	UParameterModule::Get().RemoveParameter(InName);
+	if (UParameterModule* Module = UParameterModule::GetPtr(InWorld)) Module->RemoveParameter(InName);
 }
 
-void UParameterModuleStatics::RemoveGlobalParameters(FName InName)
+void UParameterModuleStatics::RemoveGlobalParameters(UWorld* InWorld, FName InName)
 {
-	UParameterModule::Get().RemoveParameters(InName);
+	if (UParameterModule* Module = UParameterModule::GetPtr(InWorld)) Module->RemoveParameters(InName);
 }
 
-void UParameterModuleStatics::ClearAllGlobalParameter()
+void UParameterModuleStatics::ClearAllGlobalParameter(UWorld* InWorld)
 {
-	UParameterModule::Get().ClearAllParameter();
+	if (UParameterModule* Module = UParameterModule::GetPtr(InWorld)) Module->ClearAllParameter();
 }
 
 FParameter UParameterModuleStatics::MakeParameter(const int32&, const FText&)

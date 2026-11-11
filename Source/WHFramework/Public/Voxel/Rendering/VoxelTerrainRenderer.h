@@ -197,6 +197,7 @@ public:
 	bool IsLocked(const FIntVector& InSection) const;
 	bool IsBusy() const;
 	void Reset();
+	bool TryResetForWorldStop(FString& OutError);
 
 private:
 	bool EnsureState();
@@ -209,5 +210,9 @@ private:
 	EVoxelTerrainResourceAdmission BootstrapAdmission = EVoxelTerrainResourceAdmission::None;
 	uint64 BootstrapCapacityVersion = 0;
 	bool bStopped = false;
+	bool bStopInProgress = false;
+	bool bStopPrepared = false;
+	bool bComponentUnregistered = false;
+	bool bComponentDetached = false;
 	TSharedPtr<FVoxelTerrainRendererState, ESPMode::ThreadSafe> State;
 };

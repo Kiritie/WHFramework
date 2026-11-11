@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Vitality/States/AbilityVitalityState_Death.h"
+#include "Ability/AbilityTags.h"
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Vitality/AbilityVitalityBase.h"
@@ -115,5 +116,5 @@ void UAbilityVitalityState_Death::DeathEnd()
 	SetStateTag(GameplayTags::State_Vitality_Dead, true);
 
 
-	UObjectPoolModuleStatics::DespawnObject(Vitality);
+	UObjectPoolModuleStatics::DespawnObject(Vitality, Vitality);
 }

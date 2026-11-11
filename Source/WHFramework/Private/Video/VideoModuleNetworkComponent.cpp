@@ -4,32 +4,52 @@
 #include "Video/VideoModuleNetworkComponent.h"
 
 #include "Video/MediaPlayer/MediaPlayerBase.h"
+#include "GameFramework/PlayerController.h"
+
+namespace
+{
+	bool CanControlMedia(const UActorComponent* Component, const AMediaPlayerBase* Media)
+	{
+		const APlayerController* Controller = Component ? Cast<APlayerController>(Component->GetOwner()) : nullptr;
+		return IsValid(Controller) && IsValid(Media) && Controller->GetWorld() == Media->GetWorld() && Media->IsOwnedBy(Controller);
+	}
+}
 
 UVideoModuleNetworkComponent::UVideoModuleNetworkComponent()
 {
-	
+	PrimaryComponentTick.bCanEverTick = true;
 }
 
-bool UVideoModuleNetworkComponent::ServerPlayMovieMulticast_Validate(AMediaPlayerBase* InMediaPlayer, const FName& InName) { return true; }
-void UVideoModuleNetworkComponent::ServerPlayMovieMulticast_Implementation(AMediaPlayerBase* InMediaPlayer, const FName& InName)
+void UVideoModuleNetworkComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
-	InMediaPlayer->PlayMovie(InName);
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	MaintainLocalWorldRoute();
 }
 
-bool UVideoModuleNetworkComponent::ServerStopMovieMulticast_Validate(AMediaPlayerBase* InMediaPlayer, bool bSkip) { return true; }
-void UVideoModuleNetworkComponent::ServerStopMovieMulticast_Implementation(AMediaPlayerBase* InMediaPlayer, bool bSkip)
+bool UVideoModuleNetworkComponent::ServerPlayMovieMulticast_Validate(FGuid WorldRoute, AMediaPlayerBase* InMediaPlayer, const FName& InName) { return true; }
+void UVideoModuleNetworkComponent::ServerPlayMovieMulticast_Implementation(FGuid WorldRoute, AMediaPlayerBase* InMediaPlayer, const FName& InName)
 {
-	InMediaPlayer->StopMovie(bSkip);
+	if (!AcceptRemoteWorldRoute(WorldRoute) || !CanControlMedia(this, InMediaPlayer) || InName.IsNone()) return;
+	InMediaPlayer->PlayMovie(InName, true);
 }
 
-bool UVideoModuleNetworkComponent::ServerPauseMovieMulticast_Validate(AMediaPlayerBase* InMediaPlayer) { return true; }
-void UVideoModuleNetworkComponent::ServerPauseMovieMulticast_Implementation(AMediaPlayerBase* InMediaPlayer)
+bool UVideoModuleNetworkComponent::ServerStopMovieMulticast_Validate(FGuid WorldRoute, AMediaPlayerBase* InMediaPlayer, bool bSkip) { return true; }
+void UVideoModuleNetworkComponent::ServerStopMovieMulticast_Implementation(FGuid WorldRoute, AMediaPlayerBase* InMediaPlayer, bool bSkip)
 {
-	InMediaPlayer->PauseMovie();
+	if (!AcceptRemoteWorldRoute(WorldRoute) || !CanControlMedia(this, InMediaPlayer)) return;
+	InMediaPlayer->StopMovie(bSkip, true);
 }
 
-bool UVideoModuleNetworkComponent::ServerSeekMovieMulticast_Validate(AMediaPlayerBase* InMediaPlayer, const FTimespan& InTimespan) { return true; }
-void UVideoModuleNetworkComponent::ServerSeekMovieMulticast_Implementation(AMediaPlayerBase* InMediaPlayer, const FTimespan& InTimespan)
+bool UVideoModuleNetworkComponent::ServerPauseMovieMulticast_Validate(FGuid WorldRoute, AMediaPlayerBase* InMediaPlayer) { return true; }
+void UVideoModuleNetworkComponent::ServerPauseMovieMulticast_Implementation(FGuid WorldRoute, AMediaPlayerBase* InMediaPlayer)
 {
-	InMediaPlayer->SeekMovie(InTimespan);
+	if (!AcceptRemoteWorldRoute(WorldRoute) || !CanControlMedia(this, InMediaPlayer)) return;
+	InMediaPlayer->PauseMovie(true);
+}
+
+bool UVideoModuleNetworkComponent::ServerSeekMovieMulticast_Validate(FGuid WorldRoute, AMediaPlayerBase* InMediaPlayer, const FTimespan& InTimespan) { return true; }
+void UVideoModuleNetworkComponent::ServerSeekMovieMulticast_Implementation(FGuid WorldRoute, AMediaPlayerBase* InMediaPlayer, const FTimespan& InTimespan)
+{
+	if (!AcceptRemoteWorldRoute(WorldRoute) || !CanControlMedia(this, InMediaPlayer) || InTimespan < FTimespan::Zero()) return;
+	InMediaPlayer->SeekMovie(InTimespan, true);
 }

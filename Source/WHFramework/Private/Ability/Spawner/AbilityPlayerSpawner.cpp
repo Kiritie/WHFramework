@@ -1,12 +1,14 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Spawner/AbilityPlayerSpawner.h"
+#include "GameFramework/PlayerController.h"
+#include "Ability/AbilityActorSaveTypes.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Inventory/InventoryItemAssetCatalog.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Engine/World.h"
-#include "Ability/AbilityModuleTypes.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Character/AbilityCharacterDataBase.h"
 #include "Ability/Pawn/AbilityPawnBase.h"
@@ -60,7 +62,7 @@ AAbilityPlayerSpawner::AAbilityPlayerSpawner()
 
 AActor* AAbilityPlayerSpawner::SpawnImpl_Implementation(const FAbilityItem& InAbilityItem)
 {
-	const UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	const UInventoryModule* Subsystem = GetWorld() ? UInventoryModule::GetPtr(GetWorld()) : nullptr;
 	const UInventoryItemAssetCatalog* Catalog = Subsystem ? Subsystem->GetItemAssets() : nullptr;
 	const UAbilityCharacterDataBase* Definition = Catalog ? Catalog->FindAs<UAbilityCharacterDataBase>(InAbilityItem.ItemId) : nullptr;
 	if (!Definition || InAbilityItem.Level < 0 || InAbilityItem.Level > Definition->MaxLevel)
@@ -77,14 +79,16 @@ AActor* AAbilityPlayerSpawner::SpawnImpl_Implementation(const FAbilityItem& InAb
 	SaveData.SpawnTransform = GetActorTransform();
 
 	
-	AActor* PlayerActor = UAbilityModuleStatics::SpawnAbilityActor(FParameter(MoveTemp(SaveData)));
+	AActor* PlayerActor = UAbilityModuleStatics::SpawnAbilityActor(GetWorld(), FParameter(MoveTemp(SaveData)));
 	if(AAbilityPawnBase* PlayerPawn = Cast<AAbilityPawnBase>(PlayerActor))
 	{
-		UPawnModuleStatics::SwitchPawn(PlayerPawn);
+		if (APlayerController* Player = Cast<APlayerController>(GetInstigatorController()))
+			UPawnModuleStatics::SwitchPawn(Player, PlayerPawn);
 	}
 	else if(AAbilityCharacterBase* PlayerCharacter = Cast<AAbilityCharacterBase>(PlayerActor))
 	{
-		UCharacterModuleStatics::SwitchCharacter(PlayerCharacter);
+		if (APlayerController* Player = Cast<APlayerController>(GetInstigatorController()))
+			UCharacterModuleStatics::SwitchCharacter(Player, PlayerCharacter);
 	}
 	return PlayerActor;
 }

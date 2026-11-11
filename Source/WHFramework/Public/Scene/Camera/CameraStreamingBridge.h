@@ -2,6 +2,7 @@
 #include "GameFramework/Info.h"
 #include "CameraStreamingBridge.generated.h"
 class UWorldPartitionStreamingSourceComponent;
+class APlayerController;
 UCLASS(NotPlaceable)
 class WHFRAMEWORK_API ACameraStreamingBridge : public AInfo
 {
@@ -9,9 +10,9 @@ class WHFRAMEWORK_API ACameraStreamingBridge : public AInfo
 public:
 	ACameraStreamingBridge();
 	virtual void Tick(float DeltaTime) override;
-	void SetPlayerIndex(int32 InPlayerIndex) { PlayerIndex = InPlayerIndex; }
+	void SetPlayer(APlayerController* InPlayer) { Player = InPlayer; }
 private:
 	UPROPERTY(VisibleDefaultsOnly)
 	TObjectPtr<UWorldPartitionStreamingSourceComponent> StreamingSource;
-	int32 PlayerIndex = 0;
+	TWeakObjectPtr<APlayerController> Player;
 };

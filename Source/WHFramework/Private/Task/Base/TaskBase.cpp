@@ -2,8 +2,14 @@
 
 
 #include "Task/Base/TaskBase.h"
+#include "Task/TaskExecutionTypes.h"
+#include "Task/TaskReferenceTypes.h"
+#include "Task/TaskObjectiveTypes.h"
+#include "Task/TaskPresentationTypes.h"
+#include "Task/TaskSaveTypes.h"
+#include "Common/LifecycleTypes.h"
 
-#include "Event/EventModuleStatics.h"
+#include "Event/EventModule.h"
 #include "Event/Events/Task/Event_TaskCompleted.h"
 #include "Event/Events/Task/Event_TaskEntered.h"
 #include "Event/Events/Task/Event_TaskExecuted.h"
@@ -52,7 +58,6 @@ UTaskBase::UTaskBase()
 	RootTask = nullptr;
 	ParentTask = nullptr;
 
-	bRuntimeSelected = false;
 }
 
 #if WITH_EDITOR
@@ -71,22 +76,18 @@ void UTaskBase::OnStateChanged(ETaskState InTaskState)
 {
 	OnTaskStateChanged.Broadcast(InTaskState);
 	K2_OnStateChanged(InTaskState);
-
-	UEventModuleStatics::BroadcastEvent<FEventTaskStateChanged>(this, {this});
+	if (UEventModule* Events = UEventModule::GetPtr(GetWorld())) Events->BroadcastEvent<FEventTaskStateChanged>(this, {this});
 }
 
 void UTaskBase::OnInitialize()
 {
-	for (auto Iter : SubTasks)
+	for (UTaskBase* Child : SubTasks)
 	{
-		if(Iter)
-		{
-			Iter->RootTask = IsRootTask() ? this : RootTask;
-			Iter->ParentTask = this;
-			Iter->OnInitialize();
-		}
+		if (!Child) continue;
+		Child->RootTask = IsRootTask() ? this : RootTask;
+		Child->ParentTask = this;
+		Child->OnInitialize();
 	}
-
 	K2_OnInitialize();
 }
 
@@ -112,12 +113,14 @@ void UTaskBase::OnRestore()
 
 void UTaskBase::OnEnter()
 {
+	UWorld* const OriginalWorld = GetWorld();
 	ClearTaskTimers();
 	TaskExecuteResult = ETaskExecuteResult::None;
 	TaskState = ETaskState::Entered;
 	OnStateChanged(TaskState);
+	if (TaskState != ETaskState::Entered) return;
 
-	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
+	if (OriginalWorld) OriginalWorld->GetTimerManager().ClearTimer(AutoExecuteTimerHandle);
 
 	TaskExecuteResult = ETaskExecuteResult::None;
 
@@ -130,30 +133,25 @@ void UTaskBase::OnEnter()
 	{
 		case ETaskGuideType::TimerOnce:
 		{
-			if (GetWorld()) GetWorld()->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &UTaskBase::Guide, TaskGuideIntervalTime, false);
+			if (OriginalWorld) OriginalWorld->GetTimerManager().SetTimer(StartGuideTimerHandle, this, &UTaskBase::Guide, TaskGuideIntervalTime, false);
 			break;
 		}
 		default: break;
 	}
 
-	UEventModuleStatics::BroadcastEvent<FEventTaskEntered>(this, {this});
+	if (UEventModule* Events = UEventModule::GetPtr(OriginalWorld)) Events->BroadcastEvent<FEventTaskEntered>(this, {this});
+	if (TaskState != ETaskState::Entered) return;
 
 	if(bMergeSubTask)
 	{
-		for (auto Iter : SubTasks)
-		{
-			if(Iter)
-			{
-				Iter->Enter();
-			}
-		}
+		for (UTaskBase* Child : SubTasks) if (Child) Child->Enter();
 	}
 
 	if(TaskExecuteType == ETaskExecuteType::Automatic && TaskState == ETaskState::Entered)
 	{
 		if(AutoExecuteTaskTime > 0.f)
 		{
-			if (GetWorld()) GetWorld()->GetTimerManager().SetTimer(AutoExecuteTimerHandle, this, &UTaskBase::Execute, AutoExecuteTaskTime, false);
+			if (OriginalWorld) OriginalWorld->GetTimerManager().SetTimer(AutoExecuteTimerHandle, this, &UTaskBase::Execute, AutoExecuteTaskTime, false);
 		}
 		else
 		{
@@ -192,7 +190,7 @@ void UTaskBase::OnExecute()
 	K2_OnExecute();
 	if (TaskState != ETaskState::Executing) return;
 
-	UEventModuleStatics::BroadcastEvent<FEventTaskExecuted>(this, {this});
+	if (UEventModule* Events = UEventModule::GetPtr(GetWorld())) Events->BroadcastEvent<FEventTaskExecuted>(this, {this});
 
 	if(TaskState == ETaskState::Executing)
 	{
@@ -243,7 +241,7 @@ void UTaskBase::OnComplete(ETaskExecuteResult InTaskExecuteResult)
 	
 	K2_OnComplete(InTaskExecuteResult);
 
-	UEventModuleStatics::BroadcastEvent<FEventTaskCompleted>(this, {this});
+	if (UEventModule* Events = UEventModule::GetPtr(GetWorld())) Events->BroadcastEvent<FEventTaskCompleted>(this, {this});
 
 	if(InTaskExecuteResult != ETaskExecuteResult::Skipped)
 	{
@@ -285,7 +283,7 @@ void UTaskBase::OnLeave()
 
 	K2_OnLeave();
 
-	UEventModuleStatics::BroadcastEvent<FEventTaskLeaved>(this, {this});
+	if (UEventModule* Events = UEventModule::GetPtr(GetWorld())) Events->BroadcastEvent<FEventTaskLeaved>(this, {this});
 }
 
 UTaskAsset* UTaskBase::GetTaskAsset() const
@@ -296,7 +294,8 @@ UTaskAsset* UTaskBase::GetTaskAsset() const
 bool UTaskBase::IsCurrent() const
 {
 	const UTaskModule* Module = UTaskModule::GetPtr(GetWorld());
-	return Module && Module->GetCurrentTask() == this;
+	const UTaskAsset* Asset = GetTaskAsset();
+	return Module && Asset && Asset->OwnerActorID.IsValid() && Module->GetCurrentTask(Asset->OwnerActorID) == this;
 }
 
 bool UTaskBase::IsEntered() const
@@ -483,8 +482,13 @@ void UTaskBase::ClearTaskTimers()
 
 void UTaskBase::OnSuspend()
 {
-	ClearTaskTimers();
+	ReleaseRuntimeResources();
 	K2_OnSuspend();
+}
+
+void UTaskBase::ReleaseRuntimeResources()
+{
+	ClearTaskTimers();
 }
 
 void UTaskBase::OnResume()
@@ -494,7 +498,7 @@ void UTaskBase::OnResume()
 
 void UTaskBase::BeginDestroy()
 {
-	ClearTaskTimers();
+	ReleaseRuntimeResources();
 	Super::BeginDestroy();
 }
 
@@ -531,7 +535,7 @@ FTaskRuntimeSaveData UTaskBase::CaptureRuntimeData()
 	return Data;
 }
 
-void UTaskBase::ResumeRuntimeData(const FTaskRuntimeSaveData& Data)
+bool UTaskBase::ResumeRuntimeData(const FTaskRuntimeSaveData& Data)
 {
 	ClearTaskTimers();
 	Target = Data.Target;
@@ -557,6 +561,7 @@ void UTaskBase::ResumeRuntimeData(const FTaskRuntimeSaveData& Data)
 	}
 	OnResume();
 	OnStateChanged(TaskState);
+	return true;
 }
 
 bool UTaskBase::HasSubTask(bool bIgnoreMerge) const

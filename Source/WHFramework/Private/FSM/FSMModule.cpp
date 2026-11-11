@@ -2,6 +2,7 @@
 
 
 #include "FSM/FSMModule.h"
+#include "Common/LifecycleTypes.h"
 
 #include "FSM/FSMModuleNetworkComponent.h"
 #include "FSM/Components/FSMComponent.h"
@@ -23,7 +24,6 @@ UFSMModule::UFSMModule()
 
 UFSMModule::~UFSMModule()
 {
-	TERMINATION_MODULE(UFSMModule)
 }
 
 #if WITH_EDITOR
@@ -36,7 +36,6 @@ void UFSMModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UFSMModule)
 }
 #endif
 

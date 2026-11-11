@@ -45,13 +45,6 @@ AInventoryPickupActor::AInventoryPickupActor()
     MaterialIconPresentation = CreateDefaultSubobject<UMaterialBillboardComponent>(TEXT("PickupMaterialIcon"));
     MaterialIconPresentation->SetupAttachment(VisualRoot);
     MaterialIconPresentation->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    StaticPresentation = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PickupStaticMesh"));
-    StaticPresentation->SetupAttachment(VisualRoot);
-    StaticPresentation->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    SkeletalPresentation = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("PickupSkeletalMesh"));
-    SkeletalPresentation->SetupAttachment(VisualRoot);
-    SkeletalPresentation->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    SkeletalPresentation->SetComponentTickEnabled(false);
 }
 
 void AInventoryPickupActor::BeginPlay()
@@ -184,33 +177,31 @@ void AInventoryPickupActor::RefreshVisual()
         UE_LOG(LogTemp, Error, TEXT("拾取投影引用未注册物品: %s"), *PublicItemId.ToString());
         return;
     }
-    const FInventoryPickupPresentation Visual = Definition ? Definition->PickupPresentation : FInventoryPickupPresentation();
+    const FInventoryMeshData& Visual = Definition->MeshData;
     VisualRoot->SetRelativeTransform(Visual.LocalTransform);
-    const bool bStatic = Visual.Visual == EInventoryPickupVisual::StaticMesh && Visual.StaticMesh;
-    const bool bSkeletal = Visual.Visual == EInventoryPickupVisual::SkeletalMesh && Visual.SkeletalMesh;
-    StaticPresentation->SetStaticMesh(bStatic ? Visual.StaticMesh.Get() : nullptr);
-    StaticPresentation->SetVisibility(bStatic);
-    SkeletalPresentation->SetSkeletalMesh(bSkeletal ? Visual.SkeletalMesh.Get() : nullptr);
-    SkeletalPresentation->SetVisibility(bSkeletal);
-    StaticPresentation->EmptyOverrideMaterials();
-    SkeletalPresentation->EmptyOverrideMaterials();
-    if (Visual.MaterialOverride)
+    if (PresentationItemId != PublicItemId)
     {
-        if (bStatic) StaticPresentation->SetMaterial(0, Visual.MaterialOverride);
-        if (bSkeletal) SkeletalPresentation->SetMaterial(0, Visual.MaterialOverride);
+        if (MeshPresentation) MeshPresentation->DestroyComponent();
+        MeshPresentation = Visual.CreateComponent(this);
+        if (MeshPresentation)
+        {
+            MeshPresentation->SetupAttachment(VisualRoot);
+            MeshPresentation->RegisterComponent();
+        }
+        PresentationItemId = PublicItemId;
     }
     UMaterialInterface* IconMaterial = Cast<UMaterialInterface>(Definition->Icon);
-    const bool bSurfaceIcon = !bStatic && !bSkeletal && IconMaterial && IconMaterial->GetMaterial()
+    const bool bSurfaceIcon = !MeshPresentation && IconMaterial && IconMaterial->GetMaterial()
         && IconMaterial->GetMaterial()->MaterialDomain == MD_Surface;
     MaterialIconPresentation->Elements.Reset();
     if (bSurfaceIcon)
     {
-        MaterialIconPresentation->AddElement(IconMaterial, nullptr, false, Visual.IconSize * 0.5f, Visual.IconSize * 0.5f, nullptr);
+        MaterialIconPresentation->AddElement(IconMaterial, nullptr, false, 24.f, 24.f, nullptr);
     }
     MaterialIconPresentation->MarkRenderStateDirty();
     MaterialIconPresentation->SetVisibility(bSurfaceIcon);
-    IconPresentation->SetVisibility(!bStatic && !bSkeletal && !bSurfaceIcon);
-    IconPresentation->SetDrawSize(FVector2D(FMath::Clamp(Visual.IconSize, 8.f, 512.f)));
+    IconPresentation->SetVisibility(!MeshPresentation && !bSurfaceIcon);
+    IconPresentation->SetDrawSize(FVector2D(48.f));
     IconPresentation->InitWidget();
     if (UWidgetInventoryPickupIcon* Widget = Cast<UWidgetInventoryPickupIcon>(IconPresentation->GetUserWidgetObject()))
         Widget->SetItemPresentation(Definition ? Definition->Icon : nullptr,
@@ -225,8 +216,7 @@ bool AInventoryPickupActor::IsInteractable(IInteractionAgentInterface* InAgent)
 
 void AInventoryPickupActor::SetHighlighted(bool bInHighlighted)
 {
-    StaticPresentation->SetRenderCustomDepth(bInHighlighted);
-    SkeletalPresentation->SetRenderCustomDepth(bInHighlighted);
+    if (MeshPresentation) MeshPresentation->SetRenderCustomDepth(bInHighlighted);
     IconPresentation->SetTintColorAndOpacity(bInHighlighted ? FLinearColor(0.7f, 0.9f, 1.f) : FLinearColor::White);
 }
 

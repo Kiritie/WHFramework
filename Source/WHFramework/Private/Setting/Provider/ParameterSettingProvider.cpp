@@ -1,7 +1,9 @@
 #include "Setting/Provider/ParameterSettingProvider.h"
+#include "Setting/SettingPresentationTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "Parameter/ParameterModule.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 
 namespace
 {
@@ -111,18 +113,19 @@ bool UParameterSettingProvider::Apply(const FSettingDefinition& InDefinition, co
 	{
 		return false;
 	}
-	const FScopedWorldContext WorldContext(GetWorld());
 	Parameters->SetParameter(*ParameterName, InValue);
 	return true;
 }
 
-void UParameterSettingProvider::Rollback(const FSettingDefinition& InDefinition)
+bool UParameterSettingProvider::Rollback(const FSettingDefinition& InDefinition)
 {
 	if(const FParameter* Value = AppliedValues.Find(InDefinition.SettingId))
 	{
-		Apply(InDefinition, *Value);
+		if (!Apply(InDefinition, *Value)) return false;
 		PendingValues.Add(InDefinition.SettingId, *Value);
+		return true;
 	}
+	return false;
 }
 
 void UParameterSettingProvider::Commit()

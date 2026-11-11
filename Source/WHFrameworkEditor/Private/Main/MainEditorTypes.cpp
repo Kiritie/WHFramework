@@ -21,7 +21,9 @@ FModuleClassFilter::FModuleClassFilter()
 
 bool FModuleClassFilter::IsClassAllowed(UClass* InClass)
 {
-	return EditingModuleClass ? InClass != EditingModuleClass && InClass->GetDefaultObject<UModuleBase>()->GetModuleName() == EditingModuleClass.GetDefaultObject()->GetModuleName() : MainModule->CanAddModule(InClass);
+	if (!InClass || !MainModule || InClass->GetDefaultObject<UModuleBase>()->GetModuleScope() != EModuleScope::World) return false;
+	return EditingModuleClass ? InClass != EditingModuleClass && InClass->IsChildOf(EditingModuleClass) &&
+		InClass->GetDefaultObject<UModuleBase>()->GetModuleName() == EditingModuleClass.GetDefaultObject()->GetModuleName() : MainModule->CanAddModule(InClass);
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -1,7 +1,11 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
+class UAbilityVitalityDataBase;
 
+#include "Ability/AbilityAttributeAccessors.h"
+#include "Ability/AbilityInfoTypes.h"
+#include "Common/LifecycleTypes.h"
 #include "AbilityVitalityInterface.h"
 #include "Ability/Actor/AbilityActorBase.h"
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
@@ -244,12 +248,12 @@ public:
 	UFUNCTION(BlueprintPure)
 	virtual TMap<FGameplayTag, FVitalityActionAbilityData> GetActionAbilities() const override;
 
-	template <class T> T& GetVitalityData() const
+	template <class T> const T* GetVitalityData() const
 	{
-		return static_cast<T&>(GetVitalityData());
+		return Cast<T>(GetVitalityData());
 	}
 
-	UAbilityVitalityDataBase& GetVitalityData() const;
+	const UAbilityVitalityDataBase* GetVitalityData() const;
 
 	virtual UFSMComponent* GetFSMComponent() const override
 	{

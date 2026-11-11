@@ -2,22 +2,28 @@
 
 #pragma once
 
+#include "Common/LifecycleTypes.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "NetworkModule.generated.h"
+
+class UGameInstance;
+class UWorld;
 
 UCLASS()
 class WHFRAMEWORK_API UNetworkModule : public UModuleBase
 {
 	GENERATED_BODY()
 				
-	GENERATED_MODULE(UNetworkModule)
-
 public:	
 	// ParamSets default values for this actor's properties
 	UNetworkModule();
 
 	~UNetworkModule();
+
+	virtual EModuleScope GetModuleScope() const override { return EModuleScope::GameInstance; }
+	static UNetworkModule* GetPtr(const UGameInstance* InGameInstance);
+	static UNetworkModule* GetPtr(const UWorld* InWorld);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ModuleBase
@@ -62,6 +68,8 @@ public:
 	UFUNCTION(BlueprintPure)
 	FString GetServerURL() const;
 
+	const FString& GetServerHost() const { return ServerURL; }
+
 	UFUNCTION(BlueprintCallable)
 	void SetServerURL(const FString& InServerURL) { this->ServerURL = InServerURL; }
 
@@ -81,9 +89,9 @@ public:
 	int32 GetServerLocalPort() const;
 
 public:
-	UFUNCTION(BlueprintCallable)
-	bool ConnectServer(const FString& InServerURL = TEXT(""), int32 InServerPort = -1, const FString& InOptions = FString(TEXT("")));
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject"))
+	bool ConnectServer(const UObject* WorldContextObject, const FString& InServerURL = TEXT(""), int32 InServerPort = -1, const FString& InOptions = FString(TEXT("")));
 
-	UFUNCTION(BlueprintCallable)
-	bool DisconnectServer(const FString& InLevelName);
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject"))
+	bool DisconnectServer(const UObject* WorldContextObject, const FString& InLevelName);
 };

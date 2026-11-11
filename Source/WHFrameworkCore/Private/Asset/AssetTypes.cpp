@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Asset/AssetTypes.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "Asset/AssetManager.h"
 
@@ -36,7 +37,7 @@ const FUniqueType FUniqueAssetData::Type = FUniqueType(&FUniqueClass::Type);
 
 //////////////////////////////////////////////////////////////////////////
 // FUniqueAssetItem
-const FUniqueType FUniqueAssetItem::Type = FUniqueType(&FUniqueAssetItem::Type);
+const FUniqueType FUniqueAssetItem::Type = FUniqueType(&FUniqueClass::Type);
 
 FUniqueAssetData* FUniqueAssetItem::GetAssetData() const
 {

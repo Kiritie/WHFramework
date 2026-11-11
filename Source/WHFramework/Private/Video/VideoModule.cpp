@@ -2,6 +2,8 @@
 
 
 #include "Video/VideoModule.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Common/LifecycleTypes.h"
 
 #include "IMediaControls.h"
 #include "IMediaPlayer.h"
@@ -9,6 +11,7 @@
 #include "MediaPlayer.h"
 #include "MediaPlayerFacade.h"
 #include "Asset/AssetModuleStatics.h"
+#include "Asset/AssetMappingTypes.h"
 #include "Common/CommonModuleStatics.h"
 #include "GameFramework/GameUserSettings.h"
 #include "HAL/IConsoleManager.h"
@@ -52,7 +55,6 @@ UVideoModule::UVideoModule()
 
 UVideoModule::~UVideoModule()
 {
-	TERMINATION_MODULE(UVideoModule)
 }
 
 #if WITH_EDITOR
@@ -65,7 +67,6 @@ void UVideoModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UVideoModule)
 }
 #endif
 
@@ -81,7 +82,7 @@ void UVideoModule::OnInitialize()
 		}
 	}
 
-	UAssetModuleStatics::AddStaticObject(FName("EVideoQuality"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVideoQuality")));
+	UAssetModuleStatics::AddStaticObject(this, FName("EVideoQuality"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EVideoQuality")));
 }
 
 void UVideoModule::OnPreparatory(EPhase InPhase)
@@ -247,43 +248,43 @@ AMediaPlayerBase* UVideoModule::GetMediaPlayerByName(const FName InName) const
 	return nullptr;
 }
 
-void UVideoModule::PlayMovieForMediaPlayer(const FName InName, const FName InMovieName, bool bMulticast)
+void UVideoModule::PlayMovieForMediaPlayer(const FName InName, const FName InMovieName, bool bMulticast, APlayerController* InController)
 {
 	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
-		MediaPlayer->PlayMovie(InMovieName, bMulticast);
+		MediaPlayer->PlayMovie(InMovieName, bMulticast, InController);
 	}
 }
 
-void UVideoModule::PlayMovieForMediaPlayerWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast)
+void UVideoModule::PlayMovieForMediaPlayerWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast, APlayerController* InController)
 {
 	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
-		MediaPlayer->PlayMovieWithDelegate(InMovieName, InOnPlayFinished, bMulticast);
+		MediaPlayer->PlayMovieWithDelegate(InMovieName, InOnPlayFinished, bMulticast, InController);
 	}
 }
 
-void UVideoModule::PauseMovieForMediaPlayer(const FName InName, bool bMulticast)
+void UVideoModule::PauseMovieForMediaPlayer(const FName InName, bool bMulticast, APlayerController* InController)
 {
 	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
-		MediaPlayer->PauseMovie(bMulticast);
+		MediaPlayer->PauseMovie(bMulticast, InController);
 	}
 }
 
-void UVideoModule::SeekMovieForMediaPlayer(const FName InName, const FTimespan& InTimespan, bool bMulticast)
+void UVideoModule::SeekMovieForMediaPlayer(const FName InName, const FTimespan& InTimespan, bool bMulticast, APlayerController* InController)
 {
 	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
-		MediaPlayer->SeekMovie(InTimespan, bMulticast);
+		MediaPlayer->SeekMovie(InTimespan, bMulticast, InController);
 	}
 }
 
-void UVideoModule::StopMovieForMediaPlayer(const FName InName, bool bSkip, bool bMulticast)
+void UVideoModule::StopMovieForMediaPlayer(const FName InName, bool bSkip, bool bMulticast, APlayerController* InController)
 {
 	if(AMediaPlayerBase* MediaPlayer = GetMediaPlayerByName(InName))
 	{
-		MediaPlayer->StopMovie(bSkip, bMulticast);
+		MediaPlayer->StopMovie(bSkip, bMulticast, InController);
 	}
 }
 
@@ -310,7 +311,7 @@ void UVideoModule::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
 	{
 		const FName PropertyName = Property->GetFName();
 
-		bool bApplySetting = UCommonModuleStatics::IsPlaying();
+		bool bApplySetting = GetWorld() && GetWorld()->IsGameWorld();
 		
 		if(PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UVideoModule, bEnableVSync) ||
 			PropertyName == GET_MEMBER_NAME_STRING_CHECKED(UVideoModule, bEnableDynamicResolution))

@@ -67,7 +67,7 @@ UWidgetModule::UWidgetModule()
 
 	WorldWidgetConfigs = TArray<FWorldWidgetConfig>();
 
-	static ConstructorHelpers::FClassFinder<UWorldWidgetContainer> WorldWidgetContainerClassFinder(TEXT("/WHFramework/Widget/Blueprints/WBP_WorldWidgetContainer_Base.WBP_WorldWidgetContainer_Base_C"));
+	static ConstructorHelpers::FClassFinder<UWorldWidgetContainer> WorldWidgetContainerClassFinder(TEXT("/WHFramework/Blueprints/Widget/World/WBP_WorldWidgetContainer_Base.WBP_WorldWidgetContainer_Base_C"));
 	if(WorldWidgetContainerClassFinder.Succeeded())
 	{
 		WorldWidgetContainerClass = WorldWidgetContainerClassFinder.Class;

@@ -75,6 +75,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, meta = (Categories = "UI.Style.Brush"))
     FGameplayTag LockedStyleTag;
 
+    UPROPERTY(EditDefaultsOnly, meta = (Categories = "UI.Style.Text"))
+    FGameplayTag CountStyleTag;
+
     UPROPERTY(EditDefaultsOnly)
     bool bFillIcon = false;
 
@@ -89,6 +92,9 @@ private:
 
     UPROPERTY(meta = (BindWidget))
     TObjectPtr<UCommonImageN> Icon;
+
+    UPROPERTY(meta = (BindWidgetOptional))
+    TObjectPtr<UCommonTextBlockN> IconFallbackName;
 
     UPROPERTY(meta = (BindWidget))
     TObjectPtr<UCommonTextBlockN> Count;

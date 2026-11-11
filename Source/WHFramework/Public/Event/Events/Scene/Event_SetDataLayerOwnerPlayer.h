@@ -6,6 +6,7 @@
 #include "Event_SetDataLayerOwnerPlayer.generated.h"
 
 class UDataLayerAsset;
+class APlayerController;
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FEventSetDataLayerOwnerPlayer : public FEventBase
@@ -15,8 +16,8 @@ struct WHFRAMEWORK_API FEventSetDataLayerOwnerPlayer : public FEventBase
 public:
 	FEventSetDataLayerOwnerPlayer() = default;
 
-	FEventSetDataLayerOwnerPlayer(UDataLayerAsset* InDataLayer, int32 InPlayerIndex)
-		: DataLayer(MoveTemp(InDataLayer)), PlayerIndex(MoveTemp(InPlayerIndex))
+	FEventSetDataLayerOwnerPlayer(UDataLayerAsset* InDataLayer, APlayerController* InPlayer)
+		: DataLayer(InDataLayer), Player(InPlayer)
 	{
 	}
 
@@ -24,5 +25,5 @@ public:
 	UDataLayerAsset* DataLayer = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 PlayerIndex = -1;
+	TObjectPtr<APlayerController> Player = nullptr;
 };

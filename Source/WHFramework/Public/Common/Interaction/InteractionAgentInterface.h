@@ -2,9 +2,12 @@
 
 #pragma once
 
-#include "Common/CommonModuleTypes.h"
+#include "Common/InteractionTypes.h"
+#include "Common/CommonTypes.h"
 #include "UObject/Interface.h"
 #include "InteractionAgentInterface.generated.h"
+
+class APlayerController;
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
@@ -43,19 +46,19 @@ protected:
 
 protected:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void OnBeginHover();
+	void OnBeginHover(APlayerController* InPlayer);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void OnHovering();
+	void OnHovering(APlayerController* InPlayer);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void OnEndHover();
+	void OnEndHover(APlayerController* InPlayer);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void OnSelected();
+	void OnSelected(APlayerController* InPlayer);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void OnDeselected();
+	void OnDeselected(APlayerController* InPlayer);
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)

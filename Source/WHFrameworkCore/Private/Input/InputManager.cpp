@@ -2,8 +2,11 @@
 
 
 #include "Input/InputManager.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Main/MainManager.h"
 
@@ -113,14 +116,19 @@ void FInputManager::UpdateInputMode()
 		}
 
 		const bool bIsCommonUIControlled = PlayerMode.CommonUIMode.IsSet() && InputModeRequests.IsEmpty();
+		const EInputMode PreviousInputMode = PlayerMode.ResolvedMode;
+		PlayerMode.ResolvedMode = InputMode;
+		if (PreviousInputMode != InputMode && (InputMode == EInputMode::None || InputMode == EInputMode::UIOnly))
+			PlayerController->FlushPressedKeys();
+		const UGameInstance* Instance = PlayerController->GetWorld() ? PlayerController->GetWorld()->GetGameInstance() : nullptr;
+		const bool bSharedViewport = Instance && Instance->GetLocalPlayers().Num() > 1;
 		if(!bIsCommonUIControlled)
 		{
-			PlayerController->ResetIgnoreMoveInput();
-			PlayerController->ResetIgnoreLookInput();
 			switch(InputMode)
 			{
 				case EInputMode::None:
-					PlayerController->SetInputMode(FInputModeNone());
+					if (bSharedViewport) PlayerController->SetInputMode(FInputModeGameAndUI());
+					else PlayerController->SetInputMode(FInputModeNone());
 					PlayerController->bShowMouseCursor = false;
 					break;
 				case EInputMode::GameOnly:
@@ -140,16 +148,14 @@ void FInputManager::UpdateInputMode()
 					PlayerController->bShowMouseCursor = true;
 					break;
 				case EInputMode::UIOnly:
-					PlayerController->SetInputMode(FInputModeUIOnly());
+					if (bSharedViewport) PlayerController->SetInputMode(FInputModeGameAndUI());
+					else PlayerController->SetInputMode(FInputModeUIOnly());
 					PlayerController->bShowMouseCursor = true;
 					break;
 				default:
 					break;
 			}
 		}
-
-		const EInputMode PreviousInputMode = PlayerMode.ResolvedMode;
-		PlayerMode.ResolvedMode = InputMode;
 
 		if(PreviousInputMode != InputMode)
 		{

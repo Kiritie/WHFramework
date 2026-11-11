@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Camera/Mode/CameraModeBase.h"
+#include "Camera/CameraViewTypes.h"
+#include "Camera/CameraConfigTypes.h"
 #include "Camera/CameraModuleTypes.h"
 #include "Common/Base/WHObject.h"
 #include "Procedure/ProcedureModuleTypes.h"
@@ -9,6 +11,8 @@
 class UProcedureAsset;
 class UProcedureModule;
 class ACameraShotAnchor;
+class ACameraManagerBase;
+class APlayerController;
 
 UCLASS(Blueprintable, EditInlineNew, DefaultToInstanced, hidecategories = (Default))
 class WHFRAMEWORK_API UProcedureBase : public UWHObject
@@ -44,6 +48,7 @@ public:
     void K2_OnRefresh();
     UFUNCTION()
     virtual void OnRefresh();
+    virtual void OnControlRefresh(float RealDeltaSeconds) { }
     UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnGuide")
     void K2_OnGuide();
     UFUNCTION()
@@ -116,22 +121,30 @@ public:
     FCameraTransitionParams CameraTransition;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera")
     bool bRestoreDefaultCameraOnLeave = false;
-    FCameraConfigOverrideHandle CameraOverrideHandle;
-
     UFUNCTION(BlueprintCallable)
-    void ApplyCameraAction();
+    void ApplyCameraAction(APlayerController* InPlayer);
     template <class T>
-    T* GetOperationTarget() const { return Cast<T>(GetOperationTarget(T::StaticClass())); }
+    T* GetOperationTarget(APlayerController* InPlayer) const { return Cast<T>(GetOperationTarget(InPlayer, T::StaticClass())); }
     UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-    AActor* GetOperationTarget(TSubclassOf<AActor> InClass) const;
+    AActor* GetOperationTarget(APlayerController* InPlayer, TSubclassOf<AActor> InClass) const;
     UFUNCTION(BlueprintCallable)
-    void SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView = true);
+    void SetOperationTarget(APlayerController* InPlayer, AActor* InOperationTarget, bool bResetCameraView = true);
 
 protected:
     FTimerHandle StartGuideTimerHandle;
 
 private:
     void ScheduleGuide();
+    void RefreshPlayerCameraActions();
+    void ClearPlayerCameraActions(bool bRestoreDefault);
+
+    struct FPlayerCameraState
+    {
+        TWeakObjectPtr<ACameraManagerBase> Manager;
+        FCameraConfigOverrideHandle Override;
+    };
+    TMap<TWeakObjectPtr<APlayerController>, TWeakObjectPtr<AActor>> PlayerTargets;
+    TMap<TWeakObjectPtr<APlayerController>, FPlayerCameraState> PlayerCameras;
 
     UPROPERTY(Transient)
     TObjectPtr<UProcedureModule> RuntimeOwner;

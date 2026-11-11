@@ -1,8 +1,12 @@
 #include "Setting/Provider/CameraSettingProvider.h"
+#include "Camera/CameraConfigTypes.h"
+#include "Setting/SettingPresentationTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "Camera/CameraModule.h"
 #include "Setting/SettingModule.h"
 #include "UObject/UnrealType.h"
+#include "Gameplay/WHLocalPlayer.h"
 
 UCameraModule* UCameraSettingProvider::GetCameraModule() const
 {
@@ -113,7 +117,8 @@ void UCameraSettingProvider::BeginEdit(const TArray<FSettingDefinition>& InDefin
 	if (const UCameraModule* Camera = GetCameraModule())
 	{
 		Config = Camera->GetCameraConfig();
-		AppliedSettings = Camera->GetUserSettings();
+		const USettingModule* Owner = GetTypedOuter<USettingModule>();
+		AppliedSettings = Camera->GetUserSettings(Owner ? Owner->GetEditSessionPlayer() : nullptr);
 		PendingSettings = AppliedSettings;
 		DefaultSettings = FCameraUserSettings();
 	}
@@ -188,17 +193,30 @@ bool UCameraSettingProvider::Apply(const FSettingDefinition& InDefinition, const
 {
 	UCameraModule* Camera = GetCameraModule();
 	if (!Camera || !CanHandle(InDefinition)) return false;
-	FCameraUserSettings Current = Camera->GetUserSettings();
+	const USettingModule* Owner = GetTypedOuter<USettingModule>();
+	APlayerController* Player = Owner ? Owner->GetEditSessionPlayer() : nullptr;
+	if (!Player) return false;
+	FCameraUserSettings Current = Camera->GetUserSettings(Player);
 	if (!WriteValue(Current, InDefinition, InValue)) return false;
-	Camera->ApplyUserSettings(Current);
+	return Camera->ApplyUserSettings(Player, Current, Owner);
+}
+
+bool UCameraSettingProvider::Rollback(const FSettingDefinition& InDefinition)
+{
+	const FParameter Value = ReadValue(AppliedSettings, InDefinition);
+	return Apply(InDefinition, Value) && WriteValue(PendingSettings, InDefinition, Value);
+}
+
+bool UCameraSettingProvider::RollbackForHostTermination(const FSettingDefinition& InDefinition, UWHLocalPlayer* InPlayer)
+{
+	if (!::IsValid(InPlayer) || !CanHandle(InDefinition)) return false;
+	InPlayer->LocalCameraSettings = AppliedSettings;
 	return true;
 }
 
-void UCameraSettingProvider::Rollback(const FSettingDefinition& InDefinition)
+bool UCameraSettingProvider::CanRollbackForHostTermination(const FSettingDefinition& InDefinition, const UWHLocalPlayer* InPlayer) const
 {
-	const FParameter Value = ReadValue(AppliedSettings, InDefinition);
-	Apply(InDefinition, Value);
-	WriteValue(PendingSettings, InDefinition, Value);
+	return ::IsValid(InPlayer) && InPlayer->CanRestoreCameraSettings();
 }
 
 void UCameraSettingProvider::Commit()

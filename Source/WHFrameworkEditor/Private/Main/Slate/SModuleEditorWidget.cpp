@@ -3,6 +3,7 @@
 #include "Main/Slate/SModuleEditorWidget.h"
 
 #include "FileHelpers.h"
+#include "Editor.h"
 #include "SlateOptMacros.h"
 #include "SPrimaryButton.h"
 #include "Common/CommonModuleStatics.h"
@@ -69,7 +70,8 @@ void SModuleEditorWidget::OnReset()
 
 void SModuleEditorWidget::OnRefresh()
 {
-	MainModule = AMainModule::GetPtr(!bPreview, true);
+	UWorld* World = GEditor ? (bPreview ? GEditor->PlayWorld.Get() : GEditor->GetEditorWorldContext().World()) : nullptr;
+	MainModule = AMainModule::GetPtr(World);
 	if(MainModule)
 	{
 		if(bNeedRebuild)
@@ -228,7 +230,8 @@ TSharedRef<FTabManager::FLayout> SModuleEditorWidget::CreateDefaultLayout()
 
 TSharedRef<SWidget> SModuleEditorWidget::CreateMainWidget()
 {
-	MainModule = AMainModule::GetPtr(!bPreview, true);
+	UWorld* World = GEditor ? (bPreview ? GEditor->PlayWorld.Get() : GEditor->GetEditorWorldContext().World()) : nullptr;
+	MainModule = AMainModule::GetPtr(World);
 
 	if(!MainModule)
 	{

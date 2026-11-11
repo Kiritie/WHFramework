@@ -3,6 +3,9 @@
 #pragma once
 
 
+#include "Common/LifecycleTypes.h"
+#include "Common/LanguageTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "Audio/AudioModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
@@ -14,6 +17,7 @@ UCLASS()
 class WHFRAMEWORK_API UAudioModule : public UModuleBase
 {
 	GENERATED_BODY()
+	friend class UAudioModuleNetworkComponent;
 		
 	GENERATED_MODULE(UAudioModule)
 
@@ -80,52 +84,60 @@ public:
 	/// Sound
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual void PlaySound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
-	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiPlaySound2D(USoundBase* InSound, float InVolume = 1.0f);
+	virtual FNetworkDispatchResult PlaySound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false, APlayerController* InController = nullptr);
+	virtual FNetworkDispatchResult MultiPlaySound2D(USoundBase* InSound, float InVolume = 1.0f);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void PlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
-	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiPlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f);
+	virtual FNetworkDispatchResult PlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false, APlayerController* InController = nullptr);
+	virtual FNetworkDispatchResult MultiPlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// SingleSound
 protected:
+	UPROPERTY(EditAnywhere, Category = "Network")
+	TArray<TSoftObjectPtr<USoundBase>> ClientMulticastAllowedSounds;
+
 	UPROPERTY()
 	TMap<FSingleSoundHandle, FSingleSoundInfo> SingleSoundInfos;
+	TMap<FSingleSoundHandle, FOnSoundPlayFinishDelegate> PendingSoundDelegates;
 	
-	UPROPERTY(Replicated)
-	int32 SingleSoundHandle;
+	int32 LocalSoundHandle = 0;
+	int32 NetworkSoundHandle = 0;
 	
 public:
+	virtual bool CanRequestNetworkSound(const APlayerController* InController, const USoundBase* InSound) const;
+	bool IsAudioClosing() const { return bAudioClosing || !IsBusinessAdmissionOpen(); }
 	UFUNCTION(BlueprintPure)
-	virtual FSingleSoundInfo GetSingleSoundInfo(const FSingleSoundHandle& InHandle) const;
+	virtual FSingleSoundInfo GetSingleSoundInfo(const FSingleSoundHandle& InHandle, APlayerController* InController = nullptr) const;
+	UFUNCTION(BlueprintPure)
+	EAudioNetworkSoundState GetSingleSoundRequestState(const FSingleSoundHandle& InHandle, APlayerController* InController) const;
+	UFUNCTION(BlueprintPure)
+	FNetworkDispatchResult GetSingleSoundDispatchResult(const FSingleSoundHandle& InHandle, APlayerController* InController) const;
+	void BindSingleSoundCompletion(const FSingleSoundHandle& InHandle, const FOnSoundPlayFinishDelegate& InDelegate);
+	FSingleSoundHandle AllocateNetworkSoundHandle();
+	bool HasSingleSound(const FSingleSoundHandle& InHandle) const { return SingleSoundInfos.Contains(InHandle); }
+	void CancelSingleSoundCompletion(const FSingleSoundHandle& InHandle) { PendingSoundDelegates.Remove(InHandle); }
 	
 public:
 	UFUNCTION(BlueprintCallable)
-	virtual FSingleSoundHandle PlaySingleSound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
+	virtual FSoundPlaybackResult PlaySingleSound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false, APlayerController* InController = nullptr);
 	UFUNCTION(BlueprintCallable)
-	virtual FSingleSoundHandle PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume = 1.0f, bool bMulticast = false);
-	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiPlaySingleSound2D(const FSingleSoundHandle& InHandle, USoundBase* InSound, float InVolume = 1.0f);
+	virtual FSoundPlaybackResult PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume = 1.0f, bool bMulticast = false, APlayerController* InController = nullptr);
+	virtual FNetworkDispatchResult MultiPlaySingleSound2D(const FSingleSoundHandle& InHandle, USoundBase* InSound, float InVolume = 1.0f);
 
 	UFUNCTION(BlueprintCallable)
-	virtual FSingleSoundHandle PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
+	virtual FSoundPlaybackResult PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false, APlayerController* InController = nullptr);
 	UFUNCTION(BlueprintCallable)
-	virtual FSingleSoundHandle PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
-	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiPlaySingleSoundAtLocation(const FSingleSoundHandle& InHandle, USoundBase* InSound, FVector InLocation, float InVolume = 1.0f);
+	virtual FSoundPlaybackResult PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false, APlayerController* InController = nullptr);
+	virtual FNetworkDispatchResult MultiPlaySingleSoundAtLocation(const FSingleSoundHandle& InHandle, USoundBase* InSound, FVector InLocation, float InVolume = 1.0f);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void StopSingleSound(const FSingleSoundHandle& InHandle, bool bMulticast = false);
-	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiStopSingleSound(const FSingleSoundHandle& InHandle);
+	virtual FNetworkDispatchResult StopSingleSound(const FSingleSoundHandle& InHandle, bool bMulticast = false, APlayerController* InController = nullptr);
+	virtual FNetworkDispatchResult MultiStopSingleSound(const FSingleSoundHandle& InHandle);
 
 	UFUNCTION(BlueprintCallable)
-	virtual void SetSingleSoundPaused(const FSingleSoundHandle& InHandle, bool bPaused, bool bMulticast = false);
-	UFUNCTION(NetMulticast, Reliable)
-	virtual void MultiSetSingleSoundPaused(const FSingleSoundHandle& InHandle, bool bPaused);
+	virtual FNetworkDispatchResult SetSingleSoundPaused(const FSingleSoundHandle& InHandle, bool bPaused, bool bMulticast = false, APlayerController* InController = nullptr);
+	virtual FNetworkDispatchResult MultiSetSingleSoundPaused(const FSingleSoundHandle& InHandle, bool bPaused);
 
 protected:
 	virtual UAudioComponent* PlaySingleSound2DImpl(const FSingleSoundHandle& InHandle, USoundBase* InSound, float InVolume = 1.0f);
@@ -270,6 +282,7 @@ public:
 
 protected:
 	virtual void SetSoundParams(USoundMix* InSoundMix, USoundClass* InSoundClass, const FSoundParams& InParams, float InFadeInTime = 1.0f);
+	bool bAudioClosing = false;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Network

@@ -2,8 +2,14 @@
 
 
 #include "Ability/AbilityModule.h"
+#include "Ability/AbilityActorTypes.h"
+#include "Ability/AbilityAttributeAccessors.h"
+#include "Ability/AbilityItemTypes.h"
+#include "Ability/AbilityActorSaveTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Ability/Inventory/InventoryItemTypes.h"
 #include "Ability/Inventory/InventoryItemAssetCatalog.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Engine/World.h"
 
 #include "Ability/Actor/AbilityActorBase.h"
@@ -11,12 +17,9 @@
 #include "Ability/Attributes/VitalityAttributeSetBase.h"
 #include "Ability/Item/AbilityItemBase.h"
 #include "Ability/Item/Equip/AbilityEquipDataBase.h"
-#include "Ability/Item/Prop/AbilityPropDataBase.h"
-#include "Ability/Item/Raw/AbilityRawDataBase.h"
 #include "Ability/Item/Equip/AbilityEquipBase.h"
-#include "Ability/Item/Prop/AbilityPropBase.h"
-#include "Ability/Item/Raw/AbilityRawBase.h"
 #include "Asset/AssetModuleStatics.h"
+#include "Asset/AssetMappingTypes.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
 #include "SaveGame/SaveGameModuleStatics.h"
 #include "Scene/Container/SceneContainerInterface.h"
@@ -38,7 +41,6 @@ UAbilityModule::UAbilityModule()
 
 UAbilityModule::~UAbilityModule()
 {
-	TERMINATION_MODULE(UAbilityModule)
 }
 
 #if WITH_EDITOR
@@ -51,7 +53,6 @@ void UAbilityModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UAbilityModule)
 }
 #endif
 
@@ -59,7 +60,7 @@ void UAbilityModule::OnInitialize()
 {
 	Super::OnInitialize();
 
-	UAssetModuleStatics::AddStaticObject(FName("EAbilityItemType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EAbilityItemType")));
+	UAssetModuleStatics::AddStaticObject(this, FName("EAbilityItemType"), FStaticObject(UEnum::StaticClass(), TEXT("/Script/WHFramework.EAbilityItemType")));
 }
 
 void UAbilityModule::OnPreparatory(EPhase InPhase)
@@ -118,7 +119,7 @@ AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, FVector 
 AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, AActor* InOwnerActor)
 {
 	UWorld* World = InOwnerActor ? InOwnerActor->GetWorld() : GetWorld();
-	const UInventoryWorldSubsystem* Subsystem = World ? World->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	const UInventoryModule* Subsystem = World ? UInventoryModule::GetPtr(World) : nullptr;
 	const UInventoryItemAssetCatalog* Catalog = Subsystem ? Subsystem->GetItemAssets() : nullptr;
 	const UAbilityItemDataBase* Definition = Catalog ? Catalog->Find(InItem.ItemId) : nullptr;
 	if (!Definition || InItem.Level < 0 || InItem.Level > Definition->MaxLevel)
@@ -126,17 +127,14 @@ AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, AActor* 
 		return nullptr;
 	}
 	TSubclassOf<AAbilityItemBase> ProjectionClass;
-	if (const UAbilityEquipDataBase* Equipment = Cast<UAbilityEquipDataBase>(Definition))
+	const FInventoryItemDefinition* InventoryDefinition = Subsystem->GetRegistry().Find(InItem.ItemId);
+	if (InventoryDefinition)
 	{
-		ProjectionClass = Equipment->EquipClass;
-	}
-	else if (const UAbilityPropDataBase* Prop = Cast<UAbilityPropDataBase>(Definition))
-	{
-		ProjectionClass = Prop->PropClass;
-	}
-	else if (const UAbilityRawDataBase* Raw = Cast<UAbilityRawDataBase>(Definition))
-	{
-		ProjectionClass = Raw->RawClass;
+		UClass* EquipmentClass = InventoryDefinition->EquipmentActorClass.ResolveClass();
+		if (EquipmentClass && EquipmentClass->IsChildOf(AAbilityItemBase::StaticClass()))
+		{
+			ProjectionClass = EquipmentClass;
+		}
 	}
 	if (!ProjectionClass)
 	{
@@ -144,22 +142,24 @@ AAbilityItemBase* UAbilityModule::SpawnAbilityItem(FAbilityItem InItem, AActor* 
 	}
 	FAbilityItemSpawnParameter Parameter(InOwnerActor, InItem.ItemId, InItem.Level);
 	Parameter.WorldContext = World;
-	return UObjectPoolModuleStatics::SpawnObject<AAbilityItemBase>(Parameter, ProjectionClass);
+	return UObjectPoolModuleStatics::SpawnObject<AAbilityItemBase>(World, Parameter, ProjectionClass);
 }
 
 
 AActor* UAbilityModule::SpawnAbilityActor(const FParameter& InSaveData, ISceneContainerInterface* InContainer)
 {
-	const FActorSaveData& SaveData = InSaveData.GetRef<FActorSaveData>();
-	const UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	const FParameter FrozenSaveData = InSaveData;
+	const FActorSaveData* SaveData = FrozenSaveData.GetPtr<FActorSaveData>();
+	if (!SaveData) return nullptr;
+	const UInventoryModule* Subsystem = GetWorld() ? UInventoryModule::GetPtr(GetWorld()) : nullptr;
 	const UInventoryItemAssetCatalog* Catalog = Subsystem ? Subsystem->GetItemAssets() : nullptr;
-	const UAbilityActorDataBase* Definition = Catalog ? Catalog->FindAs<UAbilityActorDataBase>(SaveData.AssetID) : nullptr;
+	const UAbilityActorDataBase* Definition = Catalog ? Catalog->FindAs<UAbilityActorDataBase>(SaveData->AssetID) : nullptr;
 	if (!Definition || !Definition->Class)
 	{
 		return nullptr;
 	}
 	AActor* Actor = UObjectPoolModuleStatics::SpawnObject<AActor>(
-		FAbilityActorSpawnParameter(this, SaveData.SpawnTransform, SaveData.ActorID, SaveData.AssetID), Definition->Class);
+		this, FAbilityActorSpawnParameter(this, SaveData->SpawnTransform, SaveData->ActorID, SaveData->AssetID), Definition->Class);
 	ISaveDataAgentInterface* SaveAgent = Cast<ISaveDataAgentInterface>(Actor);
 	if (!SaveAgent)
 	{
@@ -169,10 +169,24 @@ AActor* UAbilityModule::SpawnAbilityActor(const FParameter& InSaveData, ISceneCo
 		}
 		return nullptr;
 	}
-	SaveAgent->LoadSaveData(InSaveData);
+	const bool bLoaded = SaveAgent->LoadSaveData(FrozenSaveData);
+	if (!bLoaded)
+	{
+		Actor->Destroy();
+		return nullptr;
+	}
 	if (InContainer)
 	{
-		InContainer->AddSceneActor(Actor);
+		const bool bAdded = InContainer->AddSceneActor(Actor);
+		if (!bAdded)
+		{
+			AActor* Existing = InContainer->GetSceneActor(SaveData->ActorID.ToString(), nullptr, false);
+			if (Existing != Actor)
+			{
+				Actor->Destroy();
+				return nullptr;
+			}
+		}
 	}
 	return Actor;
 }

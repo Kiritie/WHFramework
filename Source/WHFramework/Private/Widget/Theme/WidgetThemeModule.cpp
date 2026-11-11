@@ -1,32 +1,55 @@
-#include "Widget/Theme/WidgetThemeSubsystem.h"
+#include "Widget/Theme/WidgetThemeModule.h"
+#include "Common/LifecycleTypes.h"
 #include "Widget/Theme/WidgetThemeSettings.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
+#include "Gameplay/WHGameInstance.h"
 
-bool UWidgetThemeSubsystem::ShouldCreateSubsystem(UObject* Outer) const
+UWidgetThemeModule::UWidgetThemeModule()
 {
-	UGameInstance* GI = Cast<UGameInstance>(Outer);
-	return Super::ShouldCreateSubsystem(Outer) && GI && !GI->IsDedicatedServerInstance();
+	ModuleName = TEXT("WidgetThemeModule");
 }
-void UWidgetThemeSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+
+bool UWidgetThemeModule::ShouldCreateForGameInstance(const UWHGameInstance* InGameInstance) const
 {
-	Super::Initialize(Collection);
+	return InGameInstance && !InGameInstance->IsDedicatedServerInstance();
+}
+
+UWidgetThemeModule* UWidgetThemeModule::GetPtr(const UGameInstance* InGameInstance)
+{
+	const UWHGameInstance* Owner = Cast<UWHGameInstance>(InGameInstance);
+	return Owner ? Owner->FindModule<UWidgetThemeModule>() : nullptr;
+}
+
+UWidgetThemeModule* UWidgetThemeModule::GetPtr(const UWorld* InWorld)
+{
+	return InWorld ? GetPtr(InWorld->GetGameInstance()) : nullptr;
+}
+
+void UWidgetThemeModule::OnInitialize()
+{
+	Super::OnInitialize();
 	RequestTheme(GetDefault<UWidgetThemeSettings>()->DefaultTheme);
 }
-void UWidgetThemeSubsystem::Deinitialize()
+
+void UWidgetThemeModule::OnTermination(EPhase InPhase)
 {
-	++RequestSerial;
-	if (Pending)
+	if (InPhase == EPhase::Final)
 	{
-		Pending->CancelHandle();
+		++RequestSerial;
+		if (Pending)
+		{
+			Pending->CancelHandle();
+		}
+		Pending.Reset();
+		ActiveTheme = nullptr;
 	}
-	Pending.Reset();
-	ActiveTheme = nullptr;
-	Super::Deinitialize();
+	Super::OnTermination(InPhase);
 }
-void UWidgetThemeSubsystem::RequestTheme(TSoftObjectPtr<UWidgetTheme> Theme)
+void UWidgetThemeModule::RequestTheme(TSoftObjectPtr<UWidgetTheme> Theme)
 {
 	check(IsInGameThread());
 	const uint64 Serial = ++RequestSerial;
@@ -49,7 +72,7 @@ void UWidgetThemeSubsystem::RequestTheme(TSoftObjectPtr<UWidgetTheme> Theme)
 		OnSwitchFinished.Broadcast(false, TEXT("Unable to create theme load request."));
 	}
 }
-void UWidgetThemeSubsystem::CompleteRequest(uint64 Serial, TSoftObjectPtr<UWidgetTheme> Requested)
+void UWidgetThemeModule::CompleteRequest(uint64 Serial, TSoftObjectPtr<UWidgetTheme> Requested)
 {
 	if (Serial != RequestSerial)
 	{
@@ -77,7 +100,7 @@ void UWidgetThemeSubsystem::CompleteRequest(uint64 Serial, TSoftObjectPtr<UWidge
 	OnSwitchFinished.Broadcast(true, FString());
 }
 
-bool UWidgetThemeSubsystem::ApplyLoadedTheme(UWidgetTheme* Theme, FString& Error)
+bool UWidgetThemeModule::ApplyLoadedTheme(UWidgetTheme* Theme, FString& Error)
 {
 	check(IsInGameThread());
 	++RequestSerial;

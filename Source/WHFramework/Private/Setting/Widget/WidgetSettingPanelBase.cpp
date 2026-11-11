@@ -1,6 +1,11 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Setting/Widget/WidgetSettingPanelBase.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
+#include "Input/InputTags.h"
+#include "Widget/ScreenWidgetTypes.h"
+#include "Setting/SettingPresentationTypes.h"
+#include "Setting/SettingEditTypes.h"
 
 #include "CommonActivatableWidgetSwitcher.h"
 #include "Components/PanelWidget.h"
@@ -59,25 +64,22 @@ void UWidgetSettingPanelBase::OnInitialize(const FParameter& InParam)
 
 void UWidgetSettingPanelBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
-	const FScopedWorldContext WorldContext(GetWorld());
-	const uint64 Revision = ++EditSessionRevision;
 	SessionStatus = FText::GetEmpty();
 	if (!bOwnsEditSession)
 	{
 		USettingModule* Settings = USettingModule::GetPtr(GetWorld());
-		if (Settings && !Settings->IsEditSessionActive())
+		const bool bStarted = Settings && Settings->BeginEdit(GetOwningPlayer());
+		if (bStarted)
 		{
 			EditSessionSource = Settings;
 			bOwnsEditSession = true;
-			Settings->BeginEdit();
 		}
 		else
 		{
-			SessionStatus = Settings ? NSLOCTEXT("WH.Setting", "SessionInUse", "设置正在其他界面中编辑，请关闭后重试。") :
+			SessionStatus = Settings ? NSLOCTEXT("WH.Setting", "SessionUnavailable", "无法开始编辑：玩家或设置尚未就绪，或设置正在其他界面中编辑。") :
 				NSLOCTEXT("WH.Setting", "ServiceUnavailable", "设置服务尚未就绪，请稍后重新打开。");
 		}
 	}
-	if (Revision != EditSessionRevision) return;
 	BindEditObservers();
 	if (GetSubWidgets<UWidgetSettingPageBase>().IsEmpty()) GenerateSettingPages();
 	if (PageItemGroup && PageItemGroup->GetButtons().IsEmpty())
@@ -89,7 +91,6 @@ void UWidgetSettingPanelBase::OnOpen(const FParameter& InParam, bool bInstant)
 	}
 	RefreshPages();
 	Super::OnOpen(InParam, bInstant);
-	if (Revision != EditSessionRevision) return;
 	if (PageItemGroup && !PageItemGroup->GetButtons().IsEmpty()) SetCurrentPage(0);
 	RefreshActionButtonState();
 }
@@ -116,7 +117,7 @@ void UWidgetSettingPanelBase::OnDestroy(EObjectDespawnMode InMode)
 		PageItemGroup->OnSelectedButtonBaseChanged.RemoveDynamic(this, &ThisClass::OnPageItemSelected);
 		for (UCommonButtonBase* PageButton : PageItemGroup->GetButtons())
 		{
-			UObjectPoolModuleStatics::DespawnObject(PageButton, InMode);
+			UObjectPoolModuleStatics::DespawnObject(this, PageButton, InMode);
 		}
 		PageItemGroup->RemoveAll();
 		PageItemGroup = nullptr;
@@ -126,7 +127,6 @@ void UWidgetSettingPanelBase::OnDestroy(EObjectDespawnMode InMode)
 
 void UWidgetSettingPanelBase::NativeConstruct()
 {
-	const FScopedWorldContext WorldContext(GetWorld());
 	Super::NativeConstruct();
 	Window_Content->OnCloseRequested.AddUniqueDynamic(this, &ThisClass::OnCloseButtonClicked);
 	if (bOwnsEditSession)
@@ -147,7 +147,6 @@ void UWidgetSettingPanelBase::NativeDestruct()
 
 void UWidgetSettingPanelBase::ReleaseEditSession()
 {
-	++EditSessionRevision;
 	if (!bOwnsEditSession && !EditSessionSource.IsValid()) return;
 	if (GetWorld()) GetWorld()->GetTimerManager().ClearTimer(ConfirmationRefreshTimer);
 	UnbindEditObservers();
@@ -159,14 +158,14 @@ void UWidgetSettingPanelBase::ReleaseEditSession()
 	{
 		if (Page) Page->SetSettingSource(nullptr);
 	}
-	if (bRelease && Settings) Settings->EndEdit();
+	if (bRelease && Settings && Settings->IsEditSessionOwner(GetOwningPlayer())) Settings->EndEdit();
 }
 
 USettingModule* UWidgetSettingPanelBase::GetSettingSource() const
 {
 	const UWorld* World = GetWorld();
 	USettingModule* Settings = EditSessionSource.Get();
-	return bOwnsEditSession && World && !World->bIsTearingDown && Settings && Settings->GetWorld() == World && Settings->IsEditSessionActive() ? Settings : nullptr;
+	return bOwnsEditSession && World && !World->bIsTearingDown && Settings && Settings->GetWorld() == World && Settings->IsEditSessionOwner(GetOwningPlayer()) ? Settings : nullptr;
 }
 
 void UWidgetSettingPanelBase::BindEditObservers()
@@ -185,7 +184,7 @@ void UWidgetSettingPanelBase::UnbindEditObservers()
 FReply UWidgetSettingPanelBase::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
 	const UInputModule* Inputs = UInputModule::GetPtr(GetWorld());
-	const int32 PlayerIndex = GetOwningLocalPlayer() ? GetOwningLocalPlayer()->GetLocalPlayerIndex() : INDEX_NONE;
+	const int32 PlayerIndex = Inputs ? Inputs->FindPlayerRuntimeIndex(GetOwningPlayer()) : INDEX_NONE;
 	if (Inputs && PlayerIndex != INDEX_NONE && Inputs->IsPlayerMappedKeyByTag(GameplayTags::Input_SystemOperation, InKeyEvent.GetKey(), PlayerIndex))
 	{
 		Close();
@@ -203,12 +202,17 @@ void UWidgetSettingPanelBase::OnApplyButtonClicked()
 {
 	USettingModule* Settings = GetSettingSource();
 	if (!Settings || !Settings->CanApply()) return;
-	const uint64 Revision = EditSessionRevision;
 	const bool bApplied = Settings->ApplyEditSession();
-	if (Revision != EditSessionRevision || Settings != GetSettingSource()) return;
 	SessionStatus = bApplied ? FText::GetEmpty() : NSLOCTEXT("WH.Setting", "ApplyFailed", "设置未能应用，请检查输入或稍后重试。");
+	if (bApplied && !Settings->HasPendingConfirmation())
+	{
+		const UInputModule* Input = UInputModule::GetPtr(GetWorld());
+		if (!Settings->WasLastSettingsSaveSuccessful())
+			SessionStatus = NSLOCTEXT("WH.Setting", "SaveFailed", "设置已在本次会话生效，但保存失败。");
+		else if (!Input || !Input->HasPersistentInputProfile(GetOwningPlayer()))
+			SessionStatus = NSLOCTEXT("WH.Setting", "GuestInput", "设置已应用；当前玩家未绑定本地档案，输入和相机设置仅在本次会话保留。");
+	}
 	if (bApplied && Settings->HasPendingConfirmation()) K2_OnConfirmationRequested(Settings->GetConfirmationTimeout());
-	if (Revision != EditSessionRevision) return;
 	RefreshPages();
 	RefreshActionButtonState();
 }
@@ -217,10 +221,8 @@ void UWidgetSettingPanelBase::OnResetButtonClicked()
 {
 	USettingModule* Settings = GetSettingSource();
 	if (!Settings || Settings->HasPendingConfirmation()) return;
-	const uint64 Revision = EditSessionRevision;
 	SessionStatus = FText::GetEmpty();
 	Settings->ResetAllToDefault();
-	if (Revision != EditSessionRevision) return;
 	RefreshPages();
 	RefreshActionButtonState();
 }
@@ -238,9 +240,10 @@ void UWidgetSettingPanelBase::RefreshPages()
 
 UCommonButton* UWidgetSettingPanelBase::SpawnPageItem_Implementation(UWidgetSettingPageBase* InPage)
 {
-	const FScopedWorldContext WorldContext(GetWorld());
+	FWidgetSpawnParameter Spawn(InPage);
+	Spawn.OwningPlayer = GetOwningPlayer();
 	if(UCommonButton* PageItem = UObjectPoolModuleStatics::SpawnObject<UCommonButton>(
-		FWidgetSpawnParameter(InPage),
+		this, Spawn,
 		PageItemClass))
 	{
 		PageItem->SetIsSelectable(true);
@@ -261,7 +264,6 @@ UCommonButton* UWidgetSettingPanelBase::SpawnPageItem_Implementation(UWidgetSett
 
 void UWidgetSettingPanelBase::GenerateSettingPages()
 {
-	const FScopedWorldContext WorldContext(GetWorld());
 	if(!SettingPageClass || !Switcher_Page)
 	{
 		return;
@@ -345,9 +347,15 @@ bool UWidgetSettingPanelBase::ConfirmPendingSettings()
 {
 	USettingModule* Settings = GetSettingSource();
 	if (!Settings) return false;
-	const uint64 Revision = EditSessionRevision;
 	const bool bResult = Settings->ConfirmPendingSettings();
-	if (Revision == EditSessionRevision && bResult) RefreshPages();
+	if (bResult)
+	{
+		const UInputModule* Input = UInputModule::GetPtr(GetWorld());
+		if (!Settings->WasLastSettingsSaveSuccessful()) SessionStatus = NSLOCTEXT("WH.Setting", "ConfirmSaveFailed", "设置已在本次会话生效，但保存失败。");
+		else if (!Input || !Input->HasPersistentInputProfile(GetOwningPlayer())) SessionStatus = NSLOCTEXT("WH.Setting", "ConfirmGuestInput", "设置已应用；当前玩家未绑定本地档案，输入和相机设置仅在本次会话保留。");
+		RefreshPages();
+		RefreshActionButtonState();
+	}
 	return bResult;
 }
 
@@ -355,7 +363,6 @@ void UWidgetSettingPanelBase::RejectPendingSettings()
 {
 	USettingModule* Settings = GetSettingSource();
 	if (!Settings) return;
-	const uint64 Revision = EditSessionRevision;
-	Settings->RejectPendingSettings();
-	if (Revision == EditSessionRevision) RefreshPages();
+	if (!Settings->RejectPendingSettings()) SessionStatus = NSLOCTEXT("WH.Setting", "RejectFailed", "未能恢复原设置，请稍后重试。");
+	RefreshPages();
 }

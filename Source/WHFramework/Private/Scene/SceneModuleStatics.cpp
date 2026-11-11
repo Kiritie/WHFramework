@@ -1,158 +1,173 @@
 
 
 #include "Scene/SceneModuleStatics.h"
+#include "Widget/WorldWidgetTypes.h"
+#include "Scene/SceneMapTypes.h"
+#include "Scene/SceneAreaTypes.h"
+#include "Scene/SceneMarkerTypes.h"
+#include "Scene/SceneStreamingTypes.h"
 
 #include "Scene/SceneModule.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
+#include "Engine/Engine.h"
+#include "Misc/PackageName.h"
 
-float USceneModuleStatics::GetSeaLevel()
+namespace
 {
-	return USceneModule::Get().GetSeaLevel();
+	UWorld* ResolveSceneWorld(const UObject* Context)
+	{
+		return GEngine && Context ? GEngine->GetWorldFromContextObject(Context, EGetWorldErrorMode::ReturnNull) : nullptr;
+	}
 }
 
-void USceneModuleStatics::SetSeaLevel(float InSeaLevel)
+float USceneModuleStatics::GetSeaLevel(const UObject* WorldContextObject)
 {
-	USceneModule::Get().SetSeaLevel(InSeaLevel);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetSeaLevel();
 }
 
-float USceneModuleStatics::GetAltitude(bool bUnsigned, bool bRefresh)
+void USceneModuleStatics::SetSeaLevel(const UObject* WorldContextObject, float InSeaLevel)
 {
-	return USceneModule::Get().GetAltitude(bUnsigned, bRefresh);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).SetSeaLevel(InSeaLevel);
 }
 
-AMiniMapCapture* USceneModuleStatics::GetMiniMapCapture()
+float USceneModuleStatics::GetAltitude(const UObject* WorldContextObject, APlayerController* InPlayer, bool bUnsigned)
 {
-	return USceneModule::Get().GetMiniMapCapture();
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetAltitude(InPlayer, bUnsigned);
 }
 
-EWorldMiniMapMode USceneModuleStatics::GetMiniMapMode()
+AMiniMapCapture* USceneModuleStatics::GetMiniMapCapture(const UObject* WorldContextObject, APlayerController* InPlayer)
 {
-	return USceneModule::Get().GetMiniMapMode();
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetMiniMapCapture(InPlayer);
 }
 
-void USceneModuleStatics::SetMiniMapMode(EWorldMiniMapMode InMiniMapMode)
+EWorldMiniMapMode USceneModuleStatics::GetMiniMapMode(const UObject* WorldContextObject)
 {
-	USceneModule::Get().SetMiniMapMode(InMiniMapMode);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetMiniMapMode();
 }
 
-FTransform USceneModuleStatics::GetMiniMapPoint()
+void USceneModuleStatics::SetMiniMapMode(const UObject* WorldContextObject, EWorldMiniMapMode InMiniMapMode)
 {
-	return USceneModule::Get().GetMiniMapPoint();
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).SetMiniMapMode(InMiniMapMode);
 }
 
-void USceneModuleStatics::SetMiniMapPoint(const FTransform& InMiniMapPoint)
+FTransform USceneModuleStatics::GetMiniMapPoint(const UObject* WorldContextObject)
 {
-	USceneModule::Get().SetMiniMapPoint(InMiniMapPoint);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetMiniMapPoint();
 }
 
-float USceneModuleStatics::GetMiniMapRange()
+void USceneModuleStatics::SetMiniMapPoint(const UObject* WorldContextObject, const FTransform& InMiniMapPoint)
 {
-	return USceneModule::Get().GetMiniMapRange();
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).SetMiniMapPoint(InMiniMapPoint);
 }
 
-void USceneModuleStatics::SetMiniMapRange(float InMiniMapRange)
+float USceneModuleStatics::GetMiniMapRange(const UObject* WorldContextObject)
 {
-	USceneModule::Get().SetMiniMapRange(InMiniMapRange);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetMiniMapRange();
 }
 
-UTextureRenderTarget2D* USceneModuleStatics::GetMiniMapTexture()
+void USceneModuleStatics::SetMiniMapRange(const UObject* WorldContextObject, float InMiniMapRange)
 {
-	return USceneModule::Get().GetMiniMapTexture();
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).SetMiniMapRange(InMiniMapRange);
 }
 
-void USceneModuleStatics::SetMiniMapTexture(UTextureRenderTarget2D* InMiniMapTexture)
+UTextureRenderTarget2D* USceneModuleStatics::GetMiniMapTexture(const UObject* WorldContextObject)
 {
-	USceneModule::Get().SetMiniMapTexture(InMiniMapTexture);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetMiniMapTexture();
 }
 
-FSceneArea USceneModuleStatics::GetSceneArea(const FName InName)
+void USceneModuleStatics::SetMiniMapTexture(const UObject* WorldContextObject, UTextureRenderTarget2D* InMiniMapTexture)
 {
-	return USceneModule::Get().GetSceneArea(InName);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).SetMiniMapTexture(InMiniMapTexture);
 }
 
-FVector2D USceneModuleStatics::GetWorldMapCenter()
+FSceneArea USceneModuleStatics::GetSceneArea(const UObject* WorldContextObject, const FName InName)
 {
-	return USceneModule::Get().GetWorldMapCenter();
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetSceneArea(InName);
 }
 
-void USceneModuleStatics::SetWorldMapCenter(FVector2D InCenter)
+FVector2D USceneModuleStatics::GetWorldMapCenter(const UObject* WorldContextObject)
 {
-	USceneModule::Get().SetWorldMapCenter(InCenter);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetWorldMapCenter();
 }
 
-float USceneModuleStatics::GetWorldMapRange()
+void USceneModuleStatics::SetWorldMapCenter(const UObject* WorldContextObject, FVector2D InCenter)
 {
-	return USceneModule::Get().GetWorldMapRange();
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).SetWorldMapCenter(InCenter);
 }
 
-void USceneModuleStatics::SetWorldMapRange(float InRange)
+float USceneModuleStatics::GetWorldMapRange(const UObject* WorldContextObject)
 {
-	USceneModule::Get().SetWorldMapRange(InRange);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetWorldMapRange();
 }
 
-FSceneArea USceneModuleStatics::GetSceneAreaByPoint(const FVector2D& InPoint)
+void USceneModuleStatics::SetWorldMapRange(const UObject* WorldContextObject, float InRange)
 {
-	return USceneModule::Get().GetSceneAreaByPoint(InPoint);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).SetWorldMapRange(InRange);
 }
 
-TArray<FSceneArea> USceneModuleStatics::GetSceneAreas()
+FSceneArea USceneModuleStatics::GetSceneAreaByPoint(const UObject* WorldContextObject, const FVector2D& InPoint)
 {
-	return USceneModule::Get().GetSceneAreas();
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetSceneAreaByPoint(InPoint);
 }
 
-void USceneModuleStatics::AddSceneArea(const FSceneArea& InArea, bool bThreadSafe)
+TArray<FSceneArea> USceneModuleStatics::GetSceneAreas(const UObject* WorldContextObject)
 {
-	USceneModule::Get().AddSceneArea(InArea, bThreadSafe);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetSceneAreas();
 }
 
-void USceneModuleStatics::RemoveSceneArea(const FName InName)
+void USceneModuleStatics::AddSceneArea(const UObject* WorldContextObject, const FSceneArea& InArea, bool bThreadSafe)
 {
-	USceneModule::Get().RemoveSceneArea(InName);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).AddSceneArea(InArea, bThreadSafe);
 }
 
-void USceneModuleStatics::ClearSceneArea()
+void USceneModuleStatics::RemoveSceneArea(const UObject* WorldContextObject, const FName InName)
 {
-	USceneModule::Get().ClearSceneArea();
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).RemoveSceneArea(InName);
 }
 
-FGuid USceneModuleStatics::AddMarker(const FSceneMarker& InMarker)
+void USceneModuleStatics::ClearSceneArea(const UObject* WorldContextObject)
 {
-	return USceneModule::Get().AddMarker(InMarker);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).ClearSceneArea();
 }
 
-bool USceneModuleStatics::UpdateMarker(const FSceneMarker& InMarker)
+FGuid USceneModuleStatics::AddMarker(const UObject* WorldContextObject, const FSceneMarker& InMarker)
 {
-	return USceneModule::Get().UpdateMarker(InMarker);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).AddMarker(InMarker);
 }
 
-bool USceneModuleStatics::RemoveMarker(FGuid InMarkerID)
+bool USceneModuleStatics::UpdateMarker(const UObject* WorldContextObject, const FSceneMarker& InMarker)
 {
-	return USceneModule::Get().RemoveMarker(InMarkerID);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).UpdateMarker(InMarker);
 }
 
-void USceneModuleStatics::ClearMarkers(bool bIncludePersistent)
+bool USceneModuleStatics::RemoveMarker(const UObject* WorldContextObject, FGuid InMarkerID)
 {
-	USceneModule::Get().ClearMarkers(bIncludePersistent);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).RemoveMarker(InMarkerID);
 }
 
-FSceneMarker USceneModuleStatics::GetMarker(FGuid InMarkerID)
+void USceneModuleStatics::ClearMarkers(const UObject* WorldContextObject, bool bIncludePersistent)
 {
-	return USceneModule::Get().GetMarker(InMarkerID);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).ClearMarkers(bIncludePersistent);
 }
 
-TArray<FSceneMarkerView> USceneModuleStatics::GetMarkerViews(ESceneMarkerChannel InChannel, FVector InViewLocation, float InViewYaw)
+FSceneMarker USceneModuleStatics::GetMarker(const UObject* WorldContextObject, FGuid InMarkerID)
 {
-	return USceneModule::Get().GetMarkerViews(InChannel, InViewLocation, InViewYaw);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetMarker(InMarkerID);
 }
 
-bool USceneModuleStatics::SetTrackedMarker(FGuid InMarkerID)
+TArray<FSceneMarkerView> USceneModuleStatics::GetMarkerViews(const UObject* WorldContextObject, FGuid InPlayerID, ESceneMarkerChannel InChannel, FVector InViewLocation, float InViewYaw)
 {
-	return USceneModule::Get().SetTrackedMarker(InMarkerID);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetMarkerViews(InPlayerID, InChannel, InViewLocation, InViewYaw);
 }
 
-FGuid USceneModuleStatics::GetTrackedMarker()
+bool USceneModuleStatics::SetTrackedMarker(const UObject* WorldContextObject, FGuid InPlayerID, FGuid InMarkerID)
 {
-	return USceneModule::Get().GetTrackedMarker();
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).SetTrackedMarker(InPlayerID, InMarkerID);
+}
+
+FGuid USceneModuleStatics::GetTrackedMarker(const UObject* WorldContextObject, FGuid InPlayerID)
+{
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetTrackedMarker(InPlayerID);
 }
 
 bool USceneModuleStatics::ProjectMarkerToMap(const FSceneMarkerView& InMarker, FVector2D InCenter, float InRange, FVector2D InSize, float InYaw, bool bClamp, FVector2D& OutPosition)
@@ -187,187 +202,199 @@ bool USceneModuleStatics::ProjectMarkerToScreen(APlayerController* InPlayer, con
 	return InPlayer && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(InPlayer, InMarker.Location, OutPosition, bPlayerViewportRelative);
 }
 
-bool USceneModuleStatics::HasSceneArea(const FName InName)
+bool USceneModuleStatics::HasSceneArea(const UObject* WorldContextObject, const FName InName)
 {
-	return USceneModule::Get().HasSceneArea(InName);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).HasSceneArea(InName);
 }
 
-UWorldTimer* USceneModuleStatics::GetWorldTimer(TSubclassOf<UWorldTimer> InClass)
+UWorldTimer* USceneModuleStatics::GetWorldTimer(const UObject* WorldContextObject, TSubclassOf<UWorldTimer> InClass)
 {
-	return USceneModule::Get().GetWorldTimer(InClass);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetWorldTimer(InClass);
 }
 
-UWorldWeather* USceneModuleStatics::GetWorldWeather(TSubclassOf<UWorldWeather> InClass)
+UWorldWeather* USceneModuleStatics::GetWorldWeather(const UObject* WorldContextObject, TSubclassOf<UWorldWeather> InClass)
 {
-	return USceneModule::Get().GetWorldWeather(InClass);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetWorldWeather(InClass);
 }
 
-bool USceneModuleStatics::HasTraceMapping(const FName InName, bool bEnsured)
+bool USceneModuleStatics::HasTraceMapping(const UObject* WorldContextObject, const FName InName, bool bEnsured)
 {
-	return USceneModule::Get().HasTraceMapping(InName, bEnsured);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).HasTraceMapping(InName, bEnsured);
 }
 
-FTraceMapping USceneModuleStatics::GetTraceMapping(const FName InName, bool bEnsured)
+FTraceMapping USceneModuleStatics::GetTraceMapping(const UObject* WorldContextObject, const FName InName, bool bEnsured)
 {
-	return USceneModule::Get().GetTraceMapping(InName, bEnsured);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetTraceMapping(InName, bEnsured);
 }
 
-void USceneModuleStatics::AddTraceMapping(const FName InName, ECollisionChannel InTraceChannel)
+void USceneModuleStatics::AddTraceMapping(const UObject* WorldContextObject, const FName InName, ECollisionChannel InTraceChannel)
 {
-	USceneModule::Get().AddTraceMapping(InName, InTraceChannel);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).AddTraceMapping(InName, InTraceChannel);
 }
 
-void USceneModuleStatics::RemoveTraceMapping(const FName InName)
+void USceneModuleStatics::RemoveTraceMapping(const UObject* WorldContextObject, const FName InName)
 {
-	USceneModule::Get().RemoveTraceMapping(InName);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).RemoveTraceMapping(InName);
 }
 
-void USceneModuleStatics::AsyncLoadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+void USceneModuleStatics::AsyncLoadLevel(const UObject* WorldContextObject, const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
-	USceneModule::Get().AsyncLoadLevel(InLevelPath, InOnLoadFinished, InFinishDelayTime, bCreateLoadingWidget);
+	if (USceneModule* Module = USceneModule::GetPtr(ResolveSceneWorld(WorldContextObject)))
+		Module->AsyncLoadLevel(InLevelPath, InOnLoadFinished, InFinishDelayTime, bCreateLoadingWidget);
+	else InOnLoadFinished.ExecuteIfBound(InLevelPath, ESceneLevelLoadResult::Failed);
 }
 
-void USceneModuleStatics::AsyncLoadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+void USceneModuleStatics::AsyncLoadLevelByObjectPtr(const UObject* WorldContextObject, const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnLoadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
-	USceneModule::Get().AsyncLoadLevelByObjectPtr(InLevelObjectPtr, InOnLoadFinished, InFinishDelayTime, bCreateLoadingWidget);
+	if (USceneModule* Module = USceneModule::GetPtr(ResolveSceneWorld(WorldContextObject)))
+		Module->AsyncLoadLevelByObjectPtr(InLevelObjectPtr, InOnLoadFinished, InFinishDelayTime, bCreateLoadingWidget);
+	else InOnLoadFinished.ExecuteIfBound(FName(*FPackageName::ObjectPathToPackageName(InLevelObjectPtr.ToString())), ESceneLevelLoadResult::Failed);
 }
 
-void USceneModuleStatics::AsyncUnloadLevel(const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+void USceneModuleStatics::AsyncUnloadLevel(const UObject* WorldContextObject, const FName InLevelPath, const FOnAsyncLoadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
-	USceneModule::Get().AsyncUnloadLevel(InLevelPath, InOnUnloadFinished, InFinishDelayTime, bCreateLoadingWidget);
+	if (USceneModule* Module = USceneModule::GetPtr(ResolveSceneWorld(WorldContextObject)))
+		Module->AsyncUnloadLevel(InLevelPath, InOnUnloadFinished, InFinishDelayTime, bCreateLoadingWidget);
+	else InOnUnloadFinished.ExecuteIfBound(InLevelPath, ESceneLevelLoadResult::Failed);
 }
 
-void USceneModuleStatics::AsyncUnloadLevelByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
+void USceneModuleStatics::AsyncUnloadLevelByObjectPtr(const UObject* WorldContextObject, const TSoftObjectPtr<UWorld> InLevelObjectPtr, const FOnAsyncLoadLevelFinished& InOnUnloadFinished, float InFinishDelayTime, bool bCreateLoadingWidget)
 {
-	USceneModule::Get().AsyncUnloadLevelByObjectPtr(InLevelObjectPtr, InOnUnloadFinished, InFinishDelayTime, bCreateLoadingWidget);
+	if (USceneModule* Module = USceneModule::GetPtr(ResolveSceneWorld(WorldContextObject)))
+		Module->AsyncUnloadLevelByObjectPtr(InLevelObjectPtr, InOnUnloadFinished, InFinishDelayTime, bCreateLoadingWidget);
+	else InOnUnloadFinished.ExecuteIfBound(FName(*FPackageName::ObjectPathToPackageName(InLevelObjectPtr.ToString())), ESceneLevelLoadResult::Failed);
 }
 
-float USceneModuleStatics::GetAsyncLoadLevelProgress(const FName InLevelPath)
+float USceneModuleStatics::GetAsyncLoadLevelProgress(const UObject* WorldContextObject, const FName InLevelPath)
 {
-	return USceneModule::Get().GetAsyncLoadLevelProgress(InLevelPath);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetAsyncLoadLevelProgress(InLevelPath);
 }
 
-float USceneModuleStatics::GetAsyncLoadLevelProgressByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr)
+float USceneModuleStatics::GetAsyncLoadLevelProgressByObjectPtr(const UObject* WorldContextObject, const TSoftObjectPtr<UWorld> InLevelObjectPtr)
 {
-	return USceneModule::Get().GetAsyncLoadLevelProgressByObjectPtr(InLevelObjectPtr);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetAsyncLoadLevelProgressByObjectPtr(InLevelObjectPtr);
 }
 
-float USceneModuleStatics::GetAsyncUnloadLevelProgress(const FName InLevelPath)
+float USceneModuleStatics::GetAsyncUnloadLevelProgress(const UObject* WorldContextObject, const FName InLevelPath)
 {
-	return USceneModule::Get().GetAsyncUnloadLevelProgress(InLevelPath);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetAsyncUnloadLevelProgress(InLevelPath);
 }
 
-float USceneModuleStatics::GetAsyncUnloadLevelProgressByObjectPtr(const TSoftObjectPtr<UWorld> InLevelObjectPtr)
+float USceneModuleStatics::GetAsyncUnloadLevelProgressByObjectPtr(const UObject* WorldContextObject, const TSoftObjectPtr<UWorld> InLevelObjectPtr)
 {
-	return USceneModule::Get().GetAsyncUnloadLevelProgressByObjectPtr(InLevelObjectPtr);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetAsyncUnloadLevelProgressByObjectPtr(InLevelObjectPtr);
 }
 
-bool USceneModuleStatics::HasSceneActor(const FString& InID, bool bEnsured)
+bool USceneModuleStatics::HasSceneActor(const UObject* WorldContextObject, const FString& InID, bool bEnsured)
 {
-	return USceneModule::Get().HasSceneActor(InID, bEnsured);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).HasSceneActor(InID, bEnsured);
 }
 
-AActor* USceneModuleStatics::GetSceneActor(const FString& InID, TSubclassOf<AActor> InClass, bool bEnsured)
+AActor* USceneModuleStatics::GetSceneActor(const UObject* WorldContextObject, const FString& InID, TSubclassOf<AActor> InClass, bool bEnsured)
 {
-	return USceneModule::Get().GetSceneActor(InID, InClass, bEnsured);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetSceneActor(InID, InClass, bEnsured);
 }
 
-bool USceneModuleStatics::AddSceneActor(AActor* InActor)
+bool USceneModuleStatics::AddSceneActor(const UObject* WorldContextObject, AActor* InActor)
 {
-	return USceneModule::Get().AddSceneActor(InActor);
+	UWorld* World = ResolveSceneWorld(WorldContextObject);
+	USceneModule* Module = USceneModule::GetPtr(World);
+	return Module && InActor && InActor->GetWorld() == World && Module->AddSceneActor(InActor);
 }
 
-bool USceneModuleStatics::RemoveSceneActor(AActor* InActor)
+bool USceneModuleStatics::RemoveSceneActor(const UObject* WorldContextObject, AActor* InActor)
 {
-	return USceneModule::Get().RemoveSceneActor(InActor);
+	UWorld* World = ResolveSceneWorld(WorldContextObject);
+	USceneModule* Module = USceneModule::GetPtr(World);
+	return Module && InActor && InActor->GetWorld() == World && Module->RemoveSceneActor(InActor);
 }
 
-bool USceneModuleStatics::HasTargetPointByName(const FName InName, bool bEnsured)
+bool USceneModuleStatics::HasTargetPointByName(const UObject* WorldContextObject, const FName InName, bool bEnsured)
 {
-	return USceneModule::Get().HasTargetPointByName(InName, bEnsured);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).HasTargetPointByName(InName, bEnsured);
 }
 
-ATargetPoint* USceneModuleStatics::GetTargetPointByName(const FName InName, bool bEnsured)
+ATargetPoint* USceneModuleStatics::GetTargetPointByName(const UObject* WorldContextObject, const FName InName, bool bEnsured)
 {
-	return USceneModule::Get().GetTargetPointByName(InName, bEnsured);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetTargetPointByName(InName, bEnsured);
 }
 
-void USceneModuleStatics::AddTargetPointByName(const FName InName, ATargetPoint* InPoint)
+void USceneModuleStatics::AddTargetPointByName(const UObject* WorldContextObject, const FName InName, ATargetPoint* InPoint)
 {
-	USceneModule::Get().AddTargetPointByName(InName, InPoint);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).AddTargetPointByName(InName, InPoint);
 }
 
-void USceneModuleStatics::RemoveTargetPointByName(const FName InName)
+void USceneModuleStatics::RemoveTargetPointByName(const UObject* WorldContextObject, const FName InName)
 {
-	USceneModule::Get().RemoveTargetPointByName(InName);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).RemoveTargetPointByName(InName);
 }
 
-bool USceneModuleStatics::HasScenePointByName(const FName InName, bool bEnsured)
+bool USceneModuleStatics::HasScenePointByName(const UObject* WorldContextObject, const FName InName, bool bEnsured)
 {
-	return USceneModule::Get().HasScenePointByName(InName, bEnsured);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).HasScenePointByName(InName, bEnsured);
 }
 
-USceneComponent* USceneModuleStatics::GetScenePointByName(const FName InName, bool bEnsured)
+USceneComponent* USceneModuleStatics::GetScenePointByName(const UObject* WorldContextObject, const FName InName, bool bEnsured)
 {
-	return USceneModule::Get().GetScenePointByName(InName, bEnsured);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetScenePointByName(InName, bEnsured);
 }
 
-void USceneModuleStatics::AddScenePointByName(const FName InName, USceneComponent* InSceneComp)
+void USceneModuleStatics::AddScenePointByName(const UObject* WorldContextObject, const FName InName, USceneComponent* InSceneComp)
 {
-	USceneModule::Get().AddScenePointByName(InName, InSceneComp);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).AddScenePointByName(InName, InSceneComp);
 }
 
-void USceneModuleStatics::RemoveScenePointByName(const FName InName)
+void USceneModuleStatics::RemoveScenePointByName(const UObject* WorldContextObject, const FName InName)
 {
-	USceneModule::Get().RemoveScenePointByName(InName);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).RemoveScenePointByName(InName);
 }
 
-APhysicsVolume* USceneModuleStatics::GetDefaultPhysicsVolume()
+APhysicsVolume* USceneModuleStatics::GetDefaultPhysicsVolume(const UObject* WorldContextObject)
 {
-	return USceneModule::Get().GetWorld()->GetDefaultPhysicsVolume();
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetWorld()->GetDefaultPhysicsVolume();
 }
 
-bool USceneModuleStatics::HasPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
+bool USceneModuleStatics::HasPhysicsVolumeByClass(const UObject* WorldContextObject, TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
 {
-	return USceneModule::Get().HasPhysicsVolumeByClass(InClass, bEnsured);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).HasPhysicsVolumeByClass(InClass, bEnsured);
 }
 
-bool USceneModuleStatics::HasPhysicsVolumeByName(const FName InName, bool bEnsured)
+bool USceneModuleStatics::HasPhysicsVolumeByName(const UObject* WorldContextObject, const FName InName, bool bEnsured)
 {
-	return USceneModule::Get().HasPhysicsVolumeByName(InName, bEnsured);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).HasPhysicsVolumeByName(InName, bEnsured);
 }
 
-APhysicsVolumeBase* USceneModuleStatics::GetPhysicsVolumeByClass(TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
+APhysicsVolumeBase* USceneModuleStatics::GetPhysicsVolumeByClass(const UObject* WorldContextObject, TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
 {
-	return USceneModule::Get().GetPhysicsVolumeByClass(InClass, bEnsured);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetPhysicsVolumeByClass(InClass, bEnsured);
 }
 
-APhysicsVolumeBase* USceneModuleStatics::GetPhysicsVolumeByName(const FName InName, TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
+APhysicsVolumeBase* USceneModuleStatics::GetPhysicsVolumeByName(const UObject* WorldContextObject, const FName InName, TSubclassOf<APhysicsVolumeBase> InClass, bool bEnsured)
 {
-	return USceneModule::Get().GetPhysicsVolumeByName(InName, InClass, bEnsured);
+	return USceneModule::Get(ResolveSceneWorld(WorldContextObject)).GetPhysicsVolumeByName(InName, InClass, bEnsured);
 }
 
-void USceneModuleStatics::AddPhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
+void USceneModuleStatics::AddPhysicsVolume(const UObject* WorldContextObject, APhysicsVolumeBase* InPhysicsVolume)
 {
-	USceneModule::Get().AddPhysicsVolume(InPhysicsVolume);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).AddPhysicsVolume(InPhysicsVolume);
 }
 
-void USceneModuleStatics::AddPhysicsVolumeByName(const FName InName, APhysicsVolumeBase* InPhysicsVolume)
+void USceneModuleStatics::AddPhysicsVolumeByName(const UObject* WorldContextObject, const FName InName, APhysicsVolumeBase* InPhysicsVolume)
 {
-	USceneModule::Get().AddPhysicsVolumeByName(InName, InPhysicsVolume);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).AddPhysicsVolumeByName(InName, InPhysicsVolume);
 }
 
-void USceneModuleStatics::RemovePhysicsVolume(APhysicsVolumeBase* InPhysicsVolume)
+void USceneModuleStatics::RemovePhysicsVolume(const UObject* WorldContextObject, APhysicsVolumeBase* InPhysicsVolume)
 {
-	USceneModule::Get().RemovePhysicsVolume(InPhysicsVolume);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).RemovePhysicsVolume(InPhysicsVolume);
 }
 
-void USceneModuleStatics::RemovePhysicsVolumeByName(const FName InName)
+void USceneModuleStatics::RemovePhysicsVolumeByName(const UObject* WorldContextObject, const FName InName)
 {
-	USceneModule::Get().RemovePhysicsVolumeByName(InName);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).RemovePhysicsVolumeByName(InName);
 }
 
-void USceneModuleStatics::SpawnWorldText(const FString& InText, const FLinearColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange)
+void USceneModuleStatics::SpawnWorldText(const UObject* WorldContextObject, const FString& InText, const FLinearColor& InTextColor, EWorldTextStyle InTextStyle, FWorldWidgetMapping InMapping, FVector InOffsetRange)
 {
-	USceneModule::Get().SpawnWorldText(InText, InTextColor, InTextStyle, InMapping, InOffsetRange);
+	USceneModule::Get(ResolveSceneWorld(WorldContextObject)).SpawnWorldText(InText, InTextColor, InTextStyle, InMapping, InOffsetRange);
 }

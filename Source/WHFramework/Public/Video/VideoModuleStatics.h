@@ -11,6 +11,7 @@
 
 class UVideoModule;
 class AMediaPlayerBase;
+class APlayerController;
 /**
  * 
  */
@@ -20,31 +21,31 @@ class WHFRAMEWORK_API UVideoModuleStatics : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void AddMediaPlayerToList(AMediaPlayerBase* InMediaPlayer);
+	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void AddMediaPlayerToList(const UObject* WorldContextObject, AMediaPlayerBase* InMediaPlayer);
 
-	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void RemoveMediaPlayerFromList(AMediaPlayerBase* InMediaPlayer);
+	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void RemoveMediaPlayerFromList(const UObject* WorldContextObject, AMediaPlayerBase* InMediaPlayer);
 
-	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void RemoveMediaPlayerFromListByName(const FName InName);
+	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void RemoveMediaPlayerFromListByName(const UObject* WorldContextObject, const FName InName);
 
-	UFUNCTION(BlueprintPure, Category = "VideoModuleStatics")
-	static AMediaPlayerBase* GetMediaPlayerByName(const FName InName);
+	UFUNCTION(BlueprintPure, Category = "VideoModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static AMediaPlayerBase* GetMediaPlayerByName(const UObject* WorldContextObject, const FName InName);
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void PlayMovieForMediaPlayer(const FName InName, const FName InMovieName, bool bMulticast = false);
+	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void PlayMovieForMediaPlayer(const UObject* WorldContextObject, const FName InName, const FName InMovieName, bool bMulticast = false, APlayerController* InController = nullptr);
 
-	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void PlayMovieForMediaPlayerWithDelegate(const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false);
+	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void PlayMovieForMediaPlayerWithDelegate(const UObject* WorldContextObject, const FName InName, const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false, APlayerController* InController = nullptr);
 		
-	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void PauseMovieForMediaPlayer(const FName InName, bool bMulticast = false);
+	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void PauseMovieForMediaPlayer(const UObject* WorldContextObject, const FName InName, bool bMulticast = false, APlayerController* InController = nullptr);
 	
-	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void SeekMovieForMediaPlayer(const FName InName, const FTimespan& InTimespan, bool bMulticast = false);
+	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SeekMovieForMediaPlayer(const UObject* WorldContextObject, const FName InName, const FTimespan& InTimespan, bool bMulticast = false, APlayerController* InController = nullptr);
 
-	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics")
-	static void StopMovieForMediaPlayer(const FName InName, bool bSkip, bool bMulticast = false);
+	UFUNCTION(BlueprintCallable, Category = "VideoModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void StopMovieForMediaPlayer(const UObject* WorldContextObject, const FName InName, bool bSkip, bool bMulticast = false, APlayerController* InController = nullptr);
 };

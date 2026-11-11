@@ -1,4 +1,7 @@
 #include "Setting/Widget/Page/WidgetSettingPageBase.h"
+#include "Widget/ScreenWidgetTypes.h"
+#include "Setting/SettingPresentationTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Engine/World.h"
@@ -83,7 +86,7 @@ USettingModule* UWidgetSettingPageBase::GetSettingSource() const
 {
 	const UWorld* World = GetWorld();
 	USettingModule* Settings = SettingSource.Get();
-	return World && !World->bIsTearingDown && Settings && Settings->GetWorld() == World && Settings->IsEditSessionActive() ? Settings : nullptr;
+	return World && !World->bIsTearingDown && Settings && Settings->GetWorld() == World && Settings->IsEditSessionOwner(GetOwningPlayer()) ? Settings : nullptr;
 }
 
 void UWidgetSettingPageBase::SetSettingSource(USettingModule* InSource)

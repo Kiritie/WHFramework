@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Scene/SceneEditor.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "Editor.h"
 #include "IAssetViewport.h"
@@ -89,16 +90,42 @@ void FSceneEditorManager::OnInitialize()
 
 	FLevelEditorModule& LevelEditorModule = FModuleManager::Get().GetModuleChecked<FLevelEditorModule>("LevelEditor");
 	
-	LevelEditorModule.OnLevelEditorCreated().AddRaw(this, &FSceneEditorManager::OnLevelEditorCreated);
+	LevelEditorCreatedHandle = LevelEditorModule.OnLevelEditorCreated().AddRaw(this, &FSceneEditorManager::OnLevelEditorCreated);
+	if (TSharedPtr<ILevelEditor> Existing = LevelEditorModule.GetLevelEditorInstance().Pin()) OnLevelEditorCreated(Existing);
+}
+
+void FSceneEditorManager::OnTermination()
+{
+    if (FLevelEditorModule* LevelEditor = FModuleManager::GetModulePtr<FLevelEditorModule>("LevelEditor"))
+    {
+        if (LevelEditorCreatedHandle.IsValid()) LevelEditor->OnLevelEditorCreated().Remove(LevelEditorCreatedHandle);
+    }
+    LevelEditorCreatedHandle.Reset();
+    for (const FEditorViewportBinding& Binding : EditorViewportBindings)
+    {
+        if (TSharedPtr<ILevelEditor> Editor = Binding.Editor.Pin()) Editor->OnActiveViewportChanged().Remove(Binding.Handle);
+    }
+    EditorViewportBindings.Reset();
+    for (const auto& Pair : ViewportRootCanvases)
+    {
+        if (TSharedPtr<IAssetViewport> Viewport = Pair.Viewport.Pin(); Viewport && Pair.Canvas) Viewport->RemoveOverlayWidget(Pair.Canvas.ToSharedRef());
+    }
+    ViewportRootCanvases.Reset();
+    FSceneManager::OnTermination();
 }
 
 void FSceneEditorManager::OnLevelEditorCreated(TSharedPtr<ILevelEditor> InLevelEditor)
 {
-	InLevelEditor->OnActiveViewportChanged().AddRaw(this, &FSceneEditorManager::OnActiveViewportChanged);
+    if (!InLevelEditor) return;
+    for (const FEditorViewportBinding& Binding : EditorViewportBindings) if (Binding.Editor.Pin() == InLevelEditor) return;
+    FEditorViewportBinding& Binding = EditorViewportBindings.AddDefaulted_GetRef();
+    Binding.Editor = InLevelEditor;
+    Binding.Handle = InLevelEditor->OnActiveViewportChanged().AddRaw(this, &FSceneEditorManager::OnActiveViewportChanged);
 }
 
 void FSceneEditorManager::OnActiveViewportChanged(TSharedPtr<IAssetViewport> OldViewport, TSharedPtr<IAssetViewport> NewViewport)
 {
+	ViewportRootCanvases.RemoveAll([](const FViewportCanvasBinding& Binding) { return !Binding.Viewport.IsValid(); });
 	if(FWHFrameworkCoreDelegates::OnActiveViewportChanged.IsBound())
 	{
 		FWHFrameworkCoreDelegates::OnActiveViewportChanged.Broadcast();
@@ -248,8 +275,14 @@ void FSceneEditorManager::RemoveWidgetFromViewport(const TSharedPtr<IAssetViewpo
 {
 	if (InViewport.IsValid())
 	{
-		GetOrCreateViewportRootCanvas(InViewport)
-		->RemoveSlot(InWidget);
+		for (const FViewportCanvasBinding& Binding : ViewportRootCanvases)
+        {
+            if (Binding.Viewport.Pin() == InViewport && Binding.Canvas)
+            {
+                Binding.Canvas->RemoveSlot(InWidget);
+                break;
+            }
+        }
 	}
 }
 
@@ -277,21 +310,18 @@ void FSceneEditorManager::RemoveWidgetFromAllViewport(const TSharedRef<SWidget>&
 
 TSharedRef<SViewportRootCanvas> FSceneEditorManager::GetOrCreateViewportRootCanvas(const TSharedPtr<IAssetViewport>& InViewport)
 {
-	TSharedPtr<SViewportRootCanvas> RootCanvas;
-	
-	if(ViewportRootCanvases.Contains(InViewport))
-	{
-		RootCanvas = ViewportRootCanvases[InViewport].ToSharedRef();
-	}
-	else
-	{
-		RootCanvas = SNew(SViewportRootCanvas).Viewport(InViewport);
-
-		InViewport->AddOverlayWidget(RootCanvas.ToSharedRef());
-		ViewportRootCanvases.Add(InViewport, RootCanvas);
-	}
-	
-	return RootCanvas.ToSharedRef();
+    check(InViewport.IsValid());
+    ViewportRootCanvases.RemoveAll([](const FViewportCanvasBinding& Binding) { return !Binding.Viewport.IsValid(); });
+    for (const FViewportCanvasBinding& Binding : ViewportRootCanvases)
+    {
+        if (Binding.Viewport.Pin() == InViewport && Binding.Canvas) return Binding.Canvas.ToSharedRef();
+    }
+    TSharedRef<SViewportRootCanvas> Canvas = SNew(SViewportRootCanvas).Viewport(InViewport);
+    InViewport->AddOverlayWidget(Canvas);
+    FViewportCanvasBinding& Binding = ViewportRootCanvases.AddDefaulted_GetRef();
+    Binding.Viewport = InViewport;
+    Binding.Canvas = Canvas;
+    return Canvas;
 }
 
 #undef LOCTEXT_NAMESPACE

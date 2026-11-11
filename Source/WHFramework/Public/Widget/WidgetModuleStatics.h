@@ -3,6 +3,8 @@
 #pragma once
 
 
+#include "Widget/WorldWidgetTypes.h"
+#include "Common/LanguageTypes.h"
 #include "WidgetModule.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Slate/SlateWidgetManager.h"
@@ -21,42 +23,42 @@ public:
 	////////////////////////////////////////////////////
 	// GlobalSettings
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static TArray<FLanguageType> GetWidgetLanguageTypes();
+	static TArray<FLanguageType> GetWidgetLanguageTypes(const UObject* InWorldContext);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void SetWidgetLanguageTypes(const TArray<FLanguageType>& InLanguageTypes);
+	static void SetWidgetLanguageTypes(const UObject* InWorldContext, const TArray<FLanguageType>& InLanguageTypes);
 
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static int32 GetWidgetLanguageType();
+	static int32 GetWidgetLanguageType(const UObject* InWorldContext);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void SetWidgetLanguageType(int32 InLanguageType);
+	static void SetWidgetLanguageType(const UObject* InWorldContext, int32 InLanguageType);
 
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static float GetWidgetGlobalScale();
+	static float GetWidgetGlobalScale(const UObject* InWorldContext);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void SetWidgetGlobalScale(float InGlobalScale);
+	static void SetWidgetGlobalScale(const UObject* InWorldContext, float InGlobalScale);
 
 	////////////////////////////////////////////////////
 	// CommonWidget
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static UDataTable* GetCommonRichTextStyle();
+	static UDataTable* GetCommonRichTextStyle(const UObject* InWorldContext);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void SetCommonRichTextStyle(UDataTable* InCommonRichTextStyle);
+	static void SetCommonRichTextStyle(const UObject* InWorldContext, UDataTable* InCommonRichTextStyle);
 
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static TArray<TSubclassOf<URichTextBlockDecorator>> GetCommonRichTextDecorators();
+	static TArray<TSubclassOf<URichTextBlockDecorator>> GetCommonRichTextDecorators(const UObject* InWorldContext);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void SetCommonRichTextDecorators(const TArray<TSubclassOf<URichTextBlockDecorator>>& InCommonRichTextDecorators);
+	static void SetCommonRichTextDecorators(const UObject* InWorldContext, const TArray<TSubclassOf<URichTextBlockDecorator>>& InCommonRichTextDecorators);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void AddCommonRichTextDecorator(const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator);
+	static void AddCommonRichTextDecorator(const UObject* InWorldContext, const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void RemoveCommonRichTextDecorator(const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator);
+	static void RemoveCommonRichTextDecorator(const UObject* InWorldContext, const TSubclassOf<URichTextBlockDecorator>& InCommonRichTextDecorator);
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "WidgetModuleStatics")
 	static UCommonToolTip* SpawnToolTipForWidget(UWidget* InWidget, TSubclassOf<UCommonToolTip> InToolTipClass);
@@ -66,107 +68,59 @@ public:
 
 	////////////////////////////////////////////////////
 	// ScreenWidget
+	static UWidgetModule* GetPlayerModule(APlayerController* InPlayer);
+
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InExpectedClass", AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
-	static UUserWidgetBase* GetUserWidgetByTag(FGameplayTag InWidgetTag, TSubclassOf<UUserWidgetBase> InExpectedClass = nullptr);
-
+	static UUserWidgetBase* GetUserWidgetByTag(APlayerController* InPlayer, FGameplayTag InWidgetTag, TSubclassOf<UUserWidgetBase> InExpectedClass = nullptr);
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InWidgetTag,InParam"), Category = "WidgetModuleStatics")
-	static UUserWidgetBase* CreateUserWidgetByTag(FGameplayTag InWidgetTag, const FParameter& InParam = FParameter(), TSubclassOf<UUserWidgetBase> InClass = nullptr);
-
+	static UUserWidgetBase* CreateUserWidgetByTag(APlayerController* InPlayer, FGameplayTag InWidgetTag, const FParameter& InParam = FParameter(), TSubclassOf<UUserWidgetBase> InClass = nullptr);
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag,InParam"), Category = "WidgetModuleStatics")
-	static bool OpenUserWidgetByTag(FGameplayTag InWidgetTag, const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false);
-
+	static bool OpenUserWidgetByTag(APlayerController* InPlayer, FGameplayTag InWidgetTag, const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false);
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
-	static bool CloseUserWidgetByTag(FGameplayTag InWidgetTag, bool bInstant = false);
-
+	static bool CloseUserWidgetByTag(APlayerController* InPlayer, FGameplayTag InWidgetTag, bool bInstant = false);
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
-	static bool ToggleUserWidgetByTag(FGameplayTag InWidgetTag, bool bInstant = false);
-
+	static bool ToggleUserWidgetByTag(APlayerController* InPlayer, FGameplayTag InWidgetTag, bool bInstant = false);
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
-	static bool DestroyUserWidgetByTag(FGameplayTag InWidgetTag, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
+	static bool DestroyUserWidgetByTag(APlayerController* InPlayer, FGameplayTag InWidgetTag, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
-	template<class T>
-	static bool HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().HasUserWidgetClass<T>(InClass);
-	}
-
+	template<class T> static bool HasUserWidgetClass(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	{ UWidgetModule* Module = GetPlayerModule(InPlayer); return Module && Module->HasUserWidgetClass<T>(InClass); }
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static bool HasUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass);
-
-	template<class T>
-	static TSubclassOf<UUserWidgetBase> GetUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().GetUserWidgetClass<T>(InClass);
-	}
-
+	static bool HasUserWidgetClass(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass);
+	template<class T> static TSubclassOf<UUserWidgetBase> GetUserWidgetClass(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	{ UWidgetModule* Module = GetPlayerModule(InPlayer); return Module ? Module->GetUserWidgetClass<T>(InClass) : nullptr; }
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static TSubclassOf<UUserWidgetBase> GetUserWidgetClass(TSubclassOf<UUserWidgetBase> InClass);
-
-	template<class T>
-	static bool HasUserWidget(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().HasUserWidget<T>(InClass);
-	}
-
+	static TSubclassOf<UUserWidgetBase> GetUserWidgetClass(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass);
+	template<class T> static bool HasUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	{ UWidgetModule* Module = GetPlayerModule(InPlayer); return Module && Module->HasUserWidget<T>(InPlayer, InClass); }
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static bool HasUserWidget(TSubclassOf<UUserWidgetBase> InClass);
-
-	template<class T>
-	static T* GetUserWidget(TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().GetUserWidget<T>(InClass);
-	}
-
+	static bool HasUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass);
+	template<class T> static T* GetUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	{ UWidgetModule* Module = GetPlayerModule(InPlayer); return Module ? Module->GetUserWidget<T>(InPlayer, InClass) : nullptr; }
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "WidgetModuleStatics")
-	static UUserWidgetBase* GetUserWidget(TSubclassOf<UUserWidgetBase> InClass);
-
-	template<class T>
-	static T* CreateUserWidget(const FParameter& InParam = FParameter(), TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().CreateUserWidget<T>(InParam, InClass);
-	}
-
+	static UUserWidgetBase* GetUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass);
+	template<class T> static T* CreateUserWidget(APlayerController* InPlayer, const FParameter& InParam = FParameter(), TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	{ UWidgetModule* Module = GetPlayerModule(InPlayer); return Module ? Module->CreateUserWidget<T>(InPlayer, InParam, InClass) : nullptr; }
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParam"), Category = "WidgetModuleStatics")
-	static UUserWidgetBase* CreateUserWidget(TSubclassOf<UUserWidgetBase> InClass, const FParameter& InParam = FParameter());
-
-	template<class T>
-	static bool OpenUserWidget(const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().OpenUserWidget<T>(InParam, bInstant, bForce, InClass);
-	}
-
+	static UUserWidgetBase* CreateUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass, const FParameter& InParam = FParameter());
+	template<class T> static bool OpenUserWidget(APlayerController* InPlayer, const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	{ UWidgetModule* Module = GetPlayerModule(InPlayer); return Module && Module->OpenUserWidget<T>(InPlayer, InParam, bInstant, bForce, InClass); }
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InParam"), Category = "WidgetModuleStatics")
-	static bool OpenUserWidget(TSubclassOf<UUserWidgetBase> InClass, const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false);
-
-	template<class T>
-	static bool CloseUserWidget(bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().CloseUserWidget<T>(bInstant, InClass);
-	}
-
+	static bool OpenUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass, const FParameter& InParam = FParameter(), bool bInstant = false, bool bForce = false);
+	template<class T> static bool CloseUserWidget(APlayerController* InPlayer, bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	{ UWidgetModule* Module = GetPlayerModule(InPlayer); return Module && Module->CloseUserWidget<T>(InPlayer, bInstant, InClass); }
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static bool CloseUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bInstant = false);
-
-	template<class T>
-	static bool ToggleUserWidget(bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().ToggleUserWidget<T>(bInstant, InClass);
-	}
-
+	static bool CloseUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass, bool bInstant = false);
+	template<class T> static bool ToggleUserWidget(APlayerController* InPlayer, bool bInstant = false, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	{ UWidgetModule* Module = GetPlayerModule(InPlayer); return Module && Module->ToggleUserWidget<T>(InPlayer, bInstant, InClass); }
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static bool ToggleUserWidget(TSubclassOf<UUserWidgetBase> InClass, bool bInstant = false);
-
-	template<class T>
-	static bool DestroyUserWidget(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
-	{
-		return UWidgetModule::Get().DestroyUserWidget<T>(InMode, InClass);
-	}
-
+	static bool ToggleUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass, bool bInstant = false);
+	template<class T> static bool DestroyUserWidget(APlayerController* InPlayer, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy, TSubclassOf<UUserWidgetBase> InClass = T::StaticClass())
+	{ UWidgetModule* Module = GetPlayerModule(InPlayer); return Module && Module->DestroyUserWidget<T>(InPlayer, InMode, InClass); }
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static bool DestroyUserWidget(TSubclassOf<UUserWidgetBase> InClass, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
-
+	static bool DestroyUserWidget(APlayerController* InPlayer, TSubclassOf<UUserWidgetBase> InClass, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void CloseAllUserWidget(bool bInstant = false);
+	static void CloseAllUserWidget(APlayerController* InPlayer, bool bInstant = false);
 
 	////////////////////////////////////////////////////
 	// SlateWidget
@@ -211,58 +165,61 @@ public:
 	////////////////////////////////////////////////////
 	// WorldWidget
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
-	static TArray<UWorldWidgetBase*> GetWorldWidgetsByTag(FGameplayTag InWidgetTag);
+	static TArray<UWorldWidgetBase*> GetWorldWidgetsByTag(const UObject* InWorldContext, FGameplayTag InWidgetTag);
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag,InParam"), Category = "WidgetModuleStatics")
-	static UWorldWidgetBase* CreateWorldWidgetByTag(FGameplayTag InWidgetTag, FWorldWidgetMapping InMapping, const FParameter& InParam = FParameter(), TSubclassOf<UWorldWidgetBase> InClass = nullptr);
+	static UWorldWidgetBase* CreateWorldWidgetByTag(const UObject* InWorldContext, FGameplayTag InWidgetTag, FWorldWidgetMapping InMapping, const FParameter& InParam = FParameter(), TSubclassOf<UWorldWidgetBase> InClass = nullptr);
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
-	static bool DestroyWorldWidgetByTag(FGameplayTag InWidgetTag, UWorldWidgetBase* InWidget, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
+	static bool DestroyWorldWidgetByTag(const UObject* InWorldContext, FGameplayTag InWidgetTag, UWorldWidgetBase* InWidget, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 
 	UFUNCTION(BlueprintPure, meta = (AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
-	static bool GetWorldWidgetVisibleByTag(FGameplayTag InWidgetTag);
+	static bool GetWorldWidgetVisibleByTag(const UObject* InWorldContext, FGameplayTag InWidgetTag);
 
 	UFUNCTION(BlueprintCallable, meta = (AutoCreateRefTerm = "InWidgetTag"), Category = "WidgetModuleStatics")
-	static void SetWorldWidgetVisibleByTag(FGameplayTag InWidgetTag, bool bVisible);
+	static void SetWorldWidgetVisibleByTag(const UObject* InWorldContext, FGameplayTag InWidgetTag, bool bVisible);
 
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static UWorldWidgetContainer* GetWorldWidgetContainer();
+	static UWorldWidgetContainer* GetWorldWidgetContainer(APlayerController* InPlayer);
 
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static bool GetWorldWidgetVisible(TSubclassOf<UWorldWidgetBase> InClass = nullptr);
+	static bool GetWorldWidgetVisible(const UObject* InWorldContext, TSubclassOf<UWorldWidgetBase> InClass = nullptr);
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void SetWorldWidgetVisible(bool bVisible, TSubclassOf<UWorldWidgetBase> InClass = nullptr);
+	static void SetWorldWidgetVisible(const UObject* InWorldContext, bool bVisible, TSubclassOf<UWorldWidgetBase> InClass = nullptr);
 
 	template<class T>
-	static TArray<T*> GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static TArray<T*> GetWorldWidgets(const UObject* InWorldContext, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get().GetWorldWidgets<T>(InClass);
+		UWidgetModule* Widgets = InWorldContext ? UWidgetModule::GetPtr(InWorldContext->GetWorld()) : nullptr;
+		return Widgets ? Widgets->GetWorldWidgets<T>(InClass) : TArray<T*>();
 	}
 
 	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static TArray<UWorldWidgetBase*> GetWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass);
+	static TArray<UWorldWidgetBase*> GetWorldWidgets(const UObject* InWorldContext, TSubclassOf<UWorldWidgetBase> InClass);
 
 	template<class T>
-	static T* CreateWorldWidget(FWorldWidgetMapping InMapping, const FParameter& InParam = FParameter(), TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static T* CreateWorldWidget(const UObject* InWorldContext, FWorldWidgetMapping InMapping, const FParameter& InParam = FParameter(), TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		return UWidgetModule::Get().CreateWorldWidget<T>(InMapping, InParam, InClass);
+		UWidgetModule* Widgets = InWorldContext ? UWidgetModule::GetPtr(InWorldContext->GetWorld()) : nullptr;
+		return Widgets ? Widgets->CreateWorldWidget<T>(InMapping, InParam, InClass) : nullptr;
 	}
 
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass", AutoCreateRefTerm = "InParam"), Category = "WidgetModuleStatics")
-	static UWorldWidgetBase* CreateWorldWidget(TSubclassOf<UWorldWidgetBase> InClass, FWorldWidgetMapping InMapping, const FParameter& InParam = FParameter());
+	static UWorldWidgetBase* CreateWorldWidget(const UObject* InWorldContext, TSubclassOf<UWorldWidgetBase> InClass, FWorldWidgetMapping InMapping, const FParameter& InParam = FParameter());
 
 	static bool DestroyWorldWidget(UWorldWidgetBase* InWidget, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy)
 	{
-		return UWidgetModule::Get().DestroyWorldWidget(InWidget, InMode);
+		UWidgetModule* Widgets = InWidget ? UWidgetModule::GetPtr(InWidget->GetWorld()) : nullptr;
+		return Widgets && Widgets->DestroyWorldWidget(InWidget, InMode);
 	}
 
 	template<class T>
-	static void DestroyWorldWidgets(EObjectDespawnMode InMode = EObjectDespawnMode::Destroy, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
+	static void DestroyWorldWidgets(const UObject* InWorldContext, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy, TSubclassOf<UWorldWidgetBase> InClass = T::StaticClass())
 	{
-		UWidgetModule::Get().DestroyWorldWidgets<T>(InMode, InClass);
+		if (UWidgetModule* Widgets = InWorldContext ? UWidgetModule::GetPtr(InWorldContext->GetWorld()) : nullptr) Widgets->DestroyWorldWidgets<T>(InMode, InClass);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void DestroyWorldWidgets(TSubclassOf<UWorldWidgetBase> InClass, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
+	static void DestroyWorldWidgets(const UObject* InWorldContext, TSubclassOf<UWorldWidgetBase> InClass, EObjectDespawnMode InMode = EObjectDespawnMode::Destroy);
 };

@@ -1,6 +1,7 @@
 ﻿#include "Voxel/Save/VoxelWorldSaveAdapter.h"
 
 #include "Misc/Paths.h"
+#include "Common/NativeTaskRetirement.h"
 #include "Voxel/Generation/VoxelGenerationMath.h"
 #include "Voxel/Save/VoxelDeltaCodec.h"
 #include "Voxel/Save/VoxelSceneSaveCapture.h"
@@ -82,7 +83,8 @@ bool FVoxelWorldSaveAdapter::Capture(FVoxelWorldRuntime& InRuntime, const FVoxel
 	};
 	if (!RetireTaskLease)
 	{
-		const auto Admission = Grant(VoxelBoundedAllocation::TaskBytes<FSaveCaptureReclaimer>(), RetireTaskLease);
+		const auto Admission = Grant(VoxelBoundedAllocation::TaskBytes<FSaveCaptureReclaimer>() +
+			VoxelBoundedAllocation::TaskBytes<FNativeTaskRetirementSignal>() + VoxelBoundedAllocation::WorkerSharedBytes<FEventRef>(), RetireTaskLease);
 		if (Admission != EVoxelTerrainResourceAdmission::Granted) return Rejected(Admission, TEXT("退休任务未授予"));
 	}
 	const FVoxelGenerationRequiredSourceScope AcquiredTaskSource(Resources.Get(), RetireTaskLease.Get());
@@ -221,8 +223,12 @@ bool FVoxelWorldSaveAdapter::Complete(FVoxelWorldRuntime& InRuntime, FVoxelRegio
 			if (bCaptureRootsFrozen)
 			{
 				check(RetireTaskLease);
+				TSharedPtr<void, ESPMode::ThreadSafe> RetirementLease = RetireTaskLease;
 				RetireCaptureTask = UE::Tasks::Launch(UE_SOURCE_LOCATION,
-					FSaveCaptureReclaimer{MoveTemp(RetireTaskLease), MoveTemp(Pending.GetValue())});
+					FSaveCaptureReclaimer{MoveTemp(RetireTaskLease), MoveTemp(Pending.GetValue())},
+					UE::Tasks::ETaskPriority::BackgroundNormal, UE::Tasks::EExtendedTaskPriority::None,
+					UE::Tasks::ETaskFlags::DoNotRunInsideBusyWait);
+				FNativeTaskRetirement::Track(RetireCaptureTask, MoveTemp(RetirementLease));
 			}
 			Pending.Reset();
 		}
@@ -250,8 +256,12 @@ bool FVoxelWorldSaveAdapter::Complete(FVoxelWorldRuntime& InRuntime, FVoxelRegio
 	}
 	Active->RetiredSceneAttempt = MoveTemp(InRetiredSceneAttempt);
 	Active->RetiredSceneReceipt = MoveTemp(InRetiredSceneReceipt);
+	TSharedPtr<void, ESPMode::ThreadSafe> RetirementLease = RetireTaskLease;
 	RetireCaptureTask = UE::Tasks::Launch(UE_SOURCE_LOCATION,
-		FSaveCaptureReclaimer{MoveTemp(RetireTaskLease), MoveTemp(Active.GetValue())});
+		FSaveCaptureReclaimer{MoveTemp(RetireTaskLease), MoveTemp(Active.GetValue())},
+		UE::Tasks::ETaskPriority::BackgroundNormal, UE::Tasks::EExtendedTaskPriority::None,
+		UE::Tasks::ETaskFlags::DoNotRunInsideBusyWait);
+	FNativeTaskRetirement::Track(RetireCaptureTask, MoveTemp(RetirementLease));
 	Active.Reset();
 	return bApplied;
 }

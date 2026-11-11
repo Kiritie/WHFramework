@@ -1,8 +1,11 @@
 #pragma once
 
 #include "Setting/SettingModuleTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "SettingProviderBase.generated.h"
+
+class UWHLocalPlayer;
 
 UCLASS(Abstract, BlueprintType, EditInlineNew, DefaultToInstanced)
 class WHFRAMEWORK_API USettingProviderBase : public UObject
@@ -32,7 +35,11 @@ public:
 
 	virtual bool Apply(const FSettingDefinition& InDefinition, const FParameter& InValue);
 
-	virtual void Rollback(const FSettingDefinition& InDefinition);
+	virtual bool Rollback(const FSettingDefinition& InDefinition);
+
+	// 世界已不可用时仅恢复由原 LocalPlayer 持有的状态，不访问世界服务。
+	virtual bool RollbackForHostTermination(const FSettingDefinition& InDefinition, UWHLocalPlayer* InPlayer);
+	virtual bool CanRollbackForHostTermination(const FSettingDefinition& InDefinition, const UWHLocalPlayer* InPlayer) const;
 
 	virtual void Commit();
 

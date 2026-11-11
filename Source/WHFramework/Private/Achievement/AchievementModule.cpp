@@ -24,7 +24,7 @@ UAchievementModule::UAchievementModule()
 
 	ModuleDependencies = { FName("AudioModule"), FName("WidgetModule") };
 	
-	static ConstructorHelpers::FClassFinder<UWidgetAchievement> AchievementWidgetClassHelper(TEXT("WidgetBlueprintGeneratedClass'/WHFramework/Achievement/Blueprints/Widget/WBP_Achievement.WBP_Achievement_C'"));
+	static ConstructorHelpers::FClassFinder<UWidgetAchievement> AchievementWidgetClassHelper(TEXT("WidgetBlueprintGeneratedClass'/WHFramework/Blueprints/Widget/Achievement/WBP_Achievement.WBP_Achievement_C'"));
 	if(AchievementWidgetClassHelper.Succeeded())
 	{
 		AchievementWidgetClass = AchievementWidgetClassHelper.Class;
@@ -32,11 +32,11 @@ UAchievementModule::UAchievementModule()
 
 	if(!UnlockSound.IsValid())
 	{
-		UnlockSound = FString("/WHFramework/Achievement/Sounds/Achievement_Unlock_Cue.Achievement_Unlock_Cue");
+		UnlockSound = FString("/WHFramework/Sounds/Achievement/S_Achievement_Unlock_Cue.S_Achievement_Unlock_Cue");
 	}
 	if(!ProgressMadeSound.IsValid())
 	{
-		ProgressMadeSound = FString("/WHFramework/Achievement/Sounds/Achievement_Progress_Cue.Achievement_Progress_Cue");
+		ProgressMadeSound = FString("/WHFramework/Sounds/Achievement/S_Achievement_Progress_Cue.S_Achievement_Progress_Cue");
 	}
 }
 

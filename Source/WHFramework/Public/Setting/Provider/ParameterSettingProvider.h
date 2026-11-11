@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Setting/Provider/SettingProviderBase.h"
+#include "Setting/SettingDefinitionTypes.h"
 
 #include "ParameterSettingProvider.generated.h"
 
@@ -26,7 +27,7 @@ public:
 
 	virtual bool Apply(const FSettingDefinition& InDefinition, const FParameter& InValue) override;
 
-	virtual void Rollback(const FSettingDefinition& InDefinition) override;
+	virtual bool Rollback(const FSettingDefinition& InDefinition) override;
 
 	virtual void Commit() override;
 

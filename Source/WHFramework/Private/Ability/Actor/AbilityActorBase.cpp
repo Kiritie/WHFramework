@@ -1,15 +1,19 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Actor/AbilityActorBase.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Ability/AbilityActorTypes.h"
+#include "Ability/AbilityActorSaveTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Scene/SceneActorSaveTypes.h"
 
 #include "Ability/AbilityModuleStatics.h"
 #include "Ability/Actor/AbilityActorDataBase.h"
 #include "Ability/Attributes/ActorAttributeSetBase.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Engine/World.h"
-#include "Asset/AssetModuleStatics.h"
 #include "Common/Interaction/InteractionComponent.h"
 #include "Components/BoxComponent.h"
 #include "Ability/Effects/EffectBase.h"
@@ -48,6 +52,12 @@ AAbilityActorBase::AAbilityActorBase(const FObjectInitializer& ObjectInitializer
 	BirthTransform = FTransform::Identity;
 }
 
+void AAbilityActorBase::OnRep_ActorID()
+{
+	if (AbilitySystem) AbilitySystem->SetAbilityEntityId(ActorID);
+	Super::OnRep_ActorID();
+}
+
 void AAbilityActorBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	if (HasAuthority() && AttributeSet)
@@ -66,10 +76,12 @@ void AAbilityActorBase::OnSpawn_Implementation(const FParameter& InParam)
 
 	if(const FAbilityActorSpawnParameter* Param = InParam.GetPtr<FAbilityActorSpawnParameter>())
 	{
-		AssetID = Param->AssetID;
+		SetAssetID_Implementation(Param->AssetID);
 	}
+	else if (AssetID.IsValid()) AssetBinding.Bind(this, AssetID);
 
 	Super::OnSpawn_Implementation(InParam);
+	if (HasActorBegunPlay() && !Execute_IsInitialized(this)) return;
 
 	AbilitySystem->SetAbilityEntityId(ActorID);
 	InitializeAbilities();
@@ -91,6 +103,7 @@ void AAbilityActorBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	BindInventory(nullptr);
 	Super::OnDespawn_Implementation(InMode);
 
+	AssetBinding.Reset();
 	AssetID = FPrimaryAssetId();
 	Name = NAME_None;
 	Level = 0;
@@ -103,6 +116,8 @@ void AAbilityActorBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 void AAbilityActorBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+	if (!Execute_IsInitialized(this)) return;
+	if (AssetID.IsValid()) AssetBinding.Bind(this, AssetID);
 }
 
 void AAbilityActorBase::OnPreparatory_Implementation()
@@ -126,6 +141,7 @@ void AAbilityActorBase::OnTermination_Implementation()
 		AbilitySystem->RemoveGrantSource(GetActorStatSourceId());
 	}
 	Super::OnTermination_Implementation();
+	AssetBinding.Reset();
 }
 
 void AAbilityActorBase::Serialize(FArchive& Ar)
@@ -152,9 +168,11 @@ void AAbilityActorBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
 	if (!HasAuthority() || !InSaveData.GetPtr<FActorSaveData>())
 	{
+		MarkLoadDataFailed();
 		return;
 	}
 	Super::LoadData(InSaveData, InPhase);
+	if (!WasLoadDataApplied()) return;
 
 	auto& SaveData = InSaveData.GetRef<FActorSaveData>();
 
@@ -177,7 +195,7 @@ void AAbilityActorBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 
 		if (HasAuthority() && SaveData.InventorySnapshot.InventoryId.IsValid())
 		{
-			UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+			UInventoryModule* Subsystem = GetWorld() ? UInventoryModule::GetPtr(GetWorld()) : nullptr;
 			UAbilityInventoryBase* Resolved = Subsystem ? Subsystem->Resolve(SaveData.InventorySnapshot.InventoryId) : nullptr;
 			if (!Resolved)
 			{
@@ -256,9 +274,15 @@ void AAbilityActorBase::OnActorDetached(AActor* InActor)
 
 }
 
-UAbilityActorDataBase& AAbilityActorBase::GetActorData() const
+const UAbilityActorDataBase* AAbilityActorBase::GetActorData() const
 {
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UAbilityActorDataBase>(AssetID);
+	return Cast<UAbilityActorDataBase>(AssetBinding.Get());
+}
+
+void AAbilityActorBase::SetAssetID_Implementation(const FPrimaryAssetId& InID)
+{
+	AssetID = InID;
+	AssetBinding.Bind(this, AssetID);
 }
 
 UAttributeSetBase* AAbilityActorBase::GetAttributeSet() const
@@ -287,16 +311,17 @@ bool AAbilityActorBase::SetLevelA(int32 InLevel)
 	{
 		return false;
 	}
-	const UAbilityActorDataBase& Data = GetActorData();
-	InLevel = Data.ClampLevel(InLevel);
+	const UAbilityActorDataBase* Data = GetActorData();
+	if (!Data) return false;
+	InLevel = Data->ClampLevel(InLevel);
 	if (InLevel == Level)
 	{
 		return false;
 	}
 	TArray<TSubclassOf<UEffectBase>> Effects;
-	if (Data.PEClass)
+	if (Data->PEClass)
 	{
-		Effects.Add(Data.PEClass);
+		Effects.Add(Data->PEClass);
 	}
 	if (!AbilitySystem->SetGrantSource(GetActorStatSourceId(), {}, Effects, InLevel))
 	{
@@ -334,6 +359,7 @@ FGuid AAbilityActorBase::GetActorStatSourceId() const
 
 void AAbilityActorBase::OnRep_ActorMetadata()
 {
+	AssetBinding.Bind(this, AssetID);
 	RefreshAttributes();
 }
 
@@ -351,8 +377,8 @@ void AAbilityActorBase::BindInventory(UAbilityInventoryBase* InInventory)
 	{
 		return;
 	}
-	UInventoryWorldSubsystem* NextSubsystem = InInventory ? Cast<UInventoryWorldSubsystem>(InInventory->GetOuter()) : nullptr;
-	UInventoryWorldSubsystem* WorldSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	UInventoryModule* NextSubsystem = InInventory ? Cast<UInventoryModule>(InInventory->GetOuter()) : nullptr;
+	UInventoryModule* WorldSubsystem = GetWorld() ? UInventoryModule::GetPtr(GetWorld()) : nullptr;
 	if (InInventory && (!NextSubsystem || NextSubsystem != WorldSubsystem || !NextSubsystem->AcquireLease(InInventory->GetInventoryId())))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Inventory binding rejected for %s"), *GetName());
@@ -362,7 +388,7 @@ void AAbilityActorBase::BindInventory(UAbilityInventoryBase* InInventory)
 	Inventory = InInventory;
 	if (PreviousInventory)
 	{
-		if (UInventoryWorldSubsystem* PreviousSubsystem = Cast<UInventoryWorldSubsystem>(PreviousInventory->GetOuter()))
+		if (UInventoryModule* PreviousSubsystem = Cast<UInventoryModule>(PreviousInventory->GetOuter()))
 		{
 			PreviousSubsystem->ReleaseLease(PreviousInventory->GetInventoryId());
 		}

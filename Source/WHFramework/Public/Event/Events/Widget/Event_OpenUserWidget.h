@@ -6,6 +6,8 @@
 
 #include "Event_OpenUserWidget.generated.h"
 
+class APlayerController;
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FEventOpenUserWidget : public FEventBase
 {
@@ -14,10 +16,13 @@ struct WHFRAMEWORK_API FEventOpenUserWidget : public FEventBase
 public:
 	FEventOpenUserWidget() = default;
 
-	FEventOpenUserWidget(FGameplayTag InWidgetTag, const FParameter& InWidgetParam, bool bInInstant, bool bInForce, TSubclassOf<class UUserWidgetBase> InWidgetClassOverride = nullptr)
-		: WidgetTag(InWidgetTag), WidgetClassOverride(InWidgetClassOverride), WidgetParam(InWidgetParam), bInstant(bInInstant), bForce(bInForce)
+	FEventOpenUserWidget(APlayerController* InPlayer, FGameplayTag InWidgetTag, const FParameter& InWidgetParam, bool bInInstant, bool bInForce, TSubclassOf<class UUserWidgetBase> InWidgetClassOverride = nullptr)
+		: Player(InPlayer), WidgetTag(InWidgetTag), WidgetClassOverride(InWidgetClassOverride), WidgetParam(InWidgetParam), bInstant(bInInstant), bForce(bInForce)
 	{
 	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<APlayerController> Player = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (Categories = "Widget.Screen"))
 	FGameplayTag WidgetTag;

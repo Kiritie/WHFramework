@@ -2,12 +2,14 @@
 
 
 #include "Procedure/Base/ProcedureBase.h"
+#include "Camera/CameraFeatureTypes.h"
 
 #include "Camera/CameraModule.h"
 #include "Camera/Anchor/CameraShotAnchor.h"
 #include "Camera/Manager/CameraManagerBase.h"
+#include "GameFramework/PlayerController.h"
 #include "Debug/DebugModuleTypes.h"
-#include "Event/EventModuleStatics.h"
+#include "Event/EventModule.h"
 #include "Event/Events/Procedure/Event_ProcedureEntered.h"
 #include "Event/Events/Procedure/Event_ProcedureLeaved.h"
 #include "Event/Events/Procedure/Event_ProcedureStateChanged.h"
@@ -72,7 +74,7 @@ void UProcedureBase::OnStateChanged(EProcedureState InProcedureState)
 	OnProcedureStateChanged.Broadcast(InProcedureState);
 	K2_OnStateChanged(InProcedureState);
 
-	UEventModuleStatics::BroadcastEvent<FEventProcedureStateChanged>(this, {this});
+	if (UEventModule* Events = UEventModule::GetPtr(GetWorld())) Events->BroadcastEvent<FEventProcedureStateChanged>(this, {this});
 }
 
 void UProcedureBase::OnInitialize()
@@ -90,7 +92,7 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 
 	K2_OnEnter(InLastProcedure);
 
-	ApplyCameraAction();
+	RefreshPlayerCameraActions();
 
 	switch(ProcedureGuideType)
 	{
@@ -103,12 +105,13 @@ void UProcedureBase::OnEnter(UProcedureBase* InLastProcedure)
 		default: break;
 	}
 
-	UEventModuleStatics::BroadcastEvent<FEventProcedureEntered>(this, {this});
+	if (UEventModule* Events = UEventModule::GetPtr(GetWorld())) Events->BroadcastEvent<FEventProcedureEntered>(this, {this});
 }
 
 void UProcedureBase::OnRefresh()
 {
 	K2_OnRefresh();
+	RefreshPlayerCameraActions();
 }
 
 void UProcedureBase::OnGuide()
@@ -118,7 +121,9 @@ void UProcedureBase::OnGuide()
 		return;
 	}
 
-	ApplyCameraAction();
+	TArray<TWeakObjectPtr<APlayerController>> Players;
+	PlayerCameras.GetKeys(Players);
+	for (const TWeakObjectPtr<APlayerController>& Player : Players) if (Player.IsValid()) ApplyCameraAction(Player.Get());
 
 	switch(ProcedureGuideType)
 	{
@@ -140,34 +145,23 @@ void UProcedureBase::OnLeave(UProcedureBase* InNextProcedure)
     {
         World->GetTimerManager().ClearTimer(StartGuideTimerHandle);
     }
-    UCameraModule* CameraModule = UCameraModule::GetPtr(World);
-    ACameraManagerBase* CameraManager = CameraModule ? CameraModule->GetCameraManager() : nullptr;
-    if (CameraOverrideHandle.IsValid())
-    {
-        if (CameraManager)
-        {
-            CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
-        }
-        CameraOverrideHandle.Reset();
-    }
+	ClearPlayerCameraActions(bRestoreDefaultCameraOnLeave);
+	PlayerTargets.Reset();
 	ProcedureState = EProcedureState::Leaved;
 	OnStateChanged(ProcedureState);
-
-    if (bRestoreDefaultCameraOnLeave && CameraManager)
-    {
-        CameraManager->SetDefaultMode(CameraTransition);
-    }
 
 	WHDebug(FString::Printf(TEXT("离开流程: %s"), *ProcedureDisplayName.ToString()), EDM_All, EDC_Procedure, EDV_Log, FColor::Orange, 5.f);
 
 	K2_OnLeave(InNextProcedure);
 
-	UEventModuleStatics::BroadcastEvent<FEventProcedureLeaved>(this, {this});
+	if (UEventModule* Events = UEventModule::GetPtr(GetWorld())) Events->BroadcastEvent<FEventProcedureLeaved>(this, {this});
 }
 
 
 void UProcedureBase::OnShutdown()
 {
+    ClearPlayerCameraActions(false);
+    PlayerTargets.Reset();
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().ClearTimer(StartGuideTimerHandle);
@@ -212,49 +206,91 @@ UProcedureAsset* UProcedureBase::GetProcedureAsset() const
     return RuntimeOwner ? RuntimeOwner->GetCurrentAsset() : Cast<UProcedureAsset>(GetOuter());
 }
 
-void UProcedureBase::ApplyCameraAction()
+void UProcedureBase::ApplyCameraAction(APlayerController* InPlayer)
 {
-	if(!IsCurrent() || !bApplyCameraAction)
+	if(!IsCurrent() || !bApplyCameraAction || !::IsValid(InPlayer) || !InPlayer->IsLocalController() || InPlayer->GetWorld() != GetWorld())
 	{
 		return;
 	}
 
     UCameraModule* CameraModule = UCameraModule::GetPtr(GetWorld());
-    ACameraManagerBase* CameraManager = CameraModule ? CameraModule->GetCameraManager() : nullptr;
+	ACameraManagerBase* CameraManager = CameraModule ? CameraModule->GetCameraManagerForPlayer(InPlayer) : nullptr;
 	if(!CameraManager)
 	{
 		return;
 	}
-	if(CameraOverrideHandle.IsValid())
+	FPlayerCameraState& State = PlayerCameras.FindOrAdd(InPlayer);
+	if(State.Override.IsValid())
 	{
-		CameraManager->PopCameraConfigOverride(CameraOverrideHandle);
-		CameraOverrideHandle.Reset();
+		if (ACameraManagerBase* Previous = State.Manager.Get()) Previous->PopCameraConfigOverride(State.Override);
+		State.Override.Reset();
 	}
-	CameraOverrideHandle = CameraManager->PushCameraConfigOverride(CameraOverride, 10);
+	State.Manager = CameraManager;
+	State.Override = CameraManager->PushCameraConfigOverride(CameraOverride, 10);
 
 	if(CameraModeClass)
 	{
 		FCameraModeContext Context;
-		Context.Target = OperationTarget.LoadSynchronous();
+		Context.Target = GetOperationTarget(InPlayer, AActor::StaticClass());
 		Context.Anchor = CameraAnchor.LoadSynchronous();
 		Context.Transition = CameraTransition;
 		CameraManager->SetMode(CameraModeClass, Context);
 	}
 }
 
-AActor* UProcedureBase::GetOperationTarget(TSubclassOf<AActor> InClass) const
+AActor* UProcedureBase::GetOperationTarget(APlayerController* InPlayer, TSubclassOf<AActor> InClass) const
 {
-	AActor* Target = OperationTarget.Get();
+	if (!::IsValid(InPlayer) || !InPlayer->IsLocalController() || InPlayer->GetWorld() != GetWorld()) return nullptr;
+	const TWeakObjectPtr<AActor>* Assigned = PlayerTargets.Find(InPlayer);
+	AActor* Target = Assigned ? Assigned->Get() : OperationTarget.LoadSynchronous();
 	return Target && (!InClass || Target->IsA(InClass)) ? Target : nullptr;
 }
 
-void UProcedureBase::SetOperationTarget(AActor* InOperationTarget, bool bResetCameraView)
+void UProcedureBase::SetOperationTarget(APlayerController* InPlayer, AActor* InOperationTarget, bool bResetCameraView)
 {
-	OperationTarget = InOperationTarget;
+	if (!::IsValid(InPlayer) || !InPlayer->IsLocalController() || InPlayer->GetWorld() != GetWorld() ||
+		(InOperationTarget && InOperationTarget->GetWorld() != GetWorld())) return;
+	PlayerTargets.Add(InPlayer, InOperationTarget);
 	if(bResetCameraView)
 	{
-		ApplyCameraAction();
+		ApplyCameraAction(InPlayer);
 	}
+}
+
+void UProcedureBase::RefreshPlayerCameraActions()
+{
+	UWorld* World = GetWorld();
+	if (!bApplyCameraAction || !World || !IsCurrent()) return;
+	UCameraModule* Cameras = UCameraModule::GetPtr(World);
+	if (!Cameras) return;
+	TSet<TWeakObjectPtr<APlayerController>> CurrentPlayers;
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* Player = It->Get();
+		if (!::IsValid(Player) || !Player->IsLocalController() || Player->GetWorld() != World) continue;
+		CurrentPlayers.Add(Player);
+		const FPlayerCameraState* State = PlayerCameras.Find(Player);
+		if (!State || State->Manager.Get() != Cameras->GetCameraManagerForPlayer(Player)) ApplyCameraAction(Player);
+	}
+	for (auto It = PlayerCameras.CreateIterator(); It; ++It)
+		if (!CurrentPlayers.Contains(It.Key()))
+		{
+			if (ACameraManagerBase* Manager = It.Value().Manager.Get(); Manager && It.Value().Override.IsValid()) Manager->PopCameraConfigOverride(It.Value().Override);
+			PlayerTargets.Remove(It.Key());
+			It.RemoveCurrent();
+		}
+}
+
+void UProcedureBase::ClearPlayerCameraActions(bool bRestoreDefault)
+{
+	const auto PreviousCameras = MoveTemp(PlayerCameras);
+	PlayerCameras.Reset();
+	for (const auto& Pair : PreviousCameras)
+		if (ACameraManagerBase* Manager = Pair.Value.Manager.Get())
+		{
+			if (Pair.Value.Override.IsValid()) Manager->PopCameraConfigOverride(Pair.Value.Override);
+			if (bRestoreDefault) Manager->SetDefaultMode(CameraTransition);
+		}
 }
 
 void UProcedureBase::Switch_Implementation()

@@ -19,7 +19,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Defaults
 public:
-	virtual void OnInitialize(int32 InPlayerIndex) override;
 
 	virtual void OnReset() override;
 

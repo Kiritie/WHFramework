@@ -2,12 +2,14 @@
 
 #pragma once
 
+#include "Widget/ScreenWidgetTypes.h"
 #include "CommonActivatableWidget.h"
 #include "ObjectPool/ObjectPoolInterface.h"
 #include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
 #include "Widget/WidgetModuleTypes.h"
 
 #include "SubActivatableWidgetBase.generated.h"
+
 
 /**
  * 
@@ -16,6 +18,7 @@ UCLASS(BlueprintType, meta = (DisableNativeTick))
 class WHFRAMEWORK_API USubActivatableWidgetBase : public UCommonActivatableWidget, public ISubWidgetInterface, public IObjectPoolInterface
 {
 	GENERATED_BODY()
+
 	
 public:
 	USubActivatableWidgetBase(const FObjectInitializer& ObjectInitializer);

@@ -3,7 +3,9 @@
 #pragma once
 
 #include "MainTypes.h"
+#include "Type/NativeTypeIdentity.h"
 #include "Base/ManagerBase.h"
+#include "Containers/Ticker.h"
 
 class WHFRAMEWORKCORE_API FMainManager : public FManagerBase
 {
@@ -27,6 +29,8 @@ public:
 	virtual void OnRefresh(float DeltaSeconds) override;
 
 	virtual void OnTermination() override;
+	static void Startup();
+	static void Shutdown();
 
 protected:
 	virtual void OnWorldAdded(UWorld* InWorld);
@@ -34,6 +38,9 @@ protected:
 protected:
 	/// 管理器列表
 	TMap<FUniqueType, FManagerBase*> ManagerMap;
+	FDelegateHandle WorldAddedHandle;
+	FTSTicker::FDelegateHandle RefreshHandle;
+	bool bTerminating = false;
 
 public:
 	/**
@@ -42,7 +49,8 @@ public:
 	template<typename T>
 	static bool IsExistManager()
 	{
-		return Get().ManagerMap.Contains(T::Type);
+		const FMainManager* Owner = GetPtr();
+		return Owner && Owner->ManagerMap.Contains(T::Type);
 	}
 	/**
 	 * 注册指定类型的管理器
@@ -50,13 +58,24 @@ public:
 	template<typename T>
 	static void RegisterManager(bool bForce = false)
 	{
-		if(bForce) UnRegisterManager<T>();
+		FMainManager* Owner = GetPtr();
+		if (!Owner || Owner->bTerminating)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Cannot register a manager while the registry is terminating."));
+			return;
+		}
+		if(bForce)
+		{
+			UnRegisterManager<T>();
+			Owner = GetPtr();
+			if (!Owner || Owner->bTerminating) return;
+		}
 		
 		if(!IsExistManager<T>())
 		{
 			T* Manager = new T();
+			Owner->ManagerMap.Add(T::Type, Manager);
 			Manager->OnInitialize();
-			Get().ManagerMap.Add(T::Type, Manager);
 		}
 	}
 	/**
@@ -65,10 +84,13 @@ public:
 	template<typename T>
 	static void UnRegisterManager()
 	{
-		if(T* Manager = GetManager<T>())
+		FMainManager* Owner = GetPtr();
+		if (!Owner) return;
+		FManagerBase* Manager = nullptr;
+		if (Owner->ManagerMap.RemoveAndCopyValue(T::Type, Manager) && Manager)
 		{
 			Manager->OnTermination();
-			Get().ManagerMap.Remove(T::Type);
+			delete Manager;
 		}
 	}
 	/**
@@ -77,9 +99,10 @@ public:
 	template<typename T>
 	static T* GetManager()
 	{
-		if(IsExistManager<T>())
+		FMainManager* Owner = GetPtr();
+		if(Owner)
 		{
-			return Get().ManagerMap[T::Type]->template Cast<T>();
+			if (FManagerBase* const* Manager = Owner->ManagerMap.Find(T::Type)) return (*Manager)->template Cast<T>();
 		}
 		return nullptr;
 	}
@@ -89,7 +112,9 @@ public:
 	static TArray<FManagerBase*> GetAllManager()
 	{
 		TArray<FManagerBase*> Managers;
-		for(auto Iter : Get().ManagerMap)
+		const FMainManager* Owner = GetPtr();
+		if (!Owner) return Managers;
+		for(auto Iter : Owner->ManagerMap)
 		{
 			Managers.Add(Iter.Value);
 		}

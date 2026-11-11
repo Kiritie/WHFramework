@@ -6,6 +6,7 @@
 #include "EdGraphUtilities.h"
 
 #include "Editor.h"
+#include "Engine/World.h"
 #include "WHFrameworkSlateStatics.h"
 #include "Procedure/ProcedureModule.h"
 #include "Procedure/Base/ProcedureAsset.h"
@@ -114,7 +115,8 @@ TSharedRef<FProcedureEditor> FProcedureEditorModule::CreateProcedureEditor(const
 
 void FProcedureEditorModule::OnClickedProcedureEditorButton()
 {
-    if (const UProcedureModule* Module = UProcedureModule::GetPtr(!UCommonModuleStatics::IsPlaying()))
+	UWorld* EditorWorld = GEditor ? (GEditor->PlayWorld ? GEditor->PlayWorld.Get() : GEditor->GetEditorWorldContext().World()) : nullptr;
+    if (const UProcedureModule* Module = UProcedureModule::GetPtr(EditorWorld))
     {
         if (UProcedureAsset* Asset = Module->GetDefaultAsset())
         {

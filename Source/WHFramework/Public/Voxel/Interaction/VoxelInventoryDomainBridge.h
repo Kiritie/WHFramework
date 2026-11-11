@@ -1,16 +1,19 @@
 #pragma once
 
+#include "Ability/Inventory/InventoryPlanTypes.h"
 #include "CoreMinimal.h"
 #include "Ability/Inventory/InventoryDomain.h"
 #include "Voxel/Runtime/VoxelWorldRuntime.h"
 
-class UInventoryWorldSubsystem;
+class UInventoryModule;
+class FInventoryItemRegistry;
+struct FInventoryProfileDefinition;
 
 class WHFRAMEWORK_API FVoxelInventoryDomainBridge final : public IInventoryDomainAdapter,
     public TSharedFromThis<FVoxelInventoryDomainBridge>
 {
 public:
-    explicit FVoxelInventoryDomainBridge(UInventoryWorldSubsystem& InSystem);
+    explicit FVoxelInventoryDomainBridge(UInventoryModule& InSystem);
     virtual ~FVoxelInventoryDomainBridge() override;
     bool Register(FString& OutError);
     bool AttachRuntime(FVoxelWorldRuntime& InRuntime, FString& OutError);
@@ -21,6 +24,8 @@ public:
     FGuid FindInventoryAt(const FIntVector& InAnchor) const;
     bool AppendEdit(const TArray<FVoxelCellEdit>& InCells, const TArray<FVoxelEntityEdit>& InEntities,
         TArray<FInventoryDomainRedo>& InOutChanges, FString& OutError);
+
+    // 迁移检查点内的体素区块，并核对容器与迁移后的主库存保持一致。
 
     virtual FName GetDomain() const override;
     virtual bool Prepare(const FGuid& InTransactionId, TConstArrayView<FInventoryDomainRedo> InChanges, FString& OutError) override;
@@ -39,7 +44,7 @@ private:
         bool bApplied = false;
     };
 
-    UInventoryWorldSubsystem& System;
+    UInventoryModule& System;
     FVoxelWorldRuntime* Runtime = nullptr;
     TMap<FGuid, FIntVector> ContainerAnchors;
     TMap<FGuid, TSharedPtr<FPending>> Pending;

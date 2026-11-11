@@ -29,4 +29,11 @@ public:
 	virtual void OnOpen(const FParameter& InParams, bool bInstant) override;
 
 	virtual void OnClose(bool bInstant) override;
+	UWorld* GetPanelWorld() const { return PanelWorld.Get(); }
+
+protected:
+	virtual UGameViewportClient* ResolveViewport() const override;
+
+private:
+	TWeakObjectPtr<UWorld> PanelWorld;
 };

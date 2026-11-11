@@ -11,6 +11,7 @@
 #include "Ability/Abilities/AbilityBase.h"
 #include "Ability/Character/AbilityCharacterBase.h"
 #include "Ability/Effects/EffectBase.h"
+#include "Ability/Effects/ConfiguredAttributeEffect.h"
 #include "Net/UnrealNetwork.h"
 #include "Debug/DebugModuleTypes.h"
 #include "GameplayEffectAggregator.h"
@@ -1795,8 +1796,10 @@ bool UAbilitySystemComponentBase::IsGrantEffect(FActiveGameplayEffectHandle Hand
 
 bool UAbilitySystemComponentBase::MatchesGrantSource(const FAbilityGrantSourceState& Existing, const FAbilityGrantSourceDefinition& Desired) const
 {
+	const int32 AttributeEffectCount = Desired.AttributeModifiers.IsEmpty() ? 0 : 1;
 	if (Existing.Level != Desired.Level || Existing.Effects != Desired.Effects || Existing.Abilities.Num() != Desired.Abilities.Num()
-		|| Existing.AbilityHandles.Num() != Desired.Abilities.Num() || Existing.EffectHandles.Num() != Desired.Effects.Num())
+		|| Existing.AttributeEffectClass != Desired.AttributeEffectClass || Existing.AttributeModifiers != Desired.AttributeModifiers
+		|| Existing.AbilityHandles.Num() != Desired.Abilities.Num() || Existing.EffectHandles.Num() != Desired.Effects.Num() + AttributeEffectCount)
 	{
 		return false;
 	}
@@ -1820,6 +1823,14 @@ bool UAbilitySystemComponentBase::MatchesGrantSource(const FAbilityGrantSourceSt
 			return false;
 		}
 	}
+	if (AttributeEffectCount)
+	{
+		const FActiveGameplayEffect* Effect = GetActiveGameplayEffect(Existing.EffectHandles.Last());
+		if (!Effect || Effect->Spec.Def->GetClass() != Desired.AttributeEffectClass)
+		{
+			return false;
+		}
+	}
 	return true;
 }
 
@@ -1833,12 +1844,34 @@ bool UAbilitySystemComponentBase::ValidateGrantSourceSet(const TSet<FGuid>& Owne
 	for (const FAbilityGrantSourceDefinition& Desired : DesiredSources)
 	{
 		if (!Desired.SourceId.IsValid() || RevokedGrantSources.Contains(Desired.SourceId) || DesiredIds.Contains(Desired.SourceId) || Desired.Level < 1 || Desired.Level > 100000
-			|| Desired.Abilities.Num() > 128 || Desired.Effects.Num() > 128
+			|| Desired.Abilities.Num() > 128 || Desired.Effects.Num() > 128 || Desired.AttributeModifiers.Num() > 128
+			|| (Desired.AttributeEffectClass != nullptr) != !Desired.AttributeModifiers.IsEmpty()
 			|| (GrantSources.Contains(Desired.SourceId) && !OwnedSources.Contains(Desired.SourceId)))
 		{
 			return false;
 		}
 		DesiredIds.Add(Desired.SourceId);
+		if (Desired.AttributeEffectClass)
+		{
+			const UConfiguredAttributeEffect* Effect = Desired.AttributeEffectClass->GetDefaultObject<UConfiguredAttributeEffect>();
+			if (Effect->DurationPolicy != EGameplayEffectDurationType::Infinite || !Effect->Executions.IsEmpty() ||
+				Effect->Period.GetValueAtLevel(Desired.Level) != 0.f || Effect->StackingType != EGameplayEffectStackingType::None)
+			{
+				return false;
+			}
+			FGameplayEffectSpecHandle Spec = MakeOutgoingSpec(Desired.AttributeEffectClass, Desired.Level, MakeEffectContext());
+			if (!Spec.IsValid() || !Effect->ConfigureSpec(*Spec.Data.Get(), Desired.AttributeModifiers, Desired.Level))
+			{
+				return false;
+			}
+			for (const FGameplayModifierInfo& Modifier : Effect->Modifiers)
+			{
+				if (!HasAttributeSetForAttribute(Modifier.Attribute))
+				{
+					return false;
+				}
+			}
+		}
 		TSet<FPrimaryAssetId> DefinitionIds;
 		for (const FAbilityGrantDefinition& Definition : Desired.Abilities)
 		{
@@ -1957,6 +1990,8 @@ bool UAbilitySystemComponentBase::ReplaceGrantSourceSet(const TSet<FGuid>& Owned
 		FAbilityGrantSourceState& Candidate = Staged.Add(Desired.SourceId);
 		Candidate.Abilities = Desired.Abilities;
 		Candidate.Effects = Desired.Effects;
+		Candidate.AttributeEffectClass = Desired.AttributeEffectClass;
+		Candidate.AttributeModifiers = Desired.AttributeModifiers;
 		Candidate.Level = Desired.Level;
 		for (const FAbilityGrantDefinition& Definition : Desired.Abilities)
 		{
@@ -1995,6 +2030,33 @@ bool UAbilitySystemComponentBase::ReplaceGrantSourceSet(const TSet<FGuid>& Owned
 			}
 			Candidate.EffectHandles.Add(Handle);
 		}
+	}
+	// Attribute specs share the same staged handles and rollback boundary as ordinary grants.
+	for (const FAbilityGrantSourceDefinition& Desired : DesiredSources)
+	{
+		FAbilityGrantSourceState* Candidate = Staged.Find(Desired.SourceId);
+		if (!Candidate || !Desired.AttributeEffectClass)
+		{
+			continue;
+		}
+		const UConfiguredAttributeEffect* Effect = Desired.AttributeEffectClass->GetDefaultObject<UConfiguredAttributeEffect>();
+		FGameplayEffectContextHandle Context = MakeEffectContext();
+		Context.AddSourceObject(const_cast<UConfiguredAttributeEffect*>(Effect));
+		FGameplayEffectSpecHandle Spec = MakeOutgoingSpec(Desired.AttributeEffectClass, Desired.Level, Context);
+		if (!Spec.IsValid() || !Effect->ConfigureSpec(*Spec.Data.Get(), Desired.AttributeModifiers, Desired.Level))
+		{
+			Rollback();
+			return false;
+		}
+		static_cast<FGameplayEffectContextBase*>(Spec.Data->GetContext().Get())->GrantSourceId = Desired.SourceId;
+		const FActiveGameplayEffectHandle Handle = ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+		if (!Handle.IsValid() || !GetActiveGameplayEffect(Handle))
+		{
+			if (Handle.IsValid()) RemoveActiveGameplayEffect(Handle);
+			Rollback();
+			return false;
+		}
+		Candidate->EffectHandles.Add(Handle);
 	}
 	if (TransactionAvatar.Get() != GetAvatarActor() || TransactionEntity != AbilityEntityId)
 	{

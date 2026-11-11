@@ -1,6 +1,7 @@
 ﻿// Georgy Treshchev 2021.
 
 #include "WebRequest/FileDownloader/FileDownloader.h"
+#include "Type/NativeTypeIdentity.h"
 
 #include "HttpModule.h"
 #include "WHFrameworkCoreStatics.h"
@@ -30,7 +31,7 @@ FFileDownloader::~FFileDownloader()
 
 void FFileDownloader::DownloadFile(const FString& SavePath, float Timeout, const FString& ContentType, bool bForceByPayload)
 {
-	if(DownloadResult == EDownloadToStorageResult::Cancelled) return;
+	if (bDestroyed || DownloadResult != EDownloadToStorageResult::None) return;
 
 	FString URL = FCoreStatics::UrlEncode((GetFileURL().FileURL.StartsWith(TEXT("/")) ? FWebRequestManager::Get().GetServerURL() : TEXT("")) + GetFileURL().FileURL);
 	URL = URL.Replace(TEXT("%2F"), TEXT("/")).Replace(TEXT("%3A"), TEXT(":")).Replace(TEXT("+"), TEXT("%20"));
@@ -114,7 +115,10 @@ void FFileDownloader::DownloadFile(const FString& SavePath, float Timeout, const
 			
 			OnComplete_Internal(Result.Result, MoveTemp(Result.Data));
 
-			OnComplete.Broadcast(DownloadResult = (Result.Result == EDownloadToMemoryResult::SucceededByPayload ? EDownloadToStorageResult::SucceededByPayload : EDownloadToStorageResult::Success), FileSavePath);
+			if (DownloadResult == EDownloadToStorageResult::None)
+			{
+				OnComplete.Broadcast(DownloadResult = (Result.Result == EDownloadToMemoryResult::SucceededByPayload ? EDownloadToStorageResult::SucceededByPayload : EDownloadToStorageResult::Success), FileSavePath);
+			}
 
 			if(bAutoDestroy)
 			{
@@ -137,35 +141,22 @@ void FFileDownloader::DownloadFile(const FString& SavePath, float Timeout, const
 
 void FFileDownloader::CancelDownload()
 {
-	if (FPaths::FileExists(*FileSavePath))
-	{
-		IFileManager& FileManager = IFileManager::Get();
-		if (!FileManager.Delete(*FileSavePath))
-		{
-			WHLog(FString::Printf(TEXT("Something went wrong while deleting the existing file '%s'"), *FileSavePath), EDC_WebRequest, EDV_Error);
-			return;
-		}
-	}
-
-	OnComplete.Broadcast(DownloadResult = EDownloadToStorageResult::Cancelled, FileSavePath);
-	
-	if (HttpRequestPtr.IsValid())
-	{
-		const TSharedPtr<IHttpRequest> HttpRequest = HttpRequestPtr.Pin();
-
-		HttpRequest->CancelRequest();
-
-		HttpRequestPtr.Reset();
-	}
-
-	if(bAutoDestroy)
-	{
-		DestroyDownload();
-	}
+    if (bDestroyed || DownloadResult != EDownloadToStorageResult::None) return;
+    DownloadResult = EDownloadToStorageResult::Cancelled;
+    if (TSharedPtr<IHttpRequest> Request = HttpRequestPtr.Pin()) Request->CancelRequest();
+    HttpRequestPtr.Reset();
+    DeleteFileHandle();
+    if (!FileSavePath.IsEmpty() && FPaths::FileExists(*FileSavePath) && !IFileManager::Get().Delete(*FileSavePath))
+        WHLog(FString::Printf(TEXT("Could not remove canceled download '%s'"), *FileSavePath), EDC_WebRequest, EDV_Error);
+    OnComplete.Broadcast(DownloadResult, FileSavePath);
+    if (bAutoDestroy) DestroyDownload();
 }
 
 void FFileDownloader::DestroyDownload()
 {
+	if (bDestroyed) return;
+	bDestroyed = true;
+	if (DownloadResult == EDownloadToStorageResult::None) DownloadResult = EDownloadToStorageResult::Cancelled;
 	if (HttpRequestPtr.IsValid())
 	{
 		const TSharedPtr<IHttpRequest> HttpRequest = HttpRequestPtr.Pin();
@@ -535,6 +526,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByChunk(const FStrin
 	TWeakPtr<FFileDownloader> WeakThisPtr = SharedThis(this);
 
 	const TSharedRef<IHttpRequest> HttpRequestRef = FHttpModule::Get().CreateRequest();
+	HttpRequestRef->SetDelegateThreadPolicy(EHttpRequestDelegateThreadPolicy::CompleteOnGameThread);
 
 	HttpRequestRef->SetVerb("GET");
 	HttpRequestRef->SetURL(URL);
@@ -552,7 +544,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByChunk(const FStrin
 	HttpRequestRef->OnRequestProgress64().BindLambda([WeakThisPtr, ContentSize, ChunkRange, ProgressFun](FHttpRequestPtr Request, uint64 BytesSent, uint64 BytesReceived)
 	{
 		TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
-		if (SharedThis.IsValid())
+		if (SharedThis.IsValid() && SharedThis->DownloadResult == EDownloadToStorageResult::None)
 		{
 			const float Progress = ContentSize <= 0 ? 0.0f : static_cast<float>(BytesReceived) / ContentSize;
 			WHLog(FString::Printf(TEXT("Downloaded %llu bytes of file InChunk from %s. Range: {%lld; %lld}, Overall: %lld, Progress: %f"), BytesReceived, *Request->GetURL(), ChunkRange.X, ChunkRange.Y, ContentSize, Progress), EDC_WebRequest, EDV_Log);
@@ -626,6 +618,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByPayload(const FStr
 	TWeakPtr<FFileDownloader> WeakThisPtr = SharedThis(this);
 
 	const TSharedRef<IHttpRequest> HttpRequestRef = FHttpModule::Get().CreateRequest();
+	HttpRequestRef->SetDelegateThreadPolicy(EHttpRequestDelegateThreadPolicy::CompleteOnGameThread);
 
 	HttpRequestRef->SetVerb("GET");
 	HttpRequestRef->SetURL(URL);
@@ -635,7 +628,7 @@ TFuture<FFileDownloaderResult> FFileDownloader::DownloadFileByPayload(const FStr
 	HttpRequestRef->OnRequestProgress64().BindLambda([WeakThisPtr, URL](FHttpRequestPtr Request, uint64 BytesSent, uint64 BytesReceived)
 	{
 		TSharedPtr<FFileDownloader> SharedThis = WeakThisPtr.Pin();
-		if (SharedThis.IsValid())
+		if (SharedThis.IsValid() && SharedThis->DownloadResult == EDownloadToStorageResult::None)
 		{
 			const int64 ContentLength = Request->GetContentLength();
 			const float Progress = ContentLength <= 0 ? 0.0f : static_cast<float>(BytesReceived) / ContentLength;
@@ -695,6 +688,7 @@ TFuture<int64> FFileDownloader::GetContentSize(const FString& URL, float Timeout
 	TSharedPtr<TPromise<int64>> PromisePtr = MakeShared<TPromise<int64>>();
 
 	const TSharedRef<IHttpRequest> HttpRequestRef = FHttpModule::Get().CreateRequest();
+	HttpRequestRef->SetDelegateThreadPolicy(EHttpRequestDelegateThreadPolicy::CompleteOnGameThread);
 
 	HttpRequestRef->SetVerb("HEAD");
 	HttpRequestRef->SetURL(URL);
@@ -848,7 +842,7 @@ void FFileDownloader::OnDestroy_Internal()
 {
 	WHLog(FString::Printf(TEXT("Download destroyed")), EDC_WebRequest, EDV_Warning);
 
-	FWebRequestManager::Get().RemoveDownloader(SharedThis(this));
+	if (FWebRequestManager* Manager = FWebRequestManager::GetPtr()) Manager->RemoveDownloader(SharedThis(this));
 
 	DeleteFileHandle();
 }

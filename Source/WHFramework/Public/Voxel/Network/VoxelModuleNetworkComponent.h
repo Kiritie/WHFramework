@@ -16,6 +16,7 @@ struct FVoxelTaskResult;
 class FVoxelNetworkEnvelopeDecode;
 class FVoxelTerrainFrameContext;
 struct FVoxelViewSettings;
+struct FVoxelStreamingSourceView;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FVoxelProtocolFailure, const FString&, Reason);
 DECLARE_MULTICAST_DELEGATE_OneParam(FVoxelIntentReplyReceived, const FVoxelEditReply&);
@@ -80,6 +81,8 @@ public:
 	void OnTerrainWorldStopping();
 	void SetAuthorizedObserver(AActor* InObserver, bool bInAllowBuild);
 	AActor* GetAuthorizedObserver() const;
+	static bool IsRepresentationInRangeForView(const FVector& InObserverCell, EVoxelRepresentationWireType InType,
+		const FVoxelGenerationBounds& InBounds, const FVoxelStreamingSourceView& InView);
 
 	UPROPERTY(BlueprintAssignable)
 	FVoxelProtocolFailure OnProtocolFailure;

@@ -4,18 +4,19 @@
 #include "Input/Manager/InputBindingBase.h"
 
 #include "Input/Components/InputComponentBase.h"
+#include "GameFramework/PlayerController.h"
+#include "Engine/LocalPlayer.h"
 
 // ParamSets default values
 UInputBindingBase::UInputBindingBase()
 {
 	InputBindingName = NAME_None;
-	LocalPlayerIndex = INDEX_NONE;
 	BoundInputComponent = nullptr;
 }
 
-void UInputBindingBase::OnInitialize(int32 InPlayerIndex)
+void UInputBindingBase::OnInitialize(ULocalPlayer* InPlayer)
 {
-	LocalPlayerIndex = InPlayerIndex;
+	OwningLocalPlayer = InPlayer;
 	K2_OnInitialize();
 }
 
@@ -50,7 +51,7 @@ void UInputBindingBase::OnTermination()
 {
 	OnUnbindInput();
 	K2_OnTermination();
-	LocalPlayerIndex = INDEX_NONE;
+	OwningLocalPlayer.Reset();
 }
 
 void UInputBindingBase::AddBindingHandle(uint32 InHandle)
@@ -59,4 +60,9 @@ void UInputBindingBase::AddBindingHandle(uint32 InHandle)
 	{
 		BindingHandles.AddUnique(InHandle);
 	}
+}
+
+APlayerController* UInputBindingBase::GetOwningPlayerController() const
+{
+	return OwningLocalPlayer.IsValid() ? OwningLocalPlayer->GetPlayerController(GetWorld()) : nullptr;
 }

@@ -2,6 +2,7 @@
 
 #pragma once
 #include "WHFrameworkSlateTypes.h"
+#include "Type/NativeTypeIdentity.h"
 #include "Editor/Base/IEditorWidgetBase.h"
 #include "Runtime/Base/SSlateWidgetBase.h"
 #include "Main/MainTypes.h"
@@ -125,7 +126,7 @@ public:
 	{
 		if(AllSlateWidgets.Contains(InName))
 		{
-			if(TSharedPtr<T> SlateWidget = AllSlateWidgets[InName])
+			if(TSharedPtr<T> SlateWidget = StaticCastSharedPtr<T>(AllSlateWidgets[InName]))
 			{
 				AllSlateWidgets.Remove(InName);
 				if(TemporarySlateWidget == SlateWidget)

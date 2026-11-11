@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "Main/Base/ModuleBase.h"
 #include "ObjectPool/ObjectPoolModuleTypes.h"
 #include "ObjectPool/Provider/ActorPoolProvider.h"
@@ -67,6 +69,8 @@ public:
 	void DespawnObject(
 		UObject* InObject,
 		EObjectDespawnMode InMode = EObjectDespawnMode::Recovery);
+	// 宿主关闭时仅由原生退役链调用，不能接纳新的业务回收请求。
+	void DespawnObjectForCleanup(UObject* InObject, EObjectDespawnMode InMode = EObjectDespawnMode::Recovery);
 
 	template<class TObject>
 	void DespawnObjects(const TArray<TObject*>& InObjects)
@@ -85,6 +89,7 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void ClearAllObject();
+	void ClearAllObjectForCleanup();
 
 	UFUNCTION(BlueprintPure)
 	FObjectPoolPolicy GetPoolPolicy(TSubclassOf<UObject> InClass) const;
@@ -94,6 +99,7 @@ public:
 
 public:
 	void DestroyObject(UObject* InObject);
+	void DestroyObjectForCleanup(UObject* InObject);
 
 	UObjectPoolBucket* FindOrAddGenericBucket(UClass* InClass, UObject* InScope, int32 InMaxIdle);
 
@@ -120,6 +126,7 @@ private:
 	TMap<TSubclassOf<UObject>, FObjectPoolPolicy> PoolPolicies;
 
 	TSet<TWeakObjectPtr<UObject>> InactiveObjects;
+	TSet<TWeakObjectPtr<UObject>> RetiringObjects;
 
 	TUniquePtr<FObjectPoolProvider> ObjectProvider;
 

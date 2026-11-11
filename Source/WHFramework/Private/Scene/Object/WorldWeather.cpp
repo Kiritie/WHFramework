@@ -1,6 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Scene/Object/WorldWeather.h"
+#include "Common/LifecycleTypes.h"
+#include "Scene/WorldWeatherTypes.h"
 
 #include "Scene/SceneModuleTypes.h"
 

@@ -11,13 +11,12 @@ class SEditorWidgetBase;
 /**
  * Enumerates widget orientations.
  */
-UENUM(BlueprintType)
 enum EEditorDrawerOrientation : int
 {
-	DrawerOrient_LeftToRight UMETA(DisplayName="LeftToRight"),
-	DrawerOrient_RightToLeft UMETA(DisplayName="RightToLeft"),
-	DrawerOrient_BottomToTop UMETA(DisplayName="BottomToTop"),
-	DrawerOrient_TopToBottom UMETA(DisplayName="TopToBottom"),
+	DrawerOrient_LeftToRight,
+	DrawerOrient_RightToLeft,
+	DrawerOrient_BottomToTop,
+	DrawerOrient_TopToBottom,
 };
 
 class WHFRAMEWORKSLATE_API SEditorDrawerPanel : public SCompoundWidget

@@ -8,6 +8,7 @@
 
 #include "SubWidgetBase.generated.h"
 
+
 /**
  * 
  */
@@ -15,6 +16,7 @@ UCLASS(BlueprintType, meta = (DisableNativeTick))
 class WHFRAMEWORK_API USubWidgetBase : public UCommonUserWidget, public ISubWidgetInterface, public IObjectPoolInterface
 {
 	GENERATED_BODY()
+
 	
 public:
 	USubWidgetBase(const FObjectInitializer& ObjectInitializer);

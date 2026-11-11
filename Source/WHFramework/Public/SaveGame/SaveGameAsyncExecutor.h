@@ -1,6 +1,9 @@
 ﻿#pragma once
+#include "SaveGame/SaveOperationTypes.h"
+#include "SaveGame/SaveManifestTypes.h"
 #include "CoreMinimal.h"
 #include "Tasks/Task.h"
+#include "HAL/Event.h"
 #include <atomic>
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "SaveGame/SaveGameExternalStore.h"
@@ -43,8 +46,12 @@ public:
 		return State.IsValid();
 	}
 	void RequestCancel();
+	bool WaitForNativeExit(uint32 TimeoutMilliseconds) const;
 	bool IsWaitingForCapacity() const;
 	bool IsWaitingForSlot() const;
+	/** Call after world hosts have stopped, before unloading WHFramework code. */
+	static void DrainRetiredTasks();
+	static void TrackNativeRetirement(const UE::Tasks::FTask& InTask, TSharedPtr<void, ESPMode::ThreadSafe> InLifetime = {});
 
 private:
 #if WITH_DEV_AUTOMATION_TESTS
@@ -62,11 +69,15 @@ private:
 		uint64 AttemptWriterReleaseVersion = 0;
 	};
 	struct FWorker;
+	struct FWorkerCompletion;
 	struct FReclaimer;
 	static FSaveOperationResult Execute(const FSaveGenerationPlan& Plan, const std::atomic_bool& Cancel,
 		class FSaveGameStorage& Storage);
+	void LaunchWorker();
 	TSharedPtr<FState, ESPMode::ThreadSafe> State;
 	UE::Tasks::FTask Task;
+	mutable UE::Tasks::FTask CompletionTask;
+	mutable TSharedPtr<FEventRef, ESPMode::ThreadSafe> NativeExit;
 	double RetryCostMilliseconds = 0.001;
 	double CompletionCostMilliseconds = 0.001;
 };

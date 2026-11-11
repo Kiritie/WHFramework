@@ -49,8 +49,8 @@ void UCommonRichTextBlockN::RefreshRichStyle()
 {
 	if(bUseCommonRichStyle)
 	{
-		SetTextStyleSet(UWidgetModuleStatics::GetCommonRichTextStyle());
-		SetDecorators(UWidgetModuleStatics::GetCommonRichTextDecorators());
+		SetTextStyleSet(UWidgetModuleStatics::GetCommonRichTextStyle(this));
+		SetDecorators(UWidgetModuleStatics::GetCommonRichTextDecorators(this));
 	}
 	ApplyStyleTags();
 }

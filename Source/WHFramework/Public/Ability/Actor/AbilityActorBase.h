@@ -2,11 +2,16 @@
 
 #pragma once
 
+#include "Ability/AbilityAttributeAccessors.h"
+#include "Common/CommonTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Common/InteractionTypes.h"
 #include "GameFramework/Actor.h"
 #include "AbilityActorInterface.h"
 #include "Ability/Attributes/ActorAttributeSetBase.h"
 #include "Ability/Inventory/AbilityInventoryAgentInterface.h"
 #include "Asset/Primary/PrimaryEntityInterface.h"
+#include "Asset/Primary/PrimaryEntityAssetBinding.h"
 #include "Common/Base/WHActor.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 
@@ -34,6 +39,8 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 public:
+
+	virtual void OnRep_ActorID() override;
 
 	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
 
@@ -96,6 +103,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ActorStats", ReplicatedUsing = OnRep_ActorMetadata)
 	FPrimaryAssetId AssetID;
 
+	UPROPERTY(Transient)
+	FPrimaryEntityAssetBinding AssetBinding;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "ActorStats", ReplicatedUsing = OnRep_ActorMetadata)
 	FName Name;
 
@@ -112,12 +122,12 @@ public:
 
 public:
 	template<class T>
-	T& GetActorData() const
+	const T* GetActorData() const
 	{
-		return static_cast<T&>(GetActorData());
+		return Cast<T>(GetActorData());
 	}
 
-	UAbilityActorDataBase& GetActorData() const;
+	const UAbilityActorDataBase* GetActorData() const;
 
 	template<class T>
 	T* GetAttributeSet() const
@@ -160,7 +170,7 @@ public:
 
 	virtual FPrimaryAssetId GetAssetID_Implementation() const override { return AssetID; }
 
-	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override { AssetID = InID; }
+	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override;
 
 	UFUNCTION(BlueprintPure)
 	virtual FName GetNameA() const override { return Name; }

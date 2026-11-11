@@ -1,4 +1,5 @@
-﻿#include "CoreMinimal.h"
+﻿#include "Common/LifecycleTypes.h"
+#include "CoreMinimal.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 #include "HAL/PlatformTime.h"

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "Step/StepModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
 #include "StepModule.generated.h"
@@ -25,6 +27,7 @@ public:
 	virtual void OnInitialize() override;
 	virtual void OnPreparatory(EPhase InPhase) override;
 	virtual void OnRefresh(float DeltaSeconds, bool bInEditor) override;
+	virtual void OnControlRefresh(float RealDeltaSeconds) override;
 	virtual void OnPause() override;
 	virtual void OnUnPause() override;
 	virtual void OnTermination(EPhase InPhase) override;

@@ -4,7 +4,6 @@
 
 #include "Common/Base/WHObject.h"
 #include "UObject/Object.h"
-#include "WebRequest/WebRequestModuleStatics.h"
 #include "WebRequest/WebRequestModuleTypes.h"
 #include "WebInterfaceBase.generated.h"
 
@@ -18,6 +17,7 @@ class WHFRAMEWORK_API UWebInterfaceBase : public UWHObject
 
 public:
 	UWebInterfaceBase();
+	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
 
 public:
 	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode)
@@ -44,7 +44,7 @@ protected:
 	TSubclassOf<UWebRequestHandleBase> HandleClass;
 
 	UPROPERTY(Transient)
-	TMap<FString, UWebRequestHandleBase*> HandleMap;
+	TArray<TObjectPtr<UWebRequestHandleBase>> Handles;
 
 	FOnWebRequestCompleteMulti OnWebRequestComplete;
 	

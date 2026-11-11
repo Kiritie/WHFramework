@@ -6,6 +6,8 @@
 #include "GameplayTagsManager.h"
 #include "Interfaces/IPluginManager.h"
 #include "Misc/Paths.h"
+#include "Asset/AssetManager.h"
+#include "Main/MainManager.h"
 #include "Debug/DebugManager.h"
 #include "Input/InputManager.h"
 #include "Parameter/ParameterManager.h"
@@ -22,6 +24,7 @@
 
 void FWHFrameworkCoreModule::StartupModule()
 {
+	FMainManager::Startup();
 	for (const TSharedRef<IPlugin>& Plugin : IPluginManager::Get().GetEnabledPlugins())
 	{
 		const FString TagDirectory = Plugin->GetBaseDir() / TEXT("Config/Tags");
@@ -30,6 +33,7 @@ void FWHFrameworkCoreModule::StartupModule()
 			UGameplayTagsManager::Get().AddTagIniSearchPath(TagDirectory);
 		}
 	}
+	FAssetManager::Register();
 	FDebugManager::Register();
 	FInputManager::Register();
 	FParameterManager::Register();
@@ -41,7 +45,6 @@ void FWHFrameworkCoreModule::StartupModule()
 	FLinuxPlatformManager::Register();
 #endif
 	FSceneManager::Register();
-	FWebRequestManager::Register();
 	FWebRequestManager::Register();
 	FZipManager::Register();
 }
@@ -60,8 +63,9 @@ void FWHFrameworkCoreModule::ShutdownModule()
 #endif
 	FSceneManager::UnRegister();
 	FWebRequestManager::UnRegister();
-	FWebRequestManager::UnRegister();
 	FZipManager::UnRegister();
+	FAssetManager::UnRegister();
+	FMainManager::Shutdown();
 }
 
 IMPLEMENT_MODULE(FWHFrameworkCoreModule, WHFrameworkCore)

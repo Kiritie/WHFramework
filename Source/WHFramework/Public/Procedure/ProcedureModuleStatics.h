@@ -11,78 +11,69 @@ class WHFRAMEWORK_API UProcedureModuleStatics : public UBlueprintFunctionLibrary
 
 public:
     UFUNCTION(BlueprintCallable)
-    static bool StartMain();
+    static bool StartMain(UWorld* InWorld);
     UFUNCTION(BlueprintCallable)
-    static void StopMain();
+    static void StopMain(UWorld* InWorld);
     UFUNCTION(BlueprintCallable)
-    static bool SwitchProcedure(UProcedureBase* InProcedure);
+    static bool SwitchProcedure(UWorld* InWorld, UProcedureBase* InProcedure);
     UFUNCTION(BlueprintCallable)
-    static bool SwitchProcedureFrom(const FProcedureActivationToken& Token, UProcedureBase* InProcedure);
+    static bool SwitchProcedureFrom(UWorld* InWorld, const FProcedureActivationToken& Token, UProcedureBase* InProcedure);
     UFUNCTION(BlueprintPure)
-    static bool CanSwitchProcedure(UProcedureBase* InProcedure);
+    static bool CanSwitchProcedure(UWorld* InWorld, UProcedureBase* InProcedure);
     UFUNCTION(BlueprintCallable)
-    static bool SwitchProcedureByIndex(int32 InIndex);
+    static bool SwitchProcedureByIndex(UWorld* InWorld, int32 InIndex);
     UFUNCTION(BlueprintPure)
-    static bool CanSwitchProcedureByIndex(int32 InIndex);
+    static bool CanSwitchProcedureByIndex(UWorld* InWorld, int32 InIndex);
     UFUNCTION(BlueprintCallable)
-    static bool SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass);
+    static bool SwitchProcedureByClass(UWorld* InWorld, TSubclassOf<UProcedureBase> InClass);
     UFUNCTION(BlueprintPure)
-    static bool CanSwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass);
+    static bool CanSwitchProcedureByClass(UWorld* InWorld, TSubclassOf<UProcedureBase> InClass);
     UFUNCTION(BlueprintCallable)
-    static bool SwitchFirstProcedure();
+    static bool SwitchFirstProcedure(UWorld* InWorld);
     UFUNCTION(BlueprintCallable)
-    static bool SwitchLastProcedure();
+    static bool SwitchLastProcedure(UWorld* InWorld);
     UFUNCTION(BlueprintCallable)
-    static bool SwitchPreProcedure();
+    static bool SwitchPreProcedure(UWorld* InWorld);
     UFUNCTION(BlueprintCallable)
-    static bool SwitchNextProcedure();
+    static bool SwitchNextProcedure(UWorld* InWorld);
     UFUNCTION(BlueprintCallable)
-    static bool Advance(FName Output = "Out");
+    static bool Advance(UWorld* InWorld, FName Output = "Out");
     UFUNCTION(BlueprintPure)
-    static bool CanAdvance(FName Output = "Out");
+    static bool CanAdvance(UWorld* InWorld, FName Output = "Out");
     UFUNCTION(BlueprintCallable)
-    static bool AdvanceFrom(const FProcedureActivationToken& Token, FName Output = "Out");
+    static bool AdvanceFrom(UWorld* InWorld, const FProcedureActivationToken& Token, FName Output = "Out");
     UFUNCTION(BlueprintCallable)
-    static void GuideCurrentProcedure();
+    static void GuideCurrentProcedure(UWorld* InWorld);
     UFUNCTION(BlueprintPure)
-    static UProcedureAsset* GetCurrentProcedureAsset();
+    static UProcedureAsset* GetCurrentProcedureAsset(UWorld* InWorld);
     UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-    static UProcedureBase* GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass = nullptr);
+    static UProcedureBase* GetCurrentProcedure(UWorld* InWorld, TSubclassOf<UProcedureBase> InClass = nullptr);
     UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-    static UProcedureBase* GetProcedureByClass(TSubclassOf<UProcedureBase> InClass);
+    static UProcedureBase* GetProcedureByClass(UWorld* InWorld, TSubclassOf<UProcedureBase> InClass);
     UFUNCTION(BlueprintPure)
-    static bool HasProcedureByClass(TSubclassOf<UProcedureBase> InClass);
+    static bool HasProcedureByClass(UWorld* InWorld, TSubclassOf<UProcedureBase> InClass);
     UFUNCTION(BlueprintPure)
-    static bool IsCurrentProcedure(UProcedureBase* InProcedure);
+    static bool IsCurrentProcedure(UWorld* InWorld, UProcedureBase* InProcedure);
     UFUNCTION(BlueprintPure)
-    static bool IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InClass);
+    static bool IsCurrentProcedureClass(UWorld* InWorld, TSubclassOf<UProcedureBase> InClass);
     UFUNCTION(BlueprintPure)
-    static bool HasProcedureByIndex(int32 InIndex);
+    static bool HasProcedureByIndex(UWorld* InWorld, int32 InIndex);
     UFUNCTION(BlueprintPure)
-    static bool IsCurrentProcedureIndex(int32 InIndex);
+    static bool IsCurrentProcedureIndex(UWorld* InWorld, int32 InIndex);
     UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-    static UProcedureBase* GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass = nullptr);
+    static UProcedureBase* GetProcedureByIndex(UWorld* InWorld, int32 InIndex, TSubclassOf<UProcedureBase> InClass = nullptr);
     template <class T>
-    static T* GetCurrentProcedure() { return UProcedureModule::Get().GetCurrentProcedure<T>(); }
+    static T* GetCurrentProcedure(UWorld* World) { UProcedureModule* M = UProcedureModule::GetPtr(World); return M ? M->GetCurrentProcedure<T>() : nullptr; }
     template <class T>
-    static T* GetProcedureByClass(TSubclassOf<UProcedureBase> InClass = T::StaticClass())
-    {
-        return UProcedureModule::Get().GetProcedureByClass<T>(InClass);
-    }
+    static T* GetProcedureByClass(UWorld* World, TSubclassOf<UProcedureBase> Class = T::StaticClass()) { UProcedureModule* M = UProcedureModule::GetPtr(World); return M ? M->GetProcedureByClass<T>(Class) : nullptr; }
     template <class T>
-    static T* GetProcedureByIndex(int32 InIndex) { return UProcedureModule::Get().GetProcedureByIndex<T>(InIndex); }
+    static T* GetProcedureByIndex(UWorld* World, int32 Index) { UProcedureModule* M = UProcedureModule::GetPtr(World); return M ? M->GetProcedureByIndex<T>(Index) : nullptr; }
     template <class T>
-    static bool HasProcedureByClass() { return UProcedureModule::Get().HasProcedureByClass<T>(); }
+    static bool HasProcedureByClass(UWorld* World) { UProcedureModule* M = UProcedureModule::GetPtr(World); return M && M->HasProcedureByClass<T>(); }
     template <class T>
-    static bool IsCurrentProcedureClass() { return UProcedureModule::Get().IsCurrentProcedureClass<T>(); }
+    static bool IsCurrentProcedureClass(UWorld* World) { UProcedureModule* M = UProcedureModule::GetPtr(World); return M && M->IsCurrentProcedureClass<T>(); }
     template <class T>
-    static bool SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass = T::StaticClass())
-    {
-        return UProcedureModule::Get().SwitchProcedureByClass(InClass);
-    }
+    static bool SwitchProcedureByClass(UWorld* World, TSubclassOf<UProcedureBase> Class = T::StaticClass()) { UProcedureModule* M = UProcedureModule::GetPtr(World); return M && M->SwitchProcedureByClass(Class); }
     template <class T>
-    static bool CanSwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass = T::StaticClass())
-    {
-        return UProcedureModule::Get().CanSwitchProcedureByClass(InClass);
-    }
+    static bool CanSwitchProcedureByClass(UWorld* World, TSubclassOf<UProcedureBase> Class = T::StaticClass()) { UProcedureModule* M = UProcedureModule::GetPtr(World); return M && M->CanSwitchProcedureByClass(Class); }
 };

@@ -19,7 +19,9 @@ void UWebRequestHandle_GetText::OnDespawn_Implementation(EObjectDespawnMode InMo
 
 void UWebRequestHandle_GetText::Parse(const FWebRequestResult& InResult, const TArray<FParameter>& InParams)
 {
-	if(InResult.bSucceeded)
+	bSucceeded = false;
+	Text.Reset();
+	if(InResult.bSucceeded && InResult.HttpResponse.IsValid())
 	{
 		Text = InResult.HttpResponse->GetContentAsString();
 		bSucceeded = true;

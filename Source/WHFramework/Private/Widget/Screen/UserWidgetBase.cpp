@@ -2,6 +2,11 @@
 
 
 #include "Widget/Screen/UserWidgetBase.h"
+#include "Common/CommonTypes.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
+#include "Main/MainModuleStatics.h"
+#include "Widget/WidgetMountTypes.h"
+#include "Widget/ScreenWidgetTypes.h"
 
 #include "Input/Base/InputActionBase.h"
 #include "Input/InputModule.h"
@@ -32,13 +37,16 @@ namespace
 	{
 		if(!InParam.HasValue())
 		{
-			return FParameter(FSubWidgetSpawnParameter(InOwnerWidget, bInDynamic));
+			FSubWidgetSpawnParameter Spawn(InOwnerWidget, bInDynamic);
+			Spawn.OwningPlayer = InOwnerWidget ? InOwnerWidget->GetOwningPlayer() : nullptr;
+			return FParameter(Spawn);
 		}
 
 		FParameter Param = InParam;
 		if(FSubWidgetSpawnParameter* SpawnParam = Param.GetMutablePtr<FSubWidgetSpawnParameter>())
 		{
 			SpawnParam->OwnerObject = InOwnerWidget;
+			SpawnParam->OwningPlayer = InOwnerWidget ? InOwnerWidget->GetOwningPlayer() : nullptr;
 			SpawnParam->bDynamic = bInDynamic;
 		}
 		else
@@ -81,9 +89,8 @@ UUserWidgetBase::UUserWidgetBase(const FObjectInitializer& ObjectInitializer) : 
 
 const FScreenWidgetConfig* UUserWidgetBase::GetWidgetConfig() const
 {
-	return UWidgetModule::IsValid()
-		? UWidgetModule::Get().GetUserWidgetConfig(WidgetTag)
-		: nullptr;
+	const UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld());
+	return Widgets ? Widgets->GetUserWidgetConfig(WidgetTag) : nullptr;
 }
 
 EWidgetType UUserWidgetBase::GetWidgetType(bool bInheritParent) const
@@ -136,8 +143,9 @@ FUIActionBindingHandle UUserWidgetBase::RegisterUIActionByTag(
 	FGameplayTag InActionTag,
 	bool bInDisplayInActionBar)
 {
-	const UInputActionBase* InputAction = InActionTag.IsValid()
-		? UInputModule::Get().GetInputActionByTag(InActionTag, false)
+	UInputModule* Inputs = UInputModule::GetPtr(GetWorld());
+	const UInputActionBase* InputAction = InActionTag.IsValid() && Inputs
+		? Inputs->GetInputActionByTag(InActionTag, false)
 		: nullptr;
 	return InputAction
 		? RegisterUIActionBinding(FBindUIActionArgs(
@@ -192,7 +200,7 @@ TOptional<FUIInputConfig> UUserWidgetBase::GetDesiredInputConfig() const
 
 void UUserWidgetBase::OnCreate(const FParameter& InParam)
 {
-	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
+	if(UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld())) Widgets->RegisterTickableWidget(this);
 	RebuildWidgetMountSlotCache();
 
 	if(WidgetOpenAnimator)
@@ -246,6 +254,7 @@ void UUserWidgetBase::OnReset(bool bForce)
 
 void UUserWidgetBase::OnOpen(const FParameter& InParam, bool bInstant)
 {
+	UWorld* World = GetWorld();
 	if(const FWidgetOpenParameter* Param = InParam.GetPtr<FWidgetOpenParameter>();
 		Param && Param->OwnerObject)
 	{
@@ -282,7 +291,7 @@ void UUserWidgetBase::OnOpen(const FParameter& InParam, bool bInstant)
 			{
 				FTimerDelegate TimerDelegate;
 				TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishOpen, false);
-				GetWorld()->GetTimerManager().SetTimer(WidgetFinishOpenTimerHandle, TimerDelegate, WidgetOpenFinishTime, false);
+				if (World) World->GetTimerManager().SetTimer(WidgetFinishOpenTimerHandle, TimerDelegate, WidgetOpenFinishTime, false);
 			}
 			else
 			{
@@ -311,7 +320,7 @@ void UUserWidgetBase::OnOpen(const FParameter& InParam, bool bInstant)
 	{
 		case EWidgetRefreshType::Timer:
 		{
-			GetWorld()->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &UUserWidgetBase::Refresh, WidgetRefreshTime, true);
+			if (World) World->GetTimerManager().SetTimer(WidgetRefreshTimerHandle, this, &UUserWidgetBase::Refresh, WidgetRefreshTime, true);
 			break;
 		}
 		case EWidgetRefreshType::Procedure:
@@ -390,6 +399,7 @@ bool UUserWidgetBase::IsWidgetActiveInHierarchy() const
 
 void UUserWidgetBase::OnClose(bool bInstant)
 {
+	UWorld* World = GetWorld();
 	if(WidgetState == EScreenWidgetState::Closing || WidgetState == EScreenWidgetState::Closed) return;
 
 	AbortOpenTransition();
@@ -412,7 +422,7 @@ void UUserWidgetBase::OnClose(bool bInstant)
 			{
 				FTimerDelegate TimerDelegate;
 				TimerDelegate.BindUObject(this, &UUserWidgetBase::FinishClose, false);
-				GetWorld()->GetTimerManager().SetTimer(WidgetFinishCloseTimerHandle, TimerDelegate, WidgetCloseFinishTime, false);
+				if (World) World->GetTimerManager().SetTimer(WidgetFinishCloseTimerHandle, TimerDelegate, WidgetCloseFinishTime, false);
 			}
 			else
 			{
@@ -445,11 +455,13 @@ void UUserWidgetBase::OnRefresh()
 
 void UUserWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 {
-	if(UWidgetModule::IsValid()) UWidgetModule::Get().UnregisterTickableWidget(this);
+	UWorld* World = GetWorld();
+	UObjectPoolModule* Pool = UMainModuleStatics::GetModuleForCleanup<UObjectPoolModule>(World);
+	if (UWidgetModule* Widgets = UMainModuleStatics::GetModuleForCleanup<UWidgetModule>(World)) Widgets->UnregisterTickableWidget(this);
 
 	AbortOpenTransition();
 	AbortCloseTransition();
-	GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
+	if (World) World->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 	
 	DeactivateWidget();
 	
@@ -483,7 +495,8 @@ void UUserWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 	WidgetMountSlotMap.Reset();
 	InitializeParameter.Reset();
 	CurrentOpenParameter.Reset();
-	UObjectPoolModuleStatics::DespawnObject(this, InMode);
+	if (Pool)
+		Pool->DespawnObjectForCleanup(this, InMode);
 }
 
 void UUserWidgetBase::OnStateChanged(EScreenWidgetState InWidgetState)
@@ -543,12 +556,12 @@ void UUserWidgetBase::Reset(bool bForce)
 
 void UUserWidgetBase::Open(const FParameter& InParam, bool bInstant, bool bForce)
 {
-	UWidgetModuleStatics::OpenUserWidgetByTag(WidgetTag, InParam, bInstant, bForce);
+	UWidgetModuleStatics::OpenUserWidgetByTag(GetOwningPlayer(), WidgetTag, InParam, bInstant, bForce);
 }
 
 void UUserWidgetBase::Close(bool bInstant)
 {
-	UWidgetModuleStatics::CloseUserWidgetByTag(WidgetTag, bInstant);
+	UWidgetModuleStatics::CloseUserWidgetByTag(GetOwningPlayer(), WidgetTag, bInstant);
 }
 
 void UUserWidgetBase::Toggle(bool bInstant)
@@ -574,7 +587,7 @@ void UUserWidgetBase::Refresh()
 
 void UUserWidgetBase::Destroy(EObjectDespawnMode InMode)
 {
-	UWidgetModuleStatics::DestroyUserWidgetByTag(WidgetTag, InMode);
+	UWidgetModuleStatics::DestroyUserWidgetByTag(GetOwningPlayer(), WidgetTag, InMode);
 }
 
 bool UUserWidgetBase::CanOpen_Implementation() const
@@ -603,6 +616,7 @@ void UUserWidgetBase::FinishOpen(bool bInstant)
 
 void UUserWidgetBase::FinishClose(bool bInstant)
 {
+	UWorld* World = GetWorld();
 	if(WidgetState != EScreenWidgetState::Closing) return;
 
 	WidgetState = EScreenWidgetState::Closed;
@@ -612,7 +626,7 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 	
 	if(WidgetRefreshType == EWidgetRefreshType::Timer)
 	{
-		GetWorld()->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
+		if (World) World->GetTimerManager().ClearTimer(WidgetRefreshTimerHandle);
 	}
 
 	DeactivateWidget();
@@ -635,7 +649,7 @@ void UUserWidgetBase::FinishClose(bool bInstant)
 
 void UUserWidgetBase::AbortOpenTransition()
 {
-	GetWorld()->GetTimerManager().ClearTimer(WidgetFinishOpenTimerHandle);
+	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(WidgetFinishOpenTimerHandle);
 	if(WidgetOpenAnimator)
 	{
 		WidgetOpenAnimator->Abort();
@@ -644,7 +658,7 @@ void UUserWidgetBase::AbortOpenTransition()
 
 void UUserWidgetBase::AbortCloseTransition()
 {
-	GetWorld()->GetTimerManager().ClearTimer(WidgetFinishCloseTimerHandle);
+	if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(WidgetFinishCloseTimerHandle);
 	if(WidgetCloseAnimator)
 	{
 		WidgetCloseAnimator->Abort();
@@ -659,8 +673,9 @@ UUserWidget* UUserWidgetBase::K2_CreateSubWidget(TSubclassOf<UUserWidget> InClas
 ISubWidgetInterface* UUserWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const FParameter& InParam)
 {
 	const FParameter Param = MakeScreenSubWidgetParam(this, InParam, true);
+	UObjectPoolModule* Pool = UObjectPoolModule::GetPtr(GetWorld());
 	if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(
-		UObjectPoolModuleStatics::SpawnObject(InClass.Get(), Param)))
+		Pool ? Pool->SpawnObject(InClass.Get(), Param) : nullptr))
 	{
 		FSubWidgetRuntimeEntry& Entry = SubWidgetEntries.AddDefaulted_GetRef();
 		Entry.Widget = Cast<UUserWidget>(SubWidget);
@@ -684,11 +699,12 @@ bool UUserWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, EObjectDes
 	if(EntryIndex != INDEX_NONE)
 	{
 		const FSubWidgetRuntimeEntry Entry = SubWidgetEntries[EntryIndex];
+		UUserWidget* Child = Entry.Widget.Get();
 		SubWidgetEntries.RemoveAt(EntryIndex);
 		InWidget->OnDestroy(InMode);
-		if(!Entry.bDynamic && Entry.Widget)
+		if(!Entry.bDynamic && Child)
 		{
-			IObjectPoolInterface::Execute_OnDespawn(Entry.Widget, InMode);
+			IObjectPoolInterface::Execute_OnDespawn(Child, InMode);
 		}
 		return true;
 	}
@@ -702,7 +718,7 @@ void UUserWidgetBase::DestroyAllSubWidget(EObjectDespawnMode InMode)
 	{
 		if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(SubWidgetEntries[0].Widget))
 		{
-			DestroySubWidget(SubWidget, InMode);
+			if (!DestroySubWidget(SubWidget, InMode)) return;
 		}
 		else
 		{

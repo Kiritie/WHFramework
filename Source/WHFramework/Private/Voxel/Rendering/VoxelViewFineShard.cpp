@@ -501,6 +501,8 @@ bool FVoxelViewManager::RejectFineShardAdmission(const FVoxelFineShardKey& InKey
 	ClearFineShardAdmission(*Slot);
 	Slot->bSubmitted = false;
 	Slot->Build.Complete(InAttempt, false, nullptr, InError);
+	UE_LOG(LogTemp, Error, TEXT("Fine shard admission failed: min=%s side=%d attempt=%llu error=%s"),
+		*InKey.Min.ToString(), InKey.SideCells, InAttempt.Serial, *InError);
 	Module.ReleaseGenerationFacts(Consumer);
 	return false;
 }

@@ -44,6 +44,8 @@ public:
 	virtual void OpenAssetModifierEditor();
 	
 private:
+	void RegisterToolsets();
+
 	TSharedRef<SDockTab> OnSpawnAssetModifierEditorTab(const FSpawnTabArgs& SpawnTabArgs);
 
 public:

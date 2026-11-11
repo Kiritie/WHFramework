@@ -1,4 +1,6 @@
 #include "Task/Interaction/InteractionAction_Task.h"
+#include "Task/TaskExecutionTypes.h"
+#include "Common/InteractionTypes.h"
 
 #include "Task/TaskAgentInterface.h"
 #include "Task/TaskComponent.h"
@@ -12,9 +14,9 @@ bool UInteractionAction_Task::Execute_Implementation(const FInteractionContext& 
 		OutReason = NSLOCTEXT("Interaction", "TaskAgentUnavailable", "该角色无法处理任务。");
 		return false;
 	}
-	if(UTaskBase* Task = Component->GetTask(ETaskStage::Deliverable))
+	if(UTaskBase* Task = Component->GetTask(InContext.Interactor, ETaskStage::Deliverable))
 	{
-		if(Component->TurnInTask(Task)) return true;
+		if(Component->TurnInTask(InContext.Interactor, Task)) return true;
 		OutReason = NSLOCTEXT("Interaction", "TaskTurnInFailed", "任务暂时无法交付。");
 		return false;
 	}

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Interfaces/IHttpRequest.h"
+#include "Type/NativeTypeIdentity.h"
 #include "CoreMinimal.h"
 #include "FileDownloaderInterface.h"
 #include "Templates/SharedPointer.h"
@@ -104,6 +105,7 @@ protected:
 
 public:
 	TWeakPtr<IHttpRequest> HttpRequestPtr;
+	bool bDestroyed = false;
 	
 	FWebFileURL FileURL;
 

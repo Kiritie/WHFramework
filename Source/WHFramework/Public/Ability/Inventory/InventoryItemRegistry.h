@@ -86,9 +86,6 @@ struct WHFRAMEWORK_API FInventoryItemDefinition
     FSoftClassPath EquipmentActorClass;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)
-    FSoftClassPath PickupActorClass;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly)
     FPrimaryAssetId PlaceableVoxelId;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly)

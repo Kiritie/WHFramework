@@ -1,68 +1,61 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "FSM/FSMModuleStatics.h"
 
 #include "FSM/FSMModule.h"
 #include "FSM/Components/FSMComponent.h"
 
-void UFSMModuleStatics::RegisterFSM(UFSMComponent* InFSM)
+void UFSMModuleStatics::RegisterFSM(UFSMComponent* FSM)
 {
-	if (InFSM)
-	{
-		if (UFSMModule* Module = UFSMModule::GetPtr(InFSM->GetWorld())) Module->RegisterFSM(InFSM);
-	}
+	if (UFSMModule* Module = FSM ? UFSMModule::GetPtr(FSM->GetWorld()) : nullptr) Module->RegisterFSM(FSM);
 }
 
-void UFSMModuleStatics::UnregisterFSM(UFSMComponent* InFSM)
+void UFSMModuleStatics::UnregisterFSM(UFSMComponent* FSM)
 {
-	if (InFSM)
-	{
-		if (UFSMModule* Module = UFSMModule::GetPtr(InFSM->GetWorld())) Module->UnregisterFSM(InFSM);
-	}
+	if (UFSMModule* Module = FSM ? UFSMModule::GetPtr(FSM->GetWorld()) : nullptr) Module->UnregisterFSM(FSM);
 }
 
-bool UFSMModuleStatics::HasFSMGroup(const FName InGroupName)
+bool UFSMModuleStatics::HasFSMGroup(UWorld* World, FName Name)
 {
-	return UFSMModule::Get().HasGroup(InGroupName);
+	const UFSMModule* Module = UFSMModule::GetPtr(World);
+	return Module && Module->HasGroup(Name);
 }
 
-FFSMGroup UFSMModuleStatics::GetFSMGroup(const FName InGroupName)
+FFSMGroup UFSMModuleStatics::GetFSMGroup(UWorld* World, FName Name)
 {
-	return UFSMModule::Get().GetGroup(InGroupName);
+	const UFSMModule* Module = UFSMModule::GetPtr(World);
+	return Module ? Module->GetGroup(Name) : FFSMGroup();
 }
 
-void UFSMModuleStatics::SwitchFSMGroupStateByIndex(const FName InGroupName, int32 InStateIndex, const TArray<FParameter>& InParams)
+void UFSMModuleStatics::SwitchFSMGroupStateByIndex(UWorld* World, FName Name, int32 Index, const TArray<FParameter>& Params)
 {
-	UFSMModule::Get().SwitchGroupStateByIndex(InGroupName, InStateIndex, InParams);
+	if (UFSMModule* Module = UFSMModule::GetPtr(World)) Module->SwitchGroupStateByIndex(Name, Index, Params);
 }
 
-void UFSMModuleStatics::SwitchFSMGroupStateByName(const FName InGroupName, const FName InStateName, const TArray<FParameter>& InParams)
+void UFSMModuleStatics::SwitchFSMGroupStateByName(UWorld* World, FName Name, FName State, const TArray<FParameter>& Params)
 {
-	UFSMModule::Get().SwitchGroupStateByName(InGroupName, InStateName, InParams);
+	if (UFSMModule* Module = UFSMModule::GetPtr(World)) Module->SwitchGroupStateByName(Name, State, Params);
 }
 
-void UFSMModuleStatics::SwitchFSMGroupStateByClass(const FName InGroupName, TSubclassOf<UFiniteStateBase> InStateClass, const TArray<FParameter>& InParams)
+void UFSMModuleStatics::SwitchFSMGroupStateByClass(UWorld* World, FName Name, TSubclassOf<UFiniteStateBase> State, const TArray<FParameter>& Params)
 {
-	UFSMModule::Get().SwitchGroupStateByClass(InGroupName, InStateClass, InParams);
+	if (UFSMModule* Module = UFSMModule::GetPtr(World)) Module->SwitchGroupStateByClass(Name, State, Params);
 }
 
-void UFSMModuleStatics::SwitchFSMGroupDefaultState(const FName InGroupName, const TArray<FParameter>& InParams)
+void UFSMModuleStatics::SwitchFSMGroupDefaultState(UWorld* World, FName Name, const TArray<FParameter>& Params)
 {
-	UFSMModule::Get().SwitchGroupDefaultState(InGroupName, InParams);
+	if (UFSMModule* Module = UFSMModule::GetPtr(World)) Module->SwitchGroupDefaultState(Name, Params);
 }
 
-void UFSMModuleStatics::SwitchFSMGroupFinalState(const FName InGroupName, const TArray<FParameter>& InParams)
+void UFSMModuleStatics::SwitchFSMGroupFinalState(UWorld* World, FName Name, const TArray<FParameter>& Params)
 {
-	UFSMModule::Get().SwitchGroupFinalState(InGroupName, InParams);
+	if (UFSMModule* Module = UFSMModule::GetPtr(World)) Module->SwitchGroupFinalState(Name, Params);
 }
 
-void UFSMModuleStatics::SwitchFSMGroupLastState(const FName InGroupName, const TArray<FParameter>& InParams)
+void UFSMModuleStatics::SwitchFSMGroupLastState(UWorld* World, FName Name, const TArray<FParameter>& Params)
 {
-	UFSMModule::Get().SwitchGroupLastState(InGroupName, InParams);
+	if (UFSMModule* Module = UFSMModule::GetPtr(World)) Module->SwitchGroupLastState(Name, Params);
 }
 
-void UFSMModuleStatics::SwitchFSMGroupNextState(const FName InGroupName, const TArray<FParameter>& InParams)
+void UFSMModuleStatics::SwitchFSMGroupNextState(UWorld* World, FName Name, const TArray<FParameter>& Params)
 {
-	UFSMModule::Get().SwitchGroupNextState(InGroupName, InParams);
+	if (UFSMModule* Module = UFSMModule::GetPtr(World)) Module->SwitchGroupNextState(Name, Params);
 }

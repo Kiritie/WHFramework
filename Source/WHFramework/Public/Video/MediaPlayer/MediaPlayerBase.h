@@ -10,6 +10,7 @@
 
 class UMediaSource;
 class UMediaPlayer;
+class APlayerController;
 /**
  * 
  */
@@ -63,10 +64,10 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void PlayMovie(const FName InMovieName, bool bMulticast = false);
+	void PlayMovie(const FName InMovieName, bool bMulticast = false, APlayerController* InController = nullptr);
 	
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void PlayMovieWithDelegate(const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false);
+	void PlayMovieWithDelegate(const FName InMovieName, const FOnMoviePlayFinishedSingleDelegate& InOnPlayFinished, bool bMulticast = false, APlayerController* InController = nullptr);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MultiPlayMovie(const FName InMovieName);
@@ -80,7 +81,7 @@ protected:
 	
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void PauseMovie(bool bMulticast = false);
+	void PauseMovie(bool bMulticast = false, APlayerController* InController = nullptr);
 	
 	UFUNCTION(NetMulticast, Reliable)
 	void MultiPauseMovie();
@@ -91,7 +92,7 @@ protected:
 	
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void SeekMovie(const FTimespan& InTimespan, bool bMulticast = false);
+	void SeekMovie(const FTimespan& InTimespan, bool bMulticast = false, APlayerController* InController = nullptr);
 	
 	UFUNCTION(NetMulticast, Reliable)
 	void MultiSeekMovie(const FTimespan& InTimespan);
@@ -102,7 +103,7 @@ protected:
 
 public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-	void StopMovie(bool bSkip, bool bMulticast = false);
+	void StopMovie(bool bSkip, bool bMulticast = false, APlayerController* InController = nullptr);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MultiStopMovie(bool bSkip);

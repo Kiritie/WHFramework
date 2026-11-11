@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Main/MainEditor.h"
+#include "Kismet/GameplayStatics.h"
 
 #include "IAssetTools.h"
 #include "ISettingsSection.h"

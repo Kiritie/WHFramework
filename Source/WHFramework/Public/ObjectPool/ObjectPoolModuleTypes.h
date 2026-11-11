@@ -5,6 +5,8 @@
 #include "WHFrameworkCoreTypes.h"
 #include "ObjectPoolModuleTypes.generated.h"
 
+class APlayerController;
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FSpawnParameter
 {
@@ -64,6 +66,18 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FWHActorSpawnParameter : public FActorSpawnParameter
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bOverrideActorID = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FGuid ActorID;
+};
+
+USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FWidgetSpawnParameter : public FSpawnParameter
 {
 	GENERATED_BODY()
@@ -78,6 +92,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<UObject> OwnerObject = nullptr;
+
+	UPROPERTY(Transient, BlueprintReadWrite)
+	TObjectPtr<APlayerController> OwningPlayer = nullptr;
 };
 
 USTRUCT(BlueprintType)

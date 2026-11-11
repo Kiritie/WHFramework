@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "WebRequestModuleTypes.h"
 #include "WebRequest/WebRequestManager.h"
 #include "Interfaces/IHttpRequest.h"
@@ -110,7 +112,7 @@ public:
 	template<class T>
 	T* CreateWebInterface(const FName InName)
 	{
-		return Cast<T>(GetWebInterface(InName, T::StaticClass()));
+		return Cast<T>(CreateWebInterface(InName, T::StaticClass()));
 	}
 	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"))
 	UWebInterfaceBase* CreateWebInterface(const FName InName, TSubclassOf<UWebInterfaceBase> InClass);
@@ -161,6 +163,13 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	bool SendWebRequestByConfig(const FName InName);
+
+private:
+	TMap<FGuid, FName> OwnedRequests;
+	TMap<FName, FGuid> ConfigGenerations;
+	FGuid LifecycleEpoch;
+	bool bStopping = false;
+	bool bClearingInterfaces = false;
 
 protected:
 	void OnWebRequestComplete(FHttpRequestPtr HttpRequest, FHttpResponsePtr HttpResponse, bool bSucceeded, UWebInterfaceBase* InWebInterface, const FString InContent, const TArray<FParameter> InParams);

@@ -12,13 +12,17 @@ class WHFRAMEWORK_API UEventModuleNetworkComponent : public UModuleNetworkCompon
 
 public:
 	UEventModuleNetworkComponent();
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	UFUNCTION(Server, Reliable)
-	void ServerBroadcastEvent(const FEventNetworkMessage& Message);
+	void ServerBroadcastEvent(FGuid WorldRoute, const FEventNetworkMessage& Message);
 
 	UFUNCTION(Client, Reliable)
-	void ClientBroadcastEvent(const FEventNetworkMessage& Message);
+	void ClientBroadcastEvent(FGuid WorldRoute, const FEventNetworkMessage& Message);
 
-	UFUNCTION(NetMulticast, Reliable)
-	void MulticastBroadcastEvent(const FEventNetworkMessage& Message);
+	UFUNCTION(Server, Reliable)
+	void ServerRequestMulticastEvent(FGuid WorldRoute, const FEventNetworkMessage& Message);
+
+private:
+	void HandleClientEvent(FGuid WorldRoute, const FEventNetworkMessage& Message, bool bMulticast);
 };

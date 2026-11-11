@@ -1,5 +1,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "SaveGame/SaveOperationTypes.h"
+#include "SaveGame/SaveManifestTypes.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 #include "Misc/Paths.h"
@@ -55,8 +57,7 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
 	AMainModule* Owner = World->SpawnActor<AMainModule>();
 	UVoxelModule* Module = NewObject<UVoxelModule>(Owner);
-	Owner->GetModules().Add(Module);
-	Owner->GetModuleMap().Add(Module->GetModuleName(), Module);
+	Owner->RegisterModule(Module);
 	ON_SCOPE_EXIT
 	{
 		FString CleanupError;
@@ -66,8 +67,6 @@ bool FVoxelNavigationResidencyTest::RunTest(const FString& InParameters)
 #if WITH_EDITOR
 		Module->OnDestroy();
 #endif
-		Owner->GetModuleMap().Reset();
-		Owner->GetModules().Reset();
 		GEngine->DestroyWorldContext(World);
 	};
 	if (!TestEqual(TEXT("Navigation fixture registers its actual singleton"), UVoxelModule::GetPtr(World), Module)) return false;

@@ -27,8 +27,15 @@ bool UVoxelModuleNetworkComponent::IsRepresentationInRange(
 	const FVector& InObserverCell, const EVoxelRepresentationWireType InType,
 	const FVoxelGenerationBounds& InBounds, const FVoxelViewSettings& InSettings)
 {
+	return IsRepresentationInRangeForView(InObserverCell, InType, InBounds, InSettings.DefaultSourceView);
+}
+
+bool UVoxelModuleNetworkComponent::IsRepresentationInRangeForView(
+	const FVector& InObserverCell, const EVoxelRepresentationWireType InType,
+	const FVoxelGenerationBounds& InBounds, const FVoxelStreamingSourceView& InView)
+{
 	FVoxelStreamingSource Source;
-	Source.View = InSettings.DefaultSourceView;
+	Source.View = InView;
 	const FVoxelResolvedViewRanges Ranges = VoxelViewLod::ResolveViewRanges(Source);
 	const double Radius = InType == EVoxelRepresentationWireType::VoxelProxy ? Ranges.Proxy :
 		(InType == EVoxelRepresentationWireType::SurfaceProxy ? Ranges.Surface : Ranges.Macro);
@@ -1328,7 +1335,15 @@ void UVoxelModuleNetworkComponent::Handle(
 		const FVector ObserverCell = Observer->GetActorLocation() / VoxelModule->BlockSize();
 		if (!IsRepresentationInRange(ObserverCell, Request.Type, Bounds, VoxelModule->GetViewSettings()))
 		{
-			Fail(TEXT("Voxel representation request is outside the authorized visual radius"));
+			FVoxelRepresentationReply Retry;
+			Retry.Type = Request.Type;
+			Retry.Key = Request.Key;
+			Retry.Serial = Request.Serial;
+			Retry.Kind = EVoxelRepresentationReplyKind::Retry;
+			TArray<uint8> Payload;
+			FString Error;
+			if (FVoxelNetworkCodec::EncodeRepresentationReply(Retry, Payload, Error))
+				Send(EVoxelMessage::RepresentationReply, Payload, EVoxelTransferPriority::Bulk);
 			return;
 		}
 		const auto& Lod = VoxelModule->GetViewSettings().Lod;

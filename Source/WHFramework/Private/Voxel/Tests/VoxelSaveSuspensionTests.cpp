@@ -17,10 +17,9 @@ bool FVoxelSaveSuspensionOwnershipTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("未准备世界不能接纳最终保存冻结"), Module->BeginWorldSaveSuspension(Token, Error));
 	TestFalse(TEXT("失败接纳不残留冻结所有权"), Module->IsWorldSaveSuspended());
 	Module->Epoch = 17;
-	Module->WorldSaveSuspensionEpoch = 17;
-	Module->WorldSaveSuspensionToken = Token;
+	Module->WorldSaveSuspension = MakeShared<FVoxelSaveSuspension, ESPMode::ThreadSafe>(Token, 17);
 	TestFalse(TEXT("新所有者不能覆盖已接纳冻结"), Module->BeginWorldSaveSuspension(FGuid::NewGuid(), Error));
-	TestEqual(TEXT("冻结所有者保持原令牌"), Module->WorldSaveSuspensionToken, Token);
+	TestEqual(TEXT("冻结所有者保持原令牌"), Module->WorldSaveSuspension->GetToken(), Token);
 	TestFalse(TEXT("其他令牌不能释放原冻结"), Module->EndWorldSaveSuspension(FGuid::NewGuid(), Error));
 	TestTrue(TEXT("拒绝错误释放后原冻结仍有效"), Module->IsWorldSaveSuspended());
 	TestFalse(TEXT("其他令牌不能驱动存档预算"), Module->AdvanceSuspendedWorldSave(FGuid::NewGuid(), Error));

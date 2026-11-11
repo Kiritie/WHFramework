@@ -1,4 +1,5 @@
 ﻿#include "Voxel/Rendering/VoxelDetailView.h"
+#include "Common/LifecycleTypes.h"
 
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
@@ -145,6 +146,7 @@ FVoxelDetailView::FVoxelDetailView(
 	: Module(InModule)
 	, Scheduler(InScheduler)
 	, WorldEpoch(InWorldEpoch)
+	, OriginalWorld(InModule.GetWorld())
 {
 	CommitHandle = Module.OnBlocksCommitted.AddRaw(this, &FVoxelDetailView::MarkDirty);
 }
@@ -556,7 +558,7 @@ bool FVoxelDetailView::OnTask(FVoxelTaskResult&& InResult)
 	{
 		return false;
 	}
-	if (bStopped || InResult.Stamp.WorldEpoch != WorldEpoch ||
+	if (bStopped || Module.GetWorldState() == EVoxelWorldState::Closing || InResult.Stamp.WorldEpoch != WorldEpoch ||
 		InResult.Stamp.Token != WaitingToken || InResult.Stamp.OwnerId != OwnerId ||
 		InResult.Stamp.OwnerIncarnation != OwnerIncarnation)
 	{
@@ -584,20 +586,71 @@ bool FVoxelDetailView::OnTask(FVoxelTaskResult&& InResult)
 
 void FVoxelDetailView::Reset()
 {
+	FString Error;
+	const bool bReset = TryResetForWorldStop(Error);
+	ensureMsgf(bReset, TEXT("Voxel detail retirement incomplete: %s"), *Error);
+}
+
+bool FVoxelDetailView::TryResetForWorldStop(FString& OutError)
+{
+	if (bStopComplete) return true;
+	if (bStopInProgress) { OutError = TEXT("Voxel retirement is already in progress"); return false; }
+	TGuardValue<bool> Stopping(bStopInProgress, true);
 	bStopped = true;
-	CancelPlanning();
-	AbortStaging();
-	DestroyBatches(ActiveBatches);
-	DestroyBatches(RetiringBatches);
+	if (!bStopPrepared)
+	{
+		CancelPlanning();
+		bStopPrepared = true;
+	}
+	for (TArray<FVoxelDetailPresentationBatch>* Batches : {&StagedBatches, &ActiveBatches, &RetiringBatches})
+	{
+		while (!Batches->IsEmpty())
+		{
+			FVoxelDetailPresentationBatch& Batch = Batches->Last();
+			if (UVoxelCollisionComponent* Collision = Batch.Collision.Get())
+			{
+				Batch.Collision.Reset();
+				Collision->DestroyComponent();
+			}
+			if (UHierarchicalInstancedStaticMeshComponent* Instances = Batch.Instances.Get())
+			{
+				Batch.Instances.Reset();
+				Instances->DestroyComponent();
+			}
+			if (!Batch.bHostReleased)
+			{
+				FVoxelDetailHost* Host = Hosts.Find(Batch.HostKey);
+				if (!Host || Host->BatchCount <= 0) { OutError = TEXT("Voxel detail host ownership is inconsistent"); return false; }
+				Batch.bHostReleased = true;
+				--Host->BatchCount;
+			}
+			if (FVoxelDetailHost* Host = Hosts.Find(Batch.HostKey); Host && Host->BatchCount == 0)
+			{
+				AActor* Actor = Host->Actor.Get();
+				if (Actor && !Actor->IsActorBeingDestroyed() && !Actor->Destroy())
+				{
+					OutError = TEXT("Voxel detail host refused destruction");
+					return false;
+				}
+				Hosts.Remove(Batch.HostKey);
+			}
+			Batches->Pop(EAllowShrinking::No);
+		}
+	}
 	ActiveBatches.Empty(); StagedBatches.Empty(); RetiringBatches.Empty();
-	check(Hosts.IsEmpty());
+	if (!Hosts.IsEmpty()) { OutError = TEXT("Voxel detail hosts still have outstanding batches"); return false; }
 	Hosts.Empty();
+	AssetBatch.Reset();
+	PendingPlan.Reset();
 	Assets.Empty(); Meshes.Empty(); AssetIndices.Empty();
 	LastObserverSections.Empty(); Observers.Empty();
 	PlannedObserverCells.Empty();
 	FactConsumers.Empty();
 	ObserverCapacity = 8;
 	StorageLease.Reset();
+	bStopComplete = true;
+	OutError.Reset();
+	return true;
 }
 
 bool FVoxelDetailView::BuildAssetBatch(const int32 InAssetIndex, bool& bOutComplete, FString& OutError)

@@ -13,6 +13,11 @@ UObject* FObjectPoolProvider::Spawn(UClass* InClass, const FParameter& InParam)
 {
 	const FObjectSpawnParameter* Parameter = InParam.GetPtr<FObjectSpawnParameter>();
 	UObject* Outer = Parameter && Parameter->Outer ? Parameter->Outer.Get() : &Module;
+	if (!::IsValid(Outer)) return nullptr;
+	UWorld* OuterWorld = Outer->GetWorld();
+	if (OuterWorld && OuterWorld != Module.GetWorld()) return nullptr;
+	if (UObjectPoolModule* OtherPool = Cast<UObjectPoolModule>(Outer); OtherPool && OtherPool != &Module) return nullptr;
+	if (UObjectPoolModule* OtherPool = Outer->GetTypedOuter<UObjectPoolModule>(); OtherPool && OtherPool != &Module) return nullptr;
 	const FObjectPoolPolicy Policy = Module.GetPoolPolicy(InClass);
 	UObject* Object = nullptr;
 

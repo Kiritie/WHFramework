@@ -6,6 +6,8 @@
 #include "InputBindingBase.generated.h"
 
 class UInputComponentBase;
+class APlayerController;
+class ULocalPlayer;
 
 UCLASS(Abstract, BlueprintType, EditInlineNew)
 class WHFRAMEWORK_API UInputBindingBase : public UWHObject
@@ -25,7 +27,7 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, DisplayName = "OnInitialize")
 	void K2_OnInitialize();
 	UFUNCTION()
-	virtual void OnInitialize(int32 InPlayerIndex);
+	virtual void OnInitialize(ULocalPlayer* InPlayer);
 	/**
 	* 当重置
 	*/
@@ -62,14 +64,17 @@ protected:
 	FName InputBindingName;
 
 	UPROPERTY(Transient, BlueprintReadOnly)
-	int32 LocalPlayerIndex;
+	TWeakObjectPtr<ULocalPlayer> OwningLocalPlayer;
  
 public:
 	UFUNCTION(BlueprintPure)
 	FName GetInputBindingName() const { return InputBindingName; }
 
 	UFUNCTION(BlueprintPure)
-	int32 GetLocalPlayerIndex() const { return LocalPlayerIndex; }
+	ULocalPlayer* GetOwningLocalPlayer() const { return OwningLocalPlayer.Get(); }
+
+	UFUNCTION(BlueprintPure)
+	APlayerController* GetOwningPlayerController() const;
 
 	void AddBindingHandle(uint32 InHandle);
 

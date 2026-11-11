@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "ReferencePool/ReferencePoolModule.h"
+#include "Common/LifecycleTypes.h"
 
 IMPLEMENTATION_MODULE(UReferencePoolModule)
 
@@ -13,7 +14,6 @@ UReferencePoolModule::UReferencePoolModule()
 
 UReferencePoolModule::~UReferencePoolModule()
 {
-	TERMINATION_MODULE(UReferencePoolModule)
 }
 
 #if WITH_EDITOR
@@ -25,7 +25,6 @@ void UReferencePoolModule::OnGenerate()
 void UReferencePoolModule::OnDestroy()
 {
 	Super::OnDestroy();
-	TERMINATION_MODULE(UReferencePoolModule)
 }
 #endif
 

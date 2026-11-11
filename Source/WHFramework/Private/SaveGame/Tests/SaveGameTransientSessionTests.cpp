@@ -1,5 +1,10 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "SaveGame/SaveOperationTypes.h"
+#include "SaveGame/SaveSlotTypes.h"
+#include "SaveGame/SaveManifestTypes.h"
+#include "SaveGame/SaveFileTypes.h"
+#include "Common/LifecycleTypes.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Event/EventModule.h"
@@ -155,10 +160,8 @@ bool FSaveGameTransientSessionTest::RunTest(const FString&)
 		if (!TestNotNull(TEXT("创建关卡模块所有者"), Main)) return false;
 		UEventModule* Events = NewObject<UEventModule>(Main);
 		Saves[Index] = NewObject<USaveGameModule>(Main);
-		Main->GetModules().Add(Events);
-		Main->GetModules().Add(Saves[Index]);
-		Main->GetModuleMap().Add(Events->GetModuleName(), Events);
-		Main->GetModuleMap().Add(Saves[Index]->GetModuleName(), Saves[Index]);
+		Main->RegisterModule(Events);
+		Main->RegisterModule(Saves[Index]);
 	}
 
 	// 实际跨图交接：进入临时目标时拒绝并释放原文件代租约。
@@ -176,7 +179,6 @@ bool FSaveGameTransientSessionTest::RunTest(const FString&)
 	if (!TestTrue(TEXT("原跨图操作接纳有效快照"), Instance->SetPendingSaveLoad(MoveTemp(Pending)))) return false;
 	TestEqual(TEXT("原文件代被读取租约固定"), FSaveGameGenerationReadLease::GetPinCount(PinDirectory), uint64(1));
 	{
-		const FScopedWorldContext Scope(Worlds[0]);
 		Saves[0]->OnInitialize();
 	}
 	const FSaveOperationResult Rejected = Saves[0]->GetLoadOperationResult(OperationId);
@@ -190,7 +192,6 @@ bool FSaveGameTransientSessionTest::RunTest(const FString&)
 	Saves[0]->SessionPolicy = ESaveSessionPolicy::Persistent;
 	if (!TestTrue(TEXT("初始化后更改配置不能使临时会话变为持久会话"), Saves[0]->IsTransientSession())) return false;
 	{
-		const FScopedWorldContext Scope(Worlds[0]);
 		Saves[0]->OnInitialize();
 	}
 	if (!TestFalse(TEXT("重复初始化不会让临时会话取得持久租约"), Instance->GetLocalSaveContext().IsValid()) ||
@@ -289,7 +290,6 @@ bool FSaveGameTransientSessionTest::RunTest(const FString&)
 	if (!TestTrue(TEXT("正式初始化前确认没有可恢复或退役的目录"), CanInitializePersistent())) return false;
 	if (!TestFalse(TEXT("默认关卡仍是持久会话"), Saves[1]->IsTransientSession())) return false;
 	{
-		const FScopedWorldContext Scope(Worlds[1]);
 		Saves[1]->OnInitialize();
 	}
 	const auto Context = Instance->GetLocalSaveContext();
@@ -306,7 +306,6 @@ bool FSaveGameTransientSessionTest::RunTest(const FString&)
 	Saves[2]->SessionPolicy = ESaveSessionPolicy::Transient;
 	if (!TestTrue(TEXT("后续临时图初始化前仍采用临时策略"), Saves[2]->IsTransientSession())) return false;
 	{
-		const FScopedWorldContext Scope(Worlds[2]);
 		Saves[2]->OnInitialize();
 	}
 	if (!TestTrue(TEXT("临时图不接管先前持久目录"), Saves[2]->IsTransientSession() && !Saves[2]->Storage &&
@@ -343,7 +342,6 @@ bool FSaveGameTransientSessionTest::RunTest(const FString&)
 	if (!TestTrue(TEXT("再次持久初始化前仍持有原实例租约"), Instance->GetLocalSaveContext() == Context) ||
 		!TestTrue(TEXT("再次持久初始化前确认没有可恢复或退役的目录"), CanInitializePersistent())) return false;
 	{
-		const FScopedWorldContext Scope(Worlds[3]);
 		Saves[3]->OnInitialize();
 	}
 	TestTrue(TEXT("回到正式关卡仍恢复原活动槽"), Saves[3]->GetActiveSaveId() == Summary.SaveId);

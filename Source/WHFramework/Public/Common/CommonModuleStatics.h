@@ -2,8 +2,10 @@
 
 #pragma once
 
+#include "Common/LifecycleTypes.h"
+#include "WHFrameworkCoreMacros.h"
 #include "CoreMinimal.h"
-#include "CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
@@ -50,48 +52,48 @@ public:
 	/*
 	 * 当前是否为暂停状态
 	 */
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static bool IsPaused();
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static bool IsPaused(const UObject* WorldContextObject);
 	/*
 	 * 设置暂停状态
 	 */
-	UFUNCTION(BlueprintCallable, Category = "CommonModuleStatics")
-	static void SetPaused(bool bPaused);
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static void SetPaused(const UObject* WorldContextObject, bool bPaused);
 	/*
 	 * 获取时间缩放
 	 */
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static float GetTimeScale();
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static float GetTimeScale(const UObject* WorldContextObject);
 	/*
 	 * 获取时间缩放
 	 */
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static float GetDeltaSeconds();
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static float GetDeltaSeconds(const UObject* WorldContextObject);
 	/*
 	 * 设置时间缩放
 	 */
-	UFUNCTION(BlueprintCallable, Category = "CommonModuleStatics")
-	static void SetTimeScale(float TimeScale);
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static void SetTimeScale(const UObject* WorldContextObject, float TimeScale);
 	/*
 	 * 暂停游戏
 	 */
-	UFUNCTION(BlueprintCallable, Category = "CommonModuleStatics")
-	static void PauseGame(EPauseMode PauseMode = EPauseMode::Default);
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static void PauseGame(const UObject* WorldContextObject, EPauseMode PauseMode = EPauseMode::Default);
 	/*
 	 * 恢复游戏
 	 */
-	UFUNCTION(BlueprintCallable, Category = "CommonModuleStatics")
-	static void UnPauseGame(EPauseMode PauseMode = EPauseMode::Default);
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static void UnPauseGame(const UObject* WorldContextObject, EPauseMode PauseMode = EPauseMode::Default);
 	/*
 	 * 退出游戏
 	 */
 	UFUNCTION(BlueprintCallable, Category = "CommonModuleStatics")
-	static void QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions);
+	static void QuitGame(APlayerController* InPlayer, TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Viewport
 	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static bool IsInScreenViewport(const FVector& InWorldLocation);
+	static bool IsInScreenViewport(APlayerController* InPlayer, const FVector& InWorldLocation);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Clipboard
@@ -115,40 +117,40 @@ public:
 	* 获取枚举值显示名称
 	* @param InEnumName 枚举名称
 	*/
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static int32 GetEnumItemNum(const FString& InEnumName);
+	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static int32 GetEnumItemNum(const UObject* WorldContextObject, const FString& InEnumName);
 	
 	/*
 	 * 获取枚举值变量名称
 	 * @param InEnumName 枚举名称
 	 * @param InEnumValue 枚举值
 	 */
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static FString GetEnumAuthoredNameByValue(const FString& InEnumName, int32 InEnumValue);
+	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FString GetEnumAuthoredNameByValue(const UObject* WorldContextObject, const FString& InEnumName, int32 InEnumValue);
 
 	/*
 	* 获取枚举值显示名称
 	* @param InEnumName 枚举名称
 	* @param InEnumValue 枚举值
 	*/
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static FText GetEnumDisplayNameByValue(const FString& InEnumName, int32 InEnumValue);
+	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FText GetEnumDisplayNameByValue(const UObject* WorldContextObject, const FString& InEnumName, int32 InEnumValue);
 
 	/*
 	* 获取枚举值显示名称
 	* @param InEnumName 枚举名称
 	* @param InEnumValue 枚举值
 	*/
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static FText GetEnumDisplayNameByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName);
+	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FText GetEnumDisplayNameByAuthoredName(const UObject* WorldContextObject, const FString& InEnumName, const FString& InEnumAuthoredName);
 
 	/*
 	 * 通过获取枚举值名称获取枚举值
 	 * @param InEnumName 枚举名称
 	 * @param InAuthoredName 枚举值名称
 	 */
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static int32 GetEnumValueByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName);
+	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static int32 GetEnumValueByAuthoredName(const UObject* WorldContextObject, const FString& InEnumName, const FString& InEnumAuthoredName);
 	
 	//////////////////////////////////////////////////////////////////////////
 	// Enum
@@ -166,7 +168,7 @@ public:
 	* @param OutObjectData 保存到的字节数组
 	*/
 	UFUNCTION(BlueprintCallable, Category = "CommonModuleStatics")
-	static void SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData);
+	static bool SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData);
 
 	/*
 	* 从内存加载目标对象数据
@@ -174,7 +176,7 @@ public:
 	* @param InObjectData 目标对象字节数组
 	*/
 	UFUNCTION(BlueprintCallable, Category = "CommonModuleStatics")
-	static void LoadObjectDataFromMemory(UObject* InObject, const TArray<uint8>& InObjectData);
+	static bool LoadObjectDataFromMemory(UObject* InObject, const TArray<uint8>& InObjectData);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Regex
@@ -252,8 +254,8 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////
 	// Input
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static bool HasMouseCapture();
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static bool HasMouseCapture(const UObject* WorldContextObject);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Object
@@ -288,54 +290,22 @@ public:
 	UFUNCTION(BlueprintPure, DisplayName = "Get Absolute Position", Category = "CommonModuleStatics")
 	static FVector2D GetGeometryAbsolutePosition(const FGeometry& InGeometry);
 	
-	UFUNCTION(BlueprintPure, DisplayName = "Get Viewport Position", Category = "CommonModuleStatics")
-	static FVector2D GetGeometryViewportPosition(const FGeometry& InGeometry);
+	UFUNCTION(BlueprintPure, DisplayName = "Get Viewport Position", meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static FVector2D GetGeometryViewportPosition(const UObject* WorldContextObject, const FGeometry& InGeometry);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Gameplay
-	static UWorld* ResolveCurrentWorld(bool bInEditor = false);
-
-	template<class T>
-	static T* GetObjectInExistedWorld(TFunction<UObject*(UWorld*)>&& Callback, bool bInEditor = false)
-	{
-		UWorld* World = ResolveCurrentWorld(bInEditor);
-		return World ? Cast<T>(Callback(World)) : nullptr;
-	}
-
 	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
 	static UWorld* GetWorldFromObjectExisted(const UObject* InObject)
 	{
 		return InObject ? InObject->GetWorld() : nullptr;
 	}
 
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static const UObject* GetWorldContext(bool bInEditor = false);
-
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static UObject* GetMutableWorldContext(bool bInEditor = false);
-
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static UWorld* GetCurrentWorld(bool bInEditor = false)
-	{
-		return GetWorldFromObjectExisted(GetWorldContext(bInEditor));
-	}
-
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static float GetCurrentDeltaSeconds(bool bInEditor = false)
-	{
-		return GetCurrentWorld(bInEditor)->GetDeltaSeconds();
-	}
-
-	static FTimerManager& GetCurrentTimerManager(bool bInEditor = false)
-	{
-		return GetCurrentWorld(bInEditor)->GetTimerManager();
-	}
-	
 	template<class T>
-	static TArray<T*> GetAllActorsOfDataLayer(UDataLayerAsset* InDataLayer)
+	static TArray<T*> GetAllActorsOfDataLayer(const UObject* WorldContextObject, UDataLayerAsset* InDataLayer)
 	{
 		TArray<T*> ReturnValues;
-		for(auto Iter : GetAllActorsOfDataLayer(InDataLayer, T::StaticClass()))
+		for(auto Iter : GetAllActorsOfDataLayer(WorldContextObject, InDataLayer, T::StaticClass()))
 		{
 			if(T* Actor = Cast<T>(Iter))
 			{
@@ -344,14 +314,14 @@ public:
 		}
 		return ReturnValues;
 	}
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static TArray<AActor*> GetAllActorsOfDataLayer(UDataLayerAsset* InDataLayer, TSubclassOf<AActor> InClass = nullptr);
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
+	static TArray<AActor*> GetAllActorsOfDataLayer(const UObject* WorldContextObject, UDataLayerAsset* InDataLayer, TSubclassOf<AActor> InClass = nullptr);
 	
 	template<class T>
-	static TArray<T*> GetAllActorsOfLevel(const FName InLevelName)
+	static TArray<T*> GetAllActorsOfLevel(const UObject* WorldContextObject, const FName InLevelName)
 	{
 		TArray<T*> ReturnValues;
-		for(auto Iter : GetAllActorsOfLevel(InLevelName, T::StaticClass()))
+		for(auto Iter : GetAllActorsOfLevel(WorldContextObject, InLevelName))
 		{
 			if(T* Actor = Cast<T>(Iter))
 			{
@@ -360,139 +330,47 @@ public:
 		}
 		return ReturnValues;
 	}
-	UFUNCTION(BlueprintCallable, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static TArray<AActor*> GetAllActorsOfLevel(const FName InLevelName);
+	UFUNCTION(BlueprintCallable, meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static TArray<AActor*> GetAllActorsOfLevel(const UObject* WorldContextObject, const FName InLevelName);
 
-	template<class T>
-	static T* GetGameInstance()
-	{
-		return Cast<T>(GetGameInstance());
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static UWHGameInstance* GetGameInstance(TSubclassOf<UWHGameInstance> InClass = nullptr);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
+	static UWHGameInstance* GetGameInstance(const UObject* WorldContextObject, TSubclassOf<UWHGameInstance> InClass = nullptr);
 
-	template<class T>
-	static T* GetGameMode()
-	{
-		return Cast<T>(GetGameMode());
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static AWHGameMode* GetGameMode(TSubclassOf<AWHGameMode> InClass = nullptr);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
+	static AWHGameMode* GetGameMode(const UObject* WorldContextObject, TSubclassOf<AWHGameMode> InClass = nullptr);
 
-	template<class T>
-	static T* GetGameState()
-	{
-		return Cast<T>(UGameplayStatics::GetGameState(GetWorldContext()));
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static AWHGameState* GetGameState(TSubclassOf<AWHGameState> InClass = nullptr);
-	
-	template<class T>
-	T* GetGameManagerByClass(TSubclassOf<AWHGameManager> InClass = T::StaticClass())
-	{
-		return Cast<T>(GetGameManagerByClass(InClass));
-	}
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
+	static AWHGameState* GetGameState(const UObject* WorldContextObject, TSubclassOf<AWHGameState> InClass = nullptr);
+
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
+	static AWHGameManager* GetGameManagerByClass(const UObject* WorldContextObject, TSubclassOf<AWHGameManager> InClass);
+
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static AWHGameManager* GetGameManagerByName(const UObject* WorldContextObject, FName InName);
+
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
+	static AWHPlayerController* GetPlayerController(const UObject* WorldContextObject, int32 InPlayerIndex, TSubclassOf<AWHPlayerController> InClass = nullptr);
+
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
+	static AWHPlayerController* GetPlayerControllerByID(const UObject* WorldContextObject, int32 InPlayerID, TSubclassOf<AWHPlayerController> InClass = nullptr);
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static AWHGameManager* GetGameManagerByClass(TSubclassOf<AWHGameManager> InClass);
+	static AWHPlayerController* GetLocalPlayerController(UWHLocalPlayer* InPlayer, TSubclassOf<AWHPlayerController> InClass = nullptr);
 
-	template<class T>
-	T* GetGameManagerByName(const FName InName)
-	{
-		return Cast<T>(GetGameManagerByName(InName));
-	}
-
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static AWHGameManager* GetGameManagerByName(const FName InName);
-
-	template<class T>
-	static T* GetPlayerController(int32 InPlayerIndex = 0)
-	{
-		return Cast<T>(GetPlayerController(InPlayerIndex));
-	}
-	
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static AWHPlayerController* GetPlayerController(int32 InPlayerIndex = 0, TSubclassOf<AWHPlayerController> InClass = nullptr);
+	static APawn* GetPossessedPawn(APlayerController* InPlayer, TSubclassOf<APawn> InClass = nullptr);
 
-	template<class T>
-	static T* GetPlayerControllerByID(int32 InPlayerID = 0)
-	{
-		return Cast<T>(GetPlayerControllerByID(InPlayerID));
-	}
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static AWHPlayerController* GetPlayerControllerByID(int32 InPlayerID = 0, TSubclassOf<AWHPlayerController> InClass = nullptr);
+	static APawn* GetPlayerPawn(AWHPlayerController* InPlayer, TSubclassOf<APawn> InClass = nullptr);
 
-	template<class T>
-	static T* GetLocalPlayerController(int32 InPlayerIndex = 0)
-	{
-		return Cast<T>(GetLocalPlayerController(InPlayerIndex));
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static AWHPlayerController* GetLocalPlayerController(int32 InPlayerIndex = 0, TSubclassOf<AWHPlayerController> InClass = nullptr);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static TArray<UWHLocalPlayer*> GetLocalPlayers(const UObject* WorldContextObject);
 
-	template<class T>
-	static T* GetPossessedPawn(int32 InPlayerIndex = 0)
-	{
-		return Cast<T>(GetPossessedPawn(InPlayerIndex));
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static APawn* GetPossessedPawn(int32 InPlayerIndex = 0, TSubclassOf<APawn> InClass = nullptr);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
+	static UWHLocalPlayer* GetLocalPlayer(const UObject* WorldContextObject, int32 InPlayerIndex, TSubclassOf<UWHLocalPlayer> InClass = nullptr);
 
-	template<class T>
-	static T* GetPossessedPawnByID(int32 InPlayerID = 0)
-	{
-		return Cast<T>(GetPossessedPawnByID(InPlayerID));
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static APawn* GetPossessedPawnByID(int32 InPlayerID = 0, TSubclassOf<APawn> InClass = nullptr);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject"), Category = "CommonModuleStatics")
+	static int32 GetLocalPlayerNum(const UObject* WorldContextObject);
 
-	template<class T>
-	static T* GetLocalPossessedPawn(int32 InPlayerIndex = 0)
-	{
-		return Cast<T>(GetLocalPossessedPawn(InPlayerIndex));
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static APawn* GetLocalPossessedPawn(int32 InPlayerIndex = 0, TSubclassOf<APawn> InClass = nullptr);
 
-	template<class T>
-	static T* GetPlayerPawn(int32 InPlayerIndex = 0)
-	{
-		return Cast<T>(GetPlayerPawn(InPlayerIndex));
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static APawn* GetPlayerPawn(int32 InPlayerIndex = 0, TSubclassOf<APawn> InClass = nullptr);
-
-	template<class T>
-	static T* GetPlayerPawnByID(int32 InPlayerID = 0)
-	{
-		return Cast<T>(GetPlayerPawnByID(InPlayerID));
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static APawn* GetPlayerPawnByID(int32 InPlayerID = 0, TSubclassOf<APawn> InClass = nullptr);
-
-	template<class T>
-	static T* GetLocalPlayerPawn()
-	{
-		if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
-		{
-			return PlayerController->GetPlayerPawn<T>();
-		}
-		return nullptr;
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static APawn* GetLocalPlayerPawn(TSubclassOf<APawn> InClass = nullptr);
-
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static TArray<UWHLocalPlayer*> GetLocalPlayers();
-
-	template<class T>
-	static T* GetLocalPlayer(int32 InPlayerIndex = 0)
-	{
-		return Cast<T>(GetLocalPlayer(InPlayerIndex));
-	}
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "CommonModuleStatics")
-	static UWHLocalPlayer* GetLocalPlayer(int32 InPlayerIndex = 0, TSubclassOf<UWHLocalPlayer> InClass = nullptr);
-
-	UFUNCTION(BlueprintPure, Category = "CommonModuleStatics")
-	static int32 GetLocalPlayerNum();
 };

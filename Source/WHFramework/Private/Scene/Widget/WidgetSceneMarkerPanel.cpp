@@ -1,4 +1,6 @@
 #include "Scene/Widget/WidgetSceneMarkerPanel.h"
+#include "Scene/SceneMapTypes.h"
+#include "Scene/SceneMarkerTypes.h"
 
 #include "Camera/CameraModuleStatics.h"
 #include "Common/CommonModuleStatics.h"
@@ -28,13 +30,12 @@ UWidgetSceneMarkerPanel::UWidgetSceneMarkerPanel(const FObjectInitializer& Objec
 	WidgetRefreshType = EWidgetRefreshType::Tick;
 	MarkerCanvas = nullptr;
 	MarkerItemClass = UWidgetSceneMarkerItem::StaticClass();
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> CaptureMaterialFinder(TEXT("/WHFramework/Scene/Materials/M_MiniMap_Default.M_MiniMap_Default"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> CaptureMaterialFinder(TEXT("/WHFramework/Materials/Scene/M_MiniMap_Default.M_MiniMap_Default"));
 	if(CaptureMaterialFinder.Succeeded()) CaptureMaterial = CaptureMaterialFinder.Object;
 }
 
 void UWidgetSceneMarkerPanel::OnInitialize(const FParameter& InParams)
 {
-	const FScopedWorldContext WorldContext(GetWorld());
 	if (MarkerScene.IsValid())
 	{
 		MarkerScene->OnSceneMarkersChanged.RemoveDynamic(this, &UWidgetSceneMarkerPanel::RefreshMarkerMembership);
@@ -57,9 +58,9 @@ void UWidgetSceneMarkerPanel::OnInitialize(const FParameter& InParams)
 
 void UWidgetSceneMarkerPanel::OnRefresh()
 {
-	const FScopedWorldContext WorldContext(GetWorld());
 	Super::OnRefresh();
-	if(!USceneModule::IsValid())
+	const USceneModule* Scene = USceneModule::GetPtr(GetWorld());
+	if(!Scene)
 	{
 		MapView = FSceneMapView();
 		bPlayerMarkerPresent = false;
@@ -73,7 +74,7 @@ void UWidgetSceneMarkerPanel::OnRefresh()
 		}
 		return;
 	}
-	MapView = USceneModule::Get().GetMapView(MarkerChannel);
+	MapView = Scene->GetMapView(MarkerChannel, GetOwningPlayer());
 	ResolveMarkerCanvas();
 	UpdateCaptureBackground();
 	if(MapBackground)
@@ -88,7 +89,6 @@ void UWidgetSceneMarkerPanel::OnRefresh()
 
 void UWidgetSceneMarkerPanel::OnDestroy(EObjectDespawnMode InMode)
 {
-	const FScopedWorldContext WorldContext(GetWorld());
 	if (MarkerScene.IsValid())
 	{
 		MarkerScene->OnSceneMarkersChanged.RemoveDynamic(this, &UWidgetSceneMarkerPanel::RefreshMarkerMembership);
@@ -112,7 +112,7 @@ FVector UWidgetSceneMarkerPanel::GetMarkerViewLocation() const
 	{
 		if(const AActor* ViewTarget = PlayerController->GetViewTarget()) return ViewTarget->GetActorLocation();
 	}
-	return UCameraModuleStatics::GetViewLocation();
+	return FVector::ZeroVector;
 }
 
 float UWidgetSceneMarkerPanel::GetMarkerViewYaw() const
@@ -127,8 +127,7 @@ float UWidgetSceneMarkerPanel::GetMarkerViewYaw() const
 
 bool UWidgetSceneMarkerPanel::ProjectMarker(const FSceneMarkerView& InMarker, FVector2D InPanelSize, FVector2D& OutPosition) const
 {
-	if(!USceneModule::IsValid()) return false;
-	const USceneModule& Scene = USceneModule::Get();
+	if(!USceneModule::GetPtr(GetWorld())) return false;
 	switch(MarkerChannel)
 	{
 		case ESceneMarkerChannel::Map:
@@ -156,8 +155,8 @@ bool UWidgetSceneMarkerPanel::ProjectMarker(const FSceneMarkerView& InMarker, FV
 
 void UWidgetSceneMarkerPanel::RefreshMarkerMembership()
 {
-	const FScopedWorldContext WorldContext(GetWorld());
-	if(!USceneModule::IsValid())
+	const USceneModule* Scene = USceneModule::GetPtr(GetWorld());
+	if(!Scene)
 	{
 		Markers.Reset();
 		bPlayerMarkerPresent = false;
@@ -165,7 +164,7 @@ void UWidgetSceneMarkerPanel::RefreshMarkerMembership()
 		DestroyMarkerItems();
 		return;
 	}
-	Markers = USceneModule::Get().GetMarkerViews(MarkerChannel, GetMarkerViewLocation(), GetMarkerViewYaw(), false);
+	Markers = Scene->GetMarkerViews(USceneModule::GetPlayerMarkerOwnerId(GetOwningPlayer()), MarkerChannel, GetMarkerViewLocation(), GetMarkerViewYaw(), false);
 	AddPlayerMarker();
 	bPlayerMarkerPresent = bShowPlayerMarker &&
 		(MarkerChannel == ESceneMarkerChannel::Map || MarkerChannel == ESceneMarkerChannel::MiniMap) && GetOwningPlayerPawn() != nullptr;
@@ -213,7 +212,8 @@ void UWidgetSceneMarkerPanel::RebuildMarkerItems()
 
 void UWidgetSceneMarkerPanel::UpdateMarkerStates()
 {
-	if(!USceneModule::IsValid() || !MarkerCanvas) return;
+	const USceneModule* Scene = USceneModule::GetPtr(GetWorld());
+	if(!Scene || !MarkerCanvas) return;
 	const FVector ViewLocation = GetMarkerViewLocation();
 	const float ViewYaw = GetMarkerViewYaw();
 	const FVector2D PanelSize = MarkerCanvas->GetCachedGeometry().GetLocalSize();
@@ -232,7 +232,7 @@ void UWidgetSceneMarkerPanel::UpdateMarkerStates()
 		}
 		else
 		{
-			Marker = USceneModule::Get().GetMarkerView(Marker.Marker.MarkerID, ViewLocation, ViewYaw);
+			Marker = Scene->GetMarkerView(USceneModule::GetPlayerMarkerOwnerId(GetOwningPlayer()), Marker.Marker.MarkerID, ViewLocation, ViewYaw);
 		}
 		UWidgetSceneMarkerItem* Item = MarkerItems.FindRef(Marker.Marker.MarkerID);
 		if(!Item) continue;
@@ -263,7 +263,6 @@ void UWidgetSceneMarkerPanel::UpdateMarkerStates()
 
 void UWidgetSceneMarkerPanel::ResolveMapBackground()
 {
-	const FScopedWorldContext WorldContext(GetWorld());
 	const USceneModule* Scene = MarkerScene.Get();
 	const bool bUsesCapture = Scene && Scene->GetWorld() == GetWorld() && MarkerChannel == ESceneMarkerChannel::MiniMap &&
 		Scene->GetMiniMapSource() == EWorldMiniMapSource::SceneCapture;
@@ -312,7 +311,7 @@ void UWidgetSceneMarkerPanel::ResolveMapBackground()
 		}
 		MapBackground->SetClipping(EWidgetClipping::ClipToBounds);
 	}
-	MapBackground->SetMapView(Scene->GetMapView(MarkerChannel), MarkerChannel);
+	MapBackground->SetMapView(Scene->GetMapView(MarkerChannel, GetOwningPlayer()), MarkerChannel);
 	MapBackground->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 
@@ -320,7 +319,7 @@ void UWidgetSceneMarkerPanel::UpdateCaptureBackground()
 {
 	if(!CaptureBackground) return;
 	const USceneModule* Scene = MarkerScene.Get();
-	const AMiniMapCapture* Actor = Scene && Scene->GetWorld() == GetWorld() ? Scene->GetMiniMapCapture() : nullptr;
+	const AMiniMapCapture* Actor = Scene && Scene->GetWorld() == GetWorld() ? Scene->GetMiniMapCapture(GetOwningPlayer()) : nullptr;
 	const USceneCaptureComponent2D* Capture = ::IsValid(Actor) ? Actor->GetCapture() : nullptr;
 	UTextureRenderTarget2D* Texture = Capture ? Capture->TextureTarget.Get() : nullptr;
 	const FVector2D PanelSize = MapContentCanvas ? MapContentCanvas->GetCachedGeometry().GetLocalSize() : FVector2D::ZeroVector;

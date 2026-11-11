@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Task/TaskExecutionTypes.h"
+#include "Task/TaskReferenceTypes.h"
 #include "Components/ActorComponent.h"
 #include "Task/TaskModuleTypes.h"
 #include "TaskComponent.generated.h"
@@ -31,25 +33,25 @@ public:
 	TArray<UTaskAsset*> GetRuntimeAssets() const;
 
 	UFUNCTION(BlueprintPure)
-	virtual TArray<UTaskAsset*> GetOfferedAssets() const;
+	virtual TArray<UTaskAsset*> GetOfferedAssets(AActor* InInteractor) const;
 
 	UFUNCTION(BlueprintPure)
-	virtual UTaskBase* GetTask(ETaskStage InStage) const;
+	virtual UTaskBase* GetTask(AActor* InInteractor, ETaskStage InStage) const;
 
 	UFUNCTION(BlueprintPure)
-	UTaskBase* ResolveTask(const FTaskReference& InReference) const;
+	virtual UTaskBase* ResolveTask(AActor* InInteractor, const FTaskReference& InReference) const;
 
 	UFUNCTION(BlueprintCallable)
 	UTaskBase* AcceptTask(UTaskAsset* InAsset = nullptr, FString InTaskGUID = FString(), AActor* InInteractor = nullptr);
 
 	UFUNCTION(BlueprintCallable)
-	bool TurnInTask(UTaskBase* InTask = nullptr);
+	bool TurnInTask(AActor* InInteractor, UTaskBase* InTask = nullptr);
 
 	UFUNCTION(BlueprintCallable)
 	void SetAgentActive(bool bInActive);
 
 	UFUNCTION(BlueprintPure)
-	bool HasAvailableTask() const;
+	bool HasAvailableTask(AActor* InInteractor) const;
 
 	UFUNCTION(BlueprintPure)
 	FGuid GetAgentID() const { return AgentID; }
@@ -89,5 +91,5 @@ protected:
 
 	bool ResolveAgentID();
 	void ResolveTaskAssets();
-	bool HasRuntimeAsset(UTaskAsset* InSource) const;
+	bool HasRuntimeAsset(UTaskAsset* InSource, FGuid InPlayerId) const;
 };

@@ -18,17 +18,18 @@ class WHFRAMEWORK_API UVideoModuleNetworkComponent : public UModuleNetworkCompon
 
 public:
 	UVideoModuleNetworkComponent();
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	
 public:
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerPlayMovieMulticast(AMediaPlayerBase* InMediaPlayer, const FName& InName);
+	void ServerPlayMovieMulticast(FGuid WorldRoute, AMediaPlayerBase* InMediaPlayer, const FName& InName);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerPauseMovieMulticast(AMediaPlayerBase* InMediaPlayer);
+	void ServerPauseMovieMulticast(FGuid WorldRoute, AMediaPlayerBase* InMediaPlayer);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerSeekMovieMulticast(AMediaPlayerBase* InMediaPlayer, const FTimespan& InTimespan);
+	void ServerSeekMovieMulticast(FGuid WorldRoute, AMediaPlayerBase* InMediaPlayer, const FTimespan& InTimespan);
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, WithValidation)
-	void ServerStopMovieMulticast(AMediaPlayerBase* InMediaPlayer, bool bSkip);
+	void ServerStopMovieMulticast(FGuid WorldRoute, AMediaPlayerBase* InMediaPlayer, bool bSkip);
 };

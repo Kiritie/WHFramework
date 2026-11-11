@@ -5,6 +5,8 @@
 
 #include "Event_InputTypeChanged.generated.h"
 
+class APlayerController;
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FEventInputTypeChanged : public FEventBase
 {
@@ -14,15 +16,15 @@ public:
 	FEventInputTypeChanged() = default;
 
 	FEventInputTypeChanged(
-		int32 InPlayerIndex,
+		APlayerController* InPlayer,
 		ECommonInputType InInputType)
-		: PlayerIndex(InPlayerIndex),
+		: Player(InPlayer),
 		InputType(InInputType)
 	{
 	}
 
 	UPROPERTY(BlueprintReadWrite)
-	int32 PlayerIndex = 0;
+	TObjectPtr<APlayerController> Player = nullptr;
 
 	UPROPERTY(BlueprintReadWrite)
 	ECommonInputType InputType = ECommonInputType::MouseAndKeyboard;

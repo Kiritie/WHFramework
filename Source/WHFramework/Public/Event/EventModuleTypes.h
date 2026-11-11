@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "StructUtils/InstancedStruct.h"
 #include "StructUtils/StructView.h"
+#include "UObject/StrongObjectPtr.h"
 
 #include "EventModuleTypes.generated.h"
 
@@ -42,5 +43,6 @@ struct WHFRAMEWORK_API FEventListener
 
 struct WHFRAMEWORK_API FEventMapping
 {
+	TStrongObjectPtr<UScriptStruct> EventType;
 	TArray<FEventListener> Listeners;
 };

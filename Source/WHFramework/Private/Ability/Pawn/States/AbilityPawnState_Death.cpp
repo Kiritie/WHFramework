@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Pawn/States/AbilityPawnState_Death.h"
+#include "Ability/AbilityTags.h"
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Pawn/AbilityPawnBase.h"
@@ -134,7 +135,7 @@ void UAbilityPawnState_Death::DeathEnd()
 
 	if (!Pawn->IsPlayer())
 	{
-		UObjectPoolModuleStatics::DespawnObject(Pawn);
+		UObjectPoolModuleStatics::DespawnObject(Pawn, Pawn);
 	}
 	else
 	{

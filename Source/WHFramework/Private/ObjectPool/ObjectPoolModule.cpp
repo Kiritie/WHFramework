@@ -1,10 +1,22 @@
 #include "ObjectPool/ObjectPoolModule.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Common/LifecycleTypes.h"
+#include "Common/CommonTypes.h"
+#include "Common/Base/WHActor.h"
+#include "Pawn/Base/PawnBase.h"
+#include "Character/Base/CharacterBase.h"
+#include "Ability/Spawner/AbilitySpawnerBase.h"
+#include "Scene/SceneModule.h"
+#include "Scene/Actor/SceneActorInterface.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "Misc/ScopeExit.h"
 #include "ObjectPool/ObjectPoolBucket.h"
 #include "ObjectPool/ObjectPoolInterface.h"
-#include "ObjectPool/ObjectPoolProvider.h"
+#include "ObjectPool/ObjectPoolProviderInterface.h"
 #include "ObjectPool/Provider/ActorPoolProvider.h"
 #include "ObjectPool/Provider/ObjectPoolProvider.h"
 #include "ObjectPool/Provider/WidgetPoolProvider.h"
@@ -20,7 +32,6 @@ UObjectPoolModule::UObjectPoolModule()
 
 UObjectPoolModule::~UObjectPoolModule()
 {
-	TERMINATION_MODULE(UObjectPoolModule)
 }
 
 #if WITH_EDITOR
@@ -32,7 +43,6 @@ void UObjectPoolModule::OnGenerate()
 void UObjectPoolModule::OnDestroy()
 {
 	Super::OnDestroy();
-	TERMINATION_MODULE(UObjectPoolModule)
 }
 #endif
 
@@ -69,7 +79,7 @@ void UObjectPoolModule::OnTermination(EPhase InPhase)
 	Super::OnTermination(InPhase);
 	if(PHASEC(InPhase, EPhase::Final))
 	{
-		ClearAllObject();
+		ClearAllObjectForCleanup();
 		WidgetProvider.Reset();
 		ActorProvider.Reset();
 		ObjectProvider.Reset();
@@ -92,14 +102,67 @@ FString UObjectPoolModule::GetModuleDebugMessage()
 
 UObject* UObjectPoolModule::SpawnObject(UClass* InClass, const FParameter& InParam)
 {
+	if (!IsBusinessAdmissionOpen()) return nullptr;
+	if (!::IsValid(InClass) || InClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists)) return nullptr;
+	if (const UScriptStruct* SuppliedType = InParam.GetStructType(); SuppliedType && SuppliedType->IsChildOf(FSpawnParameter::StaticStruct()))
+	{
+		const UScriptStruct* ExpectedType = FObjectPoolSpawnParameterRegistry::Resolve(InClass);
+		if (!ExpectedType || !SuppliedType->IsChildOf(ExpectedType))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("对象池拒绝创建 %s：生成参数类型 %s 与要求的 %s 不匹配。"),
+				*GetNameSafe(InClass), *GetNameSafe(SuppliedType), *GetNameSafe(ExpectedType));
+			return nullptr;
+		}
+	}
 	IObjectPoolProvider* Provider = ResolveProvider(InClass);
 	UObject* Object = Provider ? Provider->Spawn(InClass, InParam) : nullptr;
 	if(!Object)
 	{
 		return nullptr;
 	}
-
 	InactiveObjects.Remove(Object);
+	AActor* Actor = Cast<AActor>(Object);
+	auto FinishActorSpawn = [&]()
+	{
+		if (ActorProvider->TakeDeferredSpawn(Actor))
+		{
+			const FActorSpawnParameter* Parameter = InParam.GetPtr<FActorSpawnParameter>();
+			Actor->FinishSpawning(Parameter ? Parameter->Transform : FTransform::Identity);
+		}
+	};
+	auto HasValidActorInitialization = [&]()
+	{
+		if (!Actor->HasActorBegunPlay() || !Actor->Implements<UWHActorInterface>()) return true;
+		const bool bDefaultLifecycle = IWHActorInterface::Execute_IsUseDefaultLifecycle(Actor);
+		const bool bInitialized = !bDefaultLifecycle || IWHActorInterface::Execute_IsInitialized(Actor);
+		return bInitialized;
+	};
+	if (Actor && Actor->HasAuthority() && (Actor->IsA<AWHActor>() || Actor->IsA<APawnBase>() ||
+		Actor->IsA<ACharacterBase>() || Actor->IsA<AAbilitySpawnerBase>()))
+	{
+		const FWHActorSpawnParameter* Parameter = InParam.GetPtr<FWHActorSpawnParameter>();
+		const FGuid NewId = Parameter && Parameter->bOverrideActorID ? Parameter->ActorID : FGuid::NewGuid();
+		USceneModule* Scene = USceneModule::GetPtr(Actor->GetWorld());
+		const bool bAssigned = Scene && ISceneActorInterface::Execute_SetActorID(Actor, NewId) &&
+			ISceneActorInterface::Execute_GetActorID(Actor) == NewId;
+		if (bAssigned) FinishActorSpawn();
+		if (!bAssigned || !HasValidActorInitialization() || !Scene->AddSceneActor(Actor))
+		{
+			UE_LOG(LogTemp, Error, TEXT("对象池无法分配场景实体身份：%s id=%s"), *GetNameSafe(Actor), *NewId.ToString());
+			if (Scene) Scene->RemoveSceneActor(Actor);
+			ActorProvider->Destroy(Object);
+			return nullptr;
+		}
+	}
+	else if (Actor)
+	{
+		FinishActorSpawn();
+		if (!HasValidActorInitialization())
+		{
+			ActorProvider->Destroy(Object);
+			return nullptr;
+		}
+	}
 	if(Object->Implements<UObjectPoolInterface>())
 	{
 		IObjectPoolInterface::Execute_OnSpawn(Object, InParam);
@@ -109,26 +172,36 @@ UObject* UObjectPoolModule::SpawnObject(UClass* InClass, const FParameter& InPar
 
 void UObjectPoolModule::DespawnObject(UObject* InObject, EObjectDespawnMode InMode)
 {
+	if (!IsBusinessAdmissionOpen()) return;
+	DespawnObjectForCleanup(InObject, InMode);
+}
+
+void UObjectPoolModule::DespawnObjectForCleanup(UObject* InObject, EObjectDespawnMode InMode)
+{
 	if(!::IsValid(InObject) || ModuleState == EModuleState::Terminated)
 	{
 		return;
 	}
+	if (UObjectPoolModule* OwnerPool = InObject->GetTypedOuter<UObjectPoolModule>(); OwnerPool && OwnerPool != this) return;
+	if (!IsBusinessAdmissionOpen()) InMode = EObjectDespawnMode::Destroy;
 	if(InMode == EObjectDespawnMode::Destroy)
 	{
-		DestroyObject(InObject);
+		DestroyObjectForCleanup(InObject);
 		return;
 	}
 	if(!ensureMsgf(!IsInactive(InObject), TEXT("Object %s was despawned more than once."), *GetNameSafe(InObject)))
 	{
 		return;
 	}
+	if (RetiringObjects.Contains(InObject)) return;
+	RetiringObjects.Add(InObject);
+	ON_SCOPE_EXIT { RetiringObjects.Remove(InObject); };
 
 	IObjectPoolProvider* Provider = ResolveProvider(InObject->GetClass());
 	if(Provider)
 	{
 		Provider->PrepareDespawn(InObject);
 	}
-
 	const bool bRecovery = Provider && Provider->Despawn(InObject);
 	const EObjectDespawnMode FinalMode = bRecovery
 		? EObjectDespawnMode::Recovery
@@ -137,7 +210,6 @@ void UObjectPoolModule::DespawnObject(UObject* InObject, EObjectDespawnMode InMo
 	{
 		IObjectPoolInterface::Execute_OnDespawn(InObject, FinalMode);
 	}
-
 	if(bRecovery)
 	{
 		InactiveObjects.Add(InObject);
@@ -154,6 +226,7 @@ void UObjectPoolModule::DespawnObjects(const TArray<UObject*>& InObjects)
 
 void UObjectPoolModule::ClearObject(TSubclassOf<UObject> InClass)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	TArray<UObject*> ObjectsToDestroy;
 	for(const TWeakObjectPtr<UObject>& Object : InactiveObjects)
 	{
@@ -170,16 +243,24 @@ void UObjectPoolModule::ClearObject(TSubclassOf<UObject> InClass)
 
 void UObjectPoolModule::ClearAllObject()
 {
-	TArray<UObject*> ObjectsToDestroy;
+	if (!IsBusinessAdmissionOpen()) return;
+	ClearAllObjectForCleanup();
+}
+
+void UObjectPoolModule::ClearAllObjectForCleanup()
+{
+	TArray<TWeakObjectPtr<UObject>> ObjectsToDestroy;
 	for(const TWeakObjectPtr<UObject>& Object : InactiveObjects)
 	{
 		if(Object.IsValid())
 		{
-			ObjectsToDestroy.Add(Object.Get());
+			ObjectsToDestroy.Emplace(Object.Get());
 		}
 	}
-	for(UObject* Object : ObjectsToDestroy)
+	for(const TWeakObjectPtr<UObject>& Entry : ObjectsToDestroy)
 	{
+		UObject* Object = Entry.Get();
+		if (!::IsValid(Object) || InactiveObjects.Remove(Object) == 0) continue;
 		if(IObjectPoolProvider* Provider = ResolveProvider(Object->GetClass()))
 		{
 			Provider->Destroy(Object);
@@ -233,6 +314,7 @@ FObjectPoolPolicy UObjectPoolModule::GetPoolPolicy(TSubclassOf<UObject> InClass)
 
 void UObjectPoolModule::SetPoolPolicy(TSubclassOf<UObject> InClass, const FObjectPoolPolicy& InPolicy)
 {
+	if (!IsBusinessAdmissionOpen()) return;
 	if(InClass)
 	{
 		PoolPolicies.Add(InClass, InPolicy);
@@ -241,17 +323,25 @@ void UObjectPoolModule::SetPoolPolicy(TSubclassOf<UObject> InClass, const FObjec
 
 void UObjectPoolModule::DestroyObject(UObject* InObject)
 {
+	if (!IsBusinessAdmissionOpen()) return;
+	DestroyObjectForCleanup(InObject);
+}
+
+void UObjectPoolModule::DestroyObjectForCleanup(UObject* InObject)
+{
 	if(!::IsValid(InObject))
 	{
 		return;
 	}
+	if (RetiringObjects.Contains(InObject)) return;
+	RetiringObjects.Add(InObject);
+	ON_SCOPE_EXIT { RetiringObjects.Remove(InObject); };
 
 	const bool bWasInactive = InactiveObjects.Remove(InObject) > 0;
 	if(!bWasInactive && InObject->Implements<UObjectPoolInterface>())
 	{
 		IObjectPoolInterface::Execute_OnDespawn(InObject, EObjectDespawnMode::Destroy);
 	}
-
 	if(IObjectPoolProvider* Provider = ResolveProvider(InObject->GetClass()))
 	{
 		Provider->Destroy(InObject);

@@ -2,9 +2,11 @@
 
 
 #include "Common/CommonModuleStatics.h"
+#include "Common/LifecycleTypes.h"
 
 #include "BlueprintGameplayTagLibrary.h"
 #include "EngineUtils.h"
+#include "Engine/GameViewportClient.h"
 #include "WHFrameworkCoreStatics.h"
 #include "Asset/AssetModuleStatics.h"
 #include "Blueprint/SlateBlueprintLibrary.h"
@@ -13,11 +15,12 @@
 #include "Gameplay/WHGameInstance.h"
 #include "Gameplay/WHGameMode.h"
 #include "Gameplay/WHGameState.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "Event/Events/Common/Game/Event_GamePaused.h"
 #include "Event/Events/Common/Game/Event_GameUnPaused.h"
 #include "Event/Events/Common/Game/Event_GameExited.h"
 #include "Gameplay/WHLocalPlayer.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetStringLibrary.h"
 #include "Main/MainModule.h"
@@ -26,106 +29,112 @@
 #include "Widgets/SViewport.h"
 #include "Windows/WindowsPlatformApplicationMisc.h"
 
-bool UCommonModuleStatics::IsPaused()
+bool UCommonModuleStatics::IsPaused(const UObject* WorldContextObject)
 {
-	return UGameplayStatics::IsGamePaused(GetWorldContext());
+	return WorldContextObject && WorldContextObject->GetWorld() && UGameplayStatics::IsGamePaused(WorldContextObject);
 }
 
-void UCommonModuleStatics::SetPaused(bool bPaused)
+void UCommonModuleStatics::SetPaused(const UObject* WorldContextObject, bool bPaused)
 {
-	UGameplayStatics::SetGamePaused(GetWorldContext(), bPaused);
+	if (WorldContextObject && WorldContextObject->GetWorld()) UGameplayStatics::SetGamePaused(WorldContextObject, bPaused);
 }
 
-float UCommonModuleStatics::GetTimeScale()
+float UCommonModuleStatics::GetTimeScale(const UObject* WorldContextObject)
 {
-	return UGameplayStatics::GetGlobalTimeDilation(GetWorldContext());
+	return WorldContextObject && WorldContextObject->GetWorld() ? UGameplayStatics::GetGlobalTimeDilation(WorldContextObject) : 1.f;
 }
 
-float UCommonModuleStatics::GetDeltaSeconds()
+float UCommonModuleStatics::GetDeltaSeconds(const UObject* WorldContextObject)
 {
-	return UGameplayStatics::GetWorldDeltaSeconds(GetWorldContext());
+	return WorldContextObject && WorldContextObject->GetWorld() ? UGameplayStatics::GetWorldDeltaSeconds(WorldContextObject) : 0.f;
 }
 
-void UCommonModuleStatics::SetTimeScale(float TimeScale)
+void UCommonModuleStatics::SetTimeScale(const UObject* WorldContextObject, float TimeScale)
 {
-	UGameplayStatics::SetGlobalTimeDilation(GetWorldContext(), TimeScale);
+	if (WorldContextObject && WorldContextObject->GetWorld()) UGameplayStatics::SetGlobalTimeDilation(WorldContextObject, TimeScale);
 }
 
-void UCommonModuleStatics::PauseGame(EPauseMode PauseMode)
+void UCommonModuleStatics::PauseGame(const UObject* WorldContextObject, EPauseMode PauseMode)
 {
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	if (!World) return;
 	switch(PauseMode)
 	{
 		case EPauseMode::Default:
 		{
-			SetPaused(true);
+			UGameplayStatics::SetGamePaused(World, true);
 			break;
 		}
 		case EPauseMode::TimeOnly:
 		{
-			SetTimeScale(0.f);
+			UGameplayStatics::SetGlobalTimeDilation(World, 0.f);
 			break;
 		}
 		case EPauseMode::ModuleOnly:
 		{
-			UMainModuleStatics::PauseAllModule();
+			if (AMainModule* Main = AMainModule::GetPtr(World)) Main->PauseModules();
 			break;
 		}
 		case EPauseMode::TimeAndModule:
 		{
-			SetTimeScale(0.f);
-			UMainModuleStatics::PauseAllModule();
+			UGameplayStatics::SetGlobalTimeDilation(World, 0.f);
+			if (AMainModule* Main = AMainModule::GetPtr(World)) Main->PauseModules();
 			break;
 		}
 	}
-	UEventModuleStatics::BroadcastEvent<FEventGamePaused>(nullptr, { PauseMode } );
+	if (UEventModule* Events = UEventModule::GetPtr(World)) Events->BroadcastEvent<FEventGamePaused>(nullptr, { PauseMode });
 }
 
-void UCommonModuleStatics::UnPauseGame(EPauseMode PauseMode)
+void UCommonModuleStatics::UnPauseGame(const UObject* WorldContextObject, EPauseMode PauseMode)
 {
+	UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	if (!World) return;
 	switch(PauseMode)
 	{
 		case EPauseMode::Default:
 		{
-			SetPaused(false);
-			UMainModuleStatics::UnPauseAllModule();
+			UGameplayStatics::SetGamePaused(World, false);
+			if (AMainModule* Main = AMainModule::GetPtr(World)) Main->UnPauseModules();
 			break;
 		}
 		case EPauseMode::TimeOnly:
 		{
-			SetTimeScale(1.f);
+			UGameplayStatics::SetGlobalTimeDilation(World, 1.f);
 			break;
 		}
 		case EPauseMode::ModuleOnly:
 		{
-			UMainModuleStatics::UnPauseAllModule();
+			if (AMainModule* Main = AMainModule::GetPtr(World)) Main->UnPauseModules();
 			break;
 		}
 		case EPauseMode::TimeAndModule:
 		{
-			SetTimeScale(1.f);
-			UMainModuleStatics::UnPauseAllModule();
+			UGameplayStatics::SetGlobalTimeDilation(World, 1.f);
+			if (AMainModule* Main = AMainModule::GetPtr(World)) Main->UnPauseModules();
 			break;
 		}
 	}
-	UEventModuleStatics::BroadcastEvent<FEventGameUnPaused>(nullptr, { PauseMode } );
+	if (UEventModule* Events = UEventModule::GetPtr(World)) Events->BroadcastEvent<FEventGameUnPaused>(nullptr, { PauseMode });
 }
 
-void UCommonModuleStatics::QuitGame(TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)
+void UCommonModuleStatics::QuitGame(APlayerController* InPlayer, TEnumAsByte<EQuitPreference::Type> QuitPreference, bool bIgnorePlatformRestrictions)
 {
-	if (auto* Save = USaveGameModule::GetPtr(); Save && Save->GetWorld() == GetCurrentWorld())
+	UWorld* World = ::IsValid(InPlayer) && InPlayer->IsLocalController() ? InPlayer->GetWorld() : nullptr;
+	if (!World) return;
+	if (auto* Save = USaveGameModule::GetPtr(World))
 	{
-		Save->RequestUserQuit(uint8(QuitPreference.GetValue()), bIgnorePlatformRestrictions);
+		Save->RequestUserQuit(InPlayer, uint8(QuitPreference.GetValue()), bIgnorePlatformRestrictions);
 		return;
 	}
 	// 未配置保存模块的世界保留直接退出行为。
-	UEventModuleStatics::BroadcastEvent<FEventGameExited>(nullptr, { false });
-	UKismetSystemLibrary::QuitGame(GetWorldContext(), GetPlayerController<AWHPlayerController>(), QuitPreference, bIgnorePlatformRestrictions);
+	if (UEventModule* Events = UEventModule::GetPtr(World)) Events->BroadcastEvent<FEventGameExited>(nullptr, { false });
+	UKismetSystemLibrary::QuitGame(World, InPlayer, QuitPreference, bIgnorePlatformRestrictions);
 }
 
-bool UCommonModuleStatics::IsInScreenViewport(const FVector& InWorldLocation)
+bool UCommonModuleStatics::IsInScreenViewport(APlayerController* InPlayer, const FVector& InWorldLocation)
 {
-	const UWHLocalPlayer* LP = GetLocalPlayer();
-	if (LP && LP->ViewportClient)
+	const ULocalPlayer* LP = InPlayer && InPlayer->IsLocalController() ? InPlayer->GetLocalPlayer() : nullptr;
+	if (LP && LP->ViewportClient && LP->ViewportClient->Viewport)
 	{
 		FSceneViewProjectionData ProjectionData;
 		if (LP->GetProjectionData(LP->ViewportClient->Viewport, ProjectionData))
@@ -133,8 +142,9 @@ bool UCommonModuleStatics::IsInScreenViewport(const FVector& InWorldLocation)
 			FMatrix const ViewProjectionMatrix = ProjectionData.ComputeViewProjectionMatrix();
 			FVector2D ScreenPosition;
 			const bool bResult = FSceneView::ProjectWorldToScreen(InWorldLocation, ProjectionData.GetConstrainedViewRect(), ViewProjectionMatrix, ScreenPosition);
-			if (bResult && ScreenPosition.X > ProjectionData.GetViewRect().Min.X && ScreenPosition.X < ProjectionData.GetViewRect().Max.X
-				&& ScreenPosition.Y > ProjectionData.GetViewRect().Min.Y && ScreenPosition.Y < ProjectionData.GetViewRect().Max.Y)
+			const FIntRect ViewRect = ProjectionData.GetConstrainedViewRect();
+			if (bResult && ScreenPosition.X >= ViewRect.Min.X && ScreenPosition.X < ViewRect.Max.X
+				&& ScreenPosition.Y >= ViewRect.Min.Y && ScreenPosition.Y < ViewRect.Max.Y)
 			{
 				return true;
 			}
@@ -153,27 +163,27 @@ void UCommonModuleStatics::ClipboardPaste(FString& OutStr)
 	FPlatformApplicationMisc::ClipboardPaste(OutStr);
 }
 
-int32 UCommonModuleStatics::GetEnumItemNum(const FString& InEnumName)
+int32 UCommonModuleStatics::GetEnumItemNum(const UObject* WorldContextObject, const FString& InEnumName)
 {
-	if(const UEnum* Enum = UAssetModuleStatics::FindObject<UEnum>(InEnumName, true))
+	if(const UEnum* Enum = UAssetModuleStatics::FindObject<UEnum>(WorldContextObject, InEnumName, true))
 	{
 		return Enum->NumEnums() - 1;
 	}
 	return 0;
 }
 
-FString UCommonModuleStatics::GetEnumAuthoredNameByValue(const FString& InEnumName, int32 InEnumValue)
+FString UCommonModuleStatics::GetEnumAuthoredNameByValue(const UObject* WorldContextObject, const FString& InEnumName, int32 InEnumValue)
 {
-	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByValue(InEnumName, InEnumValue, true))
+	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByValue(WorldContextObject, InEnumName, InEnumValue, true))
 	{
 		return Enum->GetAuthoredNameStringByValue(InEnumValue);
 	}
 	return TEXT("");
 }
 
-FText UCommonModuleStatics::GetEnumDisplayNameByValue(const FString& InEnumName, int32 InEnumValue)
+FText UCommonModuleStatics::GetEnumDisplayNameByValue(const UObject* WorldContextObject, const FString& InEnumName, int32 InEnumValue)
 {
-	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByValue(InEnumName, InEnumValue, true))
+	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByValue(WorldContextObject, InEnumName, InEnumValue, true))
 	{
 		FText DisplayName;
 		if(FText::FindTextInLiveTable_Advanced(TEXT("UObjectDisplayNames"), Enum->GetNameByValue(InEnumValue).ToString().Replace(TEXT("::"), TEXT(".")), DisplayName))
@@ -185,14 +195,14 @@ FText UCommonModuleStatics::GetEnumDisplayNameByValue(const FString& InEnumName,
 	return FText::GetEmpty();
 }
 
-FText UCommonModuleStatics::GetEnumDisplayNameByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName)
+FText UCommonModuleStatics::GetEnumDisplayNameByAuthoredName(const UObject* WorldContextObject, const FString& InEnumName, const FString& InEnumAuthoredName)
 {
-	return GetEnumDisplayNameByValue(InEnumName, GetEnumValueByAuthoredName(InEnumName, InEnumAuthoredName));
+	return GetEnumDisplayNameByValue(WorldContextObject, InEnumName, GetEnumValueByAuthoredName(WorldContextObject, InEnumName, InEnumAuthoredName));
 }
 
-int32 UCommonModuleStatics::GetEnumValueByAuthoredName(const FString& InEnumName, const FString& InEnumAuthoredName)
+int32 UCommonModuleStatics::GetEnumValueByAuthoredName(const UObject* WorldContextObject, const FString& InEnumName, const FString& InEnumAuthoredName)
 {
-	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByAuthoredName(InEnumName, InEnumAuthoredName))
+	if(const UEnum* Enum = UAssetModuleStatics::FindEnumByAuthoredName(WorldContextObject, InEnumName, InEnumAuthoredName))
 	{
 		return Enum->GetValueByNameString(InEnumAuthoredName);
 	}
@@ -209,14 +219,14 @@ FText UCommonModuleStatics::GetPropertyDisplayName(const FProperty* InProperty)
 	return PropertyName;
 }
 
-void UCommonModuleStatics::SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
+bool UCommonModuleStatics::SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData)
 {
-	FCoreStatics::SaveObjectDataToMemory(InObject, OutObjectData);
+	return FCoreStatics::SaveObjectDataToMemory(InObject, OutObjectData);
 }
 
-void UCommonModuleStatics::LoadObjectDataFromMemory(UObject* InObject, const TArray<uint8>& InObjectData)
+bool UCommonModuleStatics::LoadObjectDataFromMemory(UObject* InObject, const TArray<uint8>& InObjectData)
 {
-	FCoreStatics::LoadObjectDataFromMemory(InObject, InObjectData);
+	return FCoreStatics::LoadObjectDataFromMemory(InObject, InObjectData);
 }
 
 bool UCommonModuleStatics::RegexMatch(const FString& InSourceStr, const FString& InPattern, TArray<FString>& OutResult)
@@ -359,9 +369,12 @@ bool UCommonModuleStatics::JsonObjectToString(const TSharedPtr<FJsonObject>& InJ
 	return FJsonSerializer::Serialize(InJsonObject.ToSharedRef(), JsonWriter);
 }
 
-bool UCommonModuleStatics::HasMouseCapture()
+bool UCommonModuleStatics::HasMouseCapture(const UObject* WorldContextObject)
 {
-	return GetCurrentWorld()->GetGameViewport()->GetGameViewportWidget()->HasMouseCapture();
+	const UWorld* World = WorldContextObject ? WorldContextObject->GetWorld() : nullptr;
+	const UGameViewportClient* Viewport = World ? World->GetGameViewport() : nullptr;
+	const TSharedPtr<SViewport> Widget = Viewport ? Viewport->GetGameViewportWidget() : nullptr;
+	return Widget.IsValid() && Widget->HasMouseCapture();
 }
 
 bool UCommonModuleStatics::ExecuteObjectFunc(UObject* InObject, const FName& InFuncName, void* Params)
@@ -428,53 +441,21 @@ FVector2D UCommonModuleStatics::GetGeometryAbsolutePosition(const FGeometry& InG
 	return FVector2D(InGeometry.AbsolutePosition);
 }
 
-FVector2D UCommonModuleStatics::GetGeometryViewportPosition(const FGeometry& InGeometry)
+FVector2D UCommonModuleStatics::GetGeometryViewportPosition(const UObject* WorldContextObject, const FGeometry& InGeometry)
 {
-	FVector2D PixelPosition, ViewportPosition;
-	USlateBlueprintLibrary::AbsoluteToViewport(const_cast<UObject*>(GetWorldContext()), InGeometry.GetAbsolutePosition(), PixelPosition, ViewportPosition);
+	FVector2D PixelPosition = FVector2D::ZeroVector, ViewportPosition = FVector2D::ZeroVector;
+	if (WorldContextObject) USlateBlueprintLibrary::AbsoluteToViewport(const_cast<UObject*>(WorldContextObject), InGeometry.GetAbsolutePosition(), PixelPosition, ViewportPosition);
 	return ViewportPosition;
 }
 
-UWorld* UCommonModuleStatics::ResolveCurrentWorld(bool bInEditor)
-{
-	auto Matches = [bInEditor](const UWorld* World)
-	{
-		return IsValid(World) && (bInEditor ? World->IsEditorWorld() && !World->IsGameWorld() : World->IsGameWorld());
-	};
-	// 模块生命周期显式指定 World；Actor、组件和 RPC 使用引擎当前 World。
-	if (UObject* Context = FScopedWorldContext::Get(); IsValid(Context) && Matches(Context->GetWorld()))
-	{
-		return Context->GetWorld();
-	}
-	if (Matches(GWorld)) return GWorld;
-	if (GEngine)
-	{
-		for (const FWorldContext& Context : GEngine->GetWorldContexts())
-		{
-			if (Matches(Context.World())) return Context.World();
-		}
-	}
-	return nullptr;
-}
-
-const UObject* UCommonModuleStatics::GetWorldContext(bool bInEditor)
-{
-	return AMainModule::GetPtr(bInEditor);
-}
-
-UObject* UCommonModuleStatics::GetMutableWorldContext(bool bInEditor)
-{
-	return AMainModule::GetPtr(bInEditor);
-}
-
-TArray<AActor*> UCommonModuleStatics::GetAllActorsOfDataLayer(UDataLayerAsset* InDataLayer, TSubclassOf<AActor> InClass)
+TArray<AActor*> UCommonModuleStatics::GetAllActorsOfDataLayer(const UObject* WorldContextObject, UDataLayerAsset* InDataLayer, TSubclassOf<AActor> InClass)
 {
 	if(!InClass) InClass = AActor::StaticClass();
 
 	TArray<AActor*> ReturnValues;
 	if(InDataLayer)
 	{
-		if (UWorld* World = GEngine->GetWorldFromContextObject(GetWorldContext(), EGetWorldErrorMode::LogAndReturnNull))
+		if (UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr)
 		{
 			for (TActorIterator<AActor> It(World, InClass); It; ++It)
 			{
@@ -489,17 +470,17 @@ TArray<AActor*> UCommonModuleStatics::GetAllActorsOfDataLayer(UDataLayerAsset* I
 	return ReturnValues;
 }
 
-TArray<AActor*> UCommonModuleStatics::GetAllActorsOfLevel(const FName InLevelName)
+TArray<AActor*> UCommonModuleStatics::GetAllActorsOfLevel(const UObject* WorldContextObject, const FName InLevelName)
 {
 	TArray<AActor*> ReturnValues;
 	if(!InLevelName.IsNone())
 	{
-		if (UWorld* World = GEngine->GetWorldFromContextObject(GetWorldContext(), EGetWorldErrorMode::LogAndReturnNull))
+		if (UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr)
 		{
 			for (TActorIterator<AActor> It(World); It; ++It)
 			{
 				AActor* Actor = *It;
-				FString LevelName = Actor->GetPackage()->GetName().Replace(TEXT("UEDPIE_0_"), TEXT(""));
+				FString LevelName = UWorld::RemovePIEPrefix(Actor->GetPackage()->GetName());
 				if (LevelName == InLevelName)
 				{
 					ReturnValues.Add(Actor);
@@ -510,137 +491,76 @@ TArray<AActor*> UCommonModuleStatics::GetAllActorsOfLevel(const FName InLevelNam
 	return ReturnValues;
 }
 
-UWHGameInstance* UCommonModuleStatics::GetGameInstance(TSubclassOf<UWHGameInstance> InClass)
+UWHGameInstance* UCommonModuleStatics::GetGameInstance(const UObject* WorldContextObject, TSubclassOf<UWHGameInstance> InClass)
 {
-	return GetDeterminesOutputObject(Cast<UWHGameInstance>(UGameplayStatics::GetGameInstance(GetWorldContext())), InClass);
+	return GetDeterminesOutputObject(Cast<UWHGameInstance>(WorldContextObject ? UGameplayStatics::GetGameInstance(WorldContextObject) : nullptr), InClass);
 }
 
-AWHGameMode* UCommonModuleStatics::GetGameMode(TSubclassOf<AWHGameMode> InClass)
+AWHGameMode* UCommonModuleStatics::GetGameMode(const UObject* WorldContextObject, TSubclassOf<AWHGameMode> InClass)
 {
-	return GetDeterminesOutputObject(Cast<AWHGameMode>(UGameplayStatics::GetGameMode(GetWorldContext())), InClass);
+	return GetDeterminesOutputObject(Cast<AWHGameMode>(WorldContextObject ? UGameplayStatics::GetGameMode(WorldContextObject) : nullptr), InClass);
 }
 
-AWHGameState* UCommonModuleStatics::GetGameState(TSubclassOf<AWHGameState> InClass)
+AWHGameState* UCommonModuleStatics::GetGameState(const UObject* WorldContextObject, TSubclassOf<AWHGameState> InClass)
 {
-	return GetDeterminesOutputObject(Cast<AWHGameState>(UGameplayStatics::GetGameState(GetWorldContext())), InClass);
+	return GetDeterminesOutputObject(Cast<AWHGameState>(WorldContextObject ? UGameplayStatics::GetGameState(WorldContextObject) : nullptr), InClass);
 }
 
-AWHGameManager* UCommonModuleStatics::GetGameManagerByClass(TSubclassOf<AWHGameManager> InClass)
+AWHGameManager* UCommonModuleStatics::GetGameManagerByClass(const UObject* WorldContextObject, TSubclassOf<AWHGameManager> InClass)
 {
-	if(AWHGameMode* GameMode = GetGameMode())
-	{
-		return GameMode->GetManagerByClass(InClass);
-	}
+	if (AWHGameMode* Mode = GetGameMode(WorldContextObject)) return Mode->GetManagerByClass(InClass);
 	return nullptr;
 }
 
-AWHGameManager* UCommonModuleStatics::GetGameManagerByName(const FName InName)
+AWHGameManager* UCommonModuleStatics::GetGameManagerByName(const UObject* WorldContextObject, FName InName)
 {
-	if(AWHGameMode* GameMode = GetGameMode())
-	{
-		return GameMode->GetManagerByName(InName);
-	}
+	if (AWHGameMode* Mode = GetGameMode(WorldContextObject)) return Mode->GetManagerByName(InName);
 	return nullptr;
 }
 
-AWHPlayerController* UCommonModuleStatics::GetPlayerController(int32 InPlayerIndex, TSubclassOf<AWHPlayerController> InClass)
+AWHPlayerController* UCommonModuleStatics::GetPlayerController(const UObject* WorldContextObject, int32 InPlayerIndex, TSubclassOf<AWHPlayerController> InClass)
 {
-	return GetDeterminesOutputObject(Cast<AWHPlayerController>(UGameplayStatics::GetPlayerController(GetWorldContext(), InPlayerIndex)), InClass);
+	return GetDeterminesOutputObject(Cast<AWHPlayerController>(WorldContextObject ? UGameplayStatics::GetPlayerController(WorldContextObject, InPlayerIndex) : nullptr), InClass);
 }
 
-AWHPlayerController* UCommonModuleStatics::GetPlayerControllerByID(int32 InPlayerID, TSubclassOf<AWHPlayerController> InClass)
+AWHPlayerController* UCommonModuleStatics::GetPlayerControllerByID(const UObject* WorldContextObject, int32 InPlayerID, TSubclassOf<AWHPlayerController> InClass)
 {
-	return GetDeterminesOutputObject(Cast<AWHPlayerController>(UGameplayStatics::GetPlayerControllerFromID(GetWorldContext(), InPlayerID)), InClass);
+	return GetDeterminesOutputObject(Cast<AWHPlayerController>(WorldContextObject ? UGameplayStatics::GetPlayerControllerFromID(WorldContextObject, InPlayerID) : nullptr), InClass);
 }
 
-AWHPlayerController* UCommonModuleStatics::GetLocalPlayerController(int32 InPlayerIndex, TSubclassOf<AWHPlayerController> InClass)
+AWHPlayerController* UCommonModuleStatics::GetLocalPlayerController(UWHLocalPlayer* InPlayer, TSubclassOf<AWHPlayerController> InClass)
 {
-	TArray<UWHLocalPlayer*> LocalPlayers = GetLocalPlayers();
-	if(LocalPlayers.IsValidIndex(InPlayerIndex))
+	return GetDeterminesOutputObject(Cast<AWHPlayerController>(InPlayer ? InPlayer->GetPlayerController(InPlayer->GetWorld()) : nullptr), InClass);
+}
+
+APawn* UCommonModuleStatics::GetPossessedPawn(APlayerController* InPlayer, TSubclassOf<APawn> InClass)
+{
+	return GetDeterminesOutputObject(InPlayer ? InPlayer->GetPawn().Get() : nullptr, InClass);
+}
+
+APawn* UCommonModuleStatics::GetPlayerPawn(AWHPlayerController* InPlayer, TSubclassOf<APawn> InClass)
+{
+	return GetDeterminesOutputObject(InPlayer ? InPlayer->GetPlayerPawn() : nullptr, InClass);
+}
+
+TArray<UWHLocalPlayer*> UCommonModuleStatics::GetLocalPlayers(const UObject* WorldContextObject)
+{
+	TArray<UWHLocalPlayer*> Players;
+	if (const UWHGameInstance* Instance = GetGameInstance(WorldContextObject))
 	{
-		return GetDeterminesOutputObject(Cast<AWHPlayerController>(LocalPlayers[InPlayerIndex]->GetPlayerController(GetCurrentWorld())), InClass);
+		for (ULocalPlayer* Player : Instance->GetLocalPlayers()) if (UWHLocalPlayer* WHPlayer = Cast<UWHLocalPlayer>(Player)) Players.Add(WHPlayer);
 	}
-	return nullptr;
+	return Players;
 }
 
-APawn* UCommonModuleStatics::GetPossessedPawn(int32 InPlayerIndex, TSubclassOf<APawn> InClass)
+UWHLocalPlayer* UCommonModuleStatics::GetLocalPlayer(const UObject* WorldContextObject, int32 InPlayerIndex, TSubclassOf<UWHLocalPlayer> InClass)
 {
-	if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
-	{
-		return GetDeterminesOutputObject(PlayerController->GetPawn().Get(), InClass);
-	}
-	return nullptr;
+	const TArray<UWHLocalPlayer*> Players = GetLocalPlayers(WorldContextObject);
+	return GetDeterminesOutputObject(Players.IsValidIndex(InPlayerIndex) ? Players[InPlayerIndex] : nullptr, InClass);
 }
 
-APawn* UCommonModuleStatics::GetPossessedPawnByID(int32 InPlayerID, TSubclassOf<APawn> InClass)
+int32 UCommonModuleStatics::GetLocalPlayerNum(const UObject* WorldContextObject)
 {
-	if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
-	{
-		return GetDeterminesOutputObject(PlayerController->GetPawn().Get(), InClass);
-	}
-	return nullptr;
+	return GetLocalPlayers(WorldContextObject).Num();
 }
 
-APawn* UCommonModuleStatics::GetLocalPossessedPawn(int32 InPlayerIndex, TSubclassOf<APawn> InClass)
-{
-	if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
-	{
-		return GetDeterminesOutputObject(PlayerController->GetPawn().Get(), InClass);
-	}
-	return nullptr;
-}
-
-APawn* UCommonModuleStatics::GetPlayerPawn(int32 InPlayerIndex, TSubclassOf<APawn> InClass)
-{
-	if(AWHPlayerController* PlayerController = GetPlayerController<AWHPlayerController>(InPlayerIndex))
-	{
-		return GetDeterminesOutputObject(PlayerController->GetPlayerPawn(), InClass);
-	}
-	return nullptr;
-}
-
-APawn* UCommonModuleStatics::GetPlayerPawnByID(int32 InPlayerID, TSubclassOf<APawn> InClass)
-{
-	if(AWHPlayerController* PlayerController = GetPlayerControllerByID<AWHPlayerController>(InPlayerID))
-	{
-		return GetDeterminesOutputObject(PlayerController->GetPlayerPawn(), InClass);
-	}
-	return nullptr;
-}
-
-APawn* UCommonModuleStatics::GetLocalPlayerPawn(TSubclassOf<APawn> InClass)
-{
-	if(AWHPlayerController* PlayerController = GetLocalPlayerController<AWHPlayerController>())
-	{
-		return GetDeterminesOutputObject(PlayerController->GetPlayerPawn(), InClass);
-	}
-	return nullptr;
-}
-
-TArray<UWHLocalPlayer*> UCommonModuleStatics::GetLocalPlayers()
-{
-	TArray<UWHLocalPlayer*> LocalPlayers;
-	for(auto Iter : GetGameInstance()->GetLocalPlayers())
-	{
-		if(UWHLocalPlayer* LocalPlayer = Cast<UWHLocalPlayer>(Iter))
-		{
-			LocalPlayers.Add(LocalPlayer);
-		}
-	}
-	return LocalPlayers;
-}
-
-UWHLocalPlayer* UCommonModuleStatics::GetLocalPlayer(int32 InPlayerIndex, TSubclassOf<UWHLocalPlayer> InClass)
-{
-	TArray<UWHLocalPlayer*> LocalPlayers = GetLocalPlayers();
-	if(LocalPlayers.IsValidIndex(InPlayerIndex))
-	{
-		return GetDeterminesOutputObject(LocalPlayers[InPlayerIndex], InClass);
-	}
-	return nullptr;
-}
-
-int32 UCommonModuleStatics::GetLocalPlayerNum()
-{
-	return GetLocalPlayers().Num();
-}

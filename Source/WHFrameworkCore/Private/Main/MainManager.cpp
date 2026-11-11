@@ -2,6 +2,7 @@
 
 
 #include "Main/MainManager.h"
+#include "Type/NativeTypeIdentity.h"
 
 const FUniqueType FMainManager::Type = FUniqueType(&FManagerBase::Type);
 
@@ -21,9 +22,9 @@ void FMainManager::OnInitialize()
 {
 	FManagerBase::OnInitialize();
 
-	FCoreUObjectDelegates::PostLoadMapWithWorld.AddRaw(this, &FMainManager::OnWorldAdded);
+	WorldAddedHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddRaw(this, &FMainManager::OnWorldAdded);
 
-	FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float DeltaTime)
+	RefreshHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([this](float DeltaTime)
 	{
 		OnRefresh(DeltaTime);
 		return true;
@@ -52,17 +53,50 @@ void FMainManager::OnRefresh(float DeltaSeconds)
 
 void FMainManager::OnTermination()
 {
+	if (bTerminating) return;
+	bTerminating = true;
+	FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(WorldAddedHandle);
+	FTSTicker::GetCoreTicker().RemoveTicker(RefreshHandle);
+	WorldAddedHandle.Reset();
+	RefreshHandle.Reset();
+	TArray<FManagerBase*> Remaining;
+	ManagerMap.GenerateValueArray(Remaining);
+	ManagerMap.Empty();
+	for (FManagerBase* Manager : Remaining)
+	{
+		if (Manager)
+		{
+			Manager->OnTermination();
+			delete Manager;
+		}
+	}
 	FManagerBase::OnTermination();
+}
+
+void FMainManager::Shutdown()
+{
+	if (Instance && !Instance->bTerminating)
+	{
+		FMainManager* Manager = Instance;
+		Manager->OnTermination();
+		Instance = nullptr;
+		delete Manager;
+	}
+}
+
+void FMainManager::Startup()
+{
+	if (!Instance)
+	{
+		Instance = new FMainManager();
+		Instance->OnInitialize();
+	}
 }
 
 void FMainManager::OnWorldAdded(UWorld* InWorld)
 {
 	if (InWorld && InWorld->WorldType != EWorldType::Editor)
 	{
-		if(!GWorldContext)
-		{
-			GWorldContext = InWorld;
-		}
 		OnPreparatory();
 	}
 }

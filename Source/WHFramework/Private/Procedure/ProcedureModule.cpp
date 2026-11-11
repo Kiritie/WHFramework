@@ -1,6 +1,9 @@
 #include "Procedure/ProcedureModule.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Common/LifecycleTypes.h"
 
-#include "Event/EventModuleStatics.h"
+#include "Event/EventModule.h"
+#include "Main/MainModuleStatics.h"
 #include "Event/Events/Procedure/Event_SwitchProcedure.h"
 #include "Procedure/ProcedureModuleNetworkComponent.h"
 #include "Templates/UnrealTemplate.h"
@@ -11,12 +14,12 @@ UProcedureModule::UProcedureModule()
 {
     ModuleName = TEXT("ProcedureModule");
     ModuleDisplayName = NSLOCTEXT("Procedure", "Module", "流程模块");
+    ModuleDependencies.AddUnique(TEXT("EventModule"));
     ModuleNetworkComponent = UProcedureModuleNetworkComponent::StaticClass();
 }
 
 UProcedureModule::~UProcedureModule()
 {
-    TERMINATION_MODULE(UProcedureModule)
 }
 
 #if WITH_EDITOR
@@ -28,7 +31,6 @@ void UProcedureModule::OnGenerate()
 void UProcedureModule::OnDestroy()
 {
     Super::OnDestroy();
-    TERMINATION_MODULE(UProcedureModule)
 }
 
 void UProcedureModule::SetDefaultAsset(UProcedureAsset* InAsset)
@@ -40,7 +42,7 @@ void UProcedureModule::SetDefaultAsset(UProcedureAsset* InAsset)
 void UProcedureModule::OnInitialize()
 {
     Super::OnInitialize();
-    UEventModuleStatics::SubscribeEvent<FEventSwitchProcedure>(this, &ThisClass::OnSwitchProcedure);
+    if (UEventModule* Events = UEventModule::GetPtr(GetWorld())) Events->SubscribeEvent<FEventSwitchProcedure>(this, &ThisClass::OnSwitchProcedure);
 }
 
 void UProcedureModule::OnPreparatory(EPhase InPhase)
@@ -87,6 +89,13 @@ void UProcedureModule::OnPause()
     Super::OnPause();
 }
 
+void UProcedureModule::OnControlRefresh(float RealDeltaSeconds)
+{
+    if (bStopping || bStopRequested || bDispatching || !CurrentProcedure) return;
+    TGuardValue<bool> DispatchGuard(bDispatching, true);
+    CurrentProcedure->OnControlRefresh(RealDeltaSeconds);
+}
+
 void UProcedureModule::OnUnPause()
 {
     Super::OnUnPause();
@@ -96,7 +105,7 @@ void UProcedureModule::OnTermination(EPhase InPhase)
 {
     if (PHASEC(InPhase, EPhase::Primary))
     {
-        UEventModuleStatics::UnsubscribeEvent<FEventSwitchProcedure>(this);
+        if (UEventModule* Events = UMainModuleStatics::GetModuleForCleanup<UEventModule>(GetWorld())) Events->UnsubscribeEvent<FEventSwitchProcedure>(this);
         StopMain();
     }
     Super::OnTermination(InPhase);

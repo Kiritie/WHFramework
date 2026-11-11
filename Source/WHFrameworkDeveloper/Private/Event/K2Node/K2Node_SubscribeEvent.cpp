@@ -7,6 +7,7 @@
 #include "K2Node_CallFunction.h"
 #include "K2Node_CustomEvent.h"
 #include "K2Node_Self.h"
+#include "Kismet2/BlueprintEditorUtils.h"
 #include "KismetCompiler.h"
 #include "UObject/UnrealType.h"
 
@@ -38,7 +39,8 @@ void UK2Node_SubscribeEvent::AllocateDefaultPins()
 void UK2Node_SubscribeEvent::ExpandNode(FKismetCompilerContext& CompilerContext, UEdGraph* SourceGraph)
 {
 	Super::ExpandNode(CompilerContext, SourceGraph);
-	if(!CanUseStruct(EventStruct))
+	if(!CanUseStruct(EventStruct) || !FindPin(UEdGraphSchema_K2::PN_Execute) || !FindPin(UEdGraphSchema_K2::PN_Then) ||
+		!FindPin(SubscribeOwnerPinName) || !FindPin(SubscribeCallbackPinName) || !FindPin(SubscribeSenderPinName) || !FindPin(SubscribeEventDataPinName))
 	{
 		CompilerContext.MessageLog.Error(*LOCTEXT("MissingType", "@@ has no valid Event type.").ToString(), this);
 		BreakAllNodeLinks();
@@ -55,12 +57,18 @@ void UK2Node_SubscribeEvent::ExpandNode(FKismetCompilerContext& CompilerContext,
 
 	UEdGraphPin* OwnerPin = FindPinChecked(SubscribeOwnerPinName);
 	UEdGraphPin* SubscribeOwnerPin = SubscribeNode->FindPinChecked(SubscribeOwnerPinName);
-	if(OwnerPin->LinkedTo.Num() > 0)
+	if(OwnerPin->LinkedTo.Num() > 0 || OwnerPin->DefaultObject)
 	{
 		CompilerContext.MovePinLinksToIntermediate(*OwnerPin, *SubscribeOwnerPin);
 	}
 	else
 	{
+		if (!GetBlueprint() || !FBlueprintEditorUtils::ImplementsGetWorld(GetBlueprint()))
+		{
+			CompilerContext.MessageLog.Error(*LOCTEXT("ExplicitOwnerRequired", "@@ requires an Owner with a World context in this Blueprint.").ToString(), this);
+			BreakAllNodeLinks();
+			return;
+		}
 		UK2Node_Self* SelfNode = CompilerContext.SpawnIntermediateNode<UK2Node_Self>(this, SourceGraph);
 		SelfNode->AllocateDefaultPins();
 		bIsErrorFree &= Schema->TryCreateConnection(SelfNode->FindPinChecked(UEdGraphSchema_K2::PN_Self), SubscribeOwnerPin);
@@ -79,8 +87,12 @@ void UK2Node_SubscribeEvent::ExpandNode(FKismetCompilerContext& CompilerContext,
 			if(!Parameter->HasAnyPropertyFlags(CPF_OutParm) || Parameter->HasAnyPropertyFlags(CPF_ReferenceParm))
 			{
 				FEdGraphPinType PinType;
-				bIsErrorFree &= Schema->ConvertPropertyToPinType(Parameter, PinType);
-				bIsErrorFree &= CallbackEventNode->CreateUserDefinedPin(Parameter->GetFName(), PinType, EGPD_Output) != nullptr;
+				if (!Schema->ConvertPropertyToPinType(Parameter, PinType) ||
+					!CallbackEventNode->CreateUserDefinedPin(Parameter->GetFName(), PinType, EGPD_Output))
+				{
+					bIsErrorFree = false;
+					break;
+				}
 			}
 		}
 	}
@@ -88,7 +100,16 @@ void UK2Node_SubscribeEvent::ExpandNode(FKismetCompilerContext& CompilerContext,
 	{
 		bIsErrorFree = false;
 	}
-	bIsErrorFree &= Schema->TryCreateConnection(SubscribeNode->FindPinChecked(SubscribeCallbackPinName), CallbackEventNode->FindPinChecked(UK2Node_CustomEvent::DelegateOutputName));
+	UEdGraphPin* CallbackDelegatePin = CallbackEventNode->FindPin(UK2Node_CustomEvent::DelegateOutputName);
+	UEdGraphPin* CallbackSenderPin = CallbackEventNode->FindPin(SubscribeSenderPinName);
+	UEdGraphPin* CallbackDataPin = CallbackEventNode->FindPin(SubscribeEventDataPinName);
+	if (!bIsErrorFree || !CallbackDelegatePin || !CallbackSenderPin || !CallbackDataPin)
+	{
+		CompilerContext.MessageLog.Error(*LOCTEXT("InvalidCallbackSignature", "@@ cannot construct the Event callback signature.").ToString(), this);
+		BreakAllNodeLinks();
+		return;
+	}
+	bIsErrorFree &= Schema->TryCreateConnection(SubscribeNode->FindPinChecked(SubscribeCallbackPinName), CallbackDelegatePin);
 
 	UK2Node_CallFunction* GetDataNode = CompilerContext.SpawnIntermediateNode<UK2Node_CallFunction>(this, SourceGraph);
 	GetDataNode->SetFromFunction(UEventModuleStatics::StaticClass()->FindFunctionByName(GET_FUNCTION_NAME_CHECKED(UEventModuleStatics, K2_GetEventData)));
@@ -96,10 +117,10 @@ void UK2Node_SubscribeEvent::ExpandNode(FKismetCompilerContext& CompilerContext,
 	UEdGraphPin* TypedEventDataPin = GetDataNode->FindPinChecked(SubscribeEventDataPinName);
 	TypedEventDataPin->PinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
 	TypedEventDataPin->PinType.PinSubCategoryObject = EventStruct;
-	bIsErrorFree &= Schema->TryCreateConnection(CallbackEventNode->FindPinChecked(SubscribeEventDataPinName), GetDataNode->FindPinChecked(SubscribePackedEventPinName));
+	bIsErrorFree &= Schema->TryCreateConnection(CallbackDataPin, GetDataNode->FindPinChecked(SubscribePackedEventPinName));
 
 	CompilerContext.MovePinLinksToIntermediate(*FindPinChecked(SubscribeCallbackPinName), *CallbackEventNode->FindPinChecked(UEdGraphSchema_K2::PN_Then));
-	CompilerContext.MovePinLinksToIntermediate(*FindPinChecked(SubscribeSenderPinName), *CallbackEventNode->FindPinChecked(SubscribeSenderPinName));
+	CompilerContext.MovePinLinksToIntermediate(*FindPinChecked(SubscribeSenderPinName), *CallbackSenderPin);
 	CompilerContext.MovePinLinksToIntermediate(*FindPinChecked(SubscribeEventDataPinName), *TypedEventDataPin);
 	if(!bIsErrorFree)
 	{

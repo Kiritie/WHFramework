@@ -1,4 +1,6 @@
 ﻿#include "SaveGame/SaveDataSerializer.h"
+#include "SaveGame/SaveDataArchive.h"
+#include "SaveGame/SaveFileTypes.h"
 
 #include "SaveGame/SaveGameModuleTypes.h"
 #include "Serialization/MemoryReader.h"

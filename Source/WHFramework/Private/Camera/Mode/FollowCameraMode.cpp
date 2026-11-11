@@ -1,4 +1,8 @@
 #include "Camera/Mode/FollowCameraMode.h"
+#include "Camera/CameraInputTypes.h"
+#include "Camera/CameraViewTypes.h"
+#include "Camera/CameraConfigTypes.h"
+#include "Camera/CameraFeatureTypes.h"
 #include "Camera/Interface/CameraTrackableInterface.h"
 #include "Camera/Manager/CameraManagerBase.h"
 
@@ -42,10 +46,12 @@ void UFollowCameraMode::Update(float DeltaTime, FCameraRigState& State)
 	const FRotator BaseRotation = TargetParams.bInheritTargetRotation ? Actor->GetActorRotation() : InitialTargetRotation;
 	FRotator Rotation = BaseRotation + Resolved.RotationOffset;
 	Rotation.Yaw += RuntimeYawOffset;
-	Rotation.Pitch += RuntimePitchOffset;
-	Rotation.Pitch = FMath::Clamp(Rotation.Pitch, Resolved.PitchRange.X, Resolved.PitchRange.Y);
+	const float BasePitch = Rotation.Pitch;
+	Rotation.Pitch = FMath::Clamp(BasePitch + RuntimePitchOffset, Resolved.PitchRange.X, Resolved.PitchRange.Y);
+	RuntimePitchOffset = Rotation.Pitch - BasePitch;
 	State.PivotRotation = Rotation;
 	State.ArmLength = FMath::Clamp(Resolved.Distance + RuntimeDistanceOffset, Resolved.DistanceRange.X, Resolved.DistanceRange.Y);
+	RuntimeDistanceOffset = State.ArmLength - Resolved.Distance;
 	State.SocketOffset = Resolved.SocketOffset;
 	if(!Resolved.bSocketOffsetOverridden)
 	{

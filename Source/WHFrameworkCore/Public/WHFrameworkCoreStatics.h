@@ -11,14 +11,14 @@ public:
 	* @param InObject 目标对象
 	* @param OutObjectData 保存到的字节数组
 	*/
-	static void SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData);
+	static bool SaveObjectDataToMemory(UObject* InObject, TArray<uint8>& OutObjectData);
 
 	/*
 	* 从内存加载目标对象数据
 	* @param InObject 目标对象
 	* @param InObjectData 目标对象字节数组
 	*/
-	static void LoadObjectDataFromMemory(UObject* InObject, const TArray<uint8>& InObjectData);
+	static bool LoadObjectDataFromMemory(UObject* InObject, const TArray<uint8>& InObjectData);
 
 	/*
 	* 导入目标对象暴露的参数

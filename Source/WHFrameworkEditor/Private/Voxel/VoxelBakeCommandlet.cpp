@@ -9,9 +9,16 @@
 UVoxelBakeCommandlet::UVoxelBakeCommandlet(){IsClient=false;IsServer=false;IsEditor=true;LogToConsole=true;ShowErrorCount=true;}
 int32 UVoxelBakeCommandlet::Main(const FString& Params)
 {
-    FString Plan,SetPath=TEXT("/Game/VoxelGenerated/DA_VoxelMaterials"),Error;FVoxelArrayBuildOptions O;
+    FString Plan,SetPath=TEXT("/Game/DataAssets/Voxel/DA_VoxelMaterials"),Error;FVoxelArrayBuildOptions O;
     FParse::Value(*Params,TEXT("Plan="),Plan);FParse::Value(*Params,TEXT("Set="),SetPath);
-    FParse::Value(*Params,TEXT("Out="),O.OutputRoot);FParse::Value(*Params,TEXT("Tile="),O.TileSize);
+    FString LegacyOutputRoot;
+    if(FParse::Value(*Params,TEXT("Out="),LegacyOutputRoot))
+    {
+        UE_LOG(LogTemp,Error,TEXT("-Out is no longer supported; specify -TextureOut and -MaterialOut separately"));
+        return 1;
+    }
+    FParse::Value(*Params,TEXT("TextureOut="),O.TextureOutputRoot);FParse::Value(*Params,TEXT("MaterialOut="),O.MaterialOutputRoot);
+    FParse::Value(*Params,TEXT("Tile="),O.TileSize);
     FParse::Value(*Params,TEXT("MaxSlices="),O.MaxSlicesPerBank);
     const bool Check=FParse::Param(*Params,TEXT("CheckOnly"));TArray<UVoxelData*> Assets;
     bool OK=Plan.IsEmpty()?FVoxelAssetMigrationTool::Scan(Assets,Error):FVoxelAssetMigrationTool::ApplyPlan(Plan,!Check,Assets,Error);

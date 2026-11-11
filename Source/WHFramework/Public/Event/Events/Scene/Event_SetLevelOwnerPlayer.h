@@ -5,6 +5,8 @@
 
 #include "Event_SetLevelOwnerPlayer.generated.h"
 
+class APlayerController;
+
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FEventSetLevelOwnerPlayer : public FEventBase
 {
@@ -13,8 +15,8 @@ struct WHFRAMEWORK_API FEventSetLevelOwnerPlayer : public FEventBase
 public:
 	FEventSetLevelOwnerPlayer() = default;
 
-	FEventSetLevelOwnerPlayer(TSoftObjectPtr<UWorld> InLevelObjectPtr, FName InLevelPath, int32 InPlayerIndex)
-		: LevelObjectPtr(MoveTemp(InLevelObjectPtr)), LevelPath(MoveTemp(InLevelPath)), PlayerIndex(MoveTemp(InPlayerIndex))
+	FEventSetLevelOwnerPlayer(TSoftObjectPtr<UWorld> InLevelObjectPtr, FName InLevelPath, APlayerController* InPlayer)
+		: LevelObjectPtr(MoveTemp(InLevelObjectPtr)), LevelPath(InLevelPath), Player(InPlayer)
 	{
 	}
 
@@ -25,5 +27,5 @@ public:
 	FName LevelPath = NAME_None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 PlayerIndex = -1;
+	TObjectPtr<APlayerController> Player = nullptr;
 };

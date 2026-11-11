@@ -43,6 +43,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void BindController(
 		APlayerController* InController);
+	APlayerController* GetBoundController() const;
 
 	void NotifyTravelTeleported();
 	bool IsTravelObserverReady() const;

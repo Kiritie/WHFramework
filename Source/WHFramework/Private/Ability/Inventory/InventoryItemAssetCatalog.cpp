@@ -2,6 +2,8 @@
 
 #include "Ability/Item/AbilityItemDataBase.h"
 #include "Ability/Inventory/InventoryPickupActor.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/SkeletalMesh.h"
 
 bool UInventoryItemAssetCatalog::Initialize(TConstArrayView<UAbilityItemDataBase*> InAssets, TArray<FInventoryItemDefinition>& OutDefinitions, FString& OutError)
 {
@@ -21,15 +23,15 @@ bool UInventoryItemAssetCatalog::Initialize(TConstArrayView<UAbilityItemDataBase
             return false;
         }
         FInventoryItemDefinition Definition = Asset->BuildInventoryDefinition();
-        if (Asset->PickUpClass && Asset->PickUpClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated | CLASS_NewerVersionExists))
+        if (Asset->MeshData.Mesh && !Cast<UStaticMesh>(Asset->MeshData.Mesh) && !Cast<USkeletalMesh>(Asset->MeshData.Mesh))
         {
-            OutError = TEXT("拾取表现类不可实例化: ") + Asset->GetPathName();
+            OutError = TEXT("物品网格必须是静态网格或骨骼网格: ") + Asset->GetPathName();
             return false;
         }
-        if (Asset->PickupPresentation.LocalTransform.ContainsNaN() ||
-            !FMath::IsFinite(Asset->PickupPresentation.IconSize) || Asset->PickupPresentation.IconSize <= 0.f)
+        if (Asset->MeshData.LocalTransform.ContainsNaN() ||
+            (Asset->MeshData.AnimationClass && !Cast<USkeletalMesh>(Asset->MeshData.Mesh)))
         {
-            OutError = TEXT("拾取表现的变换或尺寸无效: ") + Asset->GetPathName();
+            OutError = TEXT("物品网格变换或动画类型无效: ") + Asset->GetPathName();
             return false;
         }
         if (!Definition.ItemId.IsValid() || Candidate.Contains(Definition.ItemId))
@@ -72,9 +74,3 @@ bool UInventoryItemAssetCatalog::IsInitialized() const
     return bInitialized;
 }
 
-TSubclassOf<AInventoryPickupActor> UInventoryItemAssetCatalog::FindPickupClass(const FPrimaryAssetId& InItemId) const
-{
-    const UAbilityItemDataBase* Asset = Find(InItemId);
-    if (!Asset) return nullptr;
-    return Asset->PickUpClass ? Asset->PickUpClass : TSubclassOf<AInventoryPickupActor>(AInventoryPickupActor::StaticClass());
-}

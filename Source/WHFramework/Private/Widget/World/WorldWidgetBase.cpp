@@ -2,12 +2,21 @@
 
 
 #include "Widget/World/WorldWidgetBase.h"
+#include "Common/CommonTypes.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Main/MainModuleStatics.h"
+#include "Widget/WidgetMountTypes.h"
+#include "Widget/WorldWidgetTypes.h"
 
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "Camera/CameraModuleStatics.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/PanelWidget.h"
+#include "Camera/PlayerCameraManager.h"
+#include "Engine/LocalPlayer.h"
+#include "GameFramework/PlayerController.h"
 #include "Common/CommonModuleStatics.h"
 #include "Scene/SceneManager.h"
 #include "Slate/Runtime/Interfaces/SubWidgetInterface.h"
@@ -25,13 +34,16 @@ namespace
 	{
 		if(!InParam.HasValue())
 		{
-			return FParameter(FSubWidgetSpawnParameter(InOwnerWidget, bInDynamic));
+			FSubWidgetSpawnParameter Spawn(InOwnerWidget, bInDynamic);
+			Spawn.OwningPlayer = InOwnerWidget ? InOwnerWidget->GetOwningPlayer() : nullptr;
+			return FParameter(Spawn);
 		}
 
 		FParameter Param = InParam;
 		if(FSubWidgetSpawnParameter* SpawnParam = Param.GetMutablePtr<FSubWidgetSpawnParameter>())
 		{
 			SpawnParam->OwnerObject = InOwnerWidget;
+			SpawnParam->OwningPlayer = InOwnerWidget ? InOwnerWidget->GetOwningPlayer() : nullptr;
 			SpawnParam->bDynamic = bInDynamic;
 		}
 		else
@@ -66,9 +78,8 @@ UWorldWidgetBase::UWorldWidgetBase(const FObjectInitializer& ObjectInitializer) 
 
 const FWorldWidgetConfig* UWorldWidgetBase::GetWidgetConfig() const
 {
-	return UWidgetModule::IsValid()
-		? UWidgetModule::Get().GetWorldWidgetConfig(WidgetTag)
-		: nullptr;
+	const UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld());
+	return Widgets ? Widgets->GetWorldWidgetConfig(WidgetTag) : nullptr;
 }
 
 int32 UWorldWidgetBase::GetWidgetZOrder() const
@@ -136,15 +147,13 @@ void UWorldWidgetBase::OnTick_Implementation(float DeltaSeconds)
 
 void UWorldWidgetBase::OnCreate(FWorldWidgetMapping InMapping, const FParameter& InParam)
 {
-	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
+	UWorld* World = GetWorld();
+	UWidgetModule* WidgetModule = UWidgetModule::GetPtr(World);
+	if(WidgetModule) WidgetModule->RegisterTickableWidget(this);
 
-	if(WidgetRefreshType == EWidgetRefreshType::Timer)
+	if(WidgetRefreshType == EWidgetRefreshType::Timer && World)
 	{
-		GetWorld()->GetTimerManager().SetTimer(RefreshTimerHandle, this, &UWorldWidgetBase::Refresh, WidgetRefreshTime, true);
-	}
-
-	if(!IsWidgetInEditor())
-	{
+		World->GetTimerManager().SetTimer(RefreshTimerHandle, this, &UWorldWidgetBase::Refresh, WidgetRefreshTime, true);
 	}
 
 	if(InMapping.SceneComp && InMapping.SceneComp->IsA<UWorldWidgetComponent>())
@@ -183,21 +192,22 @@ void UWorldWidgetBase::OnCreate(FWorldWidgetMapping InMapping, const FParameter&
 		}
 		else if(!IsInViewport())
 		{
-			if(UWorldWidgetContainer* Container = UWidgetModuleStatics::GetWorldWidgetContainer())
+			if(UWorldWidgetContainer* Container = WidgetModule ? WidgetModule->GetWorldWidgetContainer(GetOwningPlayer()) : nullptr)
 			{
 				if(UCanvasPanelSlot* CanvasPanelSlot = Container->AddWorldWidget(this))
 				{
-					const FWorldWidgetConfig* Config = GetWidgetConfig();
-					CanvasPanelSlot->SetZOrder(Config ? Config->ZOrder : 0);
-					CanvasPanelSlot->SetAutoSize(Config ? Config->bAutoSize : false);
-					CanvasPanelSlot->SetAnchors(Config ? Config->Anchors : FAnchors(0.f));
-					if(!Config || !Config->bAutoSize)
+					if(const FWorldWidgetConfig* Config = GetWidgetConfig())
 					{
-						CanvasPanelSlot->SetOffsets(Config ? Config->Offsets : FMargin(0.f));
+						CanvasPanelSlot->SetZOrder(Config->ZOrder);
+						CanvasPanelSlot->SetAutoSize(Config->bAutoSize);
+						CanvasPanelSlot->SetAnchors(Config->Anchors);
+						if(!Config->bAutoSize)
+						{
+							CanvasPanelSlot->SetOffsets(Config->Offsets);
+						}
+						CanvasPanelSlot->SetAlignment(Config->Alignment);
+						SetRenderTransformPivot(Config->Alignment);
 					}
-					const FVector2D Alignment = Config ? Config->Alignment : FVector2D::ZeroVector;
-					CanvasPanelSlot->SetAlignment(Alignment);
-					SetRenderTransformPivot(Alignment);
 				}
 			}
 			RefreshVisibility();
@@ -246,8 +256,11 @@ void UWorldWidgetBase::OnRefresh()
 
 void UWorldWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 {
-	if(UWidgetModule::IsValid()) UWidgetModule::Get().UnregisterTickableWidget(this);
-	GetWorld()->GetTimerManager().ClearTimer(RefreshTimerHandle);
+	UWorld* World = GetWorld();
+	UWidgetModule* Widgets = UMainModuleStatics::GetModuleForCleanup<UWidgetModule>(World);
+	UObjectPoolModule* Pool = UMainModuleStatics::GetModuleForCleanup<UObjectPoolModule>(World);
+	if (Widgets) Widgets->UnregisterTickableWidget(this);
+	if (World) World->GetTimerManager().ClearTimer(RefreshTimerHandle);
 	DestroyAllSubWidget(InMode);
 	for(UWidget* PoolWidget : GetPoolWidgets())
 	{
@@ -268,9 +281,12 @@ void UWorldWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 		}
 #endif
 	}
-	else if(UWorldWidgetContainer* Container = UWidgetModuleStatics::GetWorldWidgetContainer())
+	else if(Widgets)
 	{
-		Container->RemoveWorldWidget(this);
+		if(UWorldWidgetContainer* Container = Widgets->GetWorldWidgetContainer(GetOwningPlayer()))
+		{
+			Container->RemoveWorldWidget(this);
+		}
 	}
 
 	K2_OnDestroy(InMode);
@@ -284,9 +300,8 @@ void UWorldWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 	WidgetComponent = nullptr;
 	WidgetTag = FGameplayTag();
 	BindWidgetMap.Empty();
-	UObjectPoolModuleStatics::DespawnObject(
-		this,
-		InMode);
+	if (Pool)
+		Pool->DespawnObjectForCleanup(this, InMode);
 }
 
 void UWorldWidgetBase::Init(const FParameter& InParam, bool bForce)
@@ -318,7 +333,7 @@ void UWorldWidgetBase::Destroy(EObjectDespawnMode InMode)
 	}
 	else
 	{
-		UWidgetModuleStatics::DestroyWorldWidget(this, InMode);
+		if (UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld())) Widgets->DestroyWorldWidget(this, InMode);
 	}
 }
 
@@ -330,8 +345,9 @@ UUserWidget* UWorldWidgetBase::K2_CreateSubWidget(TSubclassOf<UUserWidget> InCla
 ISubWidgetInterface* UWorldWidgetBase::CreateSubWidget(TSubclassOf<UUserWidget> InClass, const FParameter& InParam)
 {
 	const FParameter Param = MakeWorldSubWidgetParam(this, InParam, true);
+	UObjectPoolModule* Pool = UObjectPoolModule::GetPtr(GetWorld());
 	if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(
-		UObjectPoolModuleStatics::SpawnObject(InClass.Get(), Param)))
+		Pool ? Pool->SpawnObject(InClass.Get(), Param) : nullptr))
 	{
 		FSubWidgetRuntimeEntry& Entry = SubWidgetEntries.AddDefaulted_GetRef();
 		Entry.Widget = Cast<UUserWidget>(SubWidget);
@@ -355,11 +371,12 @@ bool UWorldWidgetBase::DestroySubWidget(ISubWidgetInterface* InWidget, EObjectDe
 	if(EntryIndex != INDEX_NONE)
 	{
 		const FSubWidgetRuntimeEntry Entry = SubWidgetEntries[EntryIndex];
+		UUserWidget* Child = Entry.Widget.Get();
 		SubWidgetEntries.RemoveAt(EntryIndex);
 		InWidget->OnDestroy(InMode);
-		if(!Entry.bDynamic && Entry.Widget)
+		if(!Entry.bDynamic && Child)
 		{
-			IObjectPoolInterface::Execute_OnDespawn(Entry.Widget, InMode);
+			IObjectPoolInterface::Execute_OnDespawn(Child, InMode);
 		}
 		return true;
 	}
@@ -373,7 +390,7 @@ void UWorldWidgetBase::DestroyAllSubWidget(EObjectDespawnMode InMode)
 	{
 		if(ISubWidgetInterface* SubWidget = Cast<ISubWidgetInterface>(SubWidgetEntries[0].Widget))
 		{
-			DestroySubWidget(SubWidget, InMode);
+			if (!DestroySubWidget(SubWidget, InMode)) return;
 		}
 		else
 		{
@@ -388,7 +405,8 @@ void UWorldWidgetBase::RefreshLocation_Implementation(UWidget* InWidget, FWorldW
 	{
 		FVector2D ScreenPos;
 		const FVector Location = InMapping.GetLocation();
-		if(UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(UCommonModuleStatics::GetPlayerController(), Location, ScreenPos, false) && Location != FVector(-1.f))
+		APlayerController* Player = GetOwningPlayer();
+		if(Player && UWidgetLayoutLibrary::ProjectWorldLocationToWidgetPosition(Player, Location, ScreenPos, true) && Location != FVector(-1.f))
 		{
 			CanvasPanelSlot->SetPosition(ScreenPos);
 		}
@@ -452,13 +470,15 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 	if(bRefresh)
 	{
 		bool bVisible = false;
-		if(UCommonModuleStatics::GetLocalPlayerNum() == 1 && UWidgetModuleStatics::GetWorldWidgetVisible(GetClass()))
+		APlayerController* Player = GetOwningPlayer();
+		UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld());
+		if(Player && Player->IsLocalController() && Player->PlayerCameraManager && Widgets && Widgets->GetWorldWidgetVisible(GetClass()))
 		{
 			FWorldWidgetMapping Mapping;
 			const auto OwnerActor = Cast<AActor>(OwnerObject);
 			
 			const FVector Location = GetWidgetMapping(this, Mapping) ? Mapping.GetLocation() : (OwnerActor ? OwnerActor->GetActorLocation() : FVector(-1.f));
-			const FVector CameraLocation = UCameraModuleStatics::GetViewLocation();
+			const FVector CameraLocation = Player->PlayerCameraManager->GetCameraLocation();
 			const float Distance = FVector::Distance(Location, CameraLocation);
 			const FWorldWidgetConfig* Config = GetWidgetConfig();
 			const EWorldWidgetVisibility ConfigVisibility = Config ? Config->Visibility : EWorldWidgetVisibility::AlwaysShow;
@@ -484,7 +504,13 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 					}
 					if(ENUMWITH(ConfigVisibility, EWorldWidgetVisibility::ScreenOnly))
 					{
-						bVisible = bVisible && (Location != FVector(-1.f) && UCommonModuleStatics::IsInScreenViewport(Location));
+						FVector2D ScreenPosition;
+						int32 Width = 0, Height = 0;
+						Player->GetViewportSize(Width, Height);
+						const ULocalPlayer* LocalPlayer = Player->GetLocalPlayer();
+						const FVector2D PlayerSize = LocalPlayer ? FVector2D(Width * LocalPlayer->Size.X, Height * LocalPlayer->Size.Y) : FVector2D::ZeroVector;
+						bVisible = bVisible && Location != FVector(-1.f) && Player->ProjectWorldLocationToScreen(Location, ScreenPosition, true) &&
+							ScreenPosition.X >= 0.f && ScreenPosition.Y >= 0.f && ScreenPosition.X <= PlayerSize.X && ScreenPosition.Y <= PlayerSize.Y;
 					}
 					if(ENUMWITH(ConfigVisibility, EWorldWidgetVisibility::DistanceOnly))
 					{
@@ -497,8 +523,8 @@ bool UWorldWidgetBase::IsWidgetVisible_Implementation(bool bRefresh)
 						{
 							FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WorldWidgetVisibility), true, OwnerActor);
 							if(Mapping.SceneComp) QueryParams.AddIgnoredActor(Mapping.SceneComp->GetOwner());
-							QueryParams.AddIgnoredActor(UCommonModuleStatics::GetPlayerPawn());
-							bVisible = !GetWorld()->LineTraceTestByChannel(CameraLocation, Location, UEngineTypes::ConvertToCollisionChannel(UWidgetModule::Get().GetWorldWidgetTraceType()), QueryParams);
+							QueryParams.AddIgnoredActor(Player->GetPawn());
+							bVisible = Widgets && !GetWorld()->LineTraceTestByChannel(CameraLocation, Location, UEngineTypes::ConvertToCollisionChannel(Widgets->GetWorldWidgetTraceType()), QueryParams);
 						}
 					}
 					break;

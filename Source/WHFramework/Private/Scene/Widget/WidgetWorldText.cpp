@@ -1,9 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Scene/Widget/WidgetWorldText.h"
+#include "Widget/WorldWidgetTypes.h"
 
 #include "Animation/WidgetAnimation.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "Components/TextBlock.h"
 #include "Engine/World.h"
 #include "Scene/SceneModuleTypes.h"
@@ -15,7 +16,6 @@ UWidgetWorldText::UWidgetWorldText(const FObjectInitializer& ObjectInitializer) 
 
 void UWidgetWorldText::OnCreate(FWorldWidgetMapping InMapping, const FParameter& InParam)
 {
-	const FScopedWorldContext WorldContext(GetWorld());
 	const uint64 Session = ++TextSession;
 	GetWorld()->GetTimerManager().ClearTimer(ExpiryTimer);
 	StopAllAnimations();
@@ -45,7 +45,6 @@ void UWidgetWorldText::OnCreate(FWorldWidgetMapping InMapping, const FParameter&
 	GetWorld()->GetTimerManager().SetTimer(ExpiryTimer, FTimerDelegate::CreateWeakLambda(this, [this, Session]()
 	{
 		if (Session != TextSession) return;
-		const FScopedWorldContext CallbackWorldContext(GetWorld());
 		Destroy();
 	}), Duration, false);
 	PlayAnimationForward(Animation);
@@ -53,7 +52,6 @@ void UWidgetWorldText::OnCreate(FWorldWidgetMapping InMapping, const FParameter&
 
 void UWidgetWorldText::OnDestroy(EObjectDespawnMode InMode)
 {
-	const FScopedWorldContext WorldContext(GetWorld());
 	++TextSession;
 	GetWorld()->GetTimerManager().ClearTimer(ExpiryTimer);
 	StopAllAnimations();

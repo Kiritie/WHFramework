@@ -274,18 +274,8 @@ void UWidgetInputKeyTips::RefreshData()
 		InputType = LocalInputSubsystem->GetCurrentInputType();
 		GamepadName = LocalInputSubsystem->GetCurrentGamepadName();
 	}
-	const UInputModule* InputModule = nullptr;
-	if(IsDesignTime())
-	{
-		if(UInputModule::IsValid(true))
-		{
-			InputModule = UInputModule::GetPtr(true);
-		}
-	}
-	else
-	{
-		InputModule = UInputModule::GetPtr(GetWorld());
-	}
+	const UInputModule* InputModule = UInputModule::GetPtr(GetWorld());
+	const int32 PlayerIndex = InputModule ? InputModule->FindPlayerRuntimeIndex(GetOwningPlayer()) : INDEX_NONE;
 	TArray<FKey> DisplayKeys;
 	for(const FGameplayTag& ActionTag : ActionTags)
 	{
@@ -300,11 +290,11 @@ void UWidgetInputKeyTips::RefreshData()
 		if (TagName == TEXT("Input.UI.Pointer.Primary")) Keys.Add(EKeys::LeftMouseButton);
 		else if (TagName == TEXT("Input.UI.Pointer.Secondary")) Keys.Add(EKeys::RightMouseButton);
 		else if (TagName == TEXT("Input.UI.Pointer.Wheel")) Keys.Add(EKeys::MouseWheelAxis);
-		else Keys = InputModule->GetKeysByActionTag(ActionTag);
+		else Keys = InputModule->GetKeysByActionTag(ActionTag, PlayerIndex);
 		if (!KeyMappingNames.IsEmpty())
 		{
 			Keys.Reset();
-			const TArray<FPlayerKeyMapping> Mappings = InputModule->GetPlayerKeyMappingsByTag(ActionTag);
+			const TArray<FPlayerKeyMapping> Mappings = InputModule->GetPlayerKeyMappingsByTag(ActionTag, PlayerIndex);
 			for (const FPlayerKeyMapping& Mapping : Mappings)
 			{
 				if (KeyMappingNames.Contains(Mapping.GetMappingName())) Keys.AddUnique(Mapping.GetCurrentKey());

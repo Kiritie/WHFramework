@@ -2,6 +2,13 @@
 
 
 #include "Widget/Sub/SubActivatableWidgetBase.h"
+#include "Common/CommonTypes.h"
+#include "ObjectPool/ObjectPoolModuleTypes.h"
+#include "ObjectPool/ObjectPoolModule.h"
+#include "Main/MainModuleStatics.h"
+#include "Engine/World.h"
+#include "Widget/WidgetMountTypes.h"
+#include "Widget/ScreenWidgetTypes.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "ObjectPool/ObjectPoolModuleStatics.h"
@@ -38,7 +45,7 @@ void USubActivatableWidgetBase::OnTick_Implementation(float DeltaSeconds)
 
 void USubActivatableWidgetBase::OnCreate(const FParameter& InParam)
 {
-	if(UWidgetModule::IsValid()) UWidgetModule::Get().RegisterTickableWidget(this);
+	if(UWidgetModule* Widgets = UWidgetModule::GetPtr(GetWorld())) Widgets->RegisterTickableWidget(this);
 
 	for(auto Iter : GetPoolWidgets())
 	{
@@ -54,7 +61,6 @@ void USubActivatableWidgetBase::OnInitialize(const FParameter& InParam)
 {
 	WidgetParams = InParam;
 	K2_OnInitialize(InParam);
-
 	OnRefresh();
 }
 
@@ -70,7 +76,12 @@ void USubActivatableWidgetBase::OnRefresh()
 
 void USubActivatableWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 {
-	if(UWidgetModule::IsValid()) UWidgetModule::Get().UnregisterTickableWidget(this);
+	UWorld* World = GetWorld();
+	UObjectPoolModule* Pool = UMainModuleStatics::GetModuleForCleanup<UObjectPoolModule>(World);
+	if (UWidgetModule* Widgets = UMainModuleStatics::GetModuleForCleanup<UWidgetModule>(World))
+	{
+		Widgets->UnregisterTickableWidget(this);
+	}
 	for(UWidget* PoolWidget : GetPoolWidgets())
 	{
 		IObjectPoolInterface::Execute_OnDespawn(PoolWidget, InMode);
@@ -82,9 +93,14 @@ void USubActivatableWidgetBase::OnDestroy(EObjectDespawnMode InMode)
 	if(bDynamicSubWidget)
 	{
 		RemoveFromParent();
-		UObjectPoolModuleStatics::DespawnObject(this, InMode);
 	}
-
+	if (bDynamicSubWidget)
+	{
+		if (Pool)
+		{
+			Pool->DespawnObjectForCleanup(this, InMode);
+		}
+	}
 }
 
 void USubActivatableWidgetBase::NativeOnActivated()

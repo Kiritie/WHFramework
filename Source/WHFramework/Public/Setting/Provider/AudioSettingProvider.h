@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Audio/AudioModuleTypes.h"
+#include "Setting/SettingDefinitionTypes.h"
 #include "Setting/Provider/SettingProviderBase.h"
 
 #include "AudioSettingProvider.generated.h"
@@ -27,7 +28,7 @@ public:
 
 	virtual bool Apply(const FSettingDefinition& InDefinition, const FParameter& InValue) override;
 
-	virtual void Rollback(const FSettingDefinition& InDefinition) override;
+	virtual bool Rollback(const FSettingDefinition& InDefinition) override;
 
 	virtual void Commit() override;
 

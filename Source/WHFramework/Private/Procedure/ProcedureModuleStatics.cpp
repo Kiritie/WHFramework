@@ -1,131 +1,155 @@
 #include "Procedure/ProcedureModuleStatics.h"
 
-bool UProcedureModuleStatics::StartMain()
+bool UProcedureModuleStatics::StartMain(UWorld* InWorld)
 {
-    return UProcedureModule::Get().StartMain();
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->StartMain();
+    return {};
 }
 
-void UProcedureModuleStatics::StopMain()
+void UProcedureModuleStatics::StopMain(UWorld* InWorld)
 {
-    UProcedureModule::Get().StopMain();
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) Module->StopMain();
 }
 
-bool UProcedureModuleStatics::SwitchProcedure(UProcedureBase* InProcedure)
+bool UProcedureModuleStatics::SwitchProcedure(UWorld* InWorld, UProcedureBase* InProcedure)
 {
-    return UProcedureModule::Get().SwitchProcedure(InProcedure);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->SwitchProcedure(InProcedure);
+    return {};
 }
 
-bool UProcedureModuleStatics::SwitchProcedureFrom(const FProcedureActivationToken& Token, UProcedureBase* InProcedure)
+bool UProcedureModuleStatics::SwitchProcedureFrom(UWorld* InWorld, const FProcedureActivationToken& Token, UProcedureBase* InProcedure)
 {
-    return UProcedureModule::Get().SwitchProcedureFrom(Token, InProcedure);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->SwitchProcedureFrom(Token, InProcedure);
+    return {};
 }
 
-bool UProcedureModuleStatics::CanSwitchProcedure(UProcedureBase* InProcedure)
+bool UProcedureModuleStatics::CanSwitchProcedure(UWorld* InWorld, UProcedureBase* InProcedure)
 {
-    return UProcedureModule::Get().CanSwitchProcedure(InProcedure);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->CanSwitchProcedure(InProcedure);
+    return {};
 }
 
-bool UProcedureModuleStatics::SwitchProcedureByIndex(int32 InIndex)
+bool UProcedureModuleStatics::SwitchProcedureByIndex(UWorld* InWorld, int32 InIndex)
 {
-    return UProcedureModule::Get().SwitchProcedureByIndex(InIndex);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->SwitchProcedureByIndex(InIndex);
+    return {};
 }
 
-bool UProcedureModuleStatics::CanSwitchProcedureByIndex(int32 InIndex)
+bool UProcedureModuleStatics::CanSwitchProcedureByIndex(UWorld* InWorld, int32 InIndex)
 {
-    return UProcedureModule::Get().CanSwitchProcedureByIndex(InIndex);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->CanSwitchProcedureByIndex(InIndex);
+    return {};
 }
 
-bool UProcedureModuleStatics::SwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass)
+bool UProcedureModuleStatics::SwitchProcedureByClass(UWorld* InWorld, TSubclassOf<UProcedureBase> InClass)
 {
-    return UProcedureModule::Get().SwitchProcedureByClass(InClass);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->SwitchProcedureByClass(InClass);
+    return {};
 }
 
-bool UProcedureModuleStatics::CanSwitchProcedureByClass(TSubclassOf<UProcedureBase> InClass)
+bool UProcedureModuleStatics::CanSwitchProcedureByClass(UWorld* InWorld, TSubclassOf<UProcedureBase> InClass)
 {
-    return UProcedureModule::Get().CanSwitchProcedureByClass(InClass);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->CanSwitchProcedureByClass(InClass);
+    return {};
 }
 
-bool UProcedureModuleStatics::SwitchFirstProcedure()
+bool UProcedureModuleStatics::SwitchFirstProcedure(UWorld* InWorld)
 {
-    return UProcedureModule::Get().SwitchFirstProcedure();
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->SwitchFirstProcedure();
+    return {};
 }
 
-bool UProcedureModuleStatics::SwitchLastProcedure()
+bool UProcedureModuleStatics::SwitchLastProcedure(UWorld* InWorld)
 {
-    return UProcedureModule::Get().SwitchLastProcedure();
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->SwitchLastProcedure();
+    return {};
 }
 
-bool UProcedureModuleStatics::SwitchPreProcedure()
+bool UProcedureModuleStatics::SwitchPreProcedure(UWorld* InWorld)
 {
-    return UProcedureModule::Get().SwitchPreProcedure();
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->SwitchPreProcedure();
+    return {};
 }
 
-bool UProcedureModuleStatics::SwitchNextProcedure()
+bool UProcedureModuleStatics::SwitchNextProcedure(UWorld* InWorld)
 {
-    return UProcedureModule::Get().SwitchNextProcedure();
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->SwitchNextProcedure();
+    return {};
 }
 
-bool UProcedureModuleStatics::Advance(FName Output)
+bool UProcedureModuleStatics::Advance(UWorld* InWorld, FName Output)
 {
-    return UProcedureModule::Get().Advance(Output);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->Advance(Output);
+    return {};
 }
 
-bool UProcedureModuleStatics::CanAdvance(FName Output)
+bool UProcedureModuleStatics::CanAdvance(UWorld* InWorld, FName Output)
 {
-    return UProcedureModule::Get().CanAdvance(Output);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->CanAdvance(Output);
+    return {};
 }
 
-bool UProcedureModuleStatics::AdvanceFrom(const FProcedureActivationToken& Token, FName Output)
+bool UProcedureModuleStatics::AdvanceFrom(UWorld* InWorld, const FProcedureActivationToken& Token, FName Output)
 {
-    return UProcedureModule::Get().AdvanceFrom(Token, Output);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->AdvanceFrom(Token, Output);
+    return {};
 }
 
-void UProcedureModuleStatics::GuideCurrentProcedure()
+void UProcedureModuleStatics::GuideCurrentProcedure(UWorld* InWorld)
 {
-    UProcedureModule::Get().GuideCurrentProcedure();
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) Module->GuideCurrentProcedure();
 }
 
-UProcedureAsset* UProcedureModuleStatics::GetCurrentProcedureAsset()
+UProcedureAsset* UProcedureModuleStatics::GetCurrentProcedureAsset(UWorld* InWorld)
 {
-    return UProcedureModule::Get().GetCurrentAsset();
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->GetCurrentAsset();
+    return {};
 }
 
-UProcedureBase* UProcedureModuleStatics::GetCurrentProcedure(TSubclassOf<UProcedureBase> InClass)
+UProcedureBase* UProcedureModuleStatics::GetCurrentProcedure(UWorld* InWorld, TSubclassOf<UProcedureBase> InClass)
 {
-    return UProcedureModule::Get().GetCurrentProcedure(InClass);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->GetCurrentProcedure(InClass);
+    return {};
 }
 
-UProcedureBase* UProcedureModuleStatics::GetProcedureByClass(TSubclassOf<UProcedureBase> InClass)
+UProcedureBase* UProcedureModuleStatics::GetProcedureByClass(UWorld* InWorld, TSubclassOf<UProcedureBase> InClass)
 {
-    return UProcedureModule::Get().GetProcedureByClass(InClass);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->GetProcedureByClass(InClass);
+    return {};
 }
 
-bool UProcedureModuleStatics::HasProcedureByClass(TSubclassOf<UProcedureBase> InClass)
+bool UProcedureModuleStatics::HasProcedureByClass(UWorld* InWorld, TSubclassOf<UProcedureBase> InClass)
 {
-    return UProcedureModule::Get().HasProcedureByClass(InClass);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->HasProcedureByClass(InClass);
+    return {};
 }
 
-bool UProcedureModuleStatics::IsCurrentProcedure(UProcedureBase* InProcedure)
+bool UProcedureModuleStatics::IsCurrentProcedure(UWorld* InWorld, UProcedureBase* InProcedure)
 {
-    return UProcedureModule::Get().IsCurrentProcedure(InProcedure);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->IsCurrentProcedure(InProcedure);
+    return {};
 }
 
-bool UProcedureModuleStatics::IsCurrentProcedureClass(TSubclassOf<UProcedureBase> InClass)
+bool UProcedureModuleStatics::IsCurrentProcedureClass(UWorld* InWorld, TSubclassOf<UProcedureBase> InClass)
 {
-    return UProcedureModule::Get().IsCurrentProcedureClass(InClass);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->IsCurrentProcedureClass(InClass);
+    return {};
 }
 
-bool UProcedureModuleStatics::HasProcedureByIndex(int32 InIndex)
+bool UProcedureModuleStatics::HasProcedureByIndex(UWorld* InWorld, int32 InIndex)
 {
-    return UProcedureModule::Get().HasProcedureByIndex(InIndex);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->HasProcedureByIndex(InIndex);
+    return {};
 }
 
-bool UProcedureModuleStatics::IsCurrentProcedureIndex(int32 InIndex)
+bool UProcedureModuleStatics::IsCurrentProcedureIndex(UWorld* InWorld, int32 InIndex)
 {
-    return UProcedureModule::Get().IsCurrentProcedureIndex(InIndex);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->IsCurrentProcedureIndex(InIndex);
+    return {};
 }
 
-UProcedureBase* UProcedureModuleStatics::GetProcedureByIndex(int32 InIndex, TSubclassOf<UProcedureBase> InClass)
+UProcedureBase* UProcedureModuleStatics::GetProcedureByIndex(UWorld* InWorld, int32 InIndex, TSubclassOf<UProcedureBase> InClass)
 {
-    return UProcedureModule::Get().GetProcedureByIndex(InIndex, InClass);
+    if (UProcedureModule* Module = UProcedureModule::GetPtr(InWorld)) return Module->GetProcedureByIndex(InIndex, InClass);
+    return {};
 }

@@ -5,6 +5,8 @@
 #include "Slate/Runtime/Interfaces/ScreenWidgetInterface.h"
 #include "Widgets/SCompoundWidget.h"
 
+class UGameViewportClient;
+
 /**
  * 
  */
@@ -27,6 +29,8 @@ public:
 	static const FName ParentName;
 
 protected:
+	virtual UGameViewportClient* ResolveViewport() const;
+	TWeakObjectPtr<UGameViewportClient> MountedViewport;
 	virtual FReply OnMouseButtonDown(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;
 	
 	virtual FReply OnMouseButtonUp(const FGeometry& MyGeometry, const FPointerEvent& MouseEvent) override;

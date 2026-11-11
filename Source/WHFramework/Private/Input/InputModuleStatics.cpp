@@ -1,188 +1,216 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Input/InputModuleStatics.h"
 
-#include "Common/CommonModuleStatics.h"
-#include "Gameplay/WHLocalPlayer.h"
-#include "Input/InputModule.h"
 #include "EnhancedInputSubsystems.h"
-#include "Input/InputManager.h"
+#include "Engine/LocalPlayer.h"
+#include "GameFramework/PlayerController.h"
 #include "Input/Base/InputUserSettingsBase.h"
 #include "Input/Components/InputComponentBase.h"
+#include "Input/InputManager.h"
+#include "Input/InputModule.h"
 
-UEnhancedInputLocalPlayerSubsystem* UInputModuleStatics::GetInputSubsystem(int32 InPlayerIndex)
+namespace
 {
-	if(UWHLocalPlayer* LocalPlayer = UCommonModuleStatics::GetLocalPlayer(InPlayerIndex))
+	UInputModule* FindPlayerInput(APlayerController* Player, int32& Index)
 	{
-		return LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+		Index = INDEX_NONE;
+		if (!::IsValid(Player) || !Player->IsLocalController()) return nullptr;
+		UInputModule* Module = UInputModule::GetPtr(Player->GetWorld());
+		if (Module) Index = Module->FindPlayerRuntimeIndex(Player);
+		return Index != INDEX_NONE ? Module : nullptr;
 	}
-	return nullptr;
 }
 
-UInputUserSettingsBase* UInputModuleStatics::GetInputUserSettings(int32 InPlayerIndex, TSubclassOf<UWHLocalPlayer> InClass)
+UEnhancedInputLocalPlayerSubsystem* UInputModuleStatics::GetInputSubsystem(APlayerController* Player)
 {
-	if(UEnhancedInputLocalPlayerSubsystem* InputSubsystem = GetInputSubsystem(InPlayerIndex))
+	ULocalPlayer* Local = Player && Player->IsLocalController() ? Player->GetLocalPlayer() : nullptr;
+	return Local ? Local->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr;
+}
+
+UInputUserSettingsBase* UInputModuleStatics::GetInputUserSettings(APlayerController* Player, TSubclassOf<UInputUserSettingsBase> Class)
+{
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = GetInputSubsystem(Player);
+	UInputUserSettingsBase* Settings = Subsystem ? Subsystem->GetUserSettings<UInputUserSettingsBase>() : nullptr;
+	return Settings && (!Class || Settings->IsA(Class)) ? Settings : nullptr;
+}
+
+UInputComponentBase* UInputModuleStatics::GetInputComponent(APlayerController* Player, TSubclassOf<UInputComponentBase> Class)
+{
+	UInputComponentBase* Component = Player && Player->IsLocalController() ? Cast<UInputComponentBase>(Player->InputComponent) : nullptr;
+	return Component && (!Class || Component->IsA(Class)) ? Component : nullptr;
+}
+
+UInputBindingBase* UInputModuleStatics::GetInputBinding(APlayerController* Player, TSubclassOf<UInputBindingBase> Class)
+{
+	int32 Index; UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module ? Module->GetInputBinding(Class, Index) : nullptr;
+}
+
+UInputBindingBase* UInputModuleStatics::GetInputBindingByName(APlayerController* Player, FName Name, TSubclassOf<UInputBindingBase> Class)
+{
+	int32 Index; UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module ? Module->GetInputBindingByName(Name, Index, Class) : nullptr;
+}
+
+TArray<FEnhancedActionKeyMapping> UInputModuleStatics::GetAllActionKeyMappings(APlayerController* Player)
+{
+	int32 Index; UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module ? Module->GetAllActionKeyMappings(Index) : TArray<FEnhancedActionKeyMapping>();
+}
+
+TArray<FName> UInputModuleStatics::GetAllActionKeyMappingNames(APlayerController* Player)
+{
+	int32 Index; UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module ? Module->GetAllActionKeyMappingNames(Index) : TArray<FName>();
+}
+
+TArray<FPlayerKeyMapping> UInputModuleStatics::GetAllPlayerKeyMappings(APlayerController* Player)
+{
+	int32 Index; UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module ? Module->GetAllPlayerKeyMappings(Index) : TArray<FPlayerKeyMapping>();
+}
+
+bool UInputModuleStatics::IsPlayerMappedKeyByTag(APlayerController* Player, const FGameplayTag& Tag, const FKey& Key)
+{
+	int32 Index; const UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module && Module->IsPlayerMappedKeyByTag(Tag, Key, Index);
+}
+
+const UInputActionBase* UInputModuleStatics::GetInputActionByTag(UWorld* World, const FGameplayTag& Tag, bool bEnsured)
+{
+	const UInputModule* Module = UInputModule::GetPtr(World);
+	return Module ? Module->GetInputActionByTag(Tag, bEnsured) : nullptr;
+}
+
+bool UInputModuleStatics::IsInputActionActive(APlayerController* Player, const FGameplayTag& Tag)
+{
+	int32 Index; const UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module && Module->IsInputActionActive(Tag, Index);
+}
+
+bool UInputModuleStatics::ActivateInputContext(APlayerController* Player, FGameplayTag Tag)
+{
+	int32 Index; UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module && Module->ActivateInputContext(Tag, Index);
+}
+
+bool UInputModuleStatics::DeactivateInputContext(APlayerController* Player, FGameplayTag Tag)
+{
+	int32 Index; UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module && Module->DeactivateInputContext(Tag, Index);
+}
+
+bool UInputModuleStatics::IsInputContextActive(APlayerController* Player, FGameplayTag Tag)
+{
+	int32 Index; const UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module && Module->IsInputContextActive(Tag, Index);
+}
+
+bool UInputModuleStatics::MapPlayerKeyByTag(APlayerController* Player, FGameplayTag Tag, FKey Key, EPlayerMappableKeySlot Slot, FGameplayTagContainer& Failure)
+{
+	Failure.Reset();
+	int32 Index; UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module && Module->MapPlayerKeyByTag(Tag, Key, Slot, Index, &Failure);
+}
+
+bool UInputModuleStatics::MapPlayerKeyByMappingName(APlayerController* Player, FName Name, FKey Key, EPlayerMappableKeySlot Slot, FGameplayTagContainer& Failure)
+{
+	Failure.Reset();
+	int32 Index; UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module && Module->MapPlayerKeyByMappingName(Name, Key, Slot, Index, &Failure);
+}
+
+bool UInputModuleStatics::ResetPlayerKeyByTag(APlayerController* Player, FGameplayTag Tag)
+{
+	int32 Index; UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module && Module->ResetPlayerKeyByTag(Tag, Index);
+}
+
+bool UInputModuleStatics::ResetPlayerKeyByMappingName(APlayerController* Player, FName Name)
+{
+	int32 Index; UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module && Module->ResetPlayerKeyByMappingName(Name, Index);
+}
+
+TArray<FPlayerKeyMapping> UInputModuleStatics::GetPlayerKeyMappingsByTag(APlayerController* Player, FGameplayTag Tag)
+{
+	int32 Index; const UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module ? Module->GetPlayerKeyMappingsByTag(Tag, Index) : TArray<FPlayerKeyMapping>();
+}
+
+TArray<FKey> UInputModuleStatics::GetKeysByActionTag(APlayerController* Player, FGameplayTag Tag)
+{
+	int32 Index; const UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module ? Module->GetKeysByActionTag(Tag, Index) : TArray<FKey>();
+}
+
+TArray<FPlayerKeyMapping> UInputModuleStatics::GetPlayerKeyMappingsByMappingName(APlayerController* Player, FName Name)
+{
+	int32 Index; const UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module ? Module->GetPlayerKeyMappingsByMappingName(Name, Index) : TArray<FPlayerKeyMapping>();
+}
+
+FText UInputModuleStatics::GetPlayerKeyCodeByTag(APlayerController* Player, FGameplayTag Tag)
+{
+	FString Text;
+	for (const FPlayerKeyMapping& Mapping : GetPlayerKeyMappingsByTag(Player, Tag))
 	{
-		return GetDeterminesOutputObject(InputSubsystem->GetUserSettings<UInputUserSettingsBase>(), InClass);
+		if (!Text.IsEmpty()) Text += TEXT("/");
+		Text += Mapping.GetCurrentKey().GetDisplayName(false).ToString();
 	}
-	return nullptr;
+	return FText::FromString(Text);
 }
 
-UInputComponentBase* UInputModuleStatics::GetInputComponent(int32 InPlayerIndex, TSubclassOf<UInputComponentBase> InClass)
+TArray<FGameplayTag> UInputModuleStatics::GetAllMappableActions(UWorld* World)
 {
-	if(AWHPlayerController* PlayerController = UCommonModuleStatics::GetLocalPlayerController(InPlayerIndex))
-	{
-		return GetDeterminesOutputObject(Cast<UInputComponentBase>(PlayerController->InputComponent), InClass);
-	}
-	return nullptr;
+	const UInputModule* Module = UInputModule::GetPtr(World);
+	return Module ? Module->GetAllMappableActions() : TArray<FGameplayTag>();
 }
 
-UInputBindingBase* UInputModuleStatics::GetInputBinding(TSubclassOf<UInputBindingBase> InClass, int32 InPlayerIndex)
+TArray<FInputMappableEntry> UInputModuleStatics::GetAllMappableEntries(UWorld* World)
 {
-	return UInputModule::Get().GetInputBinding(InClass, InPlayerIndex);
+	const UInputModule* Module = UInputModule::GetPtr(World);
+	return Module ? Module->GetAllMappableEntries() : TArray<FInputMappableEntry>();
 }
 
-UInputBindingBase* UInputModuleStatics::GetInputBindingByName(const FName InName, int32 InPlayerIndex, TSubclassOf<UInputBindingBase> InClass)
+TArray<FInputMappableEntry> UInputModuleStatics::GetMappableEntriesByActionTag(UWorld* World, FGameplayTag Tag)
 {
-	return UInputModule::Get().GetInputBindingByName(InName, InPlayerIndex, InClass);
+	const UInputModule* Module = UInputModule::GetPtr(World);
+	return Module ? Module->GetMappableEntriesByActionTag(Tag) : TArray<FInputMappableEntry>();
 }
 
-EInputMode UInputModuleStatics::GetDefaultInputMode()
+ECommonInputType UInputModuleStatics::GetCurrentInputType(APlayerController* Player)
 {
-	return UInputModule::Get().GetDefaultInputMode();
+	int32 Index; const UInputModule* Module = FindPlayerInput(Player, Index);
+	return Module ? Module->GetCurrentInputType(Index) : ECommonInputType::Count;
 }
 
-void UInputModuleStatics::SetDefaultInputMode(EInputMode InInputMode)
+bool UInputModuleStatics::IsUsingGamepad(APlayerController* Player)
 {
-	UInputModule::Get().SetDefaultInputMode(InInputMode);
+	return GetCurrentInputType(Player) == ECommonInputType::Gamepad;
 }
 
-TArray<FPlayerKeyMapping> UInputModuleStatics::GetAllPlayerKeyMappings(int32 InPlayerIndex)
+bool UInputModuleStatics::IsUsingMouseAndKeyboard(APlayerController* Player)
 {
-	return UInputModule::Get().GetAllPlayerKeyMappings(InPlayerIndex);
+	return GetCurrentInputType(Player) == ECommonInputType::MouseAndKeyboard;
 }
 
-bool UInputModuleStatics::IsPlayerMappedKeyByTag(const FGameplayTag& InTag, const FKey& InKey, int32 InPlayerIndex)
+bool UInputModuleStatics::IsUsingTouch(APlayerController* Player)
 {
-	return UInputModule::Get().IsPlayerMappedKeyByTag(InTag, InKey, InPlayerIndex);
+	return GetCurrentInputType(Player) == ECommonInputType::Touch;
 }
 
-const UInputActionBase* UInputModuleStatics::GetInputActionByTag(const FGameplayTag& InTag, bool bEnsured)
+EInputMode UInputModuleStatics::GetDefaultInputMode(const UObject* Context)
 {
-	return UInputModule::Get().GetInputActionByTag(InTag, bEnsured);
+	const UInputModule* Module = UInputModule::GetPtr(Context ? Context->GetWorld() : nullptr);
+	return Module ? Module->GetDefaultInputMode() : EInputMode::None;
 }
 
-bool UInputModuleStatics::IsInputActionActive(const FGameplayTag& InTag, int32 InPlayerIndex)
+void UInputModuleStatics::SetDefaultInputMode(const UObject* Context, EInputMode Mode)
 {
-	return UInputModule::Get().IsInputActionActive(InTag, InPlayerIndex);
+	if (UInputModule* Module = UInputModule::GetPtr(Context ? Context->GetWorld() : nullptr)) Module->SetDefaultInputMode(Mode);
 }
 
-bool UInputModuleStatics::ActivateInputContext(FGameplayTag InContextTag, int32 InPlayerIndex)
+EInputMode UInputModuleStatics::GetGlobalInputMode(APlayerController* Player)
 {
-	return UInputModule::Get().ActivateInputContext(InContextTag, InPlayerIndex);
-}
-
-bool UInputModuleStatics::DeactivateInputContext(FGameplayTag InContextTag, int32 InPlayerIndex)
-{
-	return UInputModule::Get().DeactivateInputContext(InContextTag, InPlayerIndex);
-}
-
-bool UInputModuleStatics::IsInputContextActive(FGameplayTag InContextTag, int32 InPlayerIndex)
-{
-	return UInputModule::Get().IsInputContextActive(InContextTag, InPlayerIndex);
-}
-
-bool UInputModuleStatics::MapPlayerKeyByTag(FGameplayTag InActionTag, FKey InNewKey, EPlayerMappableKeySlot InSlot, FGameplayTagContainer& OutFailureReason, int32 InPlayerIndex)
-{
-	return UInputModule::Get().MapPlayerKeyByTag(InActionTag, InNewKey, InSlot, InPlayerIndex, &OutFailureReason);
-}
-
-bool UInputModuleStatics::MapPlayerKeyByMappingName(FName InMappingName, FKey InNewKey, EPlayerMappableKeySlot InSlot, FGameplayTagContainer& OutFailureReason, int32 InPlayerIndex)
-{
-	return UInputModule::Get().MapPlayerKeyByMappingName(InMappingName, InNewKey, InSlot, InPlayerIndex, &OutFailureReason);
-}
-
-bool UInputModuleStatics::ResetPlayerKeyByTag(FGameplayTag InActionTag, int32 InPlayerIndex)
-{
-	return UInputModule::Get().ResetPlayerKeyByTag(InActionTag, InPlayerIndex);
-}
-
-bool UInputModuleStatics::ResetPlayerKeyByMappingName(FName InMappingName, int32 InPlayerIndex)
-{
-	return UInputModule::Get().ResetPlayerKeyByMappingName(InMappingName, InPlayerIndex);
-}
-
-TArray<FPlayerKeyMapping> UInputModuleStatics::GetPlayerKeyMappingsByTag(FGameplayTag InActionTag, int32 InPlayerIndex)
-{
-	return UInputModule::Get().GetPlayerKeyMappingsByTag(InActionTag, InPlayerIndex);
-}
-
-TArray<FKey> UInputModuleStatics::GetKeysByActionTag(FGameplayTag InActionTag, int32 InPlayerIndex)
-{
-	return UInputModule::Get().GetKeysByActionTag(InActionTag, InPlayerIndex);
-}
-
-TArray<FPlayerKeyMapping> UInputModuleStatics::GetPlayerKeyMappingsByMappingName(FName InMappingName, int32 InPlayerIndex)
-{
-	return UInputModule::Get().GetPlayerKeyMappingsByMappingName(InMappingName, InPlayerIndex);
-}
-
-FText UInputModuleStatics::GetPlayerKeyCodeByTag(FGameplayTag InActionTag, int32 InPlayerIndex)
-{
-	FString KeyCode;
-	for(const FPlayerKeyMapping& Mapping : GetPlayerKeyMappingsByTag(InActionTag, InPlayerIndex))
-	{
-		if(!KeyCode.IsEmpty())
-		{
-			KeyCode += TEXT("/");
-		}
-		KeyCode += Mapping.GetCurrentKey().GetDisplayName(false).ToString();
-	}
-	return FText::FromString(KeyCode);
-}
-
-TArray<FGameplayTag> UInputModuleStatics::GetAllMappableActions()
-{
-	return UInputModule::Get().GetAllMappableActions();
-}
-
-TArray<FInputMappableEntry> UInputModuleStatics::GetAllMappableEntries()
-{
-	return UInputModule::Get().GetAllMappableEntries();
-}
-
-TArray<FInputMappableEntry> UInputModuleStatics::GetMappableEntriesByActionTag(FGameplayTag InActionTag)
-{
-	return UInputModule::Get().GetMappableEntriesByActionTag(InActionTag);
-}
-
-ECommonInputType UInputModuleStatics::GetCurrentInputType(int32 InPlayerIndex)
-{
-	return UInputModule::Get().GetCurrentInputType(InPlayerIndex);
-}
-
-bool UInputModuleStatics::IsUsingGamepad(int32 InPlayerIndex)
-{
-	return UInputModule::Get().IsUsingGamepad(InPlayerIndex);
-}
-
-bool UInputModuleStatics::IsUsingMouseAndKeyboard(int32 InPlayerIndex)
-{
-	return UInputModule::Get().IsUsingMouseAndKeyboard(InPlayerIndex);
-}
-
-bool UInputModuleStatics::IsUsingTouch(int32 InPlayerIndex)
-{
-	return UInputModule::Get().IsUsingTouch(InPlayerIndex);
-}
-
-EInputMode UInputModuleStatics::GetGlobalInputMode()
-{
-	return FInputManager::Get().GetGlobalInputMode(UCommonModuleStatics::GetLocalPlayerController());
-}
-
-void UInputModuleStatics::UpdateGlobalInputMode()
-{
-	FInputManager::Get().UpdateInputMode();
+	return Player && Player->IsLocalController() ? FInputManager::Get().GetGlobalInputMode(Player) : EInputMode::None;
 }

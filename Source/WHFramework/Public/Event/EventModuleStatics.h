@@ -16,43 +16,50 @@ public:
 	template<typename TEvent>
 	static FDelegateHandle SubscribeEvent(UObject* InOwner, TFunction<void(UObject*, const TEvent&)> InCallback)
 	{
-		return UEventModule::Get().SubscribeEvent<TEvent>(InOwner, MoveTemp(InCallback));
+		if (UEventModule* Events = UEventModule::GetPtr(InOwner ? InOwner->GetWorld() : nullptr))
+			return Events->SubscribeEvent<TEvent>(InOwner, MoveTemp(InCallback));
+		return FDelegateHandle();
 	}
 
 	template<typename TEvent, typename TObject>
 	static FDelegateHandle SubscribeEvent(TObject* InOwner, void (TObject::*InCallback)(UObject*, const TEvent&))
 	{
-		return UEventModule::Get().SubscribeEvent<TEvent>(InOwner, InCallback);
+		if (UEventModule* Events = UEventModule::GetPtr(InOwner ? InOwner->GetWorld() : nullptr))
+			return Events->SubscribeEvent<TEvent>(InOwner, InCallback);
+		return FDelegateHandle();
 	}
 
 	template<typename TEvent, typename TCallbackObject>
 	static FDelegateHandle SubscribeEvent(UObject* InOwner, void (TCallbackObject::*InCallback)())
 	{
-		return UEventModule::Get().SubscribeEvent<TEvent>(InOwner, InCallback);
+		if (UEventModule* Events = UEventModule::GetPtr(InOwner ? InOwner->GetWorld() : nullptr))
+			return Events->SubscribeEvent<TEvent>(InOwner, InCallback);
+		return FDelegateHandle();
 	}
 
-	static void UnsubscribeEvent(FDelegateHandle InHandle)
+	static void UnsubscribeEvent(const UObject* WorldContextObject, FDelegateHandle InHandle)
 	{
-		UEventModule::Get().UnsubscribeEvent(InHandle);
+		if (UEventModule* Events = UEventModule::GetPtr(WorldContextObject ? WorldContextObject->GetWorld() : nullptr)) Events->UnsubscribeEvent(InHandle);
 	}
 
 	template<typename TEvent>
 	static void UnsubscribeEvent(UObject* InOwner)
 	{
-		UEventModule::Get().UnsubscribeEvent<TEvent>(InOwner);
+		if (UEventModule* Events = UEventModule::GetPtr(InOwner ? InOwner->GetWorld() : nullptr)) Events->UnsubscribeEvent<TEvent>(InOwner);
 	}
 
-	UFUNCTION(BlueprintCallable, Category = "EventModule")
-	static void UnsubscribeAllEvent();
+	UFUNCTION(BlueprintCallable, Category = "EventModule", meta = (WorldContext = "WorldContextObject"))
+	static void UnsubscribeAllEvent(const UObject* WorldContextObject);
 
 	template<typename TEvent>
-	static void BroadcastEvent(UObject* InSender, const TEvent& InEvent = TEvent(), EEventNetType InNetType = EEventNetType::Local)
+	static FNetworkDispatchResult BroadcastEvent(UObject* InSender, const TEvent& InEvent = TEvent(), EEventNetType InNetType = EEventNetType::Local, APlayerController* InController = nullptr)
 	{
-		UEventModule::Get().BroadcastEvent<TEvent>(InSender, InEvent, InNetType);
+		if (UEventModule* Events = UEventModule::GetPtr(InSender ? InSender->GetWorld() : nullptr)) return Events->BroadcastEvent<TEvent>(InSender, InEvent, InNetType, InController);
+		return FNetworkDispatchResult::Failure(ENetworkDispatchStatus::ModuleUnavailable);
 	}
 
-	UFUNCTION(BlueprintCallable, CustomThunk, meta = (BlueprintInternalUseOnly = "true", CustomStructureParam = "Event"), Category = "EventModule")
-	static void K2_BroadcastEvent(UObject* Sender, const int32& Event, EEventNetType NetType = EEventNetType::Local);
+	UFUNCTION(BlueprintCallable, CustomThunk, meta = (WorldContext = "WorldContextObject", BlueprintInternalUseOnly = "true", CustomStructureParam = "Event"), Category = "EventModule")
+	static FNetworkDispatchResult K2_BroadcastEvent(const UObject* WorldContextObject, UObject* Sender, const int32& Event, EEventNetType NetType = EEventNetType::Local, APlayerController* Controller = nullptr);
 	DECLARE_FUNCTION(execK2_BroadcastEvent);
 
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true"), Category = "EventModule")
@@ -64,14 +71,14 @@ public:
 
 public:
 	template<class T>
-	static T* GetEventManager()
+	static T* GetEventManager(const UObject* WorldContextObject)
 	{
-		return Cast<T>(GetEventManager(T::StaticClass()));
+		return Cast<T>(GetEventManager(WorldContextObject, T::StaticClass()));
 	}
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "EventModule")
-	static UEventManagerBase* GetEventManager(TSubclassOf<UEventManagerBase> InClass);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "EventModule")
+	static UEventManagerBase* GetEventManager(const UObject* WorldContextObject, TSubclassOf<UEventManagerBase> InClass);
 
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "EventModule")
-	static UEventManagerBase* GetEventManagerByName(const FName InName, TSubclassOf<UEventManagerBase> InClass = nullptr);
+	UFUNCTION(BlueprintPure, meta = (WorldContext = "WorldContextObject", DeterminesOutputType = "InClass"), Category = "EventModule")
+	static UEventManagerBase* GetEventManagerByName(const UObject* WorldContextObject, const FName InName, TSubclassOf<UEventManagerBase> InClass = nullptr);
 };

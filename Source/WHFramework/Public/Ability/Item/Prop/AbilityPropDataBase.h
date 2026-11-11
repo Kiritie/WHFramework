@@ -4,8 +4,6 @@
 
 #include "AbilityPropDataBase.generated.h"
 
-class AAbilityPropBase;
-
 UCLASS(BlueprintType)
 class WHFRAMEWORK_API UAbilityPropDataBase : public UAbilityTransItemDataBase
 {
@@ -13,8 +11,4 @@ class WHFRAMEWORK_API UAbilityPropDataBase : public UAbilityTransItemDataBase
 
 public:
 	UAbilityPropDataBase();
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSubclassOf<AAbilityPropBase> PropClass;
 };

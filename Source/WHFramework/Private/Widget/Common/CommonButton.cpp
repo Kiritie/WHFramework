@@ -488,7 +488,8 @@ void UCommonButton::ApplyTitleStyle()
 
 void UCommonButton::ApplyTriggeringActionTag()
 {
-	const UInputActionBase* InputAction = TriggeringActionTag.IsValid() ? UInputModule::Get().GetInputActionByTag(TriggeringActionTag, false) : nullptr;
+	UInputModule* Inputs = UInputModule::GetPtr(GetWorld());
+	const UInputActionBase* InputAction = TriggeringActionTag.IsValid() && Inputs ? Inputs->GetInputActionByTag(TriggeringActionTag, false) : nullptr;
 	SetTriggeringEnhancedInputAction(const_cast<UInputActionBase*>(InputAction));
 }
 

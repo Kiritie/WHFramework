@@ -4,6 +4,7 @@
 #include "CoreGlobals.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "ObjectPool/ObjectPoolBucket.h"
 #include "ObjectPool/ObjectPoolModule.h"
 #include "ObjectPool/ObjectPoolModuleTypes.h"
@@ -18,13 +19,16 @@ UObject* FWidgetPoolProvider::Spawn(UClass* InClass, const FParameter& InParam)
 {
 	const FWidgetSpawnParameter* Parameter = InParam.GetPtr<FWidgetSpawnParameter>();
 	UObject* OwningObject = Parameter ? Parameter->OwnerObject.Get() : nullptr;
-	UWorld* World = GEngine && OwningObject
+	APlayerController* PlayerController = Parameter ? Parameter->OwningPlayer.Get() : nullptr;
+	if (!PlayerController) PlayerController = Cast<APlayerController>(OwningObject);
+	UWorld* World = PlayerController ? PlayerController->GetWorld() : (GEngine && OwningObject
 		? GEngine->GetWorldFromContextObject(OwningObject, EGetWorldErrorMode::ReturnNull)
-		: Module.GetWorld();
-	if(!World || World->bIsTearingDown)
+		: Module.GetWorld());
+	if(!World || World != Module.GetWorld() || World->bIsTearingDown)
 	{
 		return nullptr;
 	}
+	if (OwningObject && OwningObject->GetWorld() && OwningObject->GetWorld() != World) return nullptr;
 #if WITH_EDITOR
 	// 游戏实例下的 Widget 不进入外层编辑器事务，避免退出 PIE 后被撤销记录继续持有。
 	TGuardValue<ITransaction*> TransactionGuard(GUndo, World->IsGameWorld() ? nullptr : GUndo);
@@ -33,12 +37,17 @@ UObject* FWidgetPoolProvider::Spawn(UClass* InClass, const FParameter& InParam)
 	UUserWidget* Widget = nullptr;
 	if(!Policy.bEnablePooling || Policy.MaxIdle >= 0)
 	{
-		Widget = UUserWidget::CreateWidgetInstance(*World, InClass, NAME_None);
+		if (APlayerController* Player = PlayerController)
+		{
+			if (Player->GetWorld() != World || !Player->IsLocalController()) return nullptr;
+			Widget = UUserWidget::CreateWidgetInstance(*Player, InClass, NAME_None);
+		}
+		else Widget = UUserWidget::CreateWidgetInstance(*World, InClass, NAME_None);
 	}
 	else
 	{
-		APlayerController* PlayerController = Cast<APlayerController>(OwningObject);
-		UObject* Scope = OwningObject ? OwningObject : World;
+		if (PlayerController && (PlayerController->GetWorld() != World || !PlayerController->IsLocalController())) return nullptr;
+		UObject* Scope = PlayerController ? static_cast<UObject*>(PlayerController) : (OwningObject ? OwningObject : World);
 		UObjectPoolWidgetBucket* Bucket = Module.FindOrAddWidgetBucket(Scope, World, PlayerController);
 		Widget = Bucket->Acquire(InClass);
 		if(Widget)

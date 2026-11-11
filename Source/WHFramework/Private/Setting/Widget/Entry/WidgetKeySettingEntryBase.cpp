@@ -1,4 +1,5 @@
 #include "Setting/Widget/Entry/WidgetKeySettingEntryBase.h"
+#include "Setting/SettingPresentationTypes.h"
 
 #include "CommonInputBaseTypes.h"
 #include "Setting/SettingModuleTypes.h"
@@ -78,7 +79,7 @@ void UWidgetKeySettingEntryBase::OnValueClicked()
 	{
 		return;
 	}
-	if(UWidgetPressAnyKeyPanelBase* Panel = UWidgetModuleStatics::CreateUserWidget<UWidgetPressAnyKeyPanelBase>())
+	if(UWidgetPressAnyKeyPanelBase* Panel = UWidgetModuleStatics::CreateUserWidget<UWidgetPressAnyKeyPanelBase>(GetOwningPlayer()))
 	{
 		CapturePanel = Panel;
 		CaptureEntry = SettingEntry;

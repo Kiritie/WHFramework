@@ -1,12 +1,14 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
+#include "Common/LifecycleTypes.h"
 #include "Misc/AutomationTest.h"
+#include "Setting/SettingPresentationTypes.h"
 #include "NativeGameplayTags.h"
 #include "Tests/WidgetThemeTestTags.h"
 #include "Widget/Theme/WidgetTheme.h"
 #include "Widget/Theme/WidgetThemeResolver.h"
 #include "Widget/Style/CommonButtonStyleN.h"
 #include "Widget/Theme/WidgetStyleTags.h"
-#include "Widget/Theme/WidgetThemeSubsystem.h"
+#include "Widget/Theme/WidgetThemeModule.h"
 #include "Widget/Theme/WidgetThemeSettings.h"
 #include "Widget/WidgetModule.h"
 #include "Setting/Widget/Entry/WidgetSettingEntryBase.h"
@@ -109,8 +111,8 @@ bool FWidgetThemeSwitchOwnershipTest::RunTest(const FString& Parameters)
 	TStrongObjectPtr<UWidgetTheme> ThemeB(NewObject<UWidgetTheme>());
 	TStrongObjectPtr<UGameInstance> OwnerA(NewObject<UGameInstance>());
 	TStrongObjectPtr<UGameInstance> OwnerB(NewObject<UGameInstance>());
-	TStrongObjectPtr<UWidgetThemeSubsystem> InstanceA(NewObject<UWidgetThemeSubsystem>(OwnerA.Get()));
-	TStrongObjectPtr<UWidgetThemeSubsystem> InstanceB(NewObject<UWidgetThemeSubsystem>(OwnerB.Get()));
+	TStrongObjectPtr<UWidgetThemeModule> InstanceA(NewObject<UWidgetThemeModule>(OwnerA.Get()));
+	TStrongObjectPtr<UWidgetThemeModule> InstanceB(NewObject<UWidgetThemeModule>(OwnerB.Get()));
 	ThemeA->SetStyleClass(TAG_ThemeTestBrush, EWidgetStyleKind::Brush, UCommonBrushStyle::StaticClass());
 	ThemeB->SetStyleClass(TAG_ThemeTestBrush, EWidgetStyleKind::Brush, UCommonBrushStyle::StaticClass());
 	Settings->DefaultTheme = ThemeA.Get();
@@ -128,7 +130,7 @@ bool FWidgetThemeSwitchOwnershipTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Library theme is rejected"), InstanceA->ApplyLoadedTheme(ThemeA.Get(), Error));
 	TestEqual(TEXT("Rejected library retains the committed theme"), InstanceA->GetActiveTheme(), ThemeB.Get());
 	TestEqual(TEXT("Another owner retains its active theme"), InstanceB->GetActiveTheme(), ThemeB.Get());
-	InstanceA->Deinitialize();
+	InstanceA->OnTermination(EPhase::Final);
 	TestNull(TEXT("Deinitialize releases active theme"), InstanceA->GetActiveTheme());
 	TestEqual(TEXT("Deinitialize does not clear another owner"), InstanceB->GetActiveTheme(), ThemeB.Get());
 	Settings->DefaultTheme = SavedDefault;

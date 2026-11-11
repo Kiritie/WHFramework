@@ -3,10 +3,13 @@
 #pragma once
 
 
+#include "Common/LanguageTypes.h"
 #include "Audio/AudioModuleTypes.h"
-#include "Common/CommonModuleTypes.h"
+#include "Common/CommonTypes.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "AudioModuleStatics.generated.h"
+
+class APlayerController;
 
 /**
  * 
@@ -19,102 +22,108 @@ class WHFRAMEWORK_API UAudioModuleStatics : public UBlueprintFunctionLibrary
 public:
 	////////////////////////////////////////////////////
 	// GlobalSettings
-	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static TArray<FLanguageType> GetAudioLanguageTypes();
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static TArray<FLanguageType> GetAudioLanguageTypes(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void SetAudioLanguageTypes(const TArray<FLanguageType>& InLanguageTypes);
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetAudioLanguageTypes(const UObject* WorldContextObject, const TArray<FLanguageType>& InLanguageTypes);
 
-	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics")
-	static int32 GetAudioLanguageType();
+	UFUNCTION(BlueprintPure, Category = "WidgetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static int32 GetAudioLanguageType(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics")
-	static void SetAudioLanguageType(int32 InLanguageType);
+	UFUNCTION(BlueprintCallable, Category = "WidgetModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetAudioLanguageType(const UObject* WorldContextObject, int32 InLanguageType);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Sound
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static void PlaySound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FNetworkDispatchResult PlaySound2D(const UObject* WorldContextObject, USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false, APlayerController* InController = nullptr);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static void PlaySoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FNetworkDispatchResult PlaySoundAtLocation(const UObject* WorldContextObject, USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false, APlayerController* InController = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// SingleSound
-	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics")
-	static FSingleSoundInfo GetSingleSoundInfo(const FSingleSoundHandle& InHandle);
+	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FSingleSoundInfo GetSingleSoundInfo(const UObject* WorldContextObject, const FSingleSoundHandle& InHandle, APlayerController* InController = nullptr);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static FSingleSoundHandle PlaySingleSound2D(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false);
+	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static EAudioNetworkSoundState GetSingleSoundRequestState(const UObject* WorldContextObject, const FSingleSoundHandle& InHandle, APlayerController* InController);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static FSingleSoundHandle PlaySingleSound2DWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume = 1.0f, bool bMulticast = false);
+	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FNetworkDispatchResult GetSingleSoundDispatchResult(const UObject* WorldContextObject, const FSingleSoundHandle& InHandle, APlayerController* InController);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static FSingleSoundHandle PlaySingleSoundAtLocation(USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FSoundPlaybackResult PlaySingleSound2D(const UObject* WorldContextObject, USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false, APlayerController* InController = nullptr);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static FSingleSoundHandle PlaySingleSoundAtLocationWithDelegate(USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FSoundPlaybackResult PlaySingleSound2DWithDelegate(const UObject* WorldContextObject, USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, float InVolume = 1.0f, bool bMulticast = false, APlayerController* InController = nullptr);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static void StopSingleSound(const FSingleSoundHandle& InHandle, bool bMulticast = false);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FSoundPlaybackResult PlaySingleSoundAtLocation(const UObject* WorldContextObject, USoundBase* InSound, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false, APlayerController* InController = nullptr);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static void SetSingleSoundPaused(const FSingleSoundHandle& InHandle, bool bPaused, bool bMulticast = false);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FSoundPlaybackResult PlaySingleSoundAtLocationWithDelegate(const UObject* WorldContextObject, USoundBase* InSound, const FOnSoundPlayFinishDelegate& InOnSoundPlayFinish, FVector InLocation, float InVolume = 1.0f, bool bMulticast = false, APlayerController* InController = nullptr);
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FNetworkDispatchResult StopSingleSound(const UObject* WorldContextObject, const FSingleSoundHandle& InHandle, bool bMulticast = false, APlayerController* InController = nullptr);
+
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static FNetworkDispatchResult SetSingleSoundPaused(const UObject* WorldContextObject, const FSingleSoundHandle& InHandle, bool bPaused, bool bMulticast = false, APlayerController* InController = nullptr);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// GlobalSound
-	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics")
-	static float GetGlobalSoundVolume();
+	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static float GetGlobalSoundVolume(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static void SetGlobalSoundVolume(float InVolume = 1.f, float InFadeInTime = 1.0f);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetGlobalSoundVolume(const UObject* WorldContextObject, float InVolume = 1.f, float InFadeInTime = 1.0f);
 
-	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics")
-	static float GetGlobalSoundPitch();
+	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static float GetGlobalSoundPitch(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static void SetGlobalSoundPitch(float InPitch = 1.f, float InFadeInTime = 1.0f);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetGlobalSoundPitch(const UObject* WorldContextObject, float InPitch = 1.f, float InFadeInTime = 1.0f);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// BackgroundSound
-	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics")
-	static float GetBackgroundSoundVolume();
+	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static float GetBackgroundSoundVolume(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static void SetBackgroundSoundVolume(float InVolume = 1.f, float InFadeInTime = 1.0f);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetBackgroundSoundVolume(const UObject* WorldContextObject, float InVolume = 1.f, float InFadeInTime = 1.0f);
 
-	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics")
-	static float GetBackgroundSoundPitch();
+	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static float GetBackgroundSoundPitch(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static void SetBackgroundSoundPitch(float InPitch = 1.f, float InFadeInTime = 1.0f);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetBackgroundSoundPitch(const UObject* WorldContextObject, float InPitch = 1.f, float InFadeInTime = 1.0f);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// EnvironmentSound
-	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics")
-	static float GetEnvironmentSoundVolume();
+	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static float GetEnvironmentSoundVolume(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static void SetEnvironmentSoundVolume(float InVolume = 1.f, float InFadeInTime = 1.0f);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetEnvironmentSoundVolume(const UObject* WorldContextObject, float InVolume = 1.f, float InFadeInTime = 1.0f);
 
-	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics")
-	static float GetEnvironmentSoundPitch();
+	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static float GetEnvironmentSoundPitch(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static void SetEnvironmentSoundPitch(float InPitch = 1.f, float InFadeInTime = 1.0f);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetEnvironmentSoundPitch(const UObject* WorldContextObject, float InPitch = 1.f, float InFadeInTime = 1.0f);
 
 	//////////////////////////////////////////////////////////////////////////
 	/// EffectSound
-	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics")
-	static float GetEffectSoundVolume();
+	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static float GetEffectSoundVolume(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static void SetEffectSoundVolume(float InVolume = 1.f, float InFadeInTime = 1.0f);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetEffectSoundVolume(const UObject* WorldContextObject, float InVolume = 1.f, float InFadeInTime = 1.0f);
 
-	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics")
-	static float GetEffectSoundPitch();
+	UFUNCTION(BlueprintPure, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static float GetEffectSoundPitch(const UObject* WorldContextObject);
 
-	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics")
-	static void SetEffectSoundPitch(float InPitch = 1.f, float InFadeInTime = 1.0f);
+	UFUNCTION(BlueprintCallable, Category = "AudioModuleStatics", meta = (WorldContext = "WorldContextObject"))
+	static void SetEffectSoundPitch(const UObject* WorldContextObject, float InPitch = 1.f, float InFadeInTime = 1.0f);
 };

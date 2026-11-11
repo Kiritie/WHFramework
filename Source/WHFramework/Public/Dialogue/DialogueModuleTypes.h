@@ -6,6 +6,8 @@
 class UDialogueAsset;
 class UDialogueEventBase;
 class UDialogueConditionBase;
+class APlayerController;
+class AActor;
 
 USTRUCT(BlueprintType)
 struct WHFRAMEWORK_API FDialogueNode
@@ -43,9 +45,25 @@ struct WHFRAMEWORK_API FDialogueNode
 
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDialogueChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerDialogueChanged, APlayerController*, Player);
+
+struct WHFRAMEWORK_API FDialogueNetworkNode
+{
+	int32 Id = INDEX_NONE;
+	FText Text;
+	bool bPlayer = false;
+	bool bHasConditions = false;
+	bool bHasEvents = false;
+	bool bHasLinks = false;
+};
+
+DECLARE_DELEGATE_RetVal_TwoParams(bool, FDialogueNetworkBegin, APlayerController*, AActor*);
+DECLARE_DELEGATE_RetVal_OneParam(bool, FDialogueNetworkSelect, int32);
+DECLARE_DELEGATE_RetVal(bool, FDialogueNetworkContinue);
+DECLARE_DELEGATE(FDialogueNetworkEnd);
 
 USTRUCT(BlueprintType)
-struct WHFRAMEWORK_API FDialogueModuleSaveData : public FSaveData
+struct WHFRAMEWORK_API FDialogueResumeData
 {
 	GENERATED_BODY()
 
@@ -54,4 +72,12 @@ struct WHFRAMEWORK_API FDialogueModuleSaveData : public FSaveData
 
 	UPROPERTY()
 	int32 NodeID = INDEX_NONE;
+};
+
+USTRUCT(BlueprintType)
+struct WHFRAMEWORK_API FDialogueModuleSaveData : public FSaveData
+{
+	GENERATED_BODY()
+	UPROPERTY()
+	TMap<FGuid, FDialogueResumeData> PlayerSessions;
 };
