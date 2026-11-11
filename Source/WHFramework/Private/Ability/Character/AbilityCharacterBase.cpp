@@ -1,6 +1,14 @@
 // Copyright 1998-2019 Epic Games, Inc. All Rights Reserved.
 
 #include "Ability/Character/AbilityCharacterBase.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Ability/AbilityTags.h"
+#include "Character/CharacterTags.h"
+#include "Ability/AbilityExecutionTypes.h"
+#include "Ability/AbilityInfoTypes.h"
+#include "Ability/AbilityActorSaveTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 #include "Ability/Components/AbilityControlComponent.h"
 #include "Ability/Character/States/AbilityCharacterState_Alive.h"
 #include "Ability/Effects/CharacterStateEffectBase.h"
@@ -9,7 +17,7 @@
 #include "GameplayEffectAggregator.h"
 #include "Net/UnrealNetwork.h"
 #include "Ability/Inventory/AbilityInventoryBase.h"
-#include "Ability/Inventory/InventoryWorldSubsystem.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Engine/World.h"
 
 #include "Ability/Interaction/AbilityInteractionOptions.h"
@@ -94,11 +102,18 @@ void AAbilityCharacterBase::InitializeAbilities(AActor* InOwnerActor, AActor* In
 	}
 }
 
+void AAbilityCharacterBase::OnRep_ActorID()
+{
+	if (AbilitySystem) AbilitySystem->SetAbilityEntityId(ActorID);
+	Super::OnRep_ActorID();
+}
+
 void AAbilityCharacterBase::OnSpawn_Implementation(const FParameter& InParam)
 {
 	bHasAuthoritativeLevel = false;
 	bBaseAttributeSourceReady = false;
 	Super::OnSpawn_Implementation(InParam);
+	if (HasActorBegunPlay() && !Execute_IsInitialized(this)) return;
 	InitializeAbilities();
 	if (HasAuthority())
 	{
@@ -118,7 +133,6 @@ void AAbilityCharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 	}
 	BindInventory(nullptr);
 	SelectedInventorySlot = FInventorySlotKey();
-	AssetID = FPrimaryAssetId();
 	RaceID = NAME_None;
 	Level = 0;
 	BirthTransform = FTransform::Identity;
@@ -129,6 +143,7 @@ void AAbilityCharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 void AAbilityCharacterBase::OnInitialize_Implementation()
 {
 	Super::OnInitialize_Implementation();
+	if (!Execute_IsInitialized(this)) return;
 
 	DefaultGravityScale = GetCharacterMovement()->GravityScale;
 	DefaultAirControl = GetCharacterMovement()->AirControl;
@@ -187,15 +202,18 @@ void AAbilityCharacterBase::Serialize(FArchive& Ar)
 
 void AAbilityCharacterBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
+	if (!HasAuthority() || !InSaveData.GetPtr<FCharacterSaveData>())
+	{
+		MarkLoadDataFailed();
+		return;
+	}
+	Super::LoadData(InSaveData, InPhase);
+	if (!WasLoadDataApplied()) return;
 	const FCharacterSaveData& SaveData = InSaveData.GetRef<FCharacterSaveData>();
 	if (PHASEC(InPhase, EPhase::Primary))
 	{
 		bHasAuthoritativeLevel = false;
 		bBaseAttributeSourceReady = false;
-		if (HasAuthority())
-		{
-			SetActorTransform(SaveData.SpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
-		}
 		BirthTransform = SaveData.IsSaved() ? SaveData.BirthTransform : SaveData.SpawnTransform;
 	}
 	if (PHASEC(InPhase, EPhase::All))
@@ -206,10 +224,11 @@ void AAbilityCharacterBase::LoadData(const FParameter& InSaveData, EPhase InPhas
 
 		if (HasAuthority() && SaveData.InventorySnapshot.InventoryId.IsValid())
 		{
-			UInventoryWorldSubsystem* Subsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+			UInventoryModule* Subsystem = GetWorld() ? UInventoryModule::GetPtr(GetWorld()) : nullptr;
 			UAbilityInventoryBase* Resolved = Subsystem ? Subsystem->Resolve(SaveData.InventorySnapshot.InventoryId) : nullptr;
 			if (!Resolved)
 			{
+				MarkLoadDataFailed();
 				UE_LOG(LogTemp, Error, TEXT("Inventory restore requires the recovered world store: %s"), *SaveData.InventorySnapshot.InventoryId.ToString());
 				return;
 			}
@@ -668,8 +687,9 @@ bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 	{
 		return false;
 	}
-	const UAbilityCharacterDataBase& Data = GetCharacterData<UAbilityCharacterDataBase>();
-	const int32 NewLevel = Data.ClampLevel(InLevel);
+	const UAbilityCharacterDataBase* Data = GetCharacterData<UAbilityCharacterDataBase>();
+	if (!Data) return false;
+	const int32 NewLevel = Data->ClampLevel(InLevel);
 	const bool bChanged = Level != NewLevel;
 	const int32 PreviousLevel = Level;
 	const bool bWasReady = bBaseAttributeSourceReady;
@@ -686,12 +706,7 @@ bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 		}
 		return bChanged;
 	}
-	TArray<TSubclassOf<UEffectBase>> BaseEffects;
-	if (Data.PEClass)
-	{
-		BaseEffects.Add(Data.PEClass);
-	}
-	if (!AbilitySystem->SetGrantSource(BaseStatsSource, {}, BaseEffects, NewLevel))
+	if (!ApplyLevelAttributes(NewLevel))
 	{
 		Level = PreviousLevel;
 		bBaseAttributeSourceReady = bWasReady;
@@ -705,6 +720,15 @@ bool AAbilityCharacterBase::SetLevelA(int32 InLevel)
 		OnRep_Identity();
 	}
 	return bChanged;
+}
+
+bool AAbilityCharacterBase::ApplyLevelAttributes(int32 InLevel)
+{
+	const UAbilityCharacterDataBase* Data = GetCharacterData<UAbilityCharacterDataBase>();
+	if (!Data || !AbilitySystem) return false;
+	TArray<TSubclassOf<UEffectBase>> BaseEffects;
+	if (Data->PEClass) BaseEffects.Add(Data->PEClass);
+	return AbilitySystem->SetGrantSource(BaseStatsSource, {}, BaseEffects, InLevel);
 }
 
 FString AAbilityCharacterBase::GetHeadInfo() const
@@ -821,7 +845,7 @@ void AAbilityCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 
 bool AAbilityCharacterBase::IsAbilityRuntimeReady() const
 {
-	return AbilitySystem && AbilitySystem->GetAvatarActor() == this && AttributeSet
+	return GetCharacterData<UAbilityCharacterDataBase>() && AbilitySystem && AbilitySystem->GetAvatarActor() == this && AttributeSet
 		&& (!HasAuthority() || bBaseAttributeSourceReady);
 }
 
@@ -881,8 +905,8 @@ void AAbilityCharacterBase::BindInventory(UAbilityInventoryBase* InInventory)
 	{
 		return;
 	}
-	UInventoryWorldSubsystem* NextSubsystem = InInventory ? Cast<UInventoryWorldSubsystem>(InInventory->GetOuter()) : nullptr;
-	UInventoryWorldSubsystem* WorldSubsystem = GetWorld() ? GetWorld()->GetSubsystem<UInventoryWorldSubsystem>() : nullptr;
+	UInventoryModule* NextSubsystem = InInventory ? Cast<UInventoryModule>(InInventory->GetOuter()) : nullptr;
+	UInventoryModule* WorldSubsystem = GetWorld() ? UInventoryModule::GetPtr(GetWorld()) : nullptr;
 	if (InInventory && (!NextSubsystem || NextSubsystem != WorldSubsystem || !NextSubsystem->AcquireLease(InInventory->GetInventoryId())))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Inventory binding rejected for %s"), *GetName());
@@ -893,7 +917,7 @@ void AAbilityCharacterBase::BindInventory(UAbilityInventoryBase* InInventory)
 	SetSelectedInventorySlot(FInventorySlotKey());
 	if (PreviousInventory)
 	{
-		if (UInventoryWorldSubsystem* PreviousSubsystem = Cast<UInventoryWorldSubsystem>(PreviousInventory->GetOuter()))
+		if (UInventoryModule* PreviousSubsystem = Cast<UInventoryModule>(PreviousInventory->GetOuter()))
 		{
 			PreviousSubsystem->ReleaseLease(PreviousInventory->GetInventoryId());
 		}

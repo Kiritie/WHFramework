@@ -1,13 +1,20 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Character/Base/CharacterBase.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Scene/Actor/SceneActorIdentity.h"
+#include "Scene/SceneModule.h"
+#include "Ability/AbilityActorTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Camera/CameraConfigTypes.h"
+#include "Scene/SceneActorSaveTypes.h"
 
 #include "AIController.h"
 #include "Net/UnrealNetwork.h"
 #include "AI/Base/AIControllerBase.h"
 #include "Main/MainModule.h"
 #include "Animation/AnimInstance.h"
-#include "Asset/AssetModuleStatics.h"
+#include "GameFramework/PlayerController.h"
 #include "Audio/AudioModuleStatics.h"
 #include "Character/CharacterModuleNetworkComponent.h"
 #include "Character/CharacterModuleStatics.h"
@@ -70,27 +77,63 @@ ACharacterBase::ACharacterBase(const FObjectInitializer& ObjectInitializer)
 
 	bInitialized = false;
 	bBlockAllInput = false;
-
-	ActorID = FGuid::NewGuid();
 	bVisible = true;
 	Container = nullptr;
 }
 
+void ACharacterBase::PostActorCreated()
+{
+	Super::PostActorCreated();
+	SceneActorIdentity::InitializeCreated(*this, ActorID);
+}
+
+#if WITH_EDITOR
+void ACharacterBase::PostDuplicate(EDuplicateMode::Type DuplicateMode)
+{
+	Super::PostDuplicate(DuplicateMode);
+	SceneActorIdentity::InitializeEditorDuplicate(*this, ActorID, DuplicateMode);
+}
+
+void ACharacterBase::PostEditImport()
+{
+	Super::PostEditImport();
+	SceneActorIdentity::InitializeEditorImport(*this, ActorID);
+}
+#endif
+
+bool ACharacterBase::SetActorID_Implementation(FGuid InID)
+{
+	if ((Container || bSceneIdentityCommitted) && ActorID != InID) return false;
+	return SceneActorIdentity::Assign(*this, ActorID, InID);
+}
+
+void ACharacterBase::OnRep_ActorID()
+{
+	SceneActorIdentity::QueueReplication(*this, SceneIdentityRetry);
+}
+
 void ACharacterBase::OnSpawn_Implementation(const FParameter& InParam)
 {
-	USceneModuleStatics::RemoveSceneActor(this);
-
+	if (bSceneRegistrationFailed) return;
 	const FAbilityActorSpawnParameter* Param = InParam.GetPtr<FAbilityActorSpawnParameter>();
-	if (Param && Param->bOverrideActorID)
-	{
-		ActorID = Param->ActorID;
-	}
 	if (Param)
 	{
-		AssetID = Param->AssetID;
+		SetAssetID_Implementation(Param->AssetID);
 	}
-
-	USceneModuleStatics::AddSceneActor(this);
+	else if (AssetID.IsValid()) AssetBinding.Bind(this, AssetID);
+	const bool bRegistered = ActorID.IsValid() && USceneModuleStatics::AddSceneActor(this, this);
+	if (bRegistered) bSceneIdentityCommitted = true;
+	if (!bRegistered && HasAuthority() && Execute_IsUseDefaultLifecycle(this))
+	{
+		bSceneRegistrationFailed = true;
+		bInitialized = false;
+		SetActorHiddenInGame(true);
+		SetActorEnableCollision(false);
+		SetActorTickEnabled(false);
+		UE_LOG(LogTemp, Error, TEXT("场景实体登记失败，停止初始化：%s id=%s"), *GetNameSafe(this), *ActorID.ToString());
+		return;
+	}
+	if (!bRegistered && !HasAuthority() && ActorID.IsValid()) SceneActorIdentity::QueueReplication(*this, SceneIdentityRetry);
 
 	Execute_SetActorVisible(this, true);
 	if (VoxelAgentComponent)
@@ -101,6 +144,7 @@ void ACharacterBase::OnSpawn_Implementation(const FParameter& InParam)
 
 void ACharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 {
+	SceneActorIdentity::CancelReplication(SceneIdentityRetry);
 	if (VoxelAgentComponent)
 	{
 		VoxelAgentComponent->SetAgentEnabled(false);
@@ -110,7 +154,7 @@ void ACharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 
 	SetActorLocationAndRotation(UNDER_Vector, FRotator::ZeroRotator);
 
-	USceneModuleStatics::RemoveSceneActor(this);
+	if (USceneModule* Scene = UMainModuleStatics::GetModuleForCleanup<USceneModule>(GetWorld())) Scene->RemoveSceneActor(this);
 	if (Container)
 	{
 		Container->RemoveSceneActor(this);
@@ -118,6 +162,10 @@ void ACharacterBase::OnDespawn_Implementation(EObjectDespawnMode InMode)
 
 	Container = nullptr;
 	DefaultController = nullptr;
+	AssetBinding.Reset();
+	AssetID = FPrimaryAssetId();
+	bSceneIdentityCommitted = false;
+	if (HasAuthority()) { ActorID.Invalidate(); ForceNetUpdate(); }
 }
 
 UVoxelAgentComponent* ACharacterBase::GetVoxelAgentComponent() const
@@ -127,11 +175,24 @@ UVoxelAgentComponent* ACharacterBase::GetVoxelAgentComponent() const
 
 void ACharacterBase::OnInitialize_Implementation()
 {
+	if (bSceneRegistrationFailed) return;
 	bInitialized = true;
+	if (AssetID.IsValid()) AssetBinding.Bind(this, AssetID);
 
 	Execute_SetActorVisible(this, bVisible);
-
-	USceneModuleStatics::AddSceneActor(this);
+	const bool bRegistered = ActorID.IsValid() && USceneModuleStatics::AddSceneActor(this, this);
+	if (bRegistered) bSceneIdentityCommitted = true;
+	if (!bRegistered && HasAuthority() && Execute_IsUseDefaultLifecycle(this))
+	{
+		bSceneRegistrationFailed = true;
+		bInitialized = false;
+		SetActorHiddenInGame(true);
+		SetActorEnableCollision(false);
+		SetActorTickEnabled(false);
+		UE_LOG(LogTemp, Error, TEXT("场景实体登记失败，停止初始化：%s id=%s"), *GetNameSafe(this), *ActorID.ToString());
+		return;
+	}
+	if (!bRegistered && !HasAuthority() && ActorID.IsValid()) SceneActorIdentity::QueueReplication(*this, SceneIdentityRetry);
 
 	Anim = Cast<UCharacterAnimBase>(GetMesh()->GetAnimInstance());
 }
@@ -146,17 +207,25 @@ void ACharacterBase::OnRefresh_Implementation(float DeltaSeconds)
 
 void ACharacterBase::OnTermination_Implementation()
 {
-	USceneModuleStatics::RemoveSceneActor(this);
+	SceneActorIdentity::CancelReplication(SceneIdentityRetry);
+	if (USceneModule* Scene = UMainModuleStatics::GetModuleForCleanup<USceneModule>(GetWorld())) Scene->RemoveSceneActor(this);
+	AssetBinding.Reset();
 }
 
 void ACharacterBase::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
+	if (!InSaveData.GetPtr<FSceneActorSaveData>()) { MarkLoadDataFailed(); return; }
 	auto& SaveData = InSaveData.GetRef<FSceneActorSaveData>();
 
 	if (PHASEC(InPhase, EPhase::Primary))
 	{
-		ActorID = SaveData.ActorID;
-		SetActorTransform(SaveData.SpawnTransform);
+		if (!SetActorID_Implementation(SaveData.ActorID))
+		{
+			MarkLoadDataFailed();
+			UE_LOG(LogTemp, Error, TEXT("无法恢复场景实体身份：%s id=%s"), *GetNameSafe(this), *SaveData.ActorID.ToString());
+			return;
+		}
+		SetActorTransform(SaveData.SpawnTransform, false, nullptr, ETeleportType::TeleportPhysics);
 	}
 }
 
@@ -180,12 +249,15 @@ void ACharacterBase::BeginPlay()
 		{
 			Execute_OnInitialize(this);
 		}
+		if (!Execute_IsInitialized(this)) return;
 		Execute_OnPreparatory(this);
 	}
 }
 
 void ACharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	SceneActorIdentity::CancelReplication(SceneIdentityRetry);
+	if (USceneModule* Scene = UMainModuleStatics::GetModuleForCleanup<USceneModule>(GetWorld())) Scene->RemoveSceneActor(this);
 	Super::EndPlay(EndPlayReason);
 
 	if (Execute_IsUseDefaultLifecycle(this))
@@ -219,22 +291,19 @@ void ACharacterBase::OnUnSwitch_Implementation()
 {
 }
 
-void ACharacterBase::Switch_Implementation()
+void ACharacterBase::Switch_Implementation(APlayerController* InController)
 {
-	UCharacterModuleStatics::SwitchCharacter(this);
+    UCharacterModuleStatics::SwitchCharacter(InController, this);
 }
 
-void ACharacterBase::UnSwitch_Implementation()
+void ACharacterBase::UnSwitch_Implementation(APlayerController* InController)
 {
-	if (IsCurrent())
-	{
-		UCharacterModuleStatics::SwitchCharacter(nullptr);
-	}
+    if (IsCurrent(InController)) UCharacterModuleStatics::SwitchCharacter(InController, nullptr);
 }
 
-bool ACharacterBase::IsCurrent_Implementation() const
+bool ACharacterBase::IsCurrent_Implementation(APlayerController* InController) const
 {
-	return UCharacterModuleStatics::GetCurrentCharacter() == this;
+    return UCharacterModuleStatics::GetCurrentCharacter(InController) == this;
 }
 
 void ACharacterBase::OnRep_Name()
@@ -244,6 +313,13 @@ void ACharacterBase::OnRep_Name()
 
 void ACharacterBase::OnRep_AssetID()
 {
+	AssetBinding.Bind(this, AssetID);
+}
+
+void ACharacterBase::SetAssetID_Implementation(const FPrimaryAssetId& InID)
+{
+	AssetID = InID;
+	AssetBinding.Bind(this, AssetID);
 }
 
 void ACharacterBase::Turn_Implementation(float InValue)
@@ -313,14 +389,16 @@ void ACharacterBase::SetUseControllerRotation(bool bValue)
 	GetCharacterMovement()->bOrientRotationToMovement = !bValue;
 }
 
-void ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMulticast)
+FSoundPlaybackResult ACharacterBase::PlaySound(USoundBase* InSound, float InVolume, bool bMulticast)
 {
-	SoundHandle = UAudioModuleStatics::PlaySingleSoundAtLocation(InSound, GetActorLocation(), InVolume, bMulticast);
+	const FSoundPlaybackResult Result = UAudioModuleStatics::PlaySingleSoundAtLocation(this, InSound, GetActorLocation(), InVolume, bMulticast, Cast<APlayerController>(GetController()));
+	if (Result.Handle.IsValid() || Result.Handle.IsPending()) SoundHandle = Result.Handle;
+	return Result;
 }
 
-void ACharacterBase::StopSound(bool bMulticast)
+FNetworkDispatchResult ACharacterBase::StopSound(bool bMulticast)
 {
-	UAudioModuleStatics::StopSingleSound(SoundHandle, bMulticast);
+	return UAudioModuleStatics::StopSingleSound(this, SoundHandle, bMulticast, Cast<APlayerController>(GetController()));
 }
 
 void ACharacterBase::PlayMontage(UAnimMontage* InMontage, bool bMulticast)
@@ -346,10 +424,10 @@ void ACharacterBase::MultiPlayMontage_Implementation(UAnimMontage* InMontage)
 
 void ACharacterBase::PlayMontageByName(const FName InMontageName, bool bMulticast)
 {
-	auto& CharacterData = GetCharacterData<UCharacterDataBase>();
-	if (CharacterData.AnimMontages.Contains(InMontageName))
+	const UCharacterDataBase* CharacterData = GetCharacterData<UCharacterDataBase>();
+	if (CharacterData && CharacterData->AnimMontages.Contains(InMontageName))
 	{
-		PlayMontage(CharacterData.AnimMontages[InMontageName], bMulticast);
+		PlayMontage(CharacterData->AnimMontages[InMontageName], bMulticast);
 	}
 }
 
@@ -376,10 +454,10 @@ void ACharacterBase::MultiStopMontage_Implementation(UAnimMontage* InMontage)
 
 void ACharacterBase::StopMontageByName(const FName InMontageName, bool bMulticast)
 {
-	auto& CharacterData = GetCharacterData<UCharacterDataBase>();
-	if (CharacterData.AnimMontages.Contains(InMontageName))
+	const UCharacterDataBase* CharacterData = GetCharacterData<UCharacterDataBase>();
+	if (CharacterData && CharacterData->AnimMontages.Contains(InMontageName))
 	{
-		StopMontage(CharacterData.AnimMontages[InMontageName], bMulticast);
+		StopMontage(CharacterData->AnimMontages[InMontageName], bMulticast);
 	}
 }
 
@@ -483,9 +561,9 @@ bool ACharacterBase::CanLookAtTarget()
 	return true;
 }
 
-UPrimaryAssetBase& ACharacterBase::GetCharacterData() const
+const UPrimaryAssetBase* ACharacterBase::GetCharacterData() const
 {
-	return UAssetModuleStatics::LoadPrimaryAssetRef<UPrimaryAssetBase>(AssetID);
+	return AssetBinding.Get();
 }
 
 UBehaviorTree* ACharacterBase::GetBehaviorTreeAsset() const

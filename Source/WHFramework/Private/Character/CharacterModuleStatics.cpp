@@ -4,63 +4,75 @@
 #include "Character/CharacterModuleStatics.h"
 
 #include "Character/CharacterModule.h"
+#include "Character/Base/CharacterBase.h"
+#include "GameFramework/PlayerController.h"
 
-ACharacterBase* UCharacterModuleStatics::GetCurrentCharacter()
+ACharacterBase* UCharacterModuleStatics::GetCurrentCharacter(APlayerController* InController)
 {
-	return UCharacterModule::Get().GetCurrentCharacter();
+    UCharacterModule* Module = InController ? UCharacterModule::GetPtr(InController->GetWorld()) : nullptr;
+    return Module ? Module->GetCurrentCharacter(InController) : nullptr;
 }
 
-ACharacterBase* UCharacterModuleStatics::GetCurrentCharacter(TSubclassOf<ACharacterBase> InClass)
+ACharacterBase* UCharacterModuleStatics::GetCurrentCharacter(APlayerController* InController, TSubclassOf<ACharacterBase> InClass)
 {
-	return UCharacterModule::Get().GetCurrentCharacter(InClass);
+    UCharacterModule* Module = InController ? UCharacterModule::GetPtr(InController->GetWorld()) : nullptr;
+    return Module ? Module->GetCurrentCharacter(InController, InClass) : nullptr;
 }
 
-TArray<ACharacterBase*> UCharacterModuleStatics::GetAllCharacter()
+TArray<ACharacterBase*> UCharacterModuleStatics::GetAllCharacter(const UObject* WorldContextObject)
 {
-	return UCharacterModule::Get().GetAllCharacter();
+    UCharacterModule* Module = WorldContextObject ? UCharacterModule::GetPtr(WorldContextObject->GetWorld()) : nullptr;
+    return Module ? Module->GetAllCharacter() : TArray<ACharacterBase*>();
 }
 
-void UCharacterModuleStatics::SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera, bool bInstant)
+void UCharacterModuleStatics::SwitchCharacter(APlayerController* InController, ACharacterBase* InCharacter, bool bResetCamera, bool bInstant)
 {
-	UCharacterModule::Get().SwitchCharacter(InCharacter, bResetCamera, bInstant);
+    if (UCharacterModule* Module = InController ? UCharacterModule::GetPtr(InController->GetWorld()) : nullptr)
+        Module->SwitchCharacter(InController, InCharacter, bResetCamera, bInstant);
 }
 
-void UCharacterModuleStatics::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InClass, bool bResetCamera, bool bInstant)
+void UCharacterModuleStatics::SwitchCharacterByClass(APlayerController* InController, TSubclassOf<ACharacterBase> InClass, bool bResetCamera, bool bInstant)
 {
-	UCharacterModule::Get().SwitchCharacterByClass(InClass, bResetCamera, bInstant);
+    if (UCharacterModule* Module = InController ? UCharacterModule::GetPtr(InController->GetWorld()) : nullptr)
+        Module->SwitchCharacterByClass(InController, InClass, bResetCamera, bInstant);
 }
 
-void UCharacterModuleStatics::SwitchCharacterByName(FName InName, bool bResetCamera, bool bInstant)
+void UCharacterModuleStatics::SwitchCharacterByName(APlayerController* InController, FName InName, bool bResetCamera, bool bInstant)
 {
-	UCharacterModule::Get().SwitchCharacterByName(InName, bResetCamera, bInstant);
+    if (UCharacterModule* Module = InController ? UCharacterModule::GetPtr(InController->GetWorld()) : nullptr)
+        Module->SwitchCharacterByName(InController, InName, bResetCamera, bInstant);
 }
 
-bool UCharacterModuleStatics::HasCharacterByClass(TSubclassOf<ACharacterBase> InClass)
+bool UCharacterModuleStatics::HasCharacterByClass(const UObject* WorldContextObject, TSubclassOf<ACharacterBase> InClass)
 {
-	return UCharacterModule::Get().HasCharacterByClass(InClass);
+    UCharacterModule* Module = WorldContextObject ? UCharacterModule::GetPtr(WorldContextObject->GetWorld()) : nullptr;
+    return Module && Module->HasCharacterByClass(InClass);
 }
 
-bool UCharacterModuleStatics::HasCharacterByName(FName InName)
+bool UCharacterModuleStatics::HasCharacterByName(const UObject* WorldContextObject, FName InName)
 {
-	return UCharacterModule::Get().HasCharacterByName(InName);
+    UCharacterModule* Module = WorldContextObject ? UCharacterModule::GetPtr(WorldContextObject->GetWorld()) : nullptr;
+    return Module && Module->HasCharacterByName(InName);
 }
 
-ACharacterBase* UCharacterModuleStatics::GetCharacterByClass(TSubclassOf<ACharacterBase> InClass)
+ACharacterBase* UCharacterModuleStatics::GetCharacterByClass(const UObject* WorldContextObject, TSubclassOf<ACharacterBase> InClass)
 {
-	return UCharacterModule::Get().GetCharacterByClass(InClass);
+    UCharacterModule* Module = WorldContextObject ? UCharacterModule::GetPtr(WorldContextObject->GetWorld()) : nullptr;
+    return Module ? Module->GetCharacterByClass(InClass) : nullptr;
 }
 
-ACharacterBase* UCharacterModuleStatics::GetCharacterByName(FName InName)
+ACharacterBase* UCharacterModuleStatics::GetCharacterByName(const UObject* WorldContextObject, FName InName)
 {
-	return UCharacterModule::Get().GetCharacterByName(InName);
+    UCharacterModule* Module = WorldContextObject ? UCharacterModule::GetPtr(WorldContextObject->GetWorld()) : nullptr;
+    return Module ? Module->GetCharacterByName(InName) : nullptr;
 }
 
 void UCharacterModuleStatics::AddCharacterToList(ACharacterBase* InCharacter)
 {
-	UCharacterModule::Get().AddCharacterToList(InCharacter);
+    if (UCharacterModule* Module = InCharacter ? UCharacterModule::GetPtr(InCharacter->GetWorld()) : nullptr) Module->AddCharacterToList(InCharacter);
 }
 
 void UCharacterModuleStatics::RemoveCharacterFromList(ACharacterBase* InCharacter)
 {
-	UCharacterModule::Get().RemoveCharacterFromList(InCharacter);
+    if (UCharacterModule* Module = InCharacter ? UCharacterModule::GetPtr(InCharacter->GetWorld()) : nullptr) Module->RemoveCharacterFromList(InCharacter);
 }

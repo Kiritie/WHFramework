@@ -2,6 +2,12 @@
 
 #pragma once
 
+#include "Ability/AbilityAttributeAccessors.h"
+#include "Common/CommonTypes.h"
+#include "Ability/AbilityInfoTypes.h"
+#include "Common/LifecycleTypes.h"
+#include "Common/InteractionTypes.h"
+#include "Ability/Inventory/InventorySnapshotTypes.h"
 #include "Ability/Attributes/CharacterAttributeSetBase.h"
 #include "Common/Interaction/InteractionAgentInterface.h"
 #include "Character/Base/CharacterBase.h"
@@ -49,6 +55,8 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// ObjectPool
 public:
+	virtual void OnRep_ActorID() override;
+
 	virtual void OnSpawn_Implementation(const FParameter& InParam) override;
 
 	virtual void OnDespawn_Implementation(EObjectDespawnMode InMode) override;
@@ -418,6 +426,12 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	virtual bool SetLevelA(int32 InLevel) override;
+
+protected:
+	// Called for both level changes and delayed ASC binding.
+	virtual bool ApplyLevelAttributes(int32 InLevel);
+
+public:
 
 	UFUNCTION(BlueprintPure)
 	virtual FString GetHeadInfo() const override;

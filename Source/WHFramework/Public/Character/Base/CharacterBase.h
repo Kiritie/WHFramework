@@ -2,9 +2,14 @@
 
 #pragma once
 
+#include "Containers/Ticker.h"
+
+#include "Common/LifecycleTypes.h"
+#include "Camera/CameraConfigTypes.h"
 #include "CharacterInterface.h"
 #include "AI/Base/AIAgentInterface.h"
 #include "Asset/Primary/PrimaryEntityInterface.h"
+#include "Asset/Primary/PrimaryEntityAssetBinding.h"
 #include "GameFramework/Character.h"
 #include "Audio/AudioModuleTypes.h"
 #include "Common/Base/WHActor.h"
@@ -83,6 +88,13 @@ public:
 	virtual FParameter ToData() override;
 
 protected:
+	virtual void PostActorCreated() override;
+
+#if WITH_EDITOR
+	virtual void PostDuplicate(EDuplicateMode::Type DuplicateMode) override;
+	virtual void PostEditImport() override;
+#endif
+
 	virtual void BeginPlay() override;
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -103,13 +115,13 @@ public:
 
 public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void Switch();
+	void Switch(APlayerController* InController);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void UnSwitch();
+	void UnSwitch(APlayerController* InController);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	bool IsCurrent() const;
+	bool IsCurrent(APlayerController* InController) const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Name
@@ -171,8 +183,15 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Actor
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "SceneActor")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_ActorID, Category = "SceneActor")
 	FGuid ActorID;
+
+	FTSTicker::FDelegateHandle SceneIdentityRetry;
+	bool bSceneIdentityCommitted = false;
+	bool bSceneRegistrationFailed = false;
+
+	UFUNCTION()
+	virtual void OnRep_ActorID();
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SceneActor")
 	bool bVisible;
@@ -186,10 +205,7 @@ public:
 		return ActorID;
 	}
 
-	virtual void SetActorID_Implementation(const FString& InID) override
-	{
-		ActorID = FGuid(InID);
-	}
+	virtual bool SetActorID_Implementation(FGuid InID) override;
 
 	virtual TScriptInterface<ISceneContainerInterface> GetContainer_Implementation() const override
 	{
@@ -257,9 +273,9 @@ protected:
 	FSingleSoundHandle SoundHandle;
 
 public:
-	virtual void PlaySound(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) override;
+	virtual FSoundPlaybackResult PlaySound(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) override;
 
-	virtual void StopSound(bool bMulticast = false) override;
+	virtual FNetworkDispatchResult StopSound(bool bMulticast = false) override;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// Montage
@@ -330,6 +346,9 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_AssetID, EditDefaultsOnly, BlueprintReadOnly)
 	FPrimaryAssetId AssetID;
 
+	UPROPERTY(Transient)
+	FPrimaryEntityAssetBinding AssetBinding;
+
 	UFUNCTION()
 	virtual void OnRep_AssetID();
 
@@ -339,17 +358,14 @@ public:
 		return AssetID;
 	}
 
-	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override
+	virtual void SetAssetID_Implementation(const FPrimaryAssetId& InID) override;
+
+	template <class T> const T* GetCharacterData() const
 	{
-		AssetID = InID;
+		return Cast<T>(GetCharacterData());
 	}
 
-	template <class T> T& GetCharacterData() const
-	{
-		return static_cast<T&>(GetCharacterData());
-	}
-
-	UPrimaryAssetBase& GetCharacterData() const;
+	const UPrimaryAssetBase* GetCharacterData() const;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// AI

@@ -3,12 +3,15 @@
 #pragma once
 
 
+#include "Common/LifecycleTypes.h"
+#include "Main/MainModuleAccess.h"
 #include "CharacterModuleTypes.h"
 #include "Main/Base/ModuleBase.h"
 
 #include "CharacterModule.generated.h"
 
 class ACharacterBase;
+class APlayerController;
 UCLASS()
 class WHFRAMEWORK_API UCharacterModule : public UModuleBase
 {
@@ -45,13 +48,12 @@ public:
 	
 protected:
 	virtual void LoadData(const FParameter& InSaveData, EPhase InPhase) override;
+	virtual bool WasLoadDataApplied() const override { return bCharacterLoadSucceeded; }
 
 	virtual FParameter ToData() override;
 
 	virtual bool ShouldSaveCharacter(const ACharacterBase* InCharacter) const;
 
-	UPROPERTY(EditAnywhere, Category = "Character")
-	bool bSaveLocalPlayerController = true;
 
 public:
 	virtual FString GetModuleDebugMessage() override;
@@ -59,20 +61,9 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	/// Character
 protected:
+	bool bCharacterLoadSucceeded = false;
 	UPROPERTY(EditAnywhere, Replicated, Category = "Character")
 	TArray<ACharacterBase*> Characters;
-
-	UPROPERTY(EditAnywhere, Replicated, Category = "Character")
-	ACharacterBase* DefaultCharacter;
-
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultCharacter != nullptr"), Category = "Character")
-	bool DefaultResetCamera;
-
-	UPROPERTY(EditAnywhere, meta = (EditConditionHides, EditCondition = "DefaultCharacter != nullptr"), Category = "Character")
-	bool DefaultInstantSwitch;
-
-	UPROPERTY(VisibleAnywhere, Replicated, Category = "Character")
-	ACharacterBase* CurrentCharacter;
 
 private:
 	UPROPERTY(Transient)
@@ -80,33 +71,33 @@ private:
 
 public:
 	template<class T>
-	T* GetCurrentCharacter() const
+	T* GetCurrentCharacter(APlayerController* InController) const
 	{
-		return Cast<T>(CurrentCharacter);
+		return Cast<T>(GetCurrentCharacter(InController));
 	}
 
 	UFUNCTION(BlueprintPure)
 	TArray<ACharacterBase*> GetAllCharacter() const { return Characters; }
 
-	ACharacterBase* GetCurrentCharacter() const;
+	ACharacterBase* GetCurrentCharacter(APlayerController* InController) const;
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))
-	ACharacterBase* GetCurrentCharacter(TSubclassOf<ACharacterBase> InClass) const;
+	ACharacterBase* GetCurrentCharacter(APlayerController* InController, TSubclassOf<ACharacterBase> InClass) const;
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera = true, bool bInstant = false);
+	void SwitchCharacter(APlayerController* InController, ACharacterBase* InCharacter, bool bResetCamera = true, bool bInstant = false);
 
 	template<class T>
-	void SwitchCharacterByClass(bool bResetCamera = true, bool bInstant = false, TSubclassOf<ACharacterBase> InClass = T::StaticClass())
+	void SwitchCharacterByClass(APlayerController* InController, bool bResetCamera = true, bool bInstant = false, TSubclassOf<ACharacterBase> InClass = T::StaticClass())
 	{
-		SwitchCharacterByClass(InClass, bInstant, bResetCamera);
+		SwitchCharacterByClass(InController, InClass, bResetCamera, bInstant);
 	}
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCharacterByClass(TSubclassOf<ACharacterBase> InClass, bool bResetCamera = true, bool bInstant = false);
+	void SwitchCharacterByClass(APlayerController* InController, TSubclassOf<ACharacterBase> InClass, bool bResetCamera = true, bool bInstant = false);
 
 	UFUNCTION(BlueprintCallable)
-	void SwitchCharacterByName(FName InName, bool bResetCamera = true, bool bInstant = false);
+	void SwitchCharacterByName(APlayerController* InController, FName InName, bool bResetCamera = true, bool bInstant = false);
 
 	template<class T>
 	bool HasCharacterByClass(TSubclassOf<ACharacterBase> InClass = T::StaticClass())
@@ -123,7 +114,7 @@ public:
 	template<class T>
 	T* GetCharacterByClass(TSubclassOf<ACharacterBase> InClass = T::StaticClass())
 	{
-		return GetCharacterByClass(InClass);
+		return Cast<T>(GetCharacterByClass(InClass));
 	}
 
 	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"))

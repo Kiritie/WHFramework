@@ -2,6 +2,10 @@
 
 
 #include "Character/CharacterModule.h"
+#include "WHFrameworkCoreMacros.h"
+#include "Common/LifecycleTypes.h"
+#include "Camera/CameraViewTypes.h"
+#include "Camera/CameraFeatureTypes.h"
 
 #include "Camera/CameraModule.h"
 #include "Camera/Manager/CameraManagerBase.h"
@@ -28,15 +32,10 @@ UCharacterModule::UCharacterModule()
 
 	Characters = TArray<ACharacterBase*>();
 	CharacterMap = TMap<FName, ACharacterBase*>();
-	DefaultCharacter = nullptr;
-	DefaultInstantSwitch = false;
-	DefaultResetCamera = true;
-	CurrentCharacter = nullptr;
 }
 
 UCharacterModule::~UCharacterModule()
 {
-	TERMINATION_MODULE(UCharacterModule)
 }
 
 #if WITH_EDITOR
@@ -49,7 +48,6 @@ void UCharacterModule::OnDestroy()
 {
 	Super::OnDestroy();
 
-	TERMINATION_MODULE(UCharacterModule)
 }
 #endif
 
@@ -68,15 +66,7 @@ void UCharacterModule::OnInitialize()
 
 void UCharacterModule::OnPreparatory(EPhase InPhase)
 {
-	Super::OnPreparatory(InPhase);
-
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		if(!CurrentCharacter && DefaultCharacter)
-		{
-			SwitchCharacter(DefaultCharacter, DefaultResetCamera, DefaultInstantSwitch);
-		}
-	}
+    Super::OnPreparatory(InPhase);
 }
 
 void UCharacterModule::OnRefresh(float DeltaSeconds, bool bInEditor)
@@ -101,55 +91,43 @@ void UCharacterModule::OnTermination(EPhase InPhase)
 
 void UCharacterModule::LoadData(const FParameter& InSaveData, EPhase InPhase)
 {
-	auto& SaveData = InSaveData.GetRef<FCharacterModuleSaveData>();
-	if(AWHPlayerController* Player = UCommonModuleStatics::GetPlayerController<AWHPlayerController>(); bSaveLocalPlayerController && Player && Player->IsLocalController())
+	bCharacterLoadSucceeded = false;
+	const FCharacterModuleSaveData* SaveData = InSaveData.GetPtr<FCharacterModuleSaveData>();
+	if (!SaveData) return;
+	TSet<FGuid> RecordIds;
+	for (const FCharacterSaveRecord& Record : SaveData->Characters)
 	{
-		if(ISaveDataAgentInterface* Controller = Cast<ISaveDataAgentInterface>(Player))
-		{
-			Controller->LoadSaveData(SaveData.PlayerControllerData, InPhase);
-		}
+		if (!Record.CharacterId.IsValid() || RecordIds.Contains(Record.CharacterId)) return;
+		RecordIds.Add(Record.CharacterId);
 	}
-
-	if(PHASEC(InPhase, EPhase::Primary))
+	for (const EPhase Phase : { EPhase::Primary, EPhase::Final })
 	{
-		for(const FCharacterSaveRecord& Record : SaveData.Characters)
+		if (!PHASEC(InPhase, Phase)) continue;
+		for (const FCharacterSaveRecord& Record : SaveData->Characters)
 		{
-			if(ACharacterBase* const* Character = Characters.FindByPredicate([this, &Record](const ACharacterBase* Candidate)
+			ACharacterBase* const* Entry = Characters.FindByPredicate([this, &Record](const ACharacterBase* Candidate)
 			{
-				return Candidate && ShouldSaveCharacter(Candidate) && Candidate->GetActorID_Implementation() == Record.CharacterId;
-			}))
+				return ::IsValid(Candidate) && ShouldSaveCharacter(Candidate) && Candidate->GetActorID_Implementation() == Record.CharacterId;
+			});
+			ACharacterBase* Character = Entry ? *Entry : nullptr;
+			if (!Character)
 			{
-				(*Character)->LoadSaveData(Record.Data, EPhase::Primary);
+				UE_LOG(LogTemp, Error, TEXT("角色存档缺少原世界角色：%s"), *Record.CharacterId.ToString());
+				return;
 			}
+			if (!Character->LoadSaveData(Record.Data, Phase)) return;
 		}
 	}
-	if(PHASEC(InPhase, EPhase::Final))
-	{
-		for(const FCharacterSaveRecord& Record : SaveData.Characters)
-		{
-			if(ACharacterBase* const* Character = Characters.FindByPredicate([this, &Record](const ACharacterBase* Candidate)
-			{
-				return Candidate && ShouldSaveCharacter(Candidate) && Candidate->GetActorID_Implementation() == Record.CharacterId;
-			}))
-			{
-				(*Character)->LoadSaveData(Record.Data, EPhase::Final);
-				if(Record.CharacterId == SaveData.CurrentCharacterId)
-				{
-					SwitchCharacter(*Character, DefaultResetCamera, DefaultInstantSwitch);
-				}
-			}
-		}
-	}
+	bCharacterLoadSucceeded = true;
 }
 
 FParameter UCharacterModule::ToData()
 {
 	FCharacterModuleSaveData SaveData;
-	SaveData.CurrentCharacterId = CurrentCharacter && ShouldSaveCharacter(CurrentCharacter) ? CurrentCharacter->GetActorID_Implementation() : FGuid();
 	const TArray<ACharacterBase*> CapturedCharacters = Characters;
 	for (ACharacterBase* Character : CapturedCharacters)
 	{
-		if (::IsValid(Character) && !ShouldSaveCharacter(Character)) continue;
+		if (Character && !ShouldSaveCharacter(Character)) continue;
 		if (!::IsValid(Character) || Character->GetWorld() != GetWorld())
 		{
 			UE_LOG(LogTemp, Error, TEXT("Character module capture lost a registered character"));
@@ -159,32 +137,13 @@ FParameter UCharacterModule::ToData()
 		Record.CharacterId = Character->GetActorID_Implementation();
 		Record.CharacterAssetId = Character->GetAssetID_Implementation();
 		Record.Data = Character->GetSaveData(true);
-		if (!Record.Data.HasValue() || !::IsValid(Character) ||
-			Character->GetActorID_Implementation() != Record.CharacterId ||
-			Characters.Num() != CapturedCharacters.Num() || !Characters.Contains(Character))
+		if (!Record.Data.HasValue())
 		{
 			UE_LOG(LogTemp, Error, TEXT("Character module capture failed for %s; no partial module will be saved"),
 				*Record.CharacterId.ToString());
 			return FParameter();
 		}
 		SaveData.Characters.Add(MoveTemp(Record));
-	}
-	if (UWorld* World = GetWorld(); bSaveLocalPlayerController && World)
-	{
-		for (FConstPlayerControllerIterator Iterator = World->GetPlayerControllerIterator(); Iterator; ++Iterator)
-		{
-			AWHPlayerController* Player = Cast<AWHPlayerController>(Iterator->Get());
-			if (!Player || !Player->IsLocalController()) continue;
-			if (ISaveDataAgentInterface* Controller = Cast<ISaveDataAgentInterface>(Player))
-			{
-				SaveData.PlayerControllerData = Controller->GetSaveData(true);
-				if (!SaveData.PlayerControllerData.HasValue())
-				{
-					UE_LOG(LogTemp, Error, TEXT("Character module capture failed for the local controller"));
-					return FParameter();
-				}
-			}
-		}
 	}
 	return FParameter(MoveTemp(SaveData));
 }
@@ -196,7 +155,7 @@ bool UCharacterModule::ShouldSaveCharacter(const ACharacterBase* InCharacter) co
 
 FString UCharacterModule::GetModuleDebugMessage()
 {
-	return FString::Printf(TEXT("CurrentCharacter: %s"), CurrentCharacter ? *CurrentCharacter->GetNameP().ToString() : TEXT("None"));
+	return FString::Printf(TEXT("Characters: %d"), Characters.Num());
 }
 
 void UCharacterModule::AddCharacterToList(ACharacterBase* InCharacter)
@@ -223,58 +182,59 @@ void UCharacterModule::RemoveCharacterFromList(ACharacterBase* InCharacter)
 	}
 }
 
-void UCharacterModule::SwitchCharacter(ACharacterBase* InCharacter, bool bResetCamera, bool bInstant)
+void UCharacterModule::SwitchCharacter(APlayerController* InController, ACharacterBase* InCharacter, bool bResetCamera, bool bInstant)
 {
-	if(CurrentCharacter == InCharacter) return;
-
-	AWHPlayerController* PlayerController = UCommonModuleStatics::GetPlayerController<AWHPlayerController>();
-
-	if(InCharacter)
-	{
-		if(CurrentCharacter)
-		{
-			CurrentCharacter->OnUnSwitch();
-			if(CurrentCharacter->GetDefaultController())
-			{
-				CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
-			}
-		}
-		CurrentCharacter = InCharacter;
-		PlayerController->Possess(CurrentCharacter);
-		CurrentCharacter->OnSwitch();
-		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
-		{
-			FCameraModeContext Context;
-			Context.Target = CurrentCharacter;
-			Context.Transition = bInstant ? FCameraTransitionParams::Instant() : FCameraTransitionParams::Smooth();
-			CameraManager->SetMode(UFollowCameraMode::StaticClass(), Context);
-		}
-	}
-	else if(CurrentCharacter)
-	{
-		ACharacterBase* PreviousCharacter = CurrentCharacter;
-		CurrentCharacter->OnUnSwitch();
-		PlayerController->UnPossess();
-		if(CurrentCharacter->GetDefaultController())
-		{
-			CurrentCharacter->GetDefaultController()->Possess(CurrentCharacter);
-		}
-		if(ACameraManagerBase* CameraManager = UCameraModule::Get().GetCameraManager())
-		{
-			CameraManager->ClearModeTarget();
-		}
-		CurrentCharacter = nullptr;
-	}
+    if (!::IsValid(InController) || InController->GetWorld() != GetWorld() ||
+        (InCharacter && (!::IsValid(InCharacter) || InCharacter->GetWorld() != GetWorld()))) return;
+    ACharacterBase* Previous = Cast<ACharacterBase>(InController->GetPawn());
+    if (Previous == InCharacter) return;
+    if (!InController->HasAuthority())
+    {
+        if (AWHPlayerController* Player = Cast<AWHPlayerController>(InController); Player && Player->IsLocalController())
+            Player->ServerRequestCharacterSwitch(InCharacter, bResetCamera, bInstant);
+        return;
+    }
+    if (InCharacter && Cast<APlayerController>(InCharacter->GetController()) && InCharacter->GetController() != InController) return;
+    if (Previous)
+    {
+        Previous->OnUnSwitch();
+        InController->UnPossess();
+        if (AController* DefaultController = Previous->GetDefaultController()) DefaultController->Possess(Previous);
+    }
+    if (InCharacter)
+    {
+        InController->Possess(InCharacter);
+        if (InController->GetPawn() != InCharacter) return;
+        InCharacter->OnSwitch();
+    }
+    if (bResetCamera && !InController->IsLocalController())
+    {
+        if (AWHPlayerController* Player = Cast<AWHPlayerController>(InController)) Player->ClientApplyCharacterView(InCharacter, bInstant);
+    }
+    else if (bResetCamera)
+    {
+        if (ACameraManagerBase* CameraManager = Cast<ACameraManagerBase>(InController->PlayerCameraManager))
+        {
+            if (InCharacter)
+            {
+                FCameraModeContext Context;
+                Context.Target = InCharacter;
+                Context.Transition = bInstant ? FCameraTransitionParams::Instant() : FCameraTransitionParams::Smooth();
+                CameraManager->SetMode(UFollowCameraMode::StaticClass(), Context);
+            }
+            else CameraManager->ClearModeTarget();
+        }
+    }
 }
 
-void UCharacterModule::SwitchCharacterByClass(TSubclassOf<ACharacterBase> InClass, bool bResetCamera, bool bInstant)
+void UCharacterModule::SwitchCharacterByClass(APlayerController* InController, TSubclassOf<ACharacterBase> InClass, bool bResetCamera, bool bInstant)
 {
-	SwitchCharacter(GetCharacterByClass(InClass), bResetCamera, bInstant);
+    SwitchCharacter(InController, GetCharacterByClass(InClass), bResetCamera, bInstant);
 }
 
-void UCharacterModule::SwitchCharacterByName(FName InName, bool bResetCamera, bool bInstant)
+void UCharacterModule::SwitchCharacterByName(APlayerController* InController, FName InName, bool bResetCamera, bool bInstant)
 {
-	SwitchCharacter(GetCharacterByName(InName), bResetCamera, bInstant);
+    SwitchCharacter(InController, GetCharacterByName(InName), bResetCamera, bInstant);
 }
 
 bool UCharacterModule::HasCharacterByClass(TSubclassOf<ACharacterBase> InClass) const
@@ -290,14 +250,15 @@ bool UCharacterModule::HasCharacterByName(FName InName) const
 	return CharacterMap.Contains(InName);
 }
 
-ACharacterBase* UCharacterModule::GetCurrentCharacter() const
+ACharacterBase* UCharacterModule::GetCurrentCharacter(APlayerController* InController) const
 {
-	return CurrentCharacter;
+    return ::IsValid(InController) && InController->GetWorld() == GetWorld() ? Cast<ACharacterBase>(InController->GetPawn()) : nullptr;
 }
 
-ACharacterBase* UCharacterModule::GetCurrentCharacter(TSubclassOf<ACharacterBase> InClass) const
+ACharacterBase* UCharacterModule::GetCurrentCharacter(APlayerController* InController, TSubclassOf<ACharacterBase> InClass) const
 {
-	return CurrentCharacter;
+    ACharacterBase* Character = GetCurrentCharacter(InController);
+    return Character && (!InClass || Character->IsA(InClass)) ? Character : nullptr;
 }
 
 ACharacterBase* UCharacterModule::GetCharacterByClass(TSubclassOf<ACharacterBase> InClass) const

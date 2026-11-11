@@ -9,6 +9,8 @@
 
 class USoundBase;
 class UAnimMontage;
+struct FSoundPlaybackResult;
+struct FNetworkDispatchResult;
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
@@ -26,9 +28,9 @@ class WHFRAMEWORK_API ICharacterInterface : public IPawnInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	virtual void PlaySound(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) = 0;
+	virtual FSoundPlaybackResult PlaySound(USoundBase* InSound, float InVolume = 1.0f, bool bMulticast = false) = 0;
 	
-	virtual void StopSound(bool bMulticast = false) = 0;
+	virtual FNetworkDispatchResult StopSound(bool bMulticast = false) = 0;
 
 	virtual void PlayMontage(UAnimMontage* InMontage, bool bMulticast = false) = 0;
 	

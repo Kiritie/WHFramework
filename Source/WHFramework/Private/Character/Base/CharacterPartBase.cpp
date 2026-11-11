@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Character/Base/CharacterPartBase.h"
+#include "Common/CommonTypes.h"
 
 #include "Character/Base/CharacterBase.h"
 #include "Voxel/VoxelModule.h"
@@ -33,7 +34,7 @@ void UCharacterPartBase::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 void UCharacterPartBase::UpdateVoxelOverlap()
 {
 	ACharacterBase* OwnerCharacter = GetOwnerCharacter();
-	UVoxelModule* VoxelModule = UVoxelModule::GetPtr();
+	UVoxelModule* VoxelModule = UVoxelModule::GetPtr(GetWorld());
 	if (!OwnerCharacter || !VoxelModule || !VoxelModule->IsReady())
 	{
 		OverlappingVoxel = FVoxelItem();

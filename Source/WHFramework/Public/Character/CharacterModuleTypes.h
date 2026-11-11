@@ -28,14 +28,8 @@ struct WHFRAMEWORK_API FCharacterModuleSaveData : public FSaveData
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(BlueprintReadWrite)
-	FGuid CurrentCharacterId;
-
 	UPROPERTY()
 	TArray<FCharacterSaveRecord> Characters;
-
-	UPROPERTY()
-	FParameter PlayerControllerData;
 
 	virtual void MakeSaved() override
 	{
@@ -48,7 +42,6 @@ public:
 				reinterpret_cast<FSaveData*>(Data.GetMutableStructMemory())->MakeSaved();
 			}
 		};
-		Mark(PlayerControllerData);
 		for (FCharacterSaveRecord& Record : Characters)
 		{
 			Mark(Record.Data);

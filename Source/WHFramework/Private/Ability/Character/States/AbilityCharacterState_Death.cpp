@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Ability/Character/States/AbilityCharacterState_Death.h"
+#include "Ability/AbilityTags.h"
 
 #include "AbilitySystemComponent.h"
 #include "Ability/Components/AbilitySystemComponentBase.h"
@@ -119,7 +120,7 @@ void UAbilityCharacterState_Death::DeathEnd()
 
 	if (!Character->IsPlayer())
 	{
-		UObjectPoolModuleStatics::DespawnObject(Character);
+		UObjectPoolModuleStatics::DespawnObject(Character, Character);
 	}
 }
 

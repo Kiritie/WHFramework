@@ -28,23 +28,23 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MoveSpeed, Category = "CharacterAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_MoveSpeed, Category = "Attributes|Movement")
 	FGameplayAttributeData MoveSpeed;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, MoveSpeed)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_RotationSpeed, Category = "CharacterAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_RotationSpeed, Category = "Attributes|Movement")
 	FGameplayAttributeData RotationSpeed;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, RotationSpeed)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_SwimSpeed, Category = "CharacterAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_SwimSpeed, Category = "Attributes|Movement")
 	FGameplayAttributeData SwimSpeed;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, SwimSpeed)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_FlySpeed, Category = "CharacterAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_FlySpeed, Category = "Attributes|Movement")
 	FGameplayAttributeData FlySpeed;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, FlySpeed)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_JumpForce, Category = "CharacterAttributes")
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, SaveGame, ReplicatedUsing = OnRep_JumpForce, Category = "Attributes|Movement")
 	FGameplayAttributeData JumpForce;
 	GAMEPLAYATTRIBUTE_ACCESSORS(UCharacterAttributeSetBase, JumpForce)
 

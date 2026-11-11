@@ -2,11 +2,12 @@
 
 
 #include "Character/Base/CharacterAnimBase.h"
+#include "Common/CommonTypes.h"
 
 #include "Character/Base/CharacterBase.h"
+#include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Common/CommonModuleStatics.h"
 
 UCharacterAnimBase::UCharacterAnimBase()
 {
@@ -37,7 +38,7 @@ void UCharacterAnimBase::NativeUpdateAnimation(float DeltaSeconds)
 
 	ACharacterBase* Character = GetOwnerCharacter<ACharacterBase>();
 
-	if(!Character || !UCommonModuleStatics::IsPlaying()) return;
+	if (!Character || !Character->GetWorld() || !Character->GetWorld()->IsGameWorld()) return;
 	
 	UCharacterMovementComponent* MovementComponent = Character->GetCharacterMovement();
 	
