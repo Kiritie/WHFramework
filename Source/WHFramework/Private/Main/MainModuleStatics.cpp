@@ -1,145 +1,105 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Main/MainModuleStatics.h"
 
+#include "Engine/Engine.h"
+#include "Gameplay/WHGameInstance.h"
 #include "Main/MainModule.h"
 
-void UMainModuleStatics::RunModuleByClass(TSubclassOf<UModuleBase> InClass)
+namespace
 {
-	if(AMainModule* MainModule = GetMainModule())
+	UWorld* ResolveWorld(const UObject* Context)
 	{
-		MainModule->RunModuleByClass(InClass);
+		return GEngine && Context ? GEngine->GetWorldFromContextObject(Context, EGetWorldErrorMode::ReturnNull) : nullptr;
 	}
 }
 
-void UMainModuleStatics::RunModuleByName(const FName InName)
+UModuleBase* UMainModuleStatics::GetModuleByClassInWorld(UWorld* InWorld, TSubclassOf<UModuleBase> InClass)
 {
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->RunModuleByName(InName);
-	}
+	AMainModule* MainModule = InWorld && InClass ? AMainModule::GetPtr(InWorld) : nullptr;
+	if (!MainModule || !MainModule->CanResolveModules()) return nullptr;
+	const FName Name = InClass.GetDefaultObject()->GetModuleName();
+	UModuleBase* const* Entry = MainModule->GetModuleMap().Find(Name);
+	UModuleBase* Module = Entry ? *Entry : nullptr;
+	return Module && Module->IsBusinessAdmissionOpen() && Module->IsA(InClass) ? Module : nullptr;
 }
 
-void UMainModuleStatics::ResetModuleByClass(TSubclassOf<UModuleBase> InClass)
+UModuleBase* UMainModuleStatics::GetModuleByClassForCleanup(UWorld* InWorld, TSubclassOf<UModuleBase> InClass)
 {
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->ResetModuleByClass(InClass);
-	}
+	AMainModule* MainModule = InWorld && InClass ? AMainModule::GetPtr(InWorld) : nullptr;
+	if (!MainModule || (!MainModule->IsTerminationInProgress() && !MainModule->CanResolveModules())) return nullptr;
+	const FName Name = InClass.GetDefaultObject()->GetModuleName();
+	UModuleBase* const* Entry = MainModule->GetModuleMap().Find(Name);
+	UModuleBase* Module = Entry ? *Entry : nullptr;
+	return Module && Module->IsA(InClass) ? Module : nullptr;
 }
 
-void UMainModuleStatics::ResetModuleByName(const FName InName)
-{
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->ResetModuleByName(InName);
-	}
+#define DEFINE_MODULE_ACTION(Action) \
+void UMainModuleStatics::Action##ModuleByClass(const UObject* Context, TSubclassOf<UModuleBase> Class) \
+{ \
+	if (UModuleBase* Module = GetModuleByClass(Context, Class)) Module->Action(); \
+} \
+void UMainModuleStatics::Action##ModuleByName(const UObject* Context, FName Name) \
+{ \
+	if (UModuleBase* Module = GetModuleByName(Context, Name)) Module->Action(); \
 }
 
-void UMainModuleStatics::PauseModuleByClass(TSubclassOf<UModuleBase> InClass)
+DEFINE_MODULE_ACTION(Run)
+DEFINE_MODULE_ACTION(Reset)
+DEFINE_MODULE_ACTION(Pause)
+DEFINE_MODULE_ACTION(UnPause)
+DEFINE_MODULE_ACTION(Termination)
+#undef DEFINE_MODULE_ACTION
+
+void UMainModuleStatics::PauseAllModule(const UObject* Context)
 {
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->PauseModuleByClass(InClass);
-	}
+	if (AMainModule* Main = GetMainModule(Context)) Main->PauseModules();
 }
 
-void UMainModuleStatics::PauseModuleByName(const FName InName)
+void UMainModuleStatics::UnPauseAllModule(const UObject* Context)
 {
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->PauseModuleByName(InName);
-	}
+	if (AMainModule* Main = GetMainModule(Context)) Main->UnPauseModules();
 }
 
-void UMainModuleStatics::UnPauseModuleByClass(TSubclassOf<UModuleBase> InClass)
+AMainModule* UMainModuleStatics::GetMainModule(const UObject* Context)
 {
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->UnPauseModuleByClass(InClass);
-	}
+	return AMainModule::GetPtr(ResolveWorld(Context));
 }
 
-void UMainModuleStatics::UnPauseModuleByName(const FName InName)
+TArray<UModuleBase*> UMainModuleStatics::GetAllModule(const UObject* Context)
 {
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->UnPauseModuleByName(InName);
-	}
+	const AMainModule* Main = GetMainModule(Context);
+	return Main && Main->CanResolveModules() ? Main->GetModules() : TArray<UModuleBase*>();
 }
 
-void UMainModuleStatics::PauseAllModule()
+bool UMainModuleStatics::IsExistModuleByClass(const UObject* Context, TSubclassOf<UModuleBase> Class)
 {
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->PauseModules();
-	}
+	return GetModuleByClass(Context, Class) != nullptr;
 }
 
-void UMainModuleStatics::UnPauseAllModule()
+bool UMainModuleStatics::IsExistModuleByName(const UObject* Context, FName Name)
 {
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->UnPauseModules();
-	}
+	return GetModuleByName(Context, Name) != nullptr;
 }
 
-void UMainModuleStatics::TerminationModuleByClass(TSubclassOf<UModuleBase> InClass)
+UModuleBase* UMainModuleStatics::GetModuleByClass(const UObject* Context, TSubclassOf<UModuleBase> Class)
 {
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->TerminationModuleByClass(InClass);
-	}
+	return GetModuleByClassInWorld(ResolveWorld(Context), Class);
 }
 
-void UMainModuleStatics::TerminationModuleByName(const FName InName)
+UModuleBase* UMainModuleStatics::GetGameInstanceModuleByClass(const UGameInstance* InGameInstance, TSubclassOf<UModuleBase> InClass)
 {
-	if(AMainModule* MainModule = GetMainModule())
-	{
-		MainModule->TerminationModuleByName(InName);
-	}
+	const UWHGameInstance* GameInstance = Cast<UWHGameInstance>(InGameInstance);
+	return GameInstance ? GameInstance->FindModuleByClass(InClass) : nullptr;
 }
 
-AMainModule* UMainModuleStatics::GetMainModule(bool bInEditor)
+UModuleBase* UMainModuleStatics::GetModuleByName(const UObject* Context, FName Name)
 {
-	return AMainModule::GetPtr(bInEditor);
+	const AMainModule* Main = GetMainModule(Context);
+	if (!Main || !Main->CanResolveModules()) return nullptr;
+	UModuleBase* const* Entry = Main->GetModuleMap().Find(Name);
+	return Entry && *Entry && (*Entry)->IsBusinessAdmissionOpen() ? *Entry : nullptr;
 }
 
-TArray<UModuleBase*> UMainModuleStatics::GetAllModule(bool bInEditor)
+UModuleNetworkComponentBase* UMainModuleStatics::GetModuleNetworkComponentByClass(APlayerController* Controller, TSubclassOf<UModuleNetworkComponentBase> Class)
 {
-	return AMainModule::GetAllModule(bInEditor);
-}
-
-bool UMainModuleStatics::IsExistModuleByClass(TSubclassOf<UModuleBase> InClass, bool bInEditor)
-{
-	if(!GEngine)
-	{
-		return false;
-	}
-	return AMainModule::IsExistModuleByClass(bInEditor, InClass);
-}
-
-bool UMainModuleStatics::IsExistModuleByName(const FName InName, bool bInEditor)
-{
-	if(!GEngine)
-	{
-		return false;
-	}
-	return AMainModule::IsExistModuleByName(InName, bInEditor);
-}
-
-UModuleBase* UMainModuleStatics::GetModuleByClass(TSubclassOf<UModuleBase> InClass, bool bInEditor)
-{
-	return AMainModule::GetModuleByClass(bInEditor, InClass);
-}
-
-UModuleBase* UMainModuleStatics::GetModuleByName(const FName InName, bool bInEditor)
-{
-	return AMainModule::GetModuleByName<UModuleBase>(InName, bInEditor);
-}
-
-UModuleNetworkComponentBase* UMainModuleStatics::GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InClass)
-{
-	return AMainModule::GetModuleNetworkComponentByClass<UModuleNetworkComponentBase>(InClass);
+	return AMainModule::GetModuleNetworkComponentByClass<UModuleNetworkComponentBase>(Controller, Class);
 }

@@ -3,13 +3,25 @@
 #pragma once
 
 
+#include "Common/LifecycleTypes.h"
+#include "Templates/Atomic.h"
 #include "Common/Base/WHObject.h"
 #include "Main/MainModuleTypes.h"
 #include "SaveGame/Base/SaveDataAgentInterface.h"
 #include "ModuleBase.generated.h"
 
 class AMainModule;
+class APlayerController;
 class UModuleNetworkComponentBase;
+class UWHGameInstance;
+
+UENUM(BlueprintType)
+enum class EModuleScope : uint8
+{
+	None,
+	World,
+	GameInstance
+};
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FModuleStateChanged, EModuleState, InModuleState);
 
@@ -28,13 +40,14 @@ public:
 	}
 };
 
-UCLASS()
+UCLASS(EditInlineNew, DefaultToInstanced)
 class WHFRAMEWORK_API UModuleBase : public UWHObject, public ISaveDataAgentInterface
 {
 	GENERATED_BODY()
 
 	friend class AWHPlayerController;
 	friend class AMainModule;
+	friend class UWHGameInstance;
 	
 public:	
 	// ParamSets default values for this actor's properties
@@ -95,6 +108,13 @@ public:
 	void K2_OnRefresh(float DeltaSeconds, bool bInEditor);
 	UFUNCTION()
 	virtual void OnRefresh(float DeltaSeconds, bool bInEditor);
+
+	virtual void OnControlRefresh(float RealDeltaSeconds) { }
+
+	// Called once while every module still belongs to the original World.
+	virtual void PrepareForHostTermination() { }
+	// 宿主关闭时先无回调封闭全部模块的业务入口，再执行退役流程。
+	bool IsBusinessAdmissionOpen() const { return !bHostBusinessAdmissionClosed.Load(); }
 	/**
 	* 当销毁
 	*/
@@ -120,6 +140,10 @@ protected:
 public:
 	ESaveScope GetSaveScope() const { return SaveScope; }
 
+	virtual EModuleScope GetModuleScope() const { return EModuleScope::World; }
+
+	virtual bool ShouldCreateForGameInstance(const UWHGameInstance* InGameInstance) const { return true; }
+
 	int32 GetSaveDataVersion() const { return SaveDataVersion; }
 
 	virtual bool IsSaveEnabled() const { return SaveScope != ESaveScope::None; }
@@ -127,6 +151,9 @@ public:
 	virtual void OnBeforeSaveData() { }
 
 	virtual void OnAfterSaveData(bool bSuccess) { }
+
+	/** Releases the original world's capture without inspecting an in-flight native result. */
+	virtual void OnSaveCaptureAbandoned() { }
 
 	virtual void OnBeforeLoadData() { }
 
@@ -170,7 +197,7 @@ public:
 	/**
 	* 结束
 	*/
-	UFUNCTION(BlueprintNativeEvent)
+	UFUNCTION(BlueprintCallable)
 	void Termination();
 
 protected:
@@ -250,16 +277,18 @@ public:
 	*/
 	UFUNCTION(BlueprintPure)
 	AMainModule* GetModuleOwner() const;
+
+	UWHGameInstance* GetGameInstanceOwner() const;
 	/**
 	* 获取模块网络组件
 	*/
 	template<class T>
-	T* GetModuleNetworkComponent()
+	T* GetModuleNetworkComponent(APlayerController* InController) const
 	{
-		return Cast<T>(GetModuleNetworkComponent());
+		return Cast<T>(GetModuleNetworkComponent(InController));
 	}
 	UFUNCTION(BlueprintPure)
-	UModuleNetworkComponentBase* GetModuleNetworkComponent() const;
+	UModuleNetworkComponentBase* GetModuleNetworkComponent(APlayerController* InController) const;
 	/**
 	* 获取依赖模块名称
 	*/
@@ -270,6 +299,13 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual FString GetModuleDebugMessage();
+
+private:
+	void CloseHostBusinessAdmission() { bHostBusinessAdmissionClosed.Store(true); }
+	void BeginHostTermination();
+	void TerminatePhaseFromHost(EPhase InPhase);
+	TAtomic<bool> bHostBusinessAdmissionClosed{false};
+	bool bHostTerminationActive = false;
 
 	//////////////////////////////////////////////////////////////////////////
 	/// ModuleListItem

@@ -1,79 +1,69 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
-
 #include "Kismet/BlueprintFunctionLibrary.h"
-
 #include "MainModuleStatics.generated.h"
 
 class UModuleNetworkComponentBase;
 class AMainModule;
 class UModuleBase;
-/**
- * 
- */
+class UWorld;
+class UGameInstance;
+class APlayerController;
+
 UCLASS()
 class WHFRAMEWORK_API UMainModuleStatics : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
-	static void RunModuleByClass(TSubclassOf<UModuleBase> InClass);
+	static UModuleBase* GetModuleByClassInWorld(UWorld* InWorld, TSubclassOf<UModuleBase> InClass);
+	// 仅供明确的原生退役路径使用；蓝图与普通查询不能继承该能力。
+	static UModuleBase* GetModuleByClassForCleanup(UWorld* InWorld, TSubclassOf<UModuleBase> InClass);
+	template<typename T> static T* GetModuleForCleanup(UWorld* InWorld)
+	{
+		return Cast<T>(GetModuleByClassForCleanup(InWorld, T::StaticClass()));
+	}
 
-	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
-	static void RunModuleByName(const FName InName);
+	UFUNCTION(BlueprintCallable, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static void RunModuleByClass(const UObject* WorldContextObject, TSubclassOf<UModuleBase> InClass);
+	UFUNCTION(BlueprintCallable, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static void RunModuleByName(const UObject* WorldContextObject, FName InName);
+	UFUNCTION(BlueprintCallable, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static void ResetModuleByClass(const UObject* WorldContextObject, TSubclassOf<UModuleBase> InClass);
+	UFUNCTION(BlueprintCallable, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static void ResetModuleByName(const UObject* WorldContextObject, FName InName);
+	UFUNCTION(BlueprintCallable, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static void PauseModuleByClass(const UObject* WorldContextObject, TSubclassOf<UModuleBase> InClass);
+	UFUNCTION(BlueprintCallable, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static void PauseModuleByName(const UObject* WorldContextObject, FName InName);
+	UFUNCTION(BlueprintCallable, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static void UnPauseModuleByClass(const UObject* WorldContextObject, TSubclassOf<UModuleBase> InClass);
+	UFUNCTION(BlueprintCallable, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static void UnPauseModuleByName(const UObject* WorldContextObject, FName InName);
+	UFUNCTION(BlueprintCallable, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static void PauseAllModule(const UObject* WorldContextObject);
+	UFUNCTION(BlueprintCallable, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static void UnPauseAllModule(const UObject* WorldContextObject);
+	UFUNCTION(BlueprintCallable, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static void TerminationModuleByClass(const UObject* WorldContextObject, TSubclassOf<UModuleBase> InClass);
+	UFUNCTION(BlueprintCallable, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static void TerminationModuleByName(const UObject* WorldContextObject, FName InName);
 
-	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
-	static void ResetModuleByClass(TSubclassOf<UModuleBase> InClass);
+	UFUNCTION(BlueprintPure, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static AMainModule* GetMainModule(const UObject* WorldContextObject);
+	UFUNCTION(BlueprintPure, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static TArray<UModuleBase*> GetAllModule(const UObject* WorldContextObject);
+	UFUNCTION(BlueprintPure, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static bool IsExistModuleByClass(const UObject* WorldContextObject, TSubclassOf<UModuleBase> InClass);
+	UFUNCTION(BlueprintPure, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static bool IsExistModuleByName(const UObject* WorldContextObject, FName InName);
+	UFUNCTION(BlueprintPure, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject", DeterminesOutputType="InClass"))
+	static UModuleBase* GetModuleByClass(const UObject* WorldContextObject, TSubclassOf<UModuleBase> InClass);
+	UFUNCTION(BlueprintPure, Category="MainModuleStatics", meta=(DeterminesOutputType="InClass"))
+	static UModuleBase* GetGameInstanceModuleByClass(const UGameInstance* InGameInstance, TSubclassOf<UModuleBase> InClass);
+	UFUNCTION(BlueprintPure, Category="MainModuleStatics", meta=(WorldContext="WorldContextObject"))
+	static UModuleBase* GetModuleByName(const UObject* WorldContextObject, FName InName);
 
-	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
-	static void ResetModuleByName(const FName InName);
-
-	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
-	static void PauseModuleByClass(TSubclassOf<UModuleBase> InClass);
-
-	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
-	static void PauseModuleByName(const FName InName);
-		
-	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
-	static void UnPauseModuleByClass(TSubclassOf<UModuleBase> InClass);
-
-	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
-	static void UnPauseModuleByName(const FName InName);
-
-	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
-	static void PauseAllModule();
-
-	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
-	static void UnPauseAllModule();
-				
-	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
-	static void TerminationModuleByClass(TSubclassOf<UModuleBase> InClass);
-
-	UFUNCTION(BlueprintCallable, Category = "MainModuleStatics")
-	static void TerminationModuleByName(const FName InName);
-
-public:
-	UFUNCTION(BlueprintPure, Category = "MainModuleStatics")
-	static AMainModule* GetMainModule(bool bInEditor = false);
-
-	UFUNCTION(BlueprintPure, Category = "MainModuleStatics")
-	static TArray<UModuleBase*> GetAllModule(bool bInEditor = false);
-
-	UFUNCTION(BlueprintPure, Category = "MainModuleStatics")
-	static bool IsExistModuleByClass(TSubclassOf<UModuleBase> InClass, bool bInEditor = false);
-
-	UFUNCTION(BlueprintPure, Category = "MainModuleStatics")
-	static bool IsExistModuleByName(const FName InName, bool bInEditor = false);
-
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "MainModuleStatics")
-	static UModuleBase* GetModuleByClass(TSubclassOf<UModuleBase> InClass, bool bInEditor = false);
-
-	UFUNCTION(BlueprintPure, Category = "MainModuleStatics")
-	static UModuleBase* GetModuleByName(const FName InName, bool bInEditor = false);
-
-	UFUNCTION(BlueprintPure, meta = (DeterminesOutputType = "InClass"), Category = "MainModuleStatics")
-	static UModuleNetworkComponentBase* GetModuleNetworkComponentByClass(TSubclassOf<UModuleNetworkComponentBase> InClass);
+	UFUNCTION(BlueprintPure, meta=(DeterminesOutputType="InClass"), Category="MainModuleStatics")
+	static UModuleNetworkComponentBase* GetModuleNetworkComponentByClass(APlayerController* InController, TSubclassOf<UModuleNetworkComponentBase> InClass);
 };

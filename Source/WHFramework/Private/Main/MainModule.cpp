@@ -2,13 +2,19 @@
 
 
 #include "Main/MainModule.h"
+#include "Common/LifecycleTypes.h"
 
 #include "Ability/AbilityModule.h"
+#include "Ability/Inventory/InventoryModule.h"
 #include "Common/CommonModuleStatics.h"
 #include "Event/EventModuleStatics.h"
 #include "Event/Events/Common/Game/Event_GameExited.h"
 #include "Event/Events/Common/Game/Event_GameInited.h"
 #include "Event/Events/Common/Game/Event_GameStarted.h"
+#include "Gameplay/WHGameInstance.h"
+#include "GameFramework/PlayerController.h"
+#include "Main/WorldNetworkRoute.h"
+#include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
 
 IMPLEMENTATION_MAIN_MODULE(AMainModule)
@@ -24,11 +30,11 @@ AMainModule::AMainModule()
 
 	Modules = TArray<UModuleBase*>();
 	ModuleMap = TMap<FName, UModuleBase*>();
+	InventoryModuleClass = UInventoryModule::StaticClass();
 }
 
 AMainModule::~AMainModule()
 {
-	TERMINATION_MAIN_MODULE(AMainModule)
 }
 
 #if WITH_EDITOR
@@ -48,9 +54,19 @@ void AMainModule::OnDestroy()
 
 void AMainModule::OnInitialize_Implementation()
 {
-	const FScopedWorldContext WorldContextScope(this);
+	if (AMainModule::GetPtr(GetWorld()) != this)
+	{
+		UE_LOG(LogTemp, Error, TEXT("World %s does not have exactly one main module host; initialization refused."), *GetNameSafe(GetWorld()));
+		return;
+	}
+	if (bInitialized || bModulesTerminated || !ValidateAndOrderModules())
+	{
+		return;
+	}
 	Super::OnInitialize_Implementation();
+	EnsureWorldNetworkRoute();
 	SetActorTickEnabled(false);
+	LastControlRefreshTime = FPlatformTime::Seconds();
 
 	for(auto Iter : Modules)
 	{
@@ -60,9 +76,166 @@ void AMainModule::OnInitialize_Implementation()
 	UEventModuleStatics::BroadcastEvent<FEventGameInited>(this);
 }
 
+void AMainModule::EnsureWorldNetworkRoute()
+{
+	UWorld* World = GetWorld();
+	if (WorldRouteAuthority.IsValid() || bModulesTerminated || !World || World->bIsTearingDown ||
+		!World->IsGameWorld() || World->GetNetMode() == NM_Client || !World->GetAuthGameMode()) return;
+	for (TActorIterator<AWorldNetworkRouteAuthority> It(World); It; ++It) return;
+	FActorSpawnParameters Spawn;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	WorldRouteAuthority = World->SpawnActor<AWorldNetworkRouteAuthority>(Spawn);
+	if (!WorldRouteAuthority.IsValid()) UE_LOG(LogTemp, Error, TEXT("无法建立世界网络纪元，跨网络的世界操作将被拒绝。"));
+}
+
+bool AMainModule::ValidateAndOrderModules()
+{
+	if (!bModuleConfigurationValid)
+	{
+		return false;
+	}
+	TMap<FName, UModuleBase*> Candidates;
+	for (UModuleBase* Module : Modules)
+	{
+		if (!::IsValid(Module) || Module->GetOuter() != this || Module->GetModuleScope() != EModuleScope::World || Module->GetModuleName().IsNone())
+		{
+			UE_LOG(LogTemp, Error, TEXT("Invalid World module on %s"), *GetName());
+			return false;
+		}
+		if (Candidates.Contains(Module->GetModuleName()))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Duplicate World module identity: %s"), *Module->GetModuleName().ToString());
+			return false;
+		}
+		Candidates.Add(Module->GetModuleName(), Module);
+	}
+	const UWHGameInstance* GameInstance = GetWorld() ? Cast<UWHGameInstance>(GetWorld()->GetGameInstance()) : nullptr;
+	TArray<UModuleBase*> Ordered;
+	TSet<FName> OrderedNames;
+	while (Ordered.Num() < Modules.Num())
+	{
+		bool bAdvanced = false;
+		for (UModuleBase* Module : Modules)
+		{
+			if (OrderedNames.Contains(Module->GetModuleName())) continue;
+			bool bReady = true;
+			for (const FName Dependency : Module->GetModuleDependencies())
+			{
+				if (Candidates.Contains(Dependency))
+				{
+					bReady &= OrderedNames.Contains(Dependency);
+				}
+				else if (!GameInstance || !GameInstance->FindModuleByName(Dependency))
+				{
+					UE_LOG(LogTemp, Error, TEXT("World module %s has missing dependency %s"), *Module->GetModuleName().ToString(), *Dependency.ToString());
+					return false;
+				}
+			}
+			if (bReady)
+			{
+				Ordered.Add(Module);
+				OrderedNames.Add(Module->GetModuleName());
+				bAdvanced = true;
+			}
+		}
+		if (!bAdvanced)
+		{
+			UE_LOG(LogTemp, Error, TEXT("World module dependencies contain a cycle on %s"), *GetName());
+			return false;
+		}
+	}
+	Modules = MoveTemp(Ordered);
+	ModuleMap = MoveTemp(Candidates);
+	RefreshModuleIndices();
+	return true;
+}
+
+bool AMainModule::RegisterModule(UModuleBase* InModule, int32 InIndex)
+{
+	if (bInitialized || bModulesTerminated || !::IsValid(InModule) || InModule->GetOuter() != this ||
+		InModule->GetModuleScope() != EModuleScope::World || InModule->GetModuleName().IsNone() ||
+		ModuleMap.Contains(InModule->GetModuleName()) || Modules.Contains(InModule) ||
+		Modules.ContainsByPredicate([InModule](const UModuleBase* Existing) { return Existing && Existing->GetModuleName() == InModule->GetModuleName(); }) ||
+		(InIndex != INDEX_NONE && (InIndex < 0 || InIndex > Modules.Num())))
+	{
+		return false;
+	}
+#if WITH_EDITOR
+	Modify();
+#endif
+	Modules.Insert(InModule, InIndex == INDEX_NONE ? Modules.Num() : InIndex);
+	ModuleMap.Add(InModule->GetModuleName(), InModule);
+	RefreshModuleIndices();
+	return true;
+}
+
+bool AMainModule::ReplaceModule(FName InName, UModuleBase* InModule)
+{
+	UModuleBase* const* Existing = ModuleMap.Find(InName);
+	if (bInitialized || bModulesTerminated || !Existing || !::IsValid(*Existing) || !::IsValid(InModule) ||
+		InModule->GetOuter() != this || InModule->GetModuleScope() != EModuleScope::World ||
+		InModule->GetModuleName() != InName || !InModule->IsA((*Existing)->GetClass()) || Modules.Contains(InModule))
+	{
+		return false;
+	}
+	const int32 Index = Modules.IndexOfByKey(*Existing);
+	if (Index == INDEX_NONE) return false;
+#if WITH_EDITOR
+	Modify();
+#endif
+	Modules[Index] = InModule;
+	ModuleMap[InName] = InModule;
+	RefreshModuleIndices();
+	return true;
+}
+
+bool AMainModule::UnregisterModule(FName InName)
+{
+	UModuleBase* const* Existing = ModuleMap.Find(InName);
+	if (bInitialized || bModulesTerminated || !Existing) return false;
+	const int32 Index = Modules.IndexOfByKey(*Existing);
+	if (Index == INDEX_NONE) return false;
+#if WITH_EDITOR
+	Modify();
+#endif
+	Modules.RemoveAt(Index);
+	ModuleMap.Remove(InName);
+	RefreshModuleIndices();
+	return true;
+}
+
+bool AMainModule::MoveModule(FName InName, int32 InIndex)
+{
+	UModuleBase* const* Existing = ModuleMap.Find(InName);
+	if (bInitialized || bModulesTerminated || !Existing || !Modules.IsValidIndex(InIndex)) return false;
+	const int32 OldIndex = Modules.IndexOfByKey(*Existing);
+	if (OldIndex == INDEX_NONE) return false;
+	if (OldIndex == InIndex) return true;
+#if WITH_EDITOR
+	Modify();
+#endif
+	UModuleBase* Module = Modules[OldIndex];
+	Modules.RemoveAt(OldIndex);
+	Modules.Insert(Module, InIndex);
+	RefreshModuleIndices();
+	return true;
+}
+
+void AMainModule::RefreshModuleIndices()
+{
+	for (int32 Index = 0; Index < Modules.Num(); ++Index)
+	{
+		if (Modules[Index]) Modules[Index]->ModuleIndex = Index;
+	}
+}
+
 void AMainModule::OnPreparatory_Implementation()
 {
-	const FScopedWorldContext WorldContextScope(this);
+	if (!bInitialized || bModulesPrepared || bModulesTerminated)
+	{
+		return;
+	}
+	bModulesPrepared = true;
 	Super::OnPreparatory_Implementation();
 
 	ITER_PHASE(Phase,
@@ -84,38 +257,54 @@ void AMainModule::OnPreparatory_Implementation()
 
 void AMainModule::OnRefresh_Implementation(float DeltaSeconds)
 {
-	const FScopedWorldContext WorldContextScope(this);
+	EnsureWorldNetworkRoute();
 	Super::OnRefresh_Implementation(DeltaSeconds);
+	const double Now = FPlatformTime::Seconds();
+	const float RealDeltaSeconds = LastControlRefreshTime > 0.0 ? static_cast<float>(Now - LastControlRefreshTime) : 0.0f;
+	LastControlRefreshTime = Now;
+	const bool bEditor = IsInEditor();
+	const bool bWorldPaused = GetWorld() && GetWorld()->IsPaused();
 
 	for(auto Iter : Modules)
 	{
-		if(IsInEditor() || Iter->GetModuleState() == EModuleState::Running)
+		if (!bEditor && bInitialized && !bModulesTerminated && Iter->GetModuleState() != EModuleState::Terminated)
 		{
-			Iter->OnRefresh(DeltaSeconds, IsInEditor());
+			Iter->OnControlRefresh(RealDeltaSeconds);
+		}
+		if(bEditor || (bInitialized && !bModulesTerminated && !bWorldPaused && Iter->GetModuleState() == EModuleState::Running))
+		{
+			Iter->OnRefresh(DeltaSeconds, bEditor);
 		}
 	}
 }
 
 void AMainModule::OnTermination_Implementation()
 {
-	const FScopedWorldContext WorldContextScope(this);
+	if (!bInitialized || bModulesTerminated)
+	{
+		return;
+	}
+	bModulesTerminated = true;
+	TGuardValue<bool> TerminationGuard(bTerminationInProgress, true);
+	for (UModuleBase* Module : Modules)
+	{
+		if (Module) Module->BeginHostTermination();
+	}
+	for (int32 Index = Modules.Num() - 1; Index >= 0; --Index)
+	{
+		if (Modules[Index] && Modules[Index]->GetModuleState() != EModuleState::Terminated) Modules[Index]->PrepareForHostTermination();
+	}
 	const double TerminationStartTime = FPlatformTime::Seconds();
 	UE_LOG(LogTemp, Display, TEXT("Main module termination started."));
 
 	Super::OnTermination_Implementation();
 		
 	ITER_PHASE(Phase,
-		for(auto Iter : Modules)
+		for(int32 Index = Modules.Num() - 1; Index >= 0; --Index)
 		{
+			UModuleBase* Iter = Modules[Index];
 			const double ModuleStartTime = FPlatformTime::Seconds();
-			if(Phase != EPhase::Final)
-			{
-				Iter->OnTermination(Phase);
-			}
-			else
-			{
-				Iter->Termination();
-			}
+			Iter->TerminatePhaseFromHost(Phase);
 			const double ModuleDuration = FPlatformTime::Seconds() - ModuleStartTime;
 			if(ModuleDuration >= 0.1)
 			{
@@ -130,11 +319,38 @@ void AMainModule::OnTermination_Implementation()
 	)
 	
 	UEventModuleStatics::BroadcastEvent<FEventGameExited>(this, { true });
+	if (WorldRouteAuthority.IsValid()) WorldRouteAuthority->Destroy();
+	WorldRouteAuthority.Reset();
 
-	UE_LOG(LogTemp,
-	       Display,
-	       TEXT("Main module termination finished in %.3fs."),
-	       FPlatformTime::Seconds() - TerminationStartTime);
+	UE_LOG(LogTemp, Display, TEXT("Main module termination callbacks returned in %.3fs."), FPlatformTime::Seconds() - TerminationStartTime);
+}
+
+void AMainModule::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	if (GetWorld() && GetWorld()->IsGameWorld() && InventoryModuleClass)
+	{
+		const FName Identity = InventoryModuleClass.GetDefaultObject()->GetModuleName();
+		if (Identity != GetDefault<UInventoryModule>()->GetModuleName())
+		{
+			bModuleConfigurationValid = false;
+			UE_LOG(LogTemp, Error, TEXT("Inventory module class has an incompatible identity on %s"), *GetName());
+			return;
+		}
+		UModuleBase* const* Existing = ModuleMap.Find(Identity);
+		if (Existing && (!*Existing || !(*Existing)->IsA(InventoryModuleClass)))
+		{
+			bModuleConfigurationValid = false;
+			UE_LOG(LogTemp, Error, TEXT("Incompatible inventory module identity on %s"), *GetName());
+			return;
+		}
+		if (!Existing)
+		{
+			UInventoryModule* Module = NewObject<UInventoryModule>(this, InventoryModuleClass);
+			Modules.Insert(Module, 0);
+			ModuleMap.Add(Identity, Module);
+		}
+	}
 }
 
 void AMainModule::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -168,24 +384,26 @@ TStatId AMainModule::GetStatId() const
 #if WITH_EDITOR
 void AMainModule::GenerateModules()
 {
+	Modify();
 	ModuleMap.Empty();
 	for(auto Iter : Modules)
 	{
+		Iter->Modify();
 		Iter->OnGenerate();
 		ModuleMap.Add(Iter->GetModuleName(), Iter);
 	}
-	Modify();
 }
 
 void AMainModule::DestroyModules()
 {
+	Modify();
 	for(auto Iter : Modules)
 	{
+		Iter->Modify();
 		Iter->OnDestroy();
 	}
 	Modules.Empty();
 	ModuleMap.Empty();
-	Modify();
 }
 #endif
 
@@ -205,11 +423,12 @@ void AMainModule::UnPauseModules_Implementation()
 	}
 }
 
-UModuleNetworkComponentBase* AMainModule::GetModuleNetworkComponent(TSubclassOf<UModuleNetworkComponentBase> InClass)
+UModuleNetworkComponentBase* AMainModule::GetModuleNetworkComponent(APlayerController* InController, TSubclassOf<UModuleNetworkComponentBase> InClass)
 {
-	if(const AWHPlayerController* PlayerController = UCommonModuleStatics::GetPlayerController<AWHPlayerController>())
+	if (IsValid(InController) && InClass && InController->GetWorld() && !InController->GetWorld()->bIsTearingDown &&
+		(InController->HasAuthority() || InController->IsLocalController()))
 	{
-		return Cast<UModuleNetworkComponentBase>(PlayerController->GetComponentByClass(InClass));
+		return Cast<UModuleNetworkComponentBase>(InController->GetComponentByClass(InClass));
 	}
 	return nullptr;
 }
@@ -246,6 +465,7 @@ void AMainModule::UpdateModuleListItem(TArray<TSharedPtr<FModuleListItem>>& OutM
 
 bool AMainModule::CanAddModule(TSubclassOf<UModuleBase> InModuleClass) const
 {
-	return !ModuleMap.Contains(InModuleClass->GetDefaultObject<UModuleBase>()->ModuleName);
+	const UModuleBase* DefaultModule = InModuleClass ? InModuleClass.GetDefaultObject() : nullptr;
+	return DefaultModule && DefaultModule->GetModuleScope() == EModuleScope::World && !ModuleMap.Contains(DefaultModule->GetModuleName());
 }
 #endif

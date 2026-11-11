@@ -2,8 +2,12 @@
 
 
 #include "Main/Base/ModuleBase.h"
+#include "Common/LifecycleTypes.h"
 
 #include "Main/MainModule.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
+#include "Gameplay/WHGameInstance.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveGame/SaveDataSerializer.h"
 
@@ -169,19 +173,37 @@ void UModuleBase::UnPause_Implementation()
 	}
 }
 
-void UModuleBase::Termination_Implementation()
+void UModuleBase::BeginHostTermination()
 {
-	if(ModuleState != EModuleState::Terminated)
+	CloseHostBusinessAdmission();
+	bHostTerminationActive = true;
+}
+
+void UModuleBase::TerminatePhaseFromHost(EPhase InPhase)
+{
+	if (ModuleState == EModuleState::Terminated) return;
+	if (InPhase == EPhase::Final)
 	{
 		ModuleState = EModuleState::Terminated;
 		OnStateChanged(ModuleState);
-		OnTermination(EPhase::Final);
 	}
+	OnTermination(InPhase);
+}
+
+void UModuleBase::Termination()
+{
+	if (bHostTerminationActive || ModuleState == EModuleState::Terminated) return;
+	BeginHostTermination();
+	PrepareForHostTermination();
+	TerminatePhaseFromHost(EPhase::Primary);
+	TerminatePhaseFromHost(EPhase::Lesser);
+	TerminatePhaseFromHost(EPhase::Final);
 }
 
 bool UModuleBase::IsModuleInEditor() const
 {
-	return GetModuleOwner()->IsInEditor();
+	const AMainModule* Owner = GetModuleOwner();
+	return Owner && Owner->IsInEditor();
 }
 
 AMainModule* UModuleBase::GetModuleOwner() const
@@ -189,9 +211,16 @@ AMainModule* UModuleBase::GetModuleOwner() const
 	return Cast<AMainModule>(GetOuter());
 }
 
-UModuleNetworkComponentBase* UModuleBase::GetModuleNetworkComponent() const
+UWHGameInstance* UModuleBase::GetGameInstanceOwner() const
 {
-	return UMainModuleStatics::GetModuleNetworkComponentByClass(ModuleNetworkComponent);
+	return Cast<UWHGameInstance>(GetOuter());
+}
+
+UModuleNetworkComponentBase* UModuleBase::GetModuleNetworkComponent(APlayerController* InController) const
+{
+	return InController && InController->GetWorld() == GetWorld()
+		? AMainModule::GetModuleNetworkComponentByClass<UModuleNetworkComponentBase>(InController, ModuleNetworkComponent)
+		: nullptr;
 }
 
 void UModuleBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

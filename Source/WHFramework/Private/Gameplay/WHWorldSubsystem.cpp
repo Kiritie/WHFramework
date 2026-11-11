@@ -14,7 +14,6 @@ UWHWorldSubsystem::UWHWorldSubsystem()
 
 void UWHWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
-	const FScopedWorldContext WorldContextScope(&InWorld);
 	Super::OnWorldBeginPlay(InWorld);
 
 	if(AWHGameMode* GameMode = InWorld.GetAuthGameMode<AWHGameMode>())
@@ -25,7 +24,7 @@ void UWHWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		}
 	}
 
-	AMainModule* MainModule = AMainModule::GetPtr();
+	AMainModule* MainModule = AMainModule::GetPtr(&InWorld);
 	if(MainModule)
 	{
 		if(!IWHActorInterface::Execute_IsInitialized(MainModule))

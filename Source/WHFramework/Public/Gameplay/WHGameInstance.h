@@ -4,11 +4,16 @@
 
 #include "Engine/GameInstance.h"
 #include "Engine/EngineBaseTypes.h"
+#include "Containers/Ticker.h"
 #include "SaveGame/SaveGameLoadSnapshot.h"
 #include "SaveGame/SaveGameLocalContext.h"
+#include "SaveGame/SaveOperationTypes.h"
 #include "WHGameInstance.generated.h"
 
 class USaveGameModule;
+class UModuleBase;
+class ULocalPlayer;
+class FInventoryClientReceiptLedger;
 
 /**
  * 游戏实例基类
@@ -29,8 +34,25 @@ public:
 	virtual void Init() override;
 
 	virtual void Shutdown() override;
+
+	UModuleBase* FindModuleByClass(TSubclassOf<UModuleBase> InClass) const;
+
+#if WITH_EDITOR
+	UModuleBase* FindModuleTemplateForEditor(FName InName) const;
+#endif
+	UModuleBase* FindModuleByName(FName InName) const;
+
+	template<class T>
+	T* FindModule() const
+	{
+		return Cast<T>(FindModuleByClass(T::StaticClass()));
+	}
 	TSharedPtr<const FSaveGameLocalContext, ESPMode::ThreadSafe> GetLocalSaveContext() const { return LocalSaveContext; }
+	TSharedPtr<FInventoryClientReceiptLedger, ESPMode::ThreadSafe> GetInventoryReceiptLedger(ULocalPlayer* InPlayer);
 	const FString& GetLocalSaveContextError() const { return LocalSaveContextError; }
+	bool EnsureLocalSaveContext();
+	bool HasClaimedPrimaryInputProfile() const { return bPrimaryInputProfileClaimed; }
+	void ClaimPrimaryInputProfile() { bPrimaryInputProfileClaimed = true; }
 
 	bool SetPendingSaveLoad(FSaveGameLoadSnapshot InSnapshot, USaveGameModule* InSource = nullptr);
 
@@ -52,9 +74,26 @@ public:
 	}
 
 private:
+	bool InitializeModules();
+	bool TickModules(float DeltaSeconds);
+	void TerminateModules();
+
+protected:
+	void SetModuleTemplate(UModuleBase* InTemplate);
+
+	UPROPERTY(EditDefaultsOnly, Instanced, Category = "Modules")
+	TArray<TObjectPtr<UModuleBase>> ModuleTemplates;
+
+private:
+	bool bPrimaryInputProfileClaimed = false;
+	TMap<TWeakObjectPtr<ULocalPlayer>, TSharedPtr<FInventoryClientReceiptLedger, ESPMode::ThreadSafe>> InventoryReceiptLedgers;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UModuleBase>> Modules;
+
+	FTSTicker::FDelegateHandle ModuleTickHandle;
+	bool bModulesTerminated = false;
+
 	friend class USaveGameModule;
-	/** 由持久存档模块按需调用；同一 GameInstance 重用已取得的租约。 */
-	bool EnsureLocalSaveContext();
 	TSharedPtr<FSaveGameLocalContext, ESPMode::ThreadSafe> LocalSaveContext;
 	FString LocalSaveContextError;
 	FString RequestedLocalDataNamespace;

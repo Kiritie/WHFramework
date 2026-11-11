@@ -40,8 +40,7 @@ bool FMainModulePIEWorldContextTest::RunTest(const FString&)
 		Owners[Index] = Worlds[Index]->SpawnActor<AMainModule>();
 		if (!TestNotNull(TEXT("Creates the world module owner"), Owners[Index])) return false;
 		Modules[Index] = NewObject<UParameterModule>(Owners[Index]);
-		Owners[Index]->GetModules().Add(Modules[Index]);
-		Owners[Index]->GetModuleMap().Add(Modules[Index]->GetModuleName(), Modules[Index]);
+		Owners[Index]->RegisterModule(Modules[Index]);
 	}
 	TestTrue(TEXT("UE classifies PIE as both editor and game world"), Worlds[1]->IsEditorWorld() && Worlds[1]->IsGameWorld());
 	for (const int32 Index : {0, 1, 2, 0, 3, 2, 1, 0})
@@ -49,11 +48,8 @@ bool FMainModulePIEWorldContextTest::RunTest(const FString&)
 		TestTrue(TEXT("Main lookup returns the explicit world owner"), AMainModule::GetPtr(Worlds[Index]) == Owners[Index]);
 		TestTrue(TEXT("Typed module lookup preserves the explicit world"), UParameterModule::GetPtr(Worlds[Index]) == Modules[Index]);
 		TestEqual(TEXT("Only the non-game editor owner takes editor refresh"), Owners[Index]->IsInEditor(), Index == 0);
-		const FScopedWorldContext Scope(Worlds[Index]);
-		TestTrue(TEXT("Editor resolution never selects a PIE instance"), !UCommonModuleStatics::ResolveCurrentWorld(true)->IsGameWorld());
 		if (Index != 0)
 		{
-			TestTrue(TEXT("Runtime resolution uses the current PIE or game scope"), UCommonModuleStatics::ResolveCurrentWorld() == Worlds[Index]);
 			TestTrue(TEXT("Editor queries cannot change the PIE refresh classification"), !Owners[Index]->IsInEditor());
 		}
 	}

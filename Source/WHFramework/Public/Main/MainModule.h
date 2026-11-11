@@ -2,11 +2,15 @@
 
 #pragma once
 
+#include "Main/MainModuleAccess.h"
 #include "Base/ModuleBase.h"
 #include "Base/ModuleNetworkComponentBase.h"
 #include "Common/Base/WHActor.h"
 
 #include "MainModule.generated.h"
+
+class UInventoryModule;
+class AWorldNetworkRouteAuthority;
 
 UCLASS(hidecategories = (Tick, Replication, Collision, Actor, Input, LOD, Cooking, Hidden, Hlod, Networking, Physics, LevelInstance))
 class WHFRAMEWORK_API AMainModule : public AWHActor, public FTickableGameObject
@@ -46,6 +50,8 @@ protected:
 	virtual bool IsUseDefaultLifecycle_Implementation() const override { return false; }
 
 public:
+	virtual void PostInitializeComponents() override;
+
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	virtual void Tick(float DeltaSeconds) override;
@@ -58,7 +64,14 @@ public:
 	
 	virtual bool IsTickableInEditor() const override { return true; }
 
+	virtual bool IsTickableWhenPaused() const override { return true; }
+
 	virtual bool IsTickable() const override { return true; }
+	bool CanResolveModules() const
+	{
+		return !bModulesTerminated;
+	}
+	bool IsTerminationInProgress() const { return bTerminationInProgress; }
 
 public:
 #if WITH_EDITOR
@@ -85,6 +98,18 @@ public:
     void UnPauseModules();
 
 protected:
+	bool ValidateAndOrderModules();
+	void EnsureWorldNetworkRoute();
+	bool bModulesPrepared = false;
+	bool bModulesTerminated = false;
+	bool bTerminationInProgress = false;
+	bool bModuleConfigurationValid = true;
+	TWeakObjectPtr<AWorldNetworkRouteAuthority> WorldRouteAuthority;
+	double LastControlRefreshTime = 0.0;
+
+	UPROPERTY(EditAnywhere, Category = "Modules")
+	TSubclassOf<UInventoryModule> InventoryModuleClass;
+
 	/// 模块列表
 	UPROPERTY(VisibleAnywhere)
 	TArray<UModuleBase*> Modules;
@@ -92,6 +117,11 @@ protected:
 	TMap<FName, UModuleBase*> ModuleMap;
 
 public:
+	bool RegisterModule(UModuleBase* InModule, int32 InIndex = INDEX_NONE);
+	bool ReplaceModule(FName InName, UModuleBase* InModule);
+	bool UnregisterModule(FName InName);
+	bool MoveModule(FName InName, int32 InIndex);
+
 	/**
 	 * 是否在编辑器下
 	 */
@@ -99,185 +129,23 @@ public:
 	/**
 	 * 获取模块列表
 	 */
-	TArray<UModuleBase*>& GetModules() { return Modules; }
+	const TArray<UModuleBase*>& GetModules() const { return Modules; }
 	/**
 	 * 获取模块Map
 	 */
-	TMap<FName, UModuleBase*>& GetModuleMap() { return ModuleMap; }
-	/**
-	 * 通过类型运行模块
-	 */
-	template<class T>
-	static void RunModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
-	{
-		if(T* Module = GetModuleByClass<T>(false, InClass))
-		{
-			Module->Run();
-		}
-	}
-	/**
-	* 通过名称运行模块
-	*/
-	static void RunModuleByName(const FName InName)
-	{
-		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
-		{
-			Module->Run();
-		}
-	}
-	/**
-	 * 通过类型重置模块
-	 */
-	template<class T>
-	static void ResetModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
-	{
-		if(T* Module = GetModuleByClass<T>(false, InClass))
-		{
-			Module->Reset();
-		}
-	}
-	/**
-	* 通过名称重置模块
-	*/
-	static void ResetModuleByName(const FName InName)
-	{
-		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
-		{
-			Module->Reset();
-		}
-	}
-	/**
-	 * 通过类型暂停模块
-	 */
-	template<class T>
-	static void PauseModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
-	{
-		if(T* Module = GetModuleByClass<T>(false, InClass))
-		{
-			Module->Pause();
-		}
-	}
-	/**
-	* 通过名称暂停模块
-	*/
-	static void PauseModuleByName(const FName InName)
-	{
-		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
-		{
-			Module->Pause();
-		}
-	}
-	/**
-	 * 通过类型恢复模块
-	 */
-	template<class T>
-	static void UnPauseModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
-	{
-		if(T* Module = GetModuleByClass<T>(false, InClass))
-		{
-			Module->UnPause();
-		}
-	}
-	/**
-	* 通过名称恢复模块
-	*/
-	static void UnPauseModuleByName(const FName InName)
-	{
-		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
-		{
-			Module->UnPause();
-		}
-	}
-	/**
-	 * 通过类型结束模块
-	 */
-	template<class T>
-	static void TerminationModuleByClass(TSubclassOf<T> InClass = T::StaticClass())
-	{
-		if(T* Module = GetModuleByClass<T>(false, InClass))
-		{
-			Module->Termination();
-		}
-	}
-	/**
-	* 通过名称结束模块
-	*/
-	static void TerminationModuleByName(const FName InName)
-	{
-		if(UModuleBase* Module = GetModuleByName<UModuleBase>(InName))
-		{
-			Module->Termination();
-		}
-	}
-
-public:
-	/**
-	 * 是否存在指定类型的模块
-	 */
-	template<class T>
-	static bool IsExistModuleByClass(bool bInEditor = false, TSubclassOf<T> InClass = T::StaticClass())
-	{
-		const FName ModuleName = InClass.GetDefaultObject()->GetModuleName();
-		return IsExistModuleByName(ModuleName, bInEditor);
-	}
-	/**
-	 * 是否存在指定名称的模块
-	 */
-	static bool IsExistModuleByName(const FName InName, bool bInEditor = false)
-	{
-		if(AMainModule* MainModule = GetPtr(bInEditor))
-		{
-			return MainModule->ModuleMap.Contains(InName);
-		}
-		return false;
-	}
-	/**
-	 * 通过类型获取模块
-	 */
-	template<class T>
-	static T* GetModuleByClass(bool bInEditor = false, TSubclassOf<T> InClass = T::StaticClass())
-	{
-		const FName ModuleName = InClass.GetDefaultObject()->GetModuleName();
-		return GetModuleByName<T>(ModuleName, bInEditor);
-	}
-	/**
-	* 通过名称获取模块
-	*/
-	template<class T>
-	static T* GetModuleByName(const FName InName, bool bInEditor = false)
-	{
-		if(AMainModule* MainModule = GetPtr(bInEditor))
-		{
-			if(MainModule->ModuleMap.Contains(InName))
-			{
-				return Cast<T>(MainModule->ModuleMap[InName]);
-			}
-		}
-		ensureEditorMsgf(false, FString::Printf(TEXT("Failed to get module, module name: %s"), *InName.ToString()), EDC_Default, EDV_Error); \
-		return NewObject<T>();
-	}
-	/**
-	* 获取所有模块
-	*/
-	static TArray<UModuleBase*> GetAllModule(bool bInEditor = false)
-	{
-		if(AMainModule* MainModule = GetPtr(bInEditor))
-		{
-			return MainModule->GetModules();
-		}
-		return TArray<UModuleBase*>();
-	}
+	const TMap<FName, UModuleBase*>& GetModuleMap() const { return ModuleMap; }
 	/**
 	* 通过类型获取模块网络组件
 	*/
 	template<class T>
-	static T* GetModuleNetworkComponentByClass(TSubclassOf<T> InClass = T::StaticClass())
+	static T* GetModuleNetworkComponentByClass(APlayerController* InController, TSubclassOf<T> InClass = T::StaticClass())
 	{
-		return Cast<T>(GetModuleNetworkComponent(InClass));
+		return Cast<T>(GetModuleNetworkComponent(InController, InClass));
 	}
 
 protected:
-	static UModuleNetworkComponentBase* GetModuleNetworkComponent(TSubclassOf<UModuleNetworkComponentBase> InClass);
+	static UModuleNetworkComponentBase* GetModuleNetworkComponent(APlayerController* InController, TSubclassOf<UModuleNetworkComponentBase> InClass);
+	void RefreshModuleIndices();
 
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
